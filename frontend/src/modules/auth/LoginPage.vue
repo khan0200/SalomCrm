@@ -73,7 +73,7 @@ const fillCredentials = (e: string, p: string) => {
         <div class="w-12 h-12 mx-auto rounded-2xl bg-brand-500 text-white flex items-center justify-center shadow-lg shadow-brand-500/30">
           <GraduationCap class="w-6 h-6" />
         </div>
-        <h1 class="text-2xl font-black text-zinc-900 dark:text-zinc-100 tracking-tight">UNIAPP CRM</h1>
+        <h1 class="text-2xl font-black text-zinc-900 dark:text-zinc-100 tracking-tight">Salom CRM</h1>
         <p class="text-xs font-semibold text-zinc-500 dark:text-zinc-400">
           Educational Agency Multi-Tenant Platform &bull; v3.0
         </p>

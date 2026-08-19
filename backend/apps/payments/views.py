@@ -275,5 +275,5 @@ class PaymentExportView(APIView):
             buffer.getvalue(),
             content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         )
-        response['Content-Disposition'] = 'attachment; filename="uniapp_payment_history.xlsx"'
+        response['Content-Disposition'] = 'attachment; filename="salom_crm_payment_history.xlsx"'
         return response

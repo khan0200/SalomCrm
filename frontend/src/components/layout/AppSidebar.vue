@@ -42,7 +42,7 @@ const isActive = (path: string) => {
           <GraduationCap class="w-5 h-5" />
         </div>
         <div class="min-w-0">
-          <h1 class="font-black text-sm text-zinc-900 dark:text-zinc-100 tracking-tight leading-none">UNIAPP</h1>
+          <h1 class="font-black text-sm text-zinc-900 dark:text-zinc-100 tracking-tight leading-none">Salom CRM</h1>
           <span class="text-[10px] font-bold text-brand-500 uppercase tracking-widest">Version 3.0</span>
         </div>
       </div>

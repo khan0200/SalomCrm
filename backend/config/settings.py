@@ -195,8 +195,8 @@ SIMPLE_JWT = {
 
 # drf-spectacular settings
 SPECTACULAR_SETTINGS = {
-    'TITLE': 'Uniapp v3 CRM API',
-    'DESCRIPTION': 'Enterprise Multi-Tenant Educational CRM API for Students, Payments, and Status management.',
+    'TITLE': 'Salom CRM API',
+    'DESCRIPTION': 'Salom CRM Multi-Tenant Educational Agency RESTful API',
     'VERSION': '3.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
 }

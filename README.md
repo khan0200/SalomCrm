@@ -1,4 +1,4 @@
-# Uniapp v3 — Educational Agency Multi-Tenant CRM
+# Salom CRM — Educational Agency Multi-Tenant Platform
 
 > Enterprise-grade CRM architecture built with **Python + Django REST Framework + PostgreSQL + Redis** on the backend, and **Vue 3 + TypeScript + Vite + Pinia + TanStack Query + Tailwind CSS** on the frontend.
 
