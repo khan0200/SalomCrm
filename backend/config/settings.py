@@ -79,23 +79,31 @@ WSGI_APPLICATION = 'config.wsgi.application'
 ASGI_APPLICATION = 'config.asgi.application'
 
 # Database configuration
-# Support PostgreSQL as primary, with SQLite fallback if PostgreSQL is not configured/running
-DB_ENGINE = os.getenv('DB_ENGINE', 'sqlite')
-DB_NAME = os.getenv('DB_NAME', '')
-DB_USER = os.getenv('DB_USER', 'postgres')
-DB_PASSWORD = os.getenv('DB_PASSWORD', 'postgres')
-DB_HOST = os.getenv('DB_HOST', 'localhost')
-DB_PORT = os.getenv('DB_PORT', '5432')
+# Supports direct DATABASE_URL (e.g. Supabase, VPS PostgreSQL), individual env vars, or SQLite fallback for local dev
+DATABASE_URL = os.getenv('DATABASE_URL')
 
-if DB_ENGINE == 'postgresql' and DB_NAME:
+if DATABASE_URL:
+    import urllib.parse
+    url = urllib.parse.urlparse(DATABASE_URL)
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.postgresql',
-            'NAME': DB_NAME,
-            'USER': DB_USER,
-            'PASSWORD': DB_PASSWORD,
-            'HOST': DB_HOST,
-            'PORT': DB_PORT,
+            'NAME': urllib.parse.unquote(url.path[1:]) if url.path else 'postgres',
+            'USER': urllib.parse.unquote(url.username or 'postgres'),
+            'PASSWORD': urllib.parse.unquote(url.password or ''),
+            'HOST': url.hostname or 'localhost',
+            'PORT': url.port or 5432,
+        }
+    }
+elif os.getenv('DB_ENGINE') == 'postgresql' and os.getenv('DB_NAME'):
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': os.getenv('DB_NAME'),
+            'USER': os.getenv('DB_USER', 'postgres'),
+            'PASSWORD': os.getenv('DB_PASSWORD', 'postgres'),
+            'HOST': os.getenv('DB_HOST', 'localhost'),
+            'PORT': os.getenv('DB_PORT', '5432'),
         }
     }
 else:
@@ -105,6 +113,7 @@ else:
             'NAME': BASE_DIR / 'db.sqlite3',
         }
     }
+
 
 # Cache configuration
 REDIS_HOST = os.getenv('REDIS_HOST', '')
