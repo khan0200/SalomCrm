@@ -1,0 +1,249 @@
+import uuid
+from decimal import Decimal
+from django.db import models
+from apps.core.models import TenantAwareModel, TimeStampedModel
+
+class StudentLevel(models.TextChoices):
+    COLLEGE = 'COLLEGE', 'College'
+    BACHELOR = 'BACHELOR', 'Bachelor'
+    MASTERS = 'MASTERS', 'Masters'
+    MASTER_NO_CERTIFICATE = 'MASTER NO CERTIFICATE', 'Master No Certificate'
+    LANGUAGE_COURSE = 'LANGUAGE COURSE', 'Language Course'
+
+
+class StudentTariff(models.TextChoices):
+    STANDART = 'STANDART', 'Standart'
+    PREMIUM = 'PREMIUM', 'Premium'
+    VISA_PLUS = 'VISA PLUS', 'Visa Plus'
+    E_VISA = 'E-VISA', 'E-Visa'
+    REGIONAL_VISA = 'REGIONAL VISA', 'Regional Visa'
+    ZERO_RISK = 'ZERO RISK', 'Zero Risk'
+
+
+class LanguageCertificate(models.TextChoices):
+    TOPIK = 'TOPIK', 'TOPIK'
+    IELTS = 'IELTS', 'IELTS'
+    TOEFL = 'TOEFL', 'TOEFL'
+    CEFR = 'CEFR', 'CEFR'
+    SAT = 'SAT', 'SAT'
+    SKA = 'SKA', 'SKA'
+    NO_CERTIFICATE = 'NO CERTIFICATE', 'No Certificate'
+
+
+class Folder(TenantAwareModel):
+    """Student folders for categorization within a tenant."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=100)
+
+    class Meta:
+        db_table = 'crm_folders'
+        verbose_name = 'Student Folder'
+        verbose_name_plural = 'Student Folders'
+        unique_together = ('tenant', 'name')
+        ordering = ['name']
+
+    def __str__(self):
+        return f"{self.name} ({self.tenant.name})"
+
+
+class Student(TenantAwareModel):
+    """
+    Core Student Model in Uniapp CRM.
+    Preserves all business fields, financial parameters, educational backgrounds,
+    university choices, language certificates, and status board parameters.
+    """
+    # 1. Personal & Contact Information
+    id = models.CharField(max_length=50, primary_key=True)  # Alphanumeric uppercase e.g. "UB120", "AA01"
+    full_name = models.CharField(max_length=255, db_index=True)
+    korean_name = models.CharField(max_length=255, blank=True, null=True)
+    passport = models.CharField(max_length=50, blank=True, null=True, db_index=True)
+    passport_issue_date = models.CharField(max_length=50, blank=True, null=True)
+    passport_expire_date = models.CharField(max_length=50, blank=True, null=True)
+    gender = models.CharField(max_length=10, blank=True, null=True)  # MALE, FEMALE
+    birthday = models.CharField(max_length=50, blank=True, null=True)
+    phone1 = models.CharField(max_length=50, blank=True, null=True)
+    phone2 = models.CharField(max_length=50, blank=True, null=True)
+    father_name = models.CharField(max_length=255, blank=True, null=True)
+    father_phone = models.CharField(max_length=50, blank=True, null=True)
+    father_job = models.CharField(max_length=255, blank=True, null=True)
+    mother_name = models.CharField(max_length=255, blank=True, null=True)
+    mother_phone = models.CharField(max_length=50, blank=True, null=True)
+    mother_job = models.CharField(max_length=255, blank=True, null=True)
+    email = models.EmailField(max_length=255, blank=True, null=True)
+    address = models.TextField(blank=True, null=True)
+
+    # 2. Educational & Tariff Details
+    level = models.CharField(max_length=50, blank=True, null=True, db_index=True)
+    level2 = models.CharField(max_length=50, blank=True, null=True)
+    educational_background = models.CharField(max_length=255, blank=True, null=True)
+    major = models.CharField(max_length=255, blank=True, null=True)
+    final_school_name = models.CharField(max_length=255, blank=True, null=True)
+    gpa = models.CharField(max_length=50, blank=True, null=True)
+    gpa_system = models.CharField(max_length=50, blank=True, null=True)
+    degree_no = models.CharField(max_length=100, blank=True, null=True)
+    date_of_entry = models.CharField(max_length=50, blank=True, null=True)
+    date_of_graduation = models.CharField(max_length=50, blank=True, null=True)
+    graduation_expected = models.BooleanField(default=False)
+    school_address = models.TextField(blank=True, null=True)
+    school_website = models.CharField(max_length=255, blank=True, null=True)
+    school_phone = models.CharField(max_length=50, blank=True, null=True)
+    school_email = models.CharField(max_length=255, blank=True, null=True)
+    tariff = models.CharField(max_length=50, blank=True, null=True, db_index=True)
+
+    # 3. Language Certificates (Supports up to 3 slots)
+    language_certificate = models.CharField(max_length=50, blank=True, null=True, db_index=True)
+    certificate_score = models.CharField(max_length=50, blank=True, null=True)
+    certificate_test_date = models.CharField(max_length=50, blank=True, null=True)
+    certificate_valid_date = models.CharField(max_length=50, blank=True, null=True)
+
+    language_certificate_2 = models.CharField(max_length=50, blank=True, null=True)
+    certificate_score_2 = models.CharField(max_length=50, blank=True, null=True)
+    certificate_2_test_date = models.CharField(max_length=50, blank=True, null=True)
+    certificate_2_valid_date = models.CharField(max_length=50, blank=True, null=True)
+
+    language_certificate_3 = models.CharField(max_length=50, blank=True, null=True)
+    certificate_score_3 = models.CharField(max_length=50, blank=True, null=True)
+    certificate_3_test_date = models.CharField(max_length=50, blank=True, null=True)
+    certificate_3_valid_date = models.CharField(max_length=50, blank=True, null=True)
+
+    # 4. University Selections & Statuses (1 to 5)
+    university_1 = models.CharField(max_length=255, blank=True, null=True)
+    university_1_status = models.CharField(max_length=50, default='Chosen')
+    university_1_major = models.CharField(max_length=255, blank=True, null=True)
+
+    university_2 = models.CharField(max_length=255, blank=True, null=True)
+    university_2_status = models.CharField(max_length=50, blank=True, null=True)
+    university_2_major = models.CharField(max_length=255, blank=True, null=True)
+
+    university_3 = models.CharField(max_length=255, blank=True, null=True)
+    university_3_status = models.CharField(max_length=50, blank=True, null=True)
+    university_3_major = models.CharField(max_length=255, blank=True, null=True)
+
+    university_4 = models.CharField(max_length=255, blank=True, null=True)
+    university_4_status = models.CharField(max_length=50, blank=True, null=True)
+    university_4_major = models.CharField(max_length=255, blank=True, null=True)
+
+    university_5 = models.CharField(max_length=255, blank=True, null=True)
+    university_5_status = models.CharField(max_length=50, blank=True, null=True)
+    university_5_major = models.CharField(max_length=255, blank=True, null=True)
+
+    # 5. Financial Parameters
+    balance = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal('0.00'), db_index=True)
+    discount = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal('0.00'))
+
+    # 6. Document Checklist & Counts
+    pick_needed = models.JSONField(default=list, blank=True)
+    has_mc = models.BooleanField(default=False)
+    bc_hand_count = models.IntegerField(default=0)
+    mc_hand_count = models.IntegerField(default=0)
+    apos_hand_count = models.IntegerField(default=0)
+    pic_hand_count = models.IntegerField(default=0)
+
+    # 7. Status Board & Embassy Parameters
+    invoice = models.CharField(max_length=50, blank=True, null=True)  # NOT TAKEN, TAKEN, NOT PAID, PAID, CANCELLED
+    invoice_university = models.CharField(max_length=255, blank=True, null=True)
+    coa = models.CharField(max_length=50, blank=True, null=True)      # NOT TAKEN, TAKEN, MISTAKE, CANCELLED
+    embassy = models.CharField(max_length=50, blank=True, null=True)  # APPROVED, CANCELLED, PENDING
+    embassy_documents = models.JSONField(default=list, blank=True)
+    status_hidden = models.BooleanField(default=False, db_index=True)
+    kdb_put_date = models.CharField(max_length=50, blank=True, null=True)
+    kdb_take_date = models.CharField(max_length=50, blank=True, null=True)
+    embassy_father_docs = models.JSONField(default=list, blank=True)
+    embassy_mother_docs = models.JSONField(default=list, blank=True)
+    embassy_sponsor_notes = models.TextField(blank=True, null=True)
+    status_row_color = models.CharField(max_length=50, blank=True, null=True)
+
+    # 8. System & Management Metadata
+    office = models.CharField(max_length=100, blank=True, null=True, db_index=True)
+    student_group = models.CharField(max_length=100, blank=True, null=True, db_index=True)
+    lead_by = models.CharField(max_length=100, blank=True, null=True, db_index=True)
+    coordinator = models.CharField(max_length=100, blank=True, null=True)
+    notes = models.TextField(blank=True, null=True)
+    is_deleted = models.BooleanField(default=False, db_index=True)  # Soft delete archive
+    row_color = models.CharField(max_length=50, blank=True, null=True)
+    task_tags = models.JSONField(default=list, blank=True)
+    folders = models.ManyToManyField(Folder, blank=True, related_name='students')
+    google_drive_url = models.URLField(max_length=500, blank=True, null=True)
+    google_drive_folder_id = models.CharField(max_length=255, blank=True, null=True)
+    jarayon_updated_at = models.DateTimeField(blank=True, null=True)
+
+    class Meta:
+        db_table = 'crm_students'
+        verbose_name = 'Student'
+        verbose_name_plural = 'Students'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['tenant', 'id']),
+            models.Index(fields=['tenant', 'full_name']),
+            models.Index(fields=['tenant', 'is_deleted']),
+            models.Index(fields=['tenant', 'status_hidden']),
+            models.Index(fields=['tenant', 'tariff']),
+            models.Index(fields=['tenant', 'balance']),
+        ]
+
+    def __str__(self):
+        return f"{self.id} - {self.full_name} ({self.tenant.name})"
+
+    def save(self, *args, **kwargs):
+        # Enforce uppercase on alphanumeric ID, name, passport, address
+        if self.id:
+            self.id = self.id.strip().upper()
+        if self.full_name:
+            self.full_name = self.full_name.strip().upper()
+        if self.passport:
+            self.passport = self.passport.strip().upper()
+        if self.address:
+            self.address = self.address.strip().upper()
+        super().save(*args, **kwargs)
+
+
+class TariffOption(TenantAwareModel):
+    """Configurable tariff options with default prices."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=100)
+    price = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal('0.00'))
+
+    class Meta:
+        db_table = 'crm_tariff_options'
+        unique_together = ('tenant', 'name')
+        ordering = ['name']
+
+
+class EducationLevelOption(TenantAwareModel):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=100)
+
+    class Meta:
+        db_table = 'crm_education_levels'
+        unique_together = ('tenant', 'name')
+        ordering = ['name']
+
+
+class StudentGroupOption(TenantAwareModel):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=100)
+
+    class Meta:
+        db_table = 'crm_student_groups'
+        unique_together = ('tenant', 'name')
+        ordering = ['name']
+
+
+class LeadSourceOption(TenantAwareModel):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=100)
+
+    class Meta:
+        db_table = 'crm_lead_sources'
+        unique_together = ('tenant', 'name')
+        ordering = ['name']
+
+
+class CoordinatorOption(TenantAwareModel):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=100)
+
+    class Meta:
+        db_table = 'crm_coordinators'
+        unique_together = ('tenant', 'name')
+        ordering = ['name']

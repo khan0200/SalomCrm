@@ -1,0 +1,74 @@
+from rest_framework import serializers
+from django.db import transaction
+from django.contrib.auth import get_user_model
+from .models import Tenant, Branch
+
+User = get_user_model()
+
+class BranchSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Branch
+        fields = ('id', 'name', 'code', 'address', 'phone', 'is_active', 'created_at')
+        read_only_fields = ('id', 'created_at')
+
+
+class TenantSerializer(serializers.ModelSerializer):
+    user_count = serializers.SerializerMethodField()
+    student_count = serializers.SerializerMethodField()
+    branches = BranchSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Tenant
+        fields = (
+            'id', 'name', 'slug', 'is_active', 'logo_url', 'branding_color',
+            'description', 'settings', 'user_count', 'student_count',
+            'branches', 'created_at', 'updated_at'
+        )
+        read_only_fields = ('created_at', 'updated_at')
+
+    def get_user_count(self, obj):
+        return obj.users.count()
+
+    def get_student_count(self, obj):
+        return getattr(obj, 'students_count', None) or obj.crm_students_set.filter(is_deleted=False).count()
+
+
+class TenantCreateWithAdminSerializer(serializers.ModelSerializer):
+    """
+    Transactional creation of Tenant along with its first Head Manager user.
+    """
+    admin_email = serializers.EmailField(write_only=True)
+    admin_full_name = serializers.CharField(write_only=True)
+    admin_password = serializers.CharField(write_only=True, min_length=6)
+
+    class Meta:
+        model = Tenant
+        fields = (
+            'id', 'name', 'slug', 'is_active', 'logo_url', 'branding_color',
+            'description', 'admin_email', 'admin_full_name', 'admin_password'
+        )
+
+    @transaction.atomic
+    def create(self, validated_data):
+        admin_email = validated_data.pop('admin_email')
+        admin_full_name = validated_data.pop('admin_full_name')
+        admin_password = validated_data.pop('admin_password')
+
+        # 1. Create Tenant
+        tenant = Tenant.objects.create(**validated_data)
+
+        # 2. Create Initial Head Manager
+        user = User.objects.create_user(
+            email=admin_email,
+            password=admin_password,
+            full_name=admin_full_name,
+            role='HEAD_MANAGER',
+            tenant=tenant,
+            is_staff=True
+        )
+
+        # 3. Create default folders (e.g. KDB)
+        from apps.students.models import Folder
+        Folder.objects.create(tenant=tenant, name='KDB')
+
+        return tenant

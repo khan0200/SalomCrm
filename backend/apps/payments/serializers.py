@@ -1,0 +1,52 @@
+from rest_framework import serializers
+from .models import Payment, PaymentMethodTemplate, PaymentReceiverTemplate, PaymentNotePill
+from apps.students.models import Student
+
+class PaymentSerializer(serializers.ModelSerializer):
+    student_id = serializers.CharField(source='student.id', read_only=True)
+    student_full_name = serializers.CharField(source='student.full_name', read_only=True)
+    created_by_name = serializers.CharField(source='created_by.full_name', read_only=True)
+
+    class Meta:
+        model = Payment
+        fields = (
+            'id', 'student_id', 'student_full_name', 'student_name',
+            'amount', 'method', 'received_by', 'notes',
+            'is_discount', 'is_withdrawal', 'created_by_name',
+            'created_at', 'updated_at'
+        )
+        read_only_fields = ('id', 'created_at', 'updated_at')
+
+
+class PaymentCreateSerializer(serializers.Serializer):
+    student_id = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    amount = serializers.DecimalField(max_digits=14, decimal_places=2)
+    method = serializers.CharField(max_length=100)
+    received_by = serializers.CharField(max_length=100)
+    notes = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    is_discount = serializers.BooleanField(default=False)
+
+
+class PaymentWithdrawSerializer(serializers.Serializer):
+    student_id = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    amount = serializers.DecimalField(max_digits=14, decimal_places=2)
+    reason = serializers.CharField(max_length=255)
+
+
+class PaymentEditSerializer(serializers.Serializer):
+    amount = serializers.DecimalField(max_digits=14, decimal_places=2)
+    method = serializers.CharField(max_length=100)
+    received_by = serializers.CharField(max_length=100)
+    notes = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+
+
+class PaymentOverviewStudentSerializer(serializers.ModelSerializer):
+    """
+    Student financial overview serializer with formatted tariff, balance, and discount.
+    """
+    class Meta:
+        model = Student
+        fields = (
+            'id', 'full_name', 'tariff', 'balance', 'discount',
+            'student_group', 'is_deleted', 'phone1', 'office'
+        )
