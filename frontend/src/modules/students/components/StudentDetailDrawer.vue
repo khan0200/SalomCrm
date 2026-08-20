@@ -231,18 +231,26 @@ const formatRegistrationDate = (dateStr?: string | null) => {
   }
 }
 
-// Synchronize state when student changes
+// Synchronize state when student changes - only show slots if actually provided
 watch(() => props.student, (s) => {
   if (s) {
-    showLevel2.value = !!s.level2
-    showCert2.value = !!(s.language_certificate_2 || s.certificate_score_2)
-    showCert3.value = !!(s.language_certificate_3 || s.certificate_score_3)
-    showUni2.value = !!(s.university_2 || s.university_2_status || s.university_2_major)
-    showUni3.value = !!(s.university_3 || s.university_3_status || s.university_3_major)
-    showUni4.value = !!(s.university_4 || s.university_4_status || s.university_4_major)
-    showUni5.value = !!(s.university_5 || s.university_5_status || s.university_5_major)
+    showLevel2.value = !!(s.level2 && s.level2.trim())
+    showCert2.value = !!(s.language_certificate_2 && s.language_certificate_2.trim() && s.language_certificate_2 !== 'NO CERTIFICATE')
+    showCert3.value = !!(s.language_certificate_3 && s.language_certificate_3.trim() && s.language_certificate_3 !== 'NO CERTIFICATE')
+    showUni2.value = !!(s.university_2 && s.university_2.trim())
+    showUni3.value = !!(s.university_3 && s.university_3.trim())
+    showUni4.value = !!(s.university_4 && s.university_4.trim())
+    showUni5.value = !!(s.university_5 && s.university_5.trim())
     editingField.value = null
     activeStatusDropdown.value = null
+  } else {
+    showLevel2.value = false
+    showCert2.value = false
+    showCert3.value = false
+    showUni2.value = false
+    showUni3.value = false
+    showUni4.value = false
+    showUni5.value = false
   }
 }, { immediate: true })
 
@@ -461,6 +469,24 @@ const openUniversityModal = (slot: number) => {
   isUniModalOpen.value = true
 }
 
+const closeUniversityModal = () => {
+  const slot = uniModalSlot.value
+  const s = props.student as any
+  if (slot === 2 && !s?.university_2) showUni2.value = false
+  if (slot === 3 && !s?.university_3) showUni3.value = false
+  if (slot === 4 && !s?.university_4) showUni4.value = false
+  if (slot === 5 && !s?.university_5) showUni5.value = false
+  isUniModalOpen.value = false
+}
+
+const closeCertModal = () => {
+  const slot = certModalSlot.value
+  const s = props.student as any
+  if (slot === 2 && (!s?.language_certificate_2 || s?.language_certificate_2 === 'NO CERTIFICATE')) showCert2.value = false
+  if (slot === 3 && (!s?.language_certificate_3 || s?.language_certificate_3 === 'NO CERTIFICATE')) showCert3.value = false
+  isCertModalOpen.value = false
+}
+
 const saveUniversityModal = () => {
   if (!props.student) return
   const slot = uniModalSlot.value
@@ -473,6 +499,12 @@ const saveUniversityModal = () => {
     patch[`university_${slot}_status`] = 'Chosen'
   }
   emit('update-student', patch)
+  if (!val && slot >= 2) {
+    if (slot === 2) showUni2.value = false
+    if (slot === 3) showUni3.value = false
+    if (slot === 4) showUni4.value = false
+    if (slot === 5) showUni5.value = false
+  }
   isUniModalOpen.value = false
 }
 
@@ -604,6 +636,12 @@ const saveCertModal = () => {
     patch.certificate_3_valid_date = certForm.value.type === 'NO CERTIFICATE' ? null : (certForm.value.valid_date || null)
   }
   emit('update-student', patch)
+  if (slot === 2 && (!certForm.value.type || certForm.value.type === 'NO CERTIFICATE')) {
+    showCert2.value = false
+    showCert3.value = false
+  } else if (slot === 3 && (!certForm.value.type || certForm.value.type === 'NO CERTIFICATE')) {
+    showCert3.value = false
+  }
   isCertModalOpen.value = false
 }
 
@@ -2933,7 +2971,7 @@ const handleRestoreStudent = () => {
           <div class="flex items-center justify-end gap-2 pt-4 mt-4 border-t border-zinc-100 dark:border-zinc-800">
             <button
               type="button"
-              @click="isCertModalOpen = false"
+              @click="closeCertModal"
               class="px-4 py-2 text-xs font-bold rounded-xl bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:opacity-90 active:scale-[0.98] transition-all cursor-pointer"
             >
               Cancel
@@ -2964,12 +3002,12 @@ const handleRestoreStudent = () => {
       <div
         v-if="isUniModalOpen"
         class="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs"
-        @click.self="isUniModalOpen = false"
+        @click.self="closeUniversityModal"
       >
         <div class="relative w-full max-w-md overflow-visible rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-2xl p-6 z-[80]">
           <button
             type="button"
-            @click="isUniModalOpen = false"
+            @click="closeUniversityModal"
             class="absolute right-4 top-4 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 p-1 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded transition-all cursor-pointer"
           >
             <X class="w-4 h-4" />
@@ -3017,7 +3055,7 @@ const handleRestoreStudent = () => {
           <div class="flex justify-end gap-2">
             <button
               type="button"
-              @click="isUniModalOpen = false"
+              @click="closeUniversityModal"
               class="px-4 py-2 text-xs font-bold rounded-xl bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:opacity-90 active:scale-[0.98] transition-all cursor-pointer"
             >
               Cancel
