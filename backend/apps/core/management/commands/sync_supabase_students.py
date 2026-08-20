@@ -178,12 +178,21 @@ class Command(BaseCommand):
         # 3. Fetch & Sync Folders
         supabase_folders = fetch_table('folders')
         folder_map = {}
+        valid_folder_ids = []
         for f in supabase_folders:
             folder_obj, _ = Folder.objects.update_or_create(
                 tenant=tenant_ub,
                 name=f['name']
             )
+            valid_folder_ids.append(folder_obj.id)
             folder_map[f['id']] = folder_obj
+            folder_map[f['name'].strip().lower()] = folder_obj
+
+        # Delete any folders in local DB that were deleted from Supabase
+        deleted_folders_count, _ = Folder.objects.filter(tenant=tenant_ub).exclude(id__in=valid_folder_ids).delete()
+        if deleted_folders_count:
+            self.stdout.write(self.style.WARNING(f"Removed {deleted_folders_count} outdated folders from CRM"))
+        self.stdout.write(self.style.SUCCESS(f"Synced {len(supabase_folders)} active folders"))
 
         # 4. Fetch & Sync Students
         students_url = f"{supabase_url}/rest/v1/students?select=*&order=id.asc"
@@ -191,11 +200,17 @@ class Command(BaseCommand):
         with urllib.request.urlopen(req_students) as response:
             supabase_students = json.loads(response.read().decode('utf-8'))
 
+        supabase_student_ids = [s['id'].strip().upper() for s in supabase_students if s.get('id')]
+        # Delete any students in local DB that do not exist in Supabase
+        deleted_students_count, _ = Student.objects.filter(tenant=tenant_ub).exclude(id__in=supabase_student_ids).delete()
+        if deleted_students_count:
+            self.stdout.write(self.style.WARNING(f"Removed {deleted_students_count} non-existent students from CRM"))
+
         self.stdout.write(f"Fetched {len(supabase_students)} students from Supabase. Upserting...")
 
         synced_count = 0
         for s in supabase_students:
-            student_id = s.get('id')
+            student_id = str(s.get('id') or '').strip().upper()
             if not student_id:
                 continue
 
@@ -300,13 +315,20 @@ class Command(BaseCommand):
             )
 
             # Assign folders
-            student_folder_ids = s.get('folder_ids') or []
+            raw_folder_ids = s.get('folders') or s.get('folder_ids') or []
+            if not isinstance(raw_folder_ids, list):
+                raw_folder_ids = [raw_folder_ids]
             if s.get('folder_id'):
-                student_folder_ids.append(s.get('folder_id'))
+                raw_folder_ids.append(s.get('folder_id'))
 
-            assigned_folders = [folder_map[fid] for fid in student_folder_ids if fid in folder_map]
-            if assigned_folders:
-                student_obj.folders.set(assigned_folders)
+            assigned_folders = set()
+            for fid in raw_folder_ids:
+                if fid in folder_map:
+                    assigned_folders.add(folder_map[fid])
+                elif str(fid).strip().lower() in folder_map:
+                    assigned_folders.add(folder_map[str(fid).strip().lower()])
+
+            student_obj.folders.set(list(assigned_folders))
 
             synced_count += 1
 
