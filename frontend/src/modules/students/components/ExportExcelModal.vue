@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import {
   FileSpreadsheet,
   X,
@@ -450,6 +450,25 @@ const handleToggleGroupFields = (fields: ExcelField[]) => {
     checkedFields.value = Array.from(new Set([...checkedFields.value, ...keys]))
   }
 }
+
+// Close on Escape key
+const handleKeyDown = (e: KeyboardEvent) => {
+  if (e.key === 'Escape' && props.isOpen) {
+    if (isFieldPickerOpen.value) {
+      isFieldPickerOpen.value = false
+    } else {
+      emit('close')
+    }
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('keydown', handleKeyDown)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleKeyDown)
+})
 </script>
 
 <template>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import {
   Search,
@@ -12,11 +12,17 @@ import { useStudentDashboardStore } from '@/stores/studentDashboard'
 
 const route = useRoute()
 const dashboardStore = useStudentDashboardStore()
+const searchInputRef = ref<HTMLInputElement | null>(null)
 
 const pathname = computed(() => route.path)
 
 const isStudentOrStatusPage = computed(() => {
   return pathname.value === '/students' || pathname.value === '/status' || pathname.value === '/documents'
+})
+
+const isMac = computed(() => {
+  if (typeof navigator === 'undefined') return false
+  return /(Mac|iPhone|iPod|iPad)/i.test(navigator.platform || navigator.userAgent)
 })
 
 const PAGE_TITLES: Record<string, string> = {
@@ -38,6 +44,52 @@ const currentDateFormatted = computed(() => {
     month: 'long',
     day: 'numeric',
   })
+})
+
+// Global Hotkeys: Ctrl+K / Cmd+K to Search, Esc to blur/clear/close
+const handleGlobalKeyDown = (e: KeyboardEvent) => {
+  // Ctrl+K or Cmd+K
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+    e.preventDefault()
+    if (isStudentOrStatusPage.value && searchInputRef.value) {
+      searchInputRef.value.focus()
+      searchInputRef.value.select()
+    }
+    return
+  }
+
+  // Escape key handler
+  if (e.key === 'Escape') {
+    if (document.activeElement === searchInputRef.value) {
+      if (dashboardStore.searchQuery) {
+        dashboardStore.searchQuery = ''
+      }
+      searchInputRef.value?.blur()
+      return
+    }
+
+    // Close top bar modals / panels if open
+    if (dashboardStore.isFilterPanelOpen) {
+      dashboardStore.isFilterPanelOpen = false
+      return
+    }
+    if (dashboardStore.isAddStudentModalOpen) {
+      dashboardStore.isAddStudentModalOpen = false
+      return
+    }
+    if (dashboardStore.isExcelModalOpen) {
+      dashboardStore.isExcelModalOpen = false
+      return
+    }
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('keydown', handleGlobalKeyDown)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleGlobalKeyDown)
 })
 </script>
 
@@ -65,19 +117,28 @@ const currentDateFormatted = computed(() => {
     </div>
 
     <!-- Center: iOS Dynamic Island Search Bar -->
-    <div class="flex items-center gap-2.5 z-30 w-full h-auto md:flex-1 md:min-w-0 md:mx-3 max-w-full md:max-w-[450px]">
+    <div class="flex items-center gap-2.5 z-30 w-full h-auto md:flex-1 md:min-w-0 md:mx-3 max-w-full md:max-w-[460px]">
       <div
         class="relative flex-1 flex items-center rounded-full border border-zinc-200 dark:border-zinc-700 bg-white/70 dark:bg-zinc-850/80 backdrop-blur-md shadow-[0_8px_30px_rgba(0,0,0,0.06)] hover:bg-white dark:hover:bg-zinc-800 hover:shadow-[0_12px_40px_rgba(0,0,0,0.08)] transition-all duration-300 ease-out h-[38px] md:h-[42px] focus-within:border-zinc-400 dark:focus-within:border-zinc-500 focus-within:bg-white dark:focus-within:bg-zinc-850 focus-within:shadow-[0_16px_36px_rgba(0,0,0,0.08)]"
       >
-        <div class="relative flex items-center w-full h-full rounded-full pl-5 pr-2 bg-transparent gap-1">
-          <Search class="h-4.5 w-4.5 text-zinc-400 flex-shrink-0 mr-2" />
+        <div class="relative flex items-center w-full h-full rounded-full pl-4 md:pl-5 pr-2 bg-transparent gap-1.5">
+          <Search class="h-4.5 w-4.5 text-zinc-400 flex-shrink-0 mr-1" />
           <input
+            ref="searchInputRef"
             type="text"
-            :placeholder="dashboardStore.searchMode === 'id' ? 'Search ID only (e.g. G54)...' : 'Search by name, ID, passport, phone, or university...'"
+            :placeholder="dashboardStore.searchMode === 'id' ? 'Search ID (e.g. G54)...' : 'Search by name, ID, phone...'"
             v-model="dashboardStore.searchQuery"
             class="w-full bg-transparent text-[15px] md:text-sm text-zinc-800 dark:text-zinc-100 placeholder-zinc-400 py-2 border-none focus:outline-none ring-0 outline-none"
           />
-          <div class="flex items-center shrink-0 border-l border-zinc-200 dark:border-zinc-700 pl-2.5 pr-1 py-0.5">
+
+          <!-- iOS / macOS style Hotkey Badge -->
+          <div class="hidden sm:flex items-center gap-1 shrink-0 select-none mr-1">
+            <kbd class="inline-flex items-center justify-center px-1.5 py-0.5 text-[10px] font-bold text-zinc-400 dark:text-zinc-500 bg-zinc-100 dark:bg-zinc-800/80 border border-zinc-200/80 dark:border-zinc-700/80 rounded shadow-2xs font-mono">
+              {{ isMac ? '⌘K' : 'Ctrl+K' }}
+            </kbd>
+          </div>
+
+          <div class="flex items-center shrink-0 border-l border-zinc-200 dark:border-zinc-700 pl-2 pr-1 py-0.5">
             <select
               v-model="dashboardStore.searchMode"
               class="bg-transparent text-xs font-semibold text-zinc-700 dark:text-zinc-300 cursor-pointer focus:outline-none border-none py-1 pr-1"

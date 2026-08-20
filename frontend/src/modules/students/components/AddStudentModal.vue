@@ -155,8 +155,12 @@ watch(() => props.isOpen, (newVal) => {
 })
 
 const handleKeyDown = (e: KeyboardEvent) => {
-  if (e.key === 'Escape' && props.isOpen && !submitting.value && !isUniversityDropdownOpen.value) {
-    emit('close')
+  if (e.key === 'Escape' && props.isOpen && !submitting.value) {
+    if (isUniversityDropdownOpen.value) {
+      isUniversityDropdownOpen.value = false
+    } else {
+      emit('close')
+    }
   }
 }
 
