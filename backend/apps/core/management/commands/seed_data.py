@@ -17,7 +17,7 @@ class Command(BaseCommand):
     help = 'Seeds CRM database with Super Admin and Unibridge Head Manager (abdurazzakov_97@mail.ru)'
 
     def handle(self, *args, **options):
-        self.stdout.write(self.style.NOTICE("Starting Uniapp v3 Database Seeding..."))
+        self.stdout.write("Starting Uniapp v3 Database Seeding...")
 
         # 1. Platform Super Admin
         super_admin, created = User.objects.get_or_create(

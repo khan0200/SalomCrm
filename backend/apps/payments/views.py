@@ -8,13 +8,15 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment
+from openpyxl.utils import get_column_letter
 
 from apps.core.permissions import IsTenantUser
 from apps.students.models import Student
-from .models import Payment
+from .models import Payment, PaymentMethodTemplate, PaymentReceiverTemplate, PaymentNotePill
 from .serializers import (
     PaymentSerializer, PaymentCreateSerializer, PaymentWithdrawSerializer,
-    PaymentEditSerializer, PaymentOverviewStudentSerializer
+    PaymentEditSerializer, PaymentOverviewStudentSerializer,
+    PaymentMethodTemplateSerializer, PaymentReceiverTemplateSerializer, PaymentNotePillSerializer
 )
 from .services import record_payment, edit_payment, delete_payment
 
@@ -199,19 +201,19 @@ class PaymentOverviewViewSet(viewsets.ReadOnlyModelViewSet):
             bal_q = Q()
             for b in balances:
                 if 'Debt' in b or '< 0' in b:
-                    bal_q |= Q(balance__lt=0)
+                    bal_q = bal_q | Q(balance__lt=0)
                 elif 'Fully Paid' in b or '= 0' in b:
-                    bal_q |= Q(balance=0)
+                    bal_q = bal_q | Q(balance=0)
                 elif '> 500,000' in b or '> 500000' in b:
-                    bal_q |= Q(balance__gt=500000)
+                    bal_q = bal_q | Q(balance__gt=500000)
                 elif '> 1,000,000' in b or '> 1000000' in b:
-                    bal_q |= Q(balance__gt=1000000)
+                    bal_q = bal_q | Q(balance__gt=1000000)
                 elif '> 2,000,000' in b or '> 2000000' in b:
-                    bal_q |= Q(balance__gt=2000000)
+                    bal_q = bal_q | Q(balance__gt=2000000)
                 elif '> 5,000,000' in b or '> 5000000' in b:
-                    bal_q |= Q(balance__gt=5000000)
+                    bal_q = bal_q | Q(balance__gt=5000000)
                 elif '> 10,000,000' in b or '> 10000000' in b:
-                    bal_q |= Q(balance__gt=10000000)
+                    bal_q = bal_q | Q(balance__gt=10000000)
             qs = qs.filter(bal_q)
 
         return qs.order_by('id')
@@ -232,7 +234,10 @@ class PaymentExportView(APIView):
         # Create workbook
         wb = openpyxl.Workbook()
         ws = wb.active
-        ws.title = "Payment History"
+        if ws is None:
+            ws = wb.create_sheet("Payment History")
+        else:
+            ws.title = "Payment History"
 
         # Headers
         headers = ["Date & Time", "Student ID", "Student Name", "Amount (UZS)", "Payment Method", "Received By", "Type", "Notes", "Recorded By"]
@@ -264,8 +269,10 @@ class PaymentExportView(APIView):
         # Auto column widths
         for col in ws.columns:
             max_len = max(len(str(cell.value or '')) for cell in col)
-            col_letter = openpyxl.utils.get_column_letter(col[0].column)
-            ws.column_dimensions[col_letter].width = max(max_len + 3, 12)
+            col_idx = col[0].column
+            if col_idx is not None:
+                col_letter = get_column_letter(int(col_idx))
+                ws.column_dimensions[col_letter].width = max(max_len + 3, 12)
 
         buffer = io.BytesIO()
         wb.save(buffer)
@@ -282,12 +289,13 @@ class PaymentExportView(APIView):
 class BasePaymentOptionViewSet(viewsets.ModelViewSet):
     permission_classes = [IsTenantUser]
     pagination_class = None
+    model_class = None
 
     def get_queryset(self):
         user = self.request.user
         tenant = getattr(self.request, 'tenant', None) or getattr(user, 'tenant', None)
-        if not tenant:
-            return self.model_class.objects.none()
+        if not tenant or self.model_class is None:
+            return Payment.objects.none()
         return self.model_class.objects.filter(tenant=tenant)
 
     def perform_create(self, serializer):
@@ -297,22 +305,17 @@ class BasePaymentOptionViewSet(viewsets.ModelViewSet):
 
 
 class PaymentMethodTemplateViewSet(BasePaymentOptionViewSet):
-    from .models import PaymentMethodTemplate
-    from .serializers import PaymentMethodTemplateSerializer
     model_class = PaymentMethodTemplate
     serializer_class = PaymentMethodTemplateSerializer
 
 
 class PaymentReceiverTemplateViewSet(BasePaymentOptionViewSet):
-    from .models import PaymentReceiverTemplate
-    from .serializers import PaymentReceiverTemplateSerializer
     model_class = PaymentReceiverTemplate
     serializer_class = PaymentReceiverTemplateSerializer
 
 
 class PaymentNotePillViewSet(BasePaymentOptionViewSet):
-    from .models import PaymentNotePill
-    from .serializers import PaymentNotePillSerializer
     model_class = PaymentNotePill
     serializer_class = PaymentNotePillSerializer
+
 

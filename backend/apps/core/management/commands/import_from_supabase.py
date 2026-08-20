@@ -21,7 +21,7 @@ class Command(BaseCommand):
     help = 'Imports all real students, payments, folders, and options from Supabase into Salom CRM'
 
     def handle(self, *args, **options):
-        self.stdout.write(self.style.NOTICE("Connecting to Supabase and authenticating as Unibridge Head Manager..."))
+        self.stdout.write("Connecting to Supabase and authenticating as Unibridge Head Manager...")
 
         # 1. Supabase Auth
         auth_url = f"{SUPABASE_URL}/auth/v1/token?grant_type=password"
@@ -102,7 +102,7 @@ class Command(BaseCommand):
         User.objects.exclude(email__in=['admin@uniapp.com', 'abdurazzakov_97@mail.ru']).delete()
 
         # 3. Fetch and Import Folders
-        self.stdout.write(self.style.NOTICE("Fetching Folders from Supabase..."))
+        self.stdout.write("Fetching Folders from Supabase...")
         sb_folders = fetch_supabase_table('folders')
         folder_map = {}
         for f_data in sb_folders:
@@ -120,9 +120,9 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS(f"Imported {Folder.objects.filter(tenant=tenant_ub).count()} Folders."))
 
         # 4. Fetch and Import Students
-        self.stdout.write(self.style.NOTICE("Fetching Students from Supabase..."))
+        self.stdout.write("Fetching Students from Supabase...")
         sb_students = fetch_supabase_table('students')
-        self.stdout.write(self.style.NOTICE(f"Fetched {len(sb_students)} students from Supabase. Importing..."))
+        self.stdout.write(f"Fetched {len(sb_students)} students from Supabase. Importing...")
 
         tariffs_set = set()
         levels_set = set()
@@ -281,9 +281,9 @@ class Command(BaseCommand):
             CoordinatorOption.objects.get_or_create(tenant=tenant_ub, name=c_name)
 
         # 6. Fetch and Import Payments
-        self.stdout.write(self.style.NOTICE("Fetching Payments from Supabase..."))
+        self.stdout.write("Fetching Payments from Supabase...")
         sb_payments = fetch_supabase_table('payments')
-        self.stdout.write(self.style.NOTICE(f"Fetched {len(sb_payments)} payments. Importing..."))
+        self.stdout.write(f"Fetched {len(sb_payments)} payments. Importing...")
 
         payment_methods_set = set()
         receivers_set = set()

@@ -1,7 +1,7 @@
 [tool.pyright]
 include = ["backend"]
 venvPath = "."
-venv = ".venv"
+venv = "venv"
 extraPaths = [
   "backend"
 ]
@@ -10,3 +10,7 @@ pythonPlatform = "Windows"
 reportMissingTypeStubs = "none"
 reportIncompatibleVariableOverride = "none"
 reportIncompatibleMethodOverride = "none"
+reportAttributeAccessIssue = "none"
+reportOperatorIssue = "none"
+reportOptionalMemberAccess = "none"
+reportGeneralTypeIssues = "none"

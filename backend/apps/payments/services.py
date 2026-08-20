@@ -1,4 +1,5 @@
 from decimal import Decimal
+from typing import Any, cast
 from django.db import transaction
 from django.db.models import Sum
 from apps.audit.services import log_audit_event
@@ -42,7 +43,6 @@ def get_tariff_price(tariff_name, certificate=None, tenant=None):
     return DEFAULT_TARIFF_PRICES.get(tariff_upper, Decimal('0'))
 
 
-@transaction.atomic
 def recalculate_student_financials(student):
     """
     Recalculates a student's balance and discount strictly from payment history and assigned tariff.
@@ -52,35 +52,35 @@ def recalculate_student_financials(student):
     - Positive balance indicates overpayment.
     """
     from apps.students.models import Student
-    # Lock row to prevent race conditions
-    student_obj = Student.objects.select_for_update().get(id=student.id)
+    with cast(Any, transaction.atomic()):
+        # Lock row to prevent race conditions
+        student_obj = Student.objects.select_for_update().get(id=student.id)
 
-    # 1. Calculate sum of non-discount payments (normal payments are positive, withdrawals are negative)
-    payments_sum = student_obj.payments.filter(is_discount=False).aggregate(
-        total=Sum('amount')
-    )['total'] or Decimal('0.00')
+        # 1. Calculate sum of non-discount payments (normal payments are positive, withdrawals are negative)
+        payments_sum = student_obj.payments.filter(is_discount=False).aggregate(
+            total=Sum('amount')
+        )['total'] or Decimal('0.00')
 
-    # 2. Calculate sum of discounts
-    discounts_sum = student_obj.payments.filter(is_discount=True).aggregate(
-        total=Sum('amount')
-    )['total'] or Decimal('0.00')
+        # 2. Calculate sum of discounts
+        discounts_sum = student_obj.payments.filter(is_discount=True).aggregate(
+            total=Sum('amount')
+        )['total'] or Decimal('0.00')
 
-    # 3. Get tariff price
-    tariff_price = get_tariff_price(student_obj.tariff, student_obj.language_certificate, student_obj.tenant)
+        # 3. Get tariff price
+        tariff_price = get_tariff_price(student_obj.tariff, student_obj.language_certificate, student_obj.tenant)
 
-    # 4. Compute balance
-    if tariff_price > 0:
-        computed_balance = (payments_sum + discounts_sum) - tariff_price
-    else:
-        computed_balance = payments_sum + discounts_sum
+        # 4. Compute balance
+        if tariff_price > 0:
+            computed_balance = (payments_sum + discounts_sum) - tariff_price
+        else:
+            computed_balance = payments_sum + discounts_sum
 
-    student_obj.balance = computed_balance
-    student_obj.discount = discounts_sum
-    student_obj.save(update_fields=['balance', 'discount', 'updated_at'])
-    return student_obj
+        student_obj.balance = computed_balance
+        student_obj.discount = discounts_sum
+        student_obj.save(update_fields=['balance', 'discount', 'updated_at'])
+        return student_obj
 
 
-@transaction.atomic
 def record_payment(tenant, student, amount, method, received_by, notes='', is_discount=False, is_withdrawal=False, user=None):
     """
     Creates a Payment record and transactional financial update.
@@ -88,66 +88,66 @@ def record_payment(tenant, student, amount, method, received_by, notes='', is_di
     raw_amount = Decimal(str(amount))
     final_amount = -abs(raw_amount) if is_withdrawal else abs(raw_amount)
 
-    payment = Payment.objects.create(
-        tenant=tenant,
-        student=student,
-        student_name=student.full_name if student else None,
-        amount=final_amount,
-        method=method,
-        received_by=received_by,
-        notes=notes,
-        is_discount=is_discount,
-        is_withdrawal=is_withdrawal,
-        created_by=user
-    )
+    with cast(Any, transaction.atomic()):
+        payment = Payment.objects.create(
+            tenant=tenant,
+            student=student,
+            student_name=student.full_name if student else None,
+            amount=final_amount,
+            method=method,
+            received_by=received_by,
+            notes=notes,
+            is_discount=is_discount,
+            is_withdrawal=is_withdrawal,
+            created_by=user
+        )
 
-    if student:
-        recalculate_student_financials(student)
+        if student:
+            recalculate_student_financials(student)
 
-    action_name = 'DISCOUNT_RECORDED' if is_discount else ('WITHDRAWAL_RECORDED' if is_withdrawal else 'PAYMENT_RECORDED')
-    log_audit_event(
-        action=action_name,
-        entity_type='Payment',
-        entity_id=payment.id,
-        tenant=tenant,
-        user=user,
-        description=f"{action_name}: {final_amount} UZS ({method}) for student {student.id if student else 'General'}",
-        changes={'amount': str(final_amount), 'method': method, 'received_by': received_by}
-    )
+        action_name = 'DISCOUNT_RECORDED' if is_discount else ('WITHDRAWAL_RECORDED' if is_withdrawal else 'PAYMENT_RECORDED')
+        log_audit_event(
+            action=action_name,
+            entity_type='Payment',
+            entity_id=payment.id,
+            tenant=tenant,
+            user=user,
+            description=f"{action_name}: {final_amount} UZS ({method}) for student {student.id if student else 'General'}",
+            changes={'amount': str(final_amount), 'method': method, 'received_by': received_by}
+        )
 
-    return payment
+        return payment
 
 
-@transaction.atomic
 def edit_payment(payment, amount, method, received_by, notes=None, user=None):
     """Edits an existing payment and updates student balance."""
     raw_amount = Decimal(str(amount))
     final_amount = -abs(raw_amount) if payment.is_withdrawal else abs(raw_amount)
 
-    old_amount = payment.amount
-    payment.amount = final_amount
-    payment.method = method
-    payment.received_by = received_by
-    if notes is not None:
-        payment.notes = notes
-    payment.save(update_fields=['amount', 'method', 'received_by', 'notes', 'updated_at'])
+    with cast(Any, transaction.atomic()):
+        old_amount = payment.amount
+        payment.amount = final_amount
+        payment.method = method
+        payment.received_by = received_by
+        if notes is not None:
+            payment.notes = notes
+        payment.save(update_fields=['amount', 'method', 'received_by', 'notes', 'updated_at'])
 
-    if payment.student:
-        recalculate_student_financials(payment.student)
+        if payment.student:
+            recalculate_student_financials(payment.student)
 
-    log_audit_event(
-        action='PAYMENT_UPDATED',
-        entity_type='Payment',
-        entity_id=payment.id,
-        tenant=payment.tenant,
-        user=user,
-        description=f"Payment {payment.id} modified from {old_amount} to {final_amount} UZS.",
-        changes={'old_amount': str(old_amount), 'new_amount': str(final_amount)}
-    )
-    return payment
+        log_audit_event(
+            action='PAYMENT_UPDATED',
+            entity_type='Payment',
+            entity_id=payment.id,
+            tenant=payment.tenant,
+            user=user,
+            description=f"Payment {payment.id} modified from {old_amount} to {final_amount} UZS.",
+            changes={'old_amount': str(old_amount), 'new_amount': str(final_amount)}
+        )
+        return payment
 
 
-@transaction.atomic
 def delete_payment(payment, user=None):
     """Deletes a payment and recalculates student balance."""
     payment_id = payment.id
@@ -155,18 +155,19 @@ def delete_payment(payment, user=None):
     tenant = payment.tenant
     amount = payment.amount
 
-    payment.delete()
+    with cast(Any, transaction.atomic()):
+        payment.delete()
 
-    if student:
-        recalculate_student_financials(student)
+        if student:
+            recalculate_student_financials(student)
 
-    log_audit_event(
-        action='PAYMENT_DELETED',
-        entity_type='Payment',
-        entity_id=payment_id,
-        tenant=tenant,
-        user=user,
-        description=f"Payment {payment_id} ({amount} UZS) was deleted.",
-        changes={'amount': str(amount)}
-    )
-    return True
+        log_audit_event(
+            action='PAYMENT_DELETED',
+            entity_type='Payment',
+            entity_id=payment_id,
+            tenant=tenant,
+            user=user,
+            description=f"Payment {payment_id} ({amount} UZS) was deleted.",
+            changes={'amount': str(amount)}
+        )
+        return True

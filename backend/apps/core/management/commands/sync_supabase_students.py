@@ -16,7 +16,7 @@ class Command(BaseCommand):
     help = 'Fetches and synchronizes all real students, folders, and settings from Supabase into CRM'
 
     def handle(self, *args, **options):
-        self.stdout.write(self.style.NOTICE("Connecting to Supabase to fetch real data..."))
+        self.stdout.write("Connecting to Supabase to fetch real data...")
 
         supabase_url = "https://ilzghipeqjfnunrznngn.supabase.co"
         anon_key = "sb_publishable_kU3BWKbGrbhZFVY7AbNpmg_ldE8JWDE"
@@ -191,7 +191,7 @@ class Command(BaseCommand):
         with urllib.request.urlopen(req_students) as response:
             supabase_students = json.loads(response.read().decode('utf-8'))
 
-        self.stdout.write(self.style.NOTICE(f"Fetched {len(supabase_students)} students from Supabase. Upserting..."))
+        self.stdout.write(f"Fetched {len(supabase_students)} students from Supabase. Upserting...")
 
         synced_count = 0
         for s in supabase_students:
