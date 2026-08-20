@@ -50,3 +50,25 @@ class PaymentOverviewStudentSerializer(serializers.ModelSerializer):
             'id', 'full_name', 'tariff', 'balance', 'discount',
             'student_group', 'is_deleted', 'phone1', 'office'
         )
+
+
+class PaymentMethodTemplateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PaymentMethodTemplate
+        fields = ('id', 'name', 'created_at')
+        read_only_fields = ('id', 'created_at')
+
+
+class PaymentReceiverTemplateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PaymentReceiverTemplate
+        fields = ('id', 'name', 'created_at')
+        read_only_fields = ('id', 'created_at')
+
+
+class PaymentNotePillSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PaymentNotePill
+        fields = ('id', 'name', 'created_at')
+        read_only_fields = ('id', 'created_at')
+

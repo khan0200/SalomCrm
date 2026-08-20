@@ -186,14 +186,10 @@ class Student(TenantAwareModel):
 
     def save(self, *args, **kwargs):
         # Enforce uppercase on alphanumeric ID, name, passport, address
-        if self.id:
-            self.id = self.id.strip().upper()
-        if self.full_name:
-            self.full_name = self.full_name.strip().upper()
-        if self.passport:
-            self.passport = self.passport.strip().upper()
-        if self.address:
-            self.address = self.address.strip().upper()
+        for attr in ('id', 'full_name', 'passport', 'address'):
+            val = getattr(self, attr, None)
+            if isinstance(val, str) and val:
+                setattr(self, attr, val.strip().upper())
         super().save(*args, **kwargs)
 
 
@@ -245,5 +241,26 @@ class CoordinatorOption(TenantAwareModel):
 
     class Meta:
         db_table = 'crm_coordinators'
+        unique_together = ('tenant', 'name')
+        ordering = ['name']
+
+
+class UniversityOption(TenantAwareModel):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=255)
+
+    class Meta:
+        db_table = 'crm_universities'
+        unique_together = ('tenant', 'name')
+        ordering = ['name']
+
+
+class UniversityStatusOption(TenantAwareModel):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=100)
+    color_class = models.CharField(max_length=100, default='text-blue-500')
+
+    class Meta:
+        db_table = 'crm_university_statuses'
         unique_together = ('tenant', 'name')
         ordering = ['name']

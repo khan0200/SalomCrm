@@ -1,0 +1,12 @@
+[tool.pyright]
+include = ["backend"]
+venvPath = "."
+venv = ".venv"
+extraPaths = [
+  "backend"
+]
+pythonVersion = "3.12"
+pythonPlatform = "Windows"
+reportMissingTypeStubs = "none"
+reportIncompatibleVariableOverride = "none"
+reportIncompatibleMethodOverride = "none"

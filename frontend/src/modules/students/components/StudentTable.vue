@@ -18,27 +18,27 @@ const emit = defineEmits<{
 
 <template>
   <div class="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 overflow-hidden shadow-xs">
-    <div class="overflow-x-auto">
-      <table class="w-full text-left border-collapse">
+    <div class="overflow-x-auto scrollbar-thin">
+      <table class="w-full text-left border-collapse min-w-[900px]">
         <!-- Table Header -->
         <thead>
-          <tr class="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/60 text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 select-none">
+          <tr class="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/90 dark:bg-zinc-800/60 text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 select-none">
             <!-- ID (Sortable) -->
             <th
               @click="emit('toggle-sort')"
-              class="px-3 py-3 cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors w-16"
+              class="px-4 py-3 cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors w-16"
             >
-              <div class="flex items-center gap-1 text-brand-500">
+              <div class="flex items-center gap-1 text-blue-600 dark:text-blue-400">
                 <span>ID</span>
                 <ChevronDown v-if="sortOrder === 'asc'" class="w-3.5 h-3.5" />
                 <ChevronUp v-else class="w-3.5 h-3.5" />
               </div>
             </th>
-            <th class="px-3 py-3 max-w-[280px]">Full Name</th>
-            <th class="px-3 py-3">Phone</th>
-            <th class="px-3 py-3">Level</th>
-            <th class="px-3 py-3 max-w-[240px]">University Choices</th>
-            <th class="px-3 py-3 text-right w-12">Actions</th>
+            <th class="px-4 py-3 w-[36%]">FULL NAME</th>
+            <th class="px-4 py-3 w-[15%]">PHONE</th>
+            <th class="px-4 py-3 w-[18%]">LEVEL</th>
+            <th class="px-4 py-3 w-[25%]">UNIVERSITY</th>
+            <th class="px-4 py-3 text-right w-[6%]">ACTIONS</th>
           </tr>
         </thead>
 
@@ -46,8 +46,8 @@ const emit = defineEmits<{
         <tbody class="divide-y divide-zinc-100 dark:divide-zinc-850">
           <tr v-if="isLoading">
             <td colspan="6" class="p-12 text-center text-zinc-400">
-              <Loader2 class="w-6 h-6 animate-spin mx-auto text-brand-500 mb-2" />
-              <span>Loading roster data...</span>
+              <Loader2 class="w-6 h-6 animate-spin mx-auto text-blue-600 mb-2" />
+              <span class="text-xs font-medium">Loading roster data...</span>
             </td>
           </tr>
 

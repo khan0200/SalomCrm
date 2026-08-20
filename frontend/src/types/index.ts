@@ -119,6 +119,8 @@ export interface Student {
   // Financial
   balance: number
   discount: number
+  invoice_sum?: number
+  payments_sum?: number
 
   // Documents Checklist & Hand counts
   pick_needed?: string[]
@@ -143,6 +145,8 @@ export interface Student {
   embassy_mother_docs?: string[]
   embassy_sponsor_notes?: string | null
   status_row_color?: string | null
+  folders?: { id: string; name: string }[]
+  folder_names?: string[]
 
   // Management Metadata
   office?: string | null

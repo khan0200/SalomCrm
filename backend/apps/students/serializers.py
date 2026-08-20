@@ -47,11 +47,14 @@ class StudentDetailSerializer(serializers.ModelSerializer):
     Full comprehensive serializer for Student Detail Drawer and standalone detail view.
     """
     folder_ids = serializers.PrimaryKeyRelatedField(many=True, read_only=True, source='folders')
-    creator_name = serializers.CharField(source='created_by.full_name', read_only=True)
+    creator_name = serializers.SerializerMethodField()
 
     class Meta:
         model = Student
         fields = '__all__'
+
+    def get_creator_name(self, obj):
+        return getattr(obj.created_by, 'full_name', None) if getattr(obj, 'created_by', None) else None
 
 
 class StudentCreateUpdateSerializer(serializers.ModelSerializer):
@@ -94,6 +97,9 @@ class StudentCreateUpdateSerializer(serializers.ModelSerializer):
             instance.folders.set(folder_ids)
         return instance
 
+    def to_representation(self, instance):
+        return StudentDetailSerializer(instance, context=self.context).data
+
 
 class StudentSetColorSerializer(serializers.Serializer):
     row_color = serializers.CharField(required=False, allow_null=True, allow_blank=True)
@@ -101,4 +107,56 @@ class StudentSetColorSerializer(serializers.Serializer):
 
 
 class StudentSetFoldersSerializer(serializers.Serializer):
-    folder_ids = serializers.ListField(child=serializers.UUIDField())
+    folder_ids = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True, default=list)
+
+
+class TariffOptionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TariffOption
+        fields = ('id', 'name', 'price', 'created_at')
+        read_only_fields = ('id', 'created_at')
+
+
+class EducationLevelOptionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EducationLevelOption
+        fields = ('id', 'name', 'created_at')
+        read_only_fields = ('id', 'created_at')
+
+
+class StudentGroupOptionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = StudentGroupOption
+        fields = ('id', 'name', 'created_at')
+        read_only_fields = ('id', 'created_at')
+
+
+class LeadSourceOptionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = LeadSourceOption
+        fields = ('id', 'name', 'created_at')
+        read_only_fields = ('id', 'created_at')
+
+
+class CoordinatorOptionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CoordinatorOption
+        fields = ('id', 'name', 'created_at')
+        read_only_fields = ('id', 'created_at')
+
+
+class UniversityOptionSerializer(serializers.ModelSerializer):
+    class Meta:
+        from .models import UniversityOption
+        model = UniversityOption
+        fields = ('id', 'name', 'created_at')
+        read_only_fields = ('id', 'created_at')
+
+
+class UniversityStatusOptionSerializer(serializers.ModelSerializer):
+    class Meta:
+        from .models import UniversityStatusOption
+        model = UniversityStatusOption
+        fields = ('id', 'name', 'color_class', 'created_at')
+        read_only_fields = ('id', 'created_at')
+

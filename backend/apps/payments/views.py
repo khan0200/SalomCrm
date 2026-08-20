@@ -277,3 +277,42 @@ class PaymentExportView(APIView):
         )
         response['Content-Disposition'] = 'attachment; filename="salom_crm_payment_history.xlsx"'
         return response
+
+
+class BasePaymentOptionViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsTenantUser]
+    pagination_class = None
+
+    def get_queryset(self):
+        user = self.request.user
+        tenant = getattr(self.request, 'tenant', None) or getattr(user, 'tenant', None)
+        if not tenant:
+            return self.model_class.objects.none()
+        return self.model_class.objects.filter(tenant=tenant)
+
+    def perform_create(self, serializer):
+        user = self.request.user
+        tenant = getattr(self.request, 'tenant', None) or getattr(user, 'tenant', None)
+        serializer.save(tenant=tenant)
+
+
+class PaymentMethodTemplateViewSet(BasePaymentOptionViewSet):
+    from .models import PaymentMethodTemplate
+    from .serializers import PaymentMethodTemplateSerializer
+    model_class = PaymentMethodTemplate
+    serializer_class = PaymentMethodTemplateSerializer
+
+
+class PaymentReceiverTemplateViewSet(BasePaymentOptionViewSet):
+    from .models import PaymentReceiverTemplate
+    from .serializers import PaymentReceiverTemplateSerializer
+    model_class = PaymentReceiverTemplate
+    serializer_class = PaymentReceiverTemplateSerializer
+
+
+class PaymentNotePillViewSet(BasePaymentOptionViewSet):
+    from .models import PaymentNotePill
+    from .serializers import PaymentNotePillSerializer
+    model_class = PaymentNotePill
+    serializer_class = PaymentNotePillSerializer
+

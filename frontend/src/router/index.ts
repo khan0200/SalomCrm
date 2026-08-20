@@ -39,6 +39,12 @@ const routes = [
         meta: { title: 'Status Board' }
       },
       {
+        path: 'settings',
+        name: 'settings',
+        component: () => import('@/modules/settings/SettingsPage.vue'),
+        meta: { title: 'Settings' }
+      },
+      {
         path: 'tenants',
         name: 'tenants',
         component: TenantsPage,

@@ -1,9 +1,11 @@
 import uuid
+from typing import Any
 from django.db import models
 from django.conf import settings
 
 class TimeStampedModel(models.Model):
     """Abstract model providing self-updating created_at and updated_at fields."""
+    id: Any
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -22,6 +24,7 @@ class TenantAwareModel(TimeStampedModel):
     Abstract model for every entity that belongs strictly to a tenant.
     Guarantees tenant field and created_by audit link.
     """
+    id: Any
     tenant = models.ForeignKey(
         'tenants.Tenant',
         on_delete=models.CASCADE,

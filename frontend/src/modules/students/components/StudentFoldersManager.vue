@@ -1,15 +1,14 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import type { Folder } from '@/types'
-import { Folder as FolderIcon, Plus, EyeOff, Trash2, Layers } from 'lucide-vue-next'
+import { Plus, X } from 'lucide-vue-next'
 import BaseModal from '@/components/common/BaseModal.vue'
 
 const props = defineProps<{
   folders: Folder[]
   activeFolder: string
-  totalCount?: number
-  isDeletedActive?: boolean
-  isHiddenActive?: boolean
+  totalCount: number
+  folderCounts?: Record<string, number>
 }>()
 
 const emit = defineEmits<{
@@ -27,77 +26,123 @@ const handleCreate = () => {
   newFolderName.value = ''
   isCreateModalOpen.value = false
 }
+
+const activeFolderName = computed(() => {
+  if (props.activeFolder === 'all') return 'All'
+  if (props.activeFolder === 'except') return 'Except'
+  if (props.activeFolder === 'deleted' || props.activeFolder === 'archive') return 'Archive'
+  if (props.activeFolder === 'hidden') return 'Hidden'
+  const f = props.folders.find(x => String(x.id) === String(props.activeFolder))
+  return f ? f.name : props.activeFolder
+})
 </script>
 
 <template>
-  <div class="flex items-center gap-1.5 overflow-x-auto py-1 select-none text-xs">
-    <!-- All Students Tab -->
-    <button
-      @click="emit('select', 'all')"
-      class="px-3.5 py-1.5 rounded-xl font-bold border transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
-      :class="activeFolder === 'all' ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 border-transparent shadow-xs' : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800'"
-    >
-      <Layers class="w-3.5 h-3.5" />
-      <span>All Students</span>
-    </button>
+  <div class="space-y-2 select-none">
+    <!-- Folder Tabs Row -->
+    <div class="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-2.5 px-1 overflow-x-auto scrollbar-none gap-4">
+      <!-- Left Folder Tabs -->
+      <div class="flex items-center gap-3 sm:gap-5 min-w-0 flex-nowrap">
+        <!-- All Tab -->
+        <button
+          @click="emit('select', 'all')"
+          class="relative text-sm font-semibold transition-all cursor-pointer whitespace-nowrap pb-2.5 -mb-3 border-b-2 shrink-0"
+          :class="[
+            activeFolder === 'all'
+              ? 'text-blue-600 dark:text-blue-400 border-blue-600 dark:border-blue-400 font-bold'
+              : 'text-zinc-600 dark:text-zinc-400 border-transparent hover:text-zinc-900 dark:hover:text-zinc-100'
+          ]"
+        >
+          <span>All</span>
+          <span
+            class="ml-1 text-xs font-normal"
+            :class="activeFolder === 'all' ? 'text-blue-600 dark:text-blue-400 font-semibold' : 'text-zinc-400 dark:text-zinc-500'"
+          >
+            ({{ folderCounts?.all ?? totalCount }})
+          </span>
+        </button>
 
-    <!-- Except Folders Tab -->
-    <button
-      @click="emit('select', 'except')"
-      class="px-3.5 py-1.5 rounded-xl font-bold border transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
-      :class="activeFolder === 'except' ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 border-transparent shadow-xs' : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800'"
-    >
-      <span>Except Folders</span>
-    </button>
+        <!-- Custom Folder Tabs -->
+        <button
+          v-for="folder in folders.filter(f => f.name?.toUpperCase() !== 'KDB')"
+          :key="folder.id"
+          @click="emit('select', folder.id)"
+          class="relative text-sm font-semibold transition-all cursor-pointer whitespace-nowrap pb-2.5 -mb-3 border-b-2 shrink-0"
+          :class="[
+            String(activeFolder) === String(folder.id)
+              ? 'text-blue-600 dark:text-blue-400 border-blue-600 dark:border-blue-400 font-bold'
+              : 'text-zinc-600 dark:text-zinc-400 border-transparent hover:text-zinc-900 dark:hover:text-zinc-100'
+          ]"
+        >
+          <span>{{ folder.name }}</span>
+          <span
+            class="ml-1 text-xs font-normal"
+            :class="String(activeFolder) === String(folder.id) ? 'text-blue-600 dark:text-blue-400 font-semibold' : 'text-zinc-400 dark:text-zinc-500'"
+          >
+            ({{ folderCounts?.[folder.id] ?? folder.student_count ?? 0 }})
+          </span>
+        </button>
 
-    <!-- Custom Folder Tabs -->
-    <button
-      v-for="f in folders"
-      :key="f.id"
-      @click="emit('select', f.id)"
-      class="px-3.5 py-1.5 rounded-xl font-bold border transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
-      :class="activeFolder === f.id ? 'bg-brand-500 text-white border-brand-500 shadow-xs' : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800'"
-    >
-      <FolderIcon class="w-3.5 h-3.5" />
-      <span>{{ f.name }}</span>
-      <span
-        v-if="f.student_count !== undefined"
-        class="px-1.5 py-0.2 rounded-full text-[10px]"
-        :class="activeFolder === f.id ? 'bg-white/20 text-white' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500'"
-      >
-        {{ f.student_count }}
-      </span>
-    </button>
+        <!-- Add Folder Button -->
+        <button
+          @click="isCreateModalOpen = true"
+          class="inline-flex items-center justify-center p-1 text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400 rounded-md hover:bg-blue-50 dark:hover:bg-zinc-800 transition-colors cursor-pointer shrink-0"
+          title="Create New Folder"
+        >
+          <Plus class="w-3.5 h-3.5" />
+        </button>
+      </div>
 
-    <!-- + Add Folder Button -->
-    <button
-      @click="isCreateModalOpen = true"
-      class="px-2.5 py-1.5 rounded-xl font-bold border border-dashed border-zinc-300 dark:border-zinc-700 text-zinc-500 hover:text-brand-500 hover:border-brand-500 transition-colors cursor-pointer flex items-center gap-1 shrink-0"
-      title="Create New Folder"
-    >
-      <Plus class="w-3.5 h-3.5" />
-      <span>Folder</span>
-    </button>
+      <!-- Right Folder Tabs (Except & Archive) -->
+      <div class="flex items-center gap-3 sm:gap-4 shrink-0 pl-2">
+        <!-- Except Tab -->
+        <button
+          @click="emit('select', 'except')"
+          class="relative text-sm font-semibold transition-all cursor-pointer whitespace-nowrap pb-2.5 -mb-3 border-b-2"
+          :class="[
+            activeFolder === 'except'
+              ? 'text-blue-600 dark:text-blue-400 border-blue-600 dark:border-blue-400 font-bold'
+              : 'text-zinc-600 dark:text-zinc-400 border-transparent hover:text-zinc-900 dark:hover:text-zinc-100'
+          ]"
+        >
+          <span>Except</span>
+          <span
+            class="ml-1 text-xs font-normal"
+            :class="activeFolder === 'except' ? 'text-blue-600 dark:text-blue-400 font-semibold' : 'text-zinc-400 dark:text-zinc-500'"
+          >
+            ({{ folderCounts?.except ?? 0 }})
+          </span>
+        </button>
 
-    <!-- Hidden & Archive Tabs on right -->
-    <div class="ml-auto flex items-center gap-1.5 pl-2 shrink-0">
-      <button
-        @click="emit('select', 'hidden')"
-        class="px-3 py-1.5 rounded-xl font-bold border transition-all cursor-pointer flex items-center gap-1.5"
-        :class="activeFolder === 'hidden' ? 'bg-amber-500 text-white border-amber-500 shadow-xs' : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/20'"
-      >
-        <EyeOff class="w-3.5 h-3.5" />
-        <span>Hidden</span>
-      </button>
+        <!-- Archive Tab -->
+        <button
+          @click="emit('select', 'deleted')"
+          class="relative text-sm font-semibold transition-all cursor-pointer whitespace-nowrap pb-2.5 -mb-3 border-b-2"
+          :class="[
+            activeFolder === 'deleted' || activeFolder === 'archive'
+              ? 'text-blue-600 dark:text-blue-400 border-blue-600 dark:border-blue-400 font-bold'
+              : 'text-zinc-600 dark:text-zinc-400 border-transparent hover:text-zinc-900 dark:hover:text-zinc-100'
+          ]"
+        >
+          <span>Archive</span>
+          <span
+            class="ml-1 text-xs font-normal"
+            :class="activeFolder === 'deleted' || activeFolder === 'archive' ? 'text-blue-600 dark:text-blue-400 font-semibold' : 'text-zinc-400 dark:text-zinc-500'"
+          >
+            ({{ folderCounts?.deleted ?? 0 }})
+          </span>
+        </button>
+      </div>
+    </div>
 
-      <button
-        @click="emit('select', 'deleted')"
-        class="px-3 py-1.5 rounded-xl font-bold border transition-all cursor-pointer flex items-center gap-1.5"
-        :class="activeFolder === 'deleted' ? 'bg-rose-600 text-white border-rose-600 shadow-xs' : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/20'"
-      >
-        <Trash2 class="w-3.5 h-3.5" />
-        <span>Archive</span>
-      </button>
+    <!-- Subtitle Bar matching the screenshot -->
+    <div class="flex items-center justify-between text-[11px] text-zinc-400 dark:text-zinc-500 px-1 pt-0.5 select-none">
+      <div class="italic">
+        Showing all students in <span class="font-medium text-zinc-600 dark:text-zinc-300">{{ activeFolderName }}</span>
+      </div>
+      <div class="italic">
+        Total {{ totalCount }} students
+      </div>
     </div>
 
     <!-- Create Folder Modal -->
@@ -114,9 +159,9 @@ const handleCreate = () => {
           <input
             v-model="newFolderName"
             type="text"
-            placeholder="e.g. VIP 2026, Fall Intake"
+            placeholder="e.g. Jeonju, WOOSUK, NEXT SEMESTER"
             required
-            class="w-full px-3 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-xs font-medium focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none"
+            class="w-full px-3 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-xs font-medium focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
           />
         </div>
         <div class="flex items-center justify-end gap-2">
@@ -129,7 +174,7 @@ const handleCreate = () => {
           </button>
           <button
             type="submit"
-            class="px-4 py-1.5 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-xs font-bold shadow-xs cursor-pointer"
+            class="px-4 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs cursor-pointer"
           >
             Create Folder
           </button>

@@ -15,12 +15,18 @@ import StatusKdbTable from './components/StatusKdbTable.vue'
 import KdbDatePickerModal from './components/KdbDatePickerModal.vue'
 import EmbassyDocumentsDrawer from './components/EmbassyDocumentsDrawer.vue'
 
+import { useStudentDashboardStore } from '@/stores/studentDashboard'
+
 const queryClient = useQueryClient()
 const uiStore = useUiStore()
+const dashboardStore = useStudentDashboardStore()
 
 // State
 const activeTab = ref<'general' | 'kdb'>('general')
-const searchQuery = ref('')
+const searchQuery = computed({
+  get: () => dashboardStore.searchQuery,
+  set: (v) => dashboardStore.searchQuery = v,
+})
 const activeFolder = ref('all')
 const showHidden = ref(false)
 const currentPage = ref(1)

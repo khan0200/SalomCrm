@@ -1,0 +1,31 @@
+{
+  "include": [
+    "backend"
+  ],
+  "exclude": [
+    "**/node_modules/**",
+    "**/__pycache__/**",
+    "**/__pyrefly_virtual__/**"
+  ],
+  "venvPath": ".",
+  "venv": ".venv",
+  "extraPaths": [
+    "backend",
+    "c:/Users/User/Desktop/SalomCrm/backend"
+  ],
+  "pythonVersion": "3.12",
+  "pythonPlatform": "Windows",
+  "reportMissingTypeStubs": "none",
+  "reportUnknownMemberType": "none",
+  "reportIncompatibleVariableOverride": "none",
+  "reportIncompatibleMethodOverride": "none",
+  "executionEnvironments": [
+    {
+      "root": "backend",
+      "extraPaths": [
+        "backend",
+        "c:/Users/User/Desktop/SalomCrm/backend"
+      ]
+    }
+  ]
+}

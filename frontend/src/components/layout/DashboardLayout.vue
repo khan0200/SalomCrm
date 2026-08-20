@@ -5,12 +5,14 @@ import NotificationToast from '@/components/common/NotificationToast.vue'
 </script>
 
 <template>
-  <div class="flex h-screen w-screen overflow-hidden bg-zinc-50 dark:bg-zinc-950 font-sans text-zinc-900 dark:text-zinc-100">
+  <div class="flex h-screen w-screen overflow-hidden bg-zinc-50 dark:bg-[#0b0d0e] font-sans text-zinc-900 dark:text-zinc-100">
     <AppSidebar />
-    <div class="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
+    <div class="flex flex-1 flex-col overflow-hidden min-w-0">
       <AppHeader />
-      <main class="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-7">
-        <router-view />
+      <main class="flex-1 overflow-y-auto min-w-0" id="main-content">
+        <div class="p-4 sm:p-5 lg:p-6 min-w-0">
+          <router-view />
+        </div>
       </main>
     </div>
     <NotificationToast />

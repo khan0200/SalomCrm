@@ -51,6 +51,9 @@ class Command(BaseCommand):
 
         # Folders
         folder_kdb, _ = Folder.objects.get_or_create(tenant=tenant_ub, name='KDB')
+        folder_jeonju, _ = Folder.objects.get_or_create(tenant=tenant_ub, name='Jeonju')
+        folder_woosuk, _ = Folder.objects.get_or_create(tenant=tenant_ub, name='WOOSUK')
+        folder_next, _ = Folder.objects.get_or_create(tenant=tenant_ub, name='NEXT SEMESTER')
         folder_vip, _ = Folder.objects.get_or_create(tenant=tenant_ub, name='VIP 2026')
         folder_march, _ = Folder.objects.get_or_create(tenant=tenant_ub, name='March Intake')
 
@@ -116,8 +119,110 @@ class Command(BaseCommand):
         for p in pills:
             PaymentNotePill.objects.get_or_create(tenant=tenant_ub, name=p)
 
+        unis = [
+            'JEONJU UNIVERSITY (WANSAN, JEONJU)',
+            'WOOSUK UNIVERSITY (WANJU, JEOLLABUK-DO)',
+            'HANYANG UNIVERSITY (SEONGDONG, SEOUL)',
+            'INHA UNIVERSITY (MICHUHOL, INCHEON)',
+            'SEJONG UNIVERSITY (GWANGJIN, SEOUL)',
+            'KOOKMIN UNIVERSITY (SEONGBUK, SEOUL)',
+            'YEUNGNAM UNIVERSITY (GYEONGSAN, GYEONGSANGBUK-DO)',
+            'BUSAN UNIVERSITY OF FOREIGN STUDIES (GEUMJEONG, BUSAN)',
+            'KYUNGPOOK NATIONAL UNIVERSITY (BUK-GU, DAEGU)',
+        ]
+        from apps.students.models import UniversityOption, UniversityStatusOption
+        for u in unis:
+            UniversityOption.objects.get_or_create(tenant=tenant_ub, name=u)
+
+        statuses = [
+            ('Chosen', 'text-blue-500'),
+            ('Applying', 'text-amber-500'),
+            ('Applied', 'text-purple-500'),
+            ('Waiting', 'text-orange-500'),
+            ('Accepted', 'text-emerald-500'),
+            ('Rejected', 'text-red-500'),
+            ('Passed', 'text-teal-500'),
+        ]
+        for s_name, s_color in statuses:
+            UniversityStatusOption.objects.get_or_create(tenant=tenant_ub, name=s_name, defaults={'color_class': s_color})
+
         # 5. Seed Sample Students for Unibridge
         sample_students = [
+            {
+                'id': 'CF2',
+                'full_name': 'MAKHAMADAMINOV ABDULLOKH SANJARBEK UGLI',
+                'passport': 'FA8877665',
+                'phone1': '94-187-76-82',
+                'phone2': '58-888-94-74',
+                'level': 'COLLEGE',
+                'tariff': None,
+                'language_certificate': 'TOPIK',
+                'certificate_score': '2',
+                'office': 'TOSHKENT OFFIS',
+                'student_group': '2026 Spring',
+                'lead_by': 'Instagram',
+                'coordinator': 'BAXTIYOR',
+                'invoice': 'NOT TAKEN',
+                'coa': 'NOT TAKEN',
+                'folders': [folder_jeonju],
+            },
+            {
+                'id': 'D1',
+                'full_name': 'ISAKJONOV MUKHAMMADIYOR NAVRUZBEK UGLI',
+                'passport': 'FB1122334',
+                'phone1': '88-146-47-87',
+                'phone2': '88-083-56-83',
+                'level': 'COLLEGE',
+                'level2': 'LANGUAGE COURSE',
+                'tariff': 'VISA PLUS',
+                'language_certificate': 'TOPIK',
+                'certificate_score': '2',
+                'office': 'ANDIJON OFFIS',
+                'student_group': '2026 Spring',
+                'lead_by': 'Telegram',
+                'coordinator': 'ABDULAZIZ',
+                'invoice': 'NOT TAKEN',
+                'coa': 'NOT TAKEN',
+                'folders': [folder_woosuk],
+            },
+            {
+                'id': 'F4',
+                'full_name': 'SUYUNOV ABDUSHUKUR ABDIMUMIN UGLI',
+                'passport': 'FC9988112',
+                'phone1': '91-188-08-68',
+                'phone2': '91-134-06-01',
+                'level': 'MASTERS',
+                'tariff': 'E-VISA (TIL SERTIFIKATLI)',
+                'language_certificate': 'TOPIK',
+                'certificate_score': 'EXPECTED',
+                'office': 'TOSHKENT OFFIS',
+                'student_group': '2026 Fall',
+                'lead_by': 'Instagram',
+                'coordinator': 'MUHAMMADALI',
+                'invoice': 'NOT TAKEN',
+                'coa': 'NOT TAKEN',
+                'folders': [folder_next],
+            },
+            {
+                'id': 'F5',
+                'full_name': 'SAIDBOEV SOKHIDULLO MIRZAKHMAD UGLI',
+                'passport': 'FD4455667',
+                'phone1': '94-252-15-10',
+                'phone2': '50-886-60-38',
+                'level': 'MASTER NO CERTIFICATE',
+                'tariff': 'E-VISA (TIL SERTIFIKATSIZ)',
+                'language_certificate': 'NO CERTIFICATE',
+                'university_1': 'JEONJU UNIVERSITY (WANSAN, JEONJU)',
+                'university_1_status': 'Accepted',
+                'office': 'TOSHKENT OFFIS',
+                'student_group': '2026 Spring',
+                'lead_by': 'Tavsiya (Friend)',
+                'coordinator': 'MUSLIHIDDIN',
+                'invoice': 'PAID',
+                'coa': 'TAKEN',
+                'row_color': 'EMERALD',
+                'folders': [folder_jeonju],
+            },
             {
                 'id': 'UB101',
                 'full_name': 'RUSTAMOV AZIZBEK ANVAR OGLI',
