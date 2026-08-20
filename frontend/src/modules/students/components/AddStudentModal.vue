@@ -140,8 +140,8 @@ watch(() => props.isOpen, (newVal) => {
     studentId.value = ''
     fullName.value = ''
     office.value = officeOptions.value[0] || ''
-    tariff.value = tariffOptions.value[0] || ''
-    level.value = levelOptions.value[0] || ''
+    tariff.value = ''
+    level.value = ''
     university1.value = ''
     studentGroup.value = ''
     leadBy.value = ''
@@ -366,7 +366,7 @@ const handleSubmit = async () => {
                   <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <!-- Tariff -->
                     <div>
-                      <label class="block text-xs font-semibold text-zinc-600 dark:text-zinc-400 mb-1 flex items-center gap-1">
+                       <label class="block text-xs font-semibold text-zinc-600 dark:text-zinc-400 mb-1 flex items-center gap-1">
                         <Award class="h-3 w-3 text-blue-600 dark:text-blue-400" />
                         Tariff
                       </label>
@@ -375,7 +375,7 @@ const handleSubmit = async () => {
                         :disabled="submitting || modalSuccess"
                         class="w-full px-3 py-2 border border-zinc-200 dark:border-zinc-700 rounded-xl bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all text-sm cursor-pointer"
                       >
-                        <option value="">Select Tariff (Optional)</option>
+                        <option value="">Select</option>
                         <option v-for="t in tariffOptions" :key="t" :value="t">{{ t }}</option>
                       </select>
                     </div>
@@ -391,7 +391,7 @@ const handleSubmit = async () => {
                         :disabled="submitting || modalSuccess"
                         class="w-full px-3 py-2 border border-zinc-200 dark:border-zinc-700 rounded-xl bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all text-sm cursor-pointer"
                       >
-                        <option value="">Select Level (Optional)</option>
+                        <option value="">Select</option>
                         <option v-for="lvl in levelOptions" :key="lvl" :value="lvl">{{ lvl }}</option>
                       </select>
                     </div>

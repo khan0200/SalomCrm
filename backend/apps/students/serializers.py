@@ -160,3 +160,19 @@ class UniversityStatusOptionSerializer(serializers.ModelSerializer):
         fields = ('id', 'name', 'color_class', 'created_at')
         read_only_fields = ('id', 'created_at')
 
+
+class SchoolDirectorySerializer(serializers.ModelSerializer):
+    class Meta:
+        from .models import SchoolDirectory
+        model = SchoolDirectory
+        fields = ('id', 'name', 'address', 'website', 'phone', 'email', 'created_at', 'updated_at')
+        read_only_fields = ('id', 'created_at', 'updated_at')
+
+
+class MajorOptionSerializer(serializers.ModelSerializer):
+    class Meta:
+        from .models import MajorOption
+        model = MajorOption
+        fields = ('id', 'name', 'created_at')
+        read_only_fields = ('id', 'created_at')
+

@@ -15,14 +15,15 @@ from apps.core.permissions import IsTenantUser, IsTenantHeadManager
 from .models import (
     Student, Folder, TariffOption, EducationLevelOption,
     StudentGroupOption, LeadSourceOption, CoordinatorOption,
-    UniversityOption, UniversityStatusOption
+    UniversityOption, UniversityStatusOption, SchoolDirectory, MajorOption
 )
 from .serializers import (
     StudentListSerializer, StudentDetailSerializer, StudentCreateUpdateSerializer,
     StudentSetColorSerializer, StudentSetFoldersSerializer, FolderSerializer,
     TariffOptionSerializer, EducationLevelOptionSerializer, StudentGroupOptionSerializer,
     LeadSourceOptionSerializer, CoordinatorOptionSerializer,
-    UniversityOptionSerializer, UniversityStatusOptionSerializer
+    UniversityOptionSerializer, UniversityStatusOptionSerializer,
+    SchoolDirectorySerializer, MajorOptionSerializer
 )
 from .services import archive_student, restore_student, permanent_delete_student
 
@@ -570,3 +571,58 @@ class UniversityOptionViewSet(BaseOptionViewSet):
 class UniversityStatusOptionViewSet(BaseOptionViewSet):
     model_class = UniversityStatusOption
     serializer_class = UniversityStatusOptionSerializer
+
+
+class SchoolDirectoryViewSet(BaseOptionViewSet):
+    model_class = SchoolDirectory
+    serializer_class = SchoolDirectorySerializer
+
+    @action(detail=False, methods=['post'], url_path='upsert')
+    def upsert(self, request: Request):
+        tenant = getattr(request, 'tenant', None) or getattr(request.user, 'tenant', None)
+        if not tenant:
+            return Response({'error': 'Tenant required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        name = str(request.data.get('name', '')).strip()
+        if not name:
+            return Response({'error': 'School name is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        address = request.data.get('address', None)
+        website = request.data.get('website', None)
+        phone = request.data.get('phone', None)
+        email = request.data.get('email', None)
+
+        school, created = SchoolDirectory.objects.update_or_create(
+            tenant=tenant,
+            name=name,
+            defaults={
+                'address': address if address is not None else '',
+                'website': website if website is not None else '',
+                'phone': phone if phone is not None else '',
+                'email': email if email is not None else '',
+                'created_by': request.user if request.user.is_authenticated else None
+            }
+        )
+        return Response(SchoolDirectorySerializer(school).data, status=status.HTTP_200_OK)
+
+
+class MajorOptionViewSet(BaseOptionViewSet):
+    model_class = MajorOption
+    serializer_class = MajorOptionSerializer
+
+    @action(detail=False, methods=['post'], url_path='upsert')
+    def upsert(self, request: Request):
+        tenant = getattr(request, 'tenant', None) or getattr(request.user, 'tenant', None)
+        if not tenant:
+            return Response({'error': 'Tenant required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        name = str(request.data.get('name', '')).strip().upper()
+        if not name:
+            return Response({'error': 'Major name is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        major, created = MajorOption.objects.get_or_create(
+            tenant=tenant,
+            name=name,
+            defaults={'created_by': request.user if request.user.is_authenticated else None}
+        )
+        return Response(MajorOptionSerializer(major).data, status=status.HTTP_200_OK)

@@ -264,3 +264,33 @@ class UniversityStatusOption(TenantAwareModel):
         db_table = 'crm_university_statuses'
         unique_together = ('tenant', 'name')
         ordering = ['name']
+
+
+class SchoolDirectory(TenantAwareModel):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=255, db_index=True)
+    address = models.TextField(blank=True, null=True)
+    website = models.CharField(max_length=255, blank=True, null=True)
+    phone = models.CharField(max_length=100, blank=True, null=True)
+    email = models.CharField(max_length=255, blank=True, null=True)
+
+    class Meta:
+        db_table = 'crm_schools'
+        unique_together = ('tenant', 'name')
+        ordering = ['name']
+
+    def __str__(self):
+        return f"{self.name} ({self.tenant.name})"
+
+
+class MajorOption(TenantAwareModel):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=255, db_index=True)
+
+    class Meta:
+        db_table = 'crm_majors'
+        unique_together = ('tenant', 'name')
+        ordering = ['name']
+
+    def __str__(self):
+        return f"{self.name} ({self.tenant.name})"

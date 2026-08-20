@@ -196,4 +196,24 @@ export const settingsApi = {
   deletePaymentNote: async (id: string) => {
     await apiClient.delete(`/payment-notes/${id}/`)
   },
+
+  // Schools Directory (Multi-Branch Database Sync)
+  getSchools: async (): Promise<any[]> => {
+    const res = await apiClient.get('/schools/')
+    return Array.isArray(res.data) ? res.data : (res.data?.results || [])
+  },
+  upsertSchool: async (data: { name: string; address?: string; website?: string; phone?: string; email?: string }): Promise<any> => {
+    const res = await apiClient.post('/schools/upsert/', data)
+    return res.data
+  },
+
+  // Majors Directory (Multi-Branch Database Sync)
+  getMajors: async (): Promise<GeneralOption[]> => {
+    const res = await apiClient.get('/majors/')
+    return Array.isArray(res.data) ? res.data : (res.data?.results || [])
+  },
+  upsertMajor: async (data: { name: string }): Promise<GeneralOption> => {
+    const res = await apiClient.post('/majors/upsert/', data)
+    return res.data
+  },
 }

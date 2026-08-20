@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/vue-query'
 import { settingsApi } from '@/api/settings'
 import type { Student } from '@/types'
 import { useCurrency } from '@/composables/useCurrency'
+import { UNIVERSITY_SUGGESTIONS, BUILTIN_SCHOOL_DIRECTORY, UZ_MAJOR_SUGGESTIONS, type SchoolEntry } from '@/data/schoolsData'
 import {
   User, Mail, Calendar, GraduationCap, Layers, Landmark,
   Tag, Building2, CheckSquare, Plus, Pencil, CheckCircle2,
@@ -176,10 +177,10 @@ const MAJOR_SUGGESTIONS = [
   "Korean Tourism Service Department"
 ]
 
-const showMajorSuggestions = ref(false)
+const showUniMajorSuggestions = ref(false)
 
-const filteredMajorSuggestions = computed(() => {
-  if (!showMajorSuggestions.value) return []
+const filteredUniMajorSuggestions = computed(() => {
+  if (!showUniMajorSuggestions.value) return []
   const query = tempMajorValue.value.toLowerCase().trim()
   if (query.length < 3) return []
   const unique = Array.from(new Set(MAJOR_SUGGESTIONS.map(s => s.trim())))
@@ -188,14 +189,16 @@ const filteredMajorSuggestions = computed(() => {
   return list
 })
 
-const selectMajorSuggestion = (sug: string) => {
+const selectUniMajorSuggestion = (sug: string) => {
   tempMajorValue.value = sug.toUpperCase()
-  showMajorSuggestions.value = false
+  showUniMajorSuggestions.value = false
 }
 
-const onMajorInput = () => {
-  showMajorSuggestions.value = tempMajorValue.value.trim().length >= 3
+const onUniMajorInput = () => {
+  showUniMajorSuggestions.value = tempMajorValue.value.trim().length >= 3
 }
+
+const testDateYears = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i)
 
 // Status Options
 const universityStatusList = [
@@ -564,17 +567,296 @@ const saveUniversityModal = () => {
     if (slot === 5) showUni5.value = false
   }
   isUniModalOpen.value = false
+}// ═════════════════════════════════════════════════════════════
+// Educational Background Modal (100% UniApp2 UX & Behavior)
+// ═════════════════════════════════════════════════════════════
+const gpaSystemManual = ref(false)
+const gradExpected = ref(false)
+const showSchoolSuggestions = ref(false)
+const showMajorSuggestions = ref(false)
+const savingSchool = ref(false)
+
+const EXPECTED_YEAR = 'EXPECTED'
+const ENTRY_MONTH = '09'
+const ENTRY_DAY = '02'
+const GRADUATION_MONTH = '07'
+const GRADUATION_DAY = '20'
+const DEFAULT_COURSE_YEARS = 4
+const GPA_SYSTEM_OPTIONS = ['4', '4.5', '5', '100', 'MANUAL ENTRY']
+
+const normalizeSuggestion = (s: string) =>
+  (s || '').toUpperCase().replace(/[ʻʼʽ‘’'`]/g, '').replace(/\s+/g, ' ').trim()
+
+const dedupeSuggestions = (values: (string | null | undefined)[], builtIn: string[]) => {
+  const known = new Set(builtIn.map(normalizeSuggestion))
+  const out: string[] = []
+  for (const raw of values) {
+    const value = (raw || '').trim()
+    if (!value) continue
+    const key = normalizeSuggestion(value)
+    if (known.has(key)) continue
+    known.add(key)
+    out.push(value.toUpperCase())
+  }
+  return out.sort((a, b) => a.localeCompare(b, 'en'))
+}
+
+const matchSuggestions = (list: string[], input: string) => {
+  const query = normalizeSuggestion(input)
+  if (!query) return []
+  if (list.some(s => normalizeSuggestion(s) === query)) return []
+  return list.filter(s => normalizeSuggestion(s).includes(query)).slice(0, 50)
+}
+
+const isFutureDate = (date: string) => {
+  if (!date) return false
+  const parsed = new Date(`${date}T00:00:00`)
+  if (isNaN(parsed.getTime())) return false
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  return parsed.getTime() > today.getTime()
+}
+
+// Persistent / Learned Custom School Directory & Suggestions
+const loadSavedSchoolDirectory = (): Record<string, SchoolEntry> => {
+  try {
+    const raw = localStorage.getItem('salom_crm_school_directory')
+    return raw ? JSON.parse(raw) : {}
+  } catch {
+    return {}
+  }
+}
+
+const loadSavedCustomSchools = (): string[] => {
+  try {
+    const raw = localStorage.getItem('salom_crm_custom_schools')
+    return raw ? JSON.parse(raw) : []
+  } catch {
+    return []
+  }
+}
+
+const loadSavedCustomMajors = (): string[] => {
+  try {
+    const raw = localStorage.getItem('salom_crm_custom_majors')
+    return raw ? JSON.parse(raw) : []
+  } catch {
+    return []
+  }
+}
+
+const customSchoolDirectory = ref<Record<string, SchoolEntry>>(loadSavedSchoolDirectory())
+const customSchools = ref<string[]>(loadSavedCustomSchools())
+const customMajors = ref<string[]>(loadSavedCustomMajors())
+
+// Database School & Major Directory (Multi-Branch Synchronization)
+const { data: dbSchoolsData, refetch: refetchDbSchools } = useQuery({
+  queryKey: ['schools-directory'],
+  queryFn: () => settingsApi.getSchools(),
+  staleTime: 1000 * 60 * 5,
+})
+
+const { data: dbMajorsData, refetch: refetchDbMajors } = useQuery({
+  queryKey: ['majors-directory'],
+  queryFn: () => settingsApi.getMajors(),
+  staleTime: 1000 * 60 * 5,
+})
+
+const getSchoolEntry = (schoolName: string): SchoolEntry | undefined => {
+  const norm = normalizeSuggestion(schoolName)
+  // 1. Check local recent edits
+  if (customSchoolDirectory.value[norm]) {
+    return customSchoolDirectory.value[norm]
+  }
+  // 2. Check Database records (synced from all branches)
+  if (Array.isArray(dbSchoolsData.value)) {
+    const found = dbSchoolsData.value.find((s: any) => normalizeSuggestion(s.name) === norm)
+    if (found) {
+      return {
+        name: found.name,
+        address: found.address || '',
+        website: found.website || '',
+        phone: found.phone || '',
+        email: found.email || ''
+      }
+    }
+  }
+  // 3. Check Built-in directory
+  return BUILTIN_SCHOOL_DIRECTORY[norm]
+}
+
+const allSchoolSuggestions = computed(() => {
+  const dbSchoolNames = Array.isArray(dbSchoolsData.value) ? dbSchoolsData.value.map((s: any) => s.name) : []
+  return dedupeSuggestions([...customSchools.value, ...dbSchoolNames, ...UNIVERSITY_SUGGESTIONS], [])
+})
+
+const allMajorSuggestions = computed(() => {
+  const dbMajorNames = Array.isArray(dbMajorsData.value) ? dbMajorsData.value.map((m: any) => m.name) : []
+  return dedupeSuggestions([...customMajors.value, ...dbMajorNames, ...UZ_MAJOR_SUGGESTIONS], [])
+})
+
+const schoolSuggestions = computed(() => {
+  return matchSuggestions(allSchoolSuggestions.value, schoolForm.value.final_school_name || '')
+})
+
+const uzMajorSuggestions = computed(() => {
+  return matchSuggestions(allMajorSuggestions.value, schoolForm.value.major || '')
+})
+
+const applySchoolDefaults = (schoolName: string, replace = false) => {
+  const known = getSchoolEntry(schoolName)
+  if (!known && !replace) return
+  if (replace) {
+    schoolForm.value.school_address = known?.address || ''
+    schoolForm.value.school_website = known?.website || ''
+    schoolForm.value.school_phone = known?.phone || ''
+    schoolForm.value.school_email = known?.email || ''
+  } else {
+    if (!schoolForm.value.school_address && known?.address) schoolForm.value.school_address = known.address
+    if (!schoolForm.value.school_website && known?.website) schoolForm.value.school_website = known.website
+    if (!schoolForm.value.school_phone && known?.phone) schoolForm.value.school_phone = known.phone
+    if (!schoolForm.value.school_email && known?.email) schoolForm.value.school_email = known.email
+  }
+}
+
+const onSchoolNameInput = (e: Event) => {
+  const val = ((e.target as HTMLInputElement).value || '').toUpperCase()
+  schoolForm.value.final_school_name = val
+  applySchoolDefaults(val, false)
+  showSchoolSuggestions.value = true
+}
+
+const selectSchoolSuggestion = (suggestion: string) => {
+  schoolForm.value.final_school_name = suggestion
+  applySchoolDefaults(suggestion, true)
+  showSchoolSuggestions.value = false
+}
+
+const onMajorInput = (e: Event) => {
+  const val = ((e.target as HTMLInputElement).value || '').toUpperCase()
+  schoolForm.value.major = val
+  showMajorSuggestions.value = true
+}
+
+const selectMajorSuggestion = (suggestion: string) => {
+  schoolForm.value.major = suggestion
+  showMajorSuggestions.value = false
+}
+
+// School Date Pickers
+const schoolCurrentYear = new Date().getFullYear()
+const schoolYears = Array.from({ length: 71 }, (_, i) => String(schoolCurrentYear + 10 - i))
+const schoolMonths = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0'))
+
+const getEntryDateParts = () => {
+  const parts = schoolForm.value.date_of_entry ? schoolForm.value.date_of_entry.split('-') : ['', '', '']
+  return { y: parts[0] || '', m: parts[1] || '', d: parts[2] || '' }
+}
+
+const getGradDateParts = () => {
+  const parts = schoolForm.value.date_of_graduation ? schoolForm.value.date_of_graduation.split('-') : ['', '', '']
+  return { y: parts[0] || '', m: parts[1] || '', d: parts[2] || '' }
+}
+
+const getDaysInMonth = (y: string, m: string) => {
+  const count = y && m ? new Date(parseInt(y), parseInt(m), 0).getDate() : 31
+  return Array.from({ length: count }, (_, i) => String(i + 1).padStart(2, '0'))
+}
+
+const updateEntryDate = (part: 'y' | 'm' | 'd', val: string) => {
+  const parts = getEntryDateParts()
+  if (val === '') {
+    schoolForm.value.date_of_entry = ''
+    return
+  }
+  if (part === 'y') {
+    const newY = val
+    schoolForm.value.date_of_entry = `${newY}-${ENTRY_MONTH}-${ENTRY_DAY}`
+    const gradYear = String(parseInt(newY) + DEFAULT_COURSE_YEARS)
+    const gradDate = `${gradYear}-${GRADUATION_MONTH}-${GRADUATION_DAY}`
+    const expected = isFutureDate(gradDate)
+    gradExpected.value = expected
+    schoolForm.value.date_of_graduation = expected ? '' : gradDate
+    return
+  }
+  let newY = parts.y || String(schoolCurrentYear)
+  let newM = part === 'm' ? val : (parts.m || '01')
+  let newD = part === 'd' ? val : (parts.d || '01')
+  const maxD = new Date(parseInt(newY), parseInt(newM), 0).getDate()
+  if (parseInt(newD) > maxD) newD = String(maxD).padStart(2, '0')
+  schoolForm.value.date_of_entry = `${newY}-${newM}-${newD}`
+}
+
+const updateGradDate = (part: 'y' | 'm' | 'd', val: string) => {
+  const parts = getGradDateParts()
+  if (val === '') {
+    gradExpected.value = false
+    schoolForm.value.date_of_graduation = ''
+    return
+  }
+  if (part === 'y' && val === EXPECTED_YEAR) {
+    gradExpected.value = true
+    schoolForm.value.date_of_graduation = ''
+    return
+  }
+  if (part === 'y') {
+    const newY = val
+    let newM = parts.m || GRADUATION_MONTH
+    let newD = parts.d || GRADUATION_DAY
+    const maxD = new Date(parseInt(newY), parseInt(newM), 0).getDate()
+    if (parseInt(newD) > maxD) newD = String(maxD).padStart(2, '0')
+    const fullDate = `${newY}-${newM}-${newD}`
+    const expected = isFutureDate(fullDate)
+    gradExpected.value = expected
+    schoolForm.value.date_of_graduation = fullDate
+    return
+  }
+  let newY = parts.y || String(schoolCurrentYear)
+  let newM = part === 'm' ? val : (parts.m || '01')
+  let newD = part === 'd' ? val : (parts.d || '01')
+  const maxD = new Date(parseInt(newY), parseInt(newM), 0).getDate()
+  if (parseInt(newD) > maxD) newD = String(maxD).padStart(2, '0')
+  const fullDate = `${newY}-${newM}-${newD}`
+  gradExpected.value = isFutureDate(fullDate)
+  schoolForm.value.date_of_graduation = fullDate
+}
+
+const handleGpaSystemChange = (e: Event) => {
+  const target = e.target as HTMLSelectElement
+  if (target.value === 'MANUAL ENTRY') {
+    gpaSystemManual.value = true
+    schoolForm.value.gpa_system = ''
+  } else {
+    schoolForm.value.gpa_system = target.value
+  }
+}
+
+const handleEntryDateChange = (part: 'y' | 'm' | 'd', e: Event) => {
+  const target = e.target as HTMLSelectElement
+  updateEntryDate(part, target.value)
+}
+
+const handleGradDateChange = (part: 'y' | 'm' | 'd', e: Event) => {
+  const target = e.target as HTMLSelectElement
+  updateGradDate(part, target.value)
 }
 
 // School Details Modal Handlers
 const openSchoolModal = () => {
   if (!props.student) return
   const s = props.student
+  const systemVal = (s.gpa_system || '').trim()
+  const isPreset = ['4', '4.5', '5', '100'].includes(systemVal)
+  gpaSystemManual.value = !isPreset && systemVal !== ''
+  
+  const isGradExp = s.graduation_expected ?? (isFutureDate(s.date_of_graduation || '') || !s.date_of_graduation)
+  gradExpected.value = !!isGradExp && (!s.date_of_graduation || isFutureDate(s.date_of_graduation))
+
   schoolForm.value = {
     final_school_name: s.final_school_name || '',
     major: s.major || '',
     gpa: s.gpa || '',
-    gpa_system: s.gpa_system || '4.5',
+    gpa_system: systemVal, // Default is "" so SYSTEM dropdown selects "Select" by default
     degree_no: s.degree_no || '',
     date_of_entry: s.date_of_entry || '',
     date_of_graduation: s.date_of_graduation || '',
@@ -583,17 +865,84 @@ const openSchoolModal = () => {
     school_phone: s.school_phone || '',
     school_email: s.school_email || ''
   }
+  showSchoolSuggestions.value = false
+  showMajorSuggestions.value = false
   isSchoolModalOpen.value = true
 }
 
-const saveSchoolModal = () => {
-  emit('update-student', schoolForm.value)
-  isSchoolModalOpen.value = false
+const saveSchoolModal = async () => {
+  savingSchool.value = true
+  try {
+    const schoolName = (schoolForm.value.final_school_name || '').trim()
+    const majorName = (schoolForm.value.major || '').trim()
+    
+    // Save new or edited school data for future autocomplete and auto-fill
+    if (schoolName) {
+      const norm = normalizeSuggestion(schoolName)
+      const updatedEntry: SchoolEntry = {
+        name: schoolName,
+        address: (schoolForm.value.school_address || '').trim(),
+        website: (schoolForm.value.school_website || '').trim(),
+        phone: (schoolForm.value.school_phone || '').trim(),
+        email: (schoolForm.value.school_email || '').trim()
+      }
+      
+      customSchoolDirectory.value = {
+        ...customSchoolDirectory.value,
+        [norm]: updatedEntry
+      }
+      try {
+        localStorage.setItem('salom_crm_school_directory', JSON.stringify(customSchoolDirectory.value))
+      } catch (e) {
+        console.error('Failed to save school directory to storage', e)
+      }
+
+      customSchools.value = dedupeSuggestions([...customSchools.value, schoolName], UNIVERSITY_SUGGESTIONS)
+      try {
+        localStorage.setItem('salom_crm_custom_schools', JSON.stringify(customSchools.value))
+      } catch (e) {
+        console.error('Failed to save custom schools to storage', e)
+      }
+
+      // Persist to Central Database for all branches to see
+      settingsApi.upsertSchool(updatedEntry)
+        .then(() => refetchDbSchools())
+        .catch(e => console.error('Database school sync error:', e))
+    }
+
+    // Save new or edited major for future autocomplete
+    if (majorName) {
+      customMajors.value = dedupeSuggestions([...customMajors.value, majorName], UZ_MAJOR_SUGGESTIONS)
+      try {
+        localStorage.setItem('salom_crm_custom_majors', JSON.stringify(customMajors.value))
+      } catch (e) {
+        console.error('Failed to save custom majors to storage', e)
+      }
+
+      // Persist to Central Database for all branches to see
+      settingsApi.upsertMajor({ name: majorName })
+        .then(() => refetchDbMajors())
+        .catch(e => console.error('Database major sync error:', e))
+    }
+
+    const cleaned: Record<string, any> = {}
+    for (const [k, v] of Object.entries(schoolForm.value)) {
+      if (typeof v === 'string') {
+        cleaned[k] = v.trim() === '' ? null : v.trim()
+      } else {
+        cleaned[k] = v
+      }
+    }
+    cleaned.graduation_expected = gradExpected.value
+    emit('update-student', cleaned)
+    isSchoolModalOpen.value = false
+  } finally {
+    savingSchool.value = false
+  }
 }
 
 // Certificate Date Helpers
 const currentYear = new Date().getFullYear()
-const testDateYears = Array.from({ length: 20 }, (_, i) => String(currentYear - 10 + i))
 const validDateYears = Array.from({ length: 20 }, (_, i) => String(currentYear - 8 + i))
 const dateMonths = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0'))
 
@@ -940,7 +1289,7 @@ const handleRestoreStudent = () => {
 
         <!-- 2. Main 3-Column Dashboard Body -->
         <div class="flex-1 overflow-y-auto p-2.5 lg:p-3">
-          <div class="grid grid-cols-1 lg:grid-cols-[1.42fr_1.28fr_0.8fr] gap-2.5">
+          <div class="grid grid-cols-1 lg:grid-cols-[1.65fr_1.25fr_0.68fr] gap-2.5">
             
             <!-- ═════════════════════════════════════════════════════════════
                  COLUMN 1: Passport Details, Contact & Educational Background
@@ -2852,89 +3201,312 @@ const handleRestoreStudent = () => {
     </transition>
 
     <!-- ═════════════════════════════════════════════════════════════
-         MODAL 1: Educational Background Modal
+         MODAL 1: Educational Background Modal (100% UniApp2 UX & UI)
          ═════════════════════════════════════════════════════════════ -->
     <transition
-      enter-active-class="transition duration-200 ease-out"
+      enter-active-class="transition duration-150 ease-out"
       enter-from-class="opacity-0 scale-95"
       enter-to-class="opacity-100 scale-100"
-      leave-active-class="transition duration-150 ease-in"
+      leave-active-class="transition duration-100 ease-in"
       leave-from-class="opacity-100 scale-100"
       leave-to-class="opacity-0 scale-95"
     >
       <div
         v-if="isSchoolModalOpen"
-        class="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs"
+        class="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm overflow-y-auto"
         @click.self="isSchoolModalOpen = false"
       >
-        <div class="relative w-full max-w-xl overflow-hidden rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-2xl p-6 space-y-4 text-xs z-[80]">
-          <div class="flex items-center justify-between pb-2 border-b border-zinc-100 dark:border-zinc-800">
-            <h3 class="text-base font-bold text-zinc-900 dark:text-zinc-100">Edit Educational Background</h3>
-            <button @click="isSchoolModalOpen = false" class="rounded-lg p-1 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200">
-              <X class="w-4 h-4" />
-            </button>
-          </div>
+        <div class="relative bg-white dark:bg-[#18181b] border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl p-6 w-full max-w-4xl mx-4 z-[80] max-h-[90vh] overflow-y-auto">
+          <button
+            type="button"
+            @click="isSchoolModalOpen = false"
+            class="absolute right-4 top-4 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 p-1 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded transition-all cursor-pointer"
+          >
+            <X class="w-4 h-4" />
+          </button>
 
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[60vh] overflow-y-auto pr-1">
+          <h3 class="text-[17px] font-bold text-zinc-900 dark:text-zinc-100 mb-1 pr-6">
+            Edit Educational Background
+          </h3>
+          <p class="text-[12px] text-zinc-400 dark:text-zinc-500 mb-5">
+            All fields are optional — leave blank to clear.
+          </p>
+
+          <!-- 8 Columns Grid matching UniApp2 -->
+          <div class="grid grid-cols-1 sm:grid-cols-8 gap-4">
+            <!-- 1. FINAL SCHOOL NAME (sm:col-span-8) -->
+            <div class="sm:col-span-8">
+              <label class="block text-[12px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase mb-1.5">
+                FINAL SCHOOL NAME
+              </label>
+              <div class="relative">
+                <input
+                  type="text"
+                  :value="schoolForm.final_school_name"
+                  @input="onSchoolNameInput"
+                  @focus="showSchoolSuggestions = true"
+                  placeholder="e.g. Tashkent State University"
+                  autoComplete="off"
+                  class="w-full bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 px-3 py-2 rounded-lg outline-none focus:border-blue-500 transition-colors text-[14px]"
+                />
+                <!-- School Suggestions Dropdown -->
+                <div
+                  v-if="showSchoolSuggestions && schoolSuggestions.length > 0"
+                  class="absolute left-0 right-0 mt-1 max-h-52 overflow-y-auto border border-zinc-200 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-800 shadow-xl z-50 divide-y divide-zinc-100 dark:divide-zinc-700/60 animate-in fade-in slide-in-from-top-1 duration-100"
+                >
+                  <button
+                    v-for="suggestion in schoolSuggestions"
+                    :key="suggestion"
+                    type="button"
+                    @click="selectSchoolSuggestion(suggestion)"
+                    class="w-full text-left px-3.5 py-2 text-xs font-semibold hover:bg-zinc-100 dark:hover:bg-zinc-700 text-zinc-900 dark:text-zinc-100 transition-colors cursor-pointer"
+                  >
+                    {{ suggestion }}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- 2. MAJOR (sm:col-span-8) -->
+            <div class="sm:col-span-8">
+              <label class="block text-[12px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase mb-1.5">
+                MAJOR
+              </label>
+              <div class="relative">
+                <input
+                  type="text"
+                  :value="schoolForm.major"
+                  @input="onMajorInput"
+                  @focus="showMajorSuggestions = true"
+                  placeholder="e.g. Computer Science"
+                  autoComplete="off"
+                  class="w-full bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 px-3 py-2 rounded-lg outline-none focus:border-blue-500 transition-colors text-[14px]"
+                />
+                <!-- Major Suggestions Dropdown -->
+                <div
+                  v-if="showMajorSuggestions && uzMajorSuggestions.length > 0"
+                  class="absolute left-0 right-0 mt-1 max-h-52 overflow-y-auto border border-zinc-200 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-800 shadow-xl z-50 divide-y divide-zinc-100 dark:divide-zinc-700/60 animate-in fade-in slide-in-from-top-1 duration-100"
+                >
+                  <button
+                    v-for="suggestion in uzMajorSuggestions"
+                    :key="suggestion"
+                    type="button"
+                    @click="selectMajorSuggestion(suggestion)"
+                    class="w-full text-left px-3.5 py-2 text-xs font-semibold hover:bg-zinc-100 dark:hover:bg-zinc-700 text-zinc-900 dark:text-zinc-100 transition-colors cursor-pointer"
+                  >
+                    {{ suggestion }}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- 3. GPA (sm:col-span-2) -->
             <div class="sm:col-span-2">
-              <label class="block text-[10.5px] font-bold uppercase text-zinc-500 mb-1">Final School Name</label>
-              <input v-model="schoolForm.final_school_name" type="text" class="w-full px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 font-bold" />
+              <label class="block text-[12px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase mb-1.5">
+                GPA
+              </label>
+              <input
+                type="text"
+                v-model="schoolForm.gpa"
+                placeholder="e.g. 3.8"
+                class="w-full bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 px-3 py-2 rounded-lg outline-none focus:border-blue-500 transition-colors text-[14px] font-mono"
+              />
             </div>
 
+            <!-- 4. SYSTEM (sm:col-span-2) -->
             <div class="sm:col-span-2">
-              <label class="block text-[10.5px] font-bold uppercase text-zinc-500 mb-1">Major</label>
-              <input v-model="schoolForm.major" type="text" class="w-full px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 font-bold" />
-            </div>
-
-            <div>
-              <label class="block text-[10.5px] font-bold uppercase text-zinc-500 mb-1">GPA</label>
-              <input v-model="schoolForm.gpa" type="text" class="w-full px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 font-bold font-mono" />
-            </div>
-
-            <div>
-              <label class="block text-[10.5px] font-bold uppercase text-zinc-500 mb-1">GPA System</label>
-              <select v-model="schoolForm.gpa_system" class="w-full px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 font-bold">
-                <option value="4.5">4.5 Scale</option>
-                <option value="4.0">4.0 Scale</option>
-                <option value="5.0">5.0 Scale</option>
-                <option value="100">100% Scale</option>
+              <label class="block text-[12px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase mb-1.5">
+                SYSTEM
+              </label>
+              <div v-if="gpaSystemManual" class="flex gap-1">
+                <input
+                  type="text"
+                  v-model="schoolForm.gpa_system"
+                  placeholder="e.g. 10"
+                  autoFocus
+                  class="w-full bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 px-3 py-2 rounded-lg outline-none focus:border-blue-500 transition-colors text-[14px]"
+                />
+                <button
+                  type="button"
+                  @click="gpaSystemManual = false; schoolForm.gpa_system = '4.5'"
+                  title="Back to preset systems"
+                  class="shrink-0 px-2 rounded-lg border border-zinc-200 dark:border-zinc-700 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+                >
+                  <X class="h-3.5 w-3.5" />
+                </button>
+              </div>
+              <select
+                v-else
+                :value="schoolForm.gpa_system"
+                @change="handleGpaSystemChange"
+                class="w-full bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 px-3 py-2 rounded-lg outline-none focus:border-blue-500 transition-colors text-[14px]"
+              >
+                <option value="">Select</option>
+                <option v-for="opt in GPA_SYSTEM_OPTIONS" :key="opt" :value="opt">{{ opt }}</option>
               </select>
             </div>
 
-            <div>
-              <label class="block text-[10.5px] font-bold uppercase text-zinc-500 mb-1">Degree No</label>
-              <input v-model="schoolForm.degree_no" type="text" class="w-full px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 font-bold font-mono" />
+            <!-- 5. DEGREE NO (sm:col-span-4) -->
+            <div class="sm:col-span-4">
+              <label class="block text-[12px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase mb-1.5">
+                DEGREE NO
+              </label>
+              <input
+                type="text"
+                v-model="schoolForm.degree_no"
+                placeholder="e.g. AB1234567"
+                class="w-full bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 px-3 py-2 rounded-lg outline-none focus:border-blue-500 transition-colors text-[14px] font-mono uppercase"
+              />
             </div>
 
-            <div>
-              <label class="block text-[10.5px] font-bold uppercase text-zinc-500 mb-1">Date of Entry</label>
-              <input v-model="schoolForm.date_of_entry" type="date" class="w-full px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 font-bold" />
+            <!-- 6. DATE OF ENTRY (sm:col-span-4) -->
+            <div class="sm:col-span-4">
+              <label class="block text-[12px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase mb-1.5">
+                DATE OF ENTRY
+              </label>
+              <div class="grid grid-cols-3 gap-1 w-full">
+                <!-- Year -->
+                <select
+                  :value="getEntryDateParts().y"
+                  @change="handleEntryDateChange('y', $event)"
+                  class="w-full bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 px-2 py-2 rounded-lg outline-none focus:border-blue-500 transition-colors text-[13px]"
+                >
+                  <option value="">YYYY</option>
+                  <option v-for="yr in schoolYears" :key="yr" :value="yr">{{ yr }}</option>
+                </select>
+                <!-- Month -->
+                <select
+                  :value="getEntryDateParts().m"
+                  @change="handleEntryDateChange('m', $event)"
+                  class="w-full bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 px-2 py-2 rounded-lg outline-none focus:border-blue-500 transition-colors text-[13px]"
+                >
+                  <option value="">MM</option>
+                  <option v-for="mo in schoolMonths" :key="mo" :value="mo">{{ mo }}</option>
+                </select>
+                <!-- Day -->
+                <select
+                  :value="getEntryDateParts().d"
+                  @change="handleEntryDateChange('d', $event)"
+                  class="w-full bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 px-2 py-2 rounded-lg outline-none focus:border-blue-500 transition-colors text-[13px]"
+                >
+                  <option value="">DD</option>
+                  <option v-for="dy in getDaysInMonth(getEntryDateParts().y, getEntryDateParts().m)" :key="dy" :value="dy">{{ dy }}</option>
+                </select>
+              </div>
             </div>
 
-            <div>
-              <label class="block text-[10.5px] font-bold uppercase text-zinc-500 mb-1">Date of Graduation</label>
-              <input v-model="schoolForm.date_of_graduation" type="date" class="w-full px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 font-bold" />
+            <!-- 7. DATE OF GRADUATION (sm:col-span-4) -->
+            <div class="sm:col-span-4">
+              <label class="block text-[12px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase mb-1.5">
+                DATE OF GRADUATION
+              </label>
+              <div class="grid grid-cols-3 gap-1 w-full">
+                <!-- Year with EXPECTED -->
+                <select
+                  :value="gradExpected ? EXPECTED_YEAR : getGradDateParts().y"
+                  @change="handleGradDateChange('y', $event)"
+                  class="w-full bg-zinc-50 dark:bg-zinc-800/80 border text-zinc-900 dark:text-zinc-100 px-2 py-2 rounded-lg outline-none focus:border-blue-500 transition-colors text-[13px]"
+                  :class="gradExpected ? 'border-blue-500 text-blue-600 dark:text-blue-400 font-bold' : 'border-zinc-200 dark:border-zinc-700'"
+                >
+                  <option value="">YYYY</option>
+                  <option :value="EXPECTED_YEAR">{{ EXPECTED_YEAR }}</option>
+                  <option v-for="yr in schoolYears" :key="yr" :value="yr">{{ yr }}</option>
+                </select>
+                <!-- Month -->
+                <select
+                  :disabled="gradExpected"
+                  :value="gradExpected ? '' : getGradDateParts().m"
+                  @change="handleGradDateChange('m', $event)"
+                  class="w-full bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 px-2 py-2 rounded-lg outline-none focus:border-blue-500 transition-colors text-[13px] disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <option value="">MM</option>
+                  <option v-for="mo in schoolMonths" :key="mo" :value="mo">{{ mo }}</option>
+                </select>
+                <!-- Day -->
+                <select
+                  :disabled="gradExpected"
+                  :value="gradExpected ? '' : getGradDateParts().d"
+                  @change="handleGradDateChange('d', $event)"
+                  class="w-full bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 px-2 py-2 rounded-lg outline-none focus:border-blue-500 transition-colors text-[13px] disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <option value="">DD</option>
+                  <option v-for="dy in getDaysInMonth(getGradDateParts().y, getGradDateParts().m)" :key="dy" :value="dy">{{ dy }}</option>
+                </select>
+              </div>
             </div>
 
-            <div>
-              <label class="block text-[10.5px] font-bold uppercase text-zinc-500 mb-1">School Phone</label>
-              <input v-model="schoolForm.school_phone" type="text" class="w-full px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 font-bold font-mono" />
+            <!-- 8. SCHOOL ADDRESS (sm:col-span-8) -->
+            <div class="sm:col-span-8">
+              <label class="block text-[12px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase mb-1.5">
+                SCHOOL ADDRESS
+              </label>
+              <input
+                type="text"
+                v-model="schoolForm.school_address"
+                placeholder="Street, city, country"
+                class="w-full bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 px-3 py-2 rounded-lg outline-none focus:border-blue-500 transition-colors text-[14px]"
+              />
             </div>
 
+            <!-- 9. SCHOOL WEBSITE (sm:col-span-3) -->
+            <div class="sm:col-span-3">
+              <label class="block text-[12px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase mb-1.5">
+                SCHOOL WEBSITE
+              </label>
+              <input
+                type="url"
+                v-model="schoolForm.school_website"
+                placeholder="https://example.edu"
+                class="w-full bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 px-3 py-2 rounded-lg outline-none focus:border-blue-500 transition-colors text-[14px]"
+              />
+            </div>
+
+            <!-- 10. SCHOOL PHONE (sm:col-span-2) -->
             <div class="sm:col-span-2">
-              <label class="block text-[10.5px] font-bold uppercase text-zinc-500 mb-1">School Address</label>
-              <input v-model="schoolForm.school_address" type="text" class="w-full px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 font-medium" />
+              <label class="block text-[12px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase mb-1.5">
+                SCHOOL PHONE
+              </label>
+              <input
+                type="tel"
+                v-model="schoolForm.school_phone"
+                placeholder="+998 XX XXX XX XX"
+                class="w-full bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 px-3 py-2 rounded-lg outline-none focus:border-blue-500 transition-colors text-[14px] font-mono"
+              />
             </div>
 
-            <div class="sm:col-span-2">
-              <label class="block text-[10.5px] font-bold uppercase text-zinc-500 mb-1">School Website</label>
-              <input v-model="schoolForm.school_website" type="text" class="w-full px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 font-medium" />
+            <!-- 11. SCHOOL E-MAIL (sm:col-span-3) -->
+            <div class="sm:col-span-3">
+              <label class="block text-[12px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase mb-1.5">
+                SCHOOL E-MAIL
+              </label>
+              <input
+                type="email"
+                v-model="schoolForm.school_email"
+                placeholder="info@example.edu"
+                class="w-full bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 px-3 py-2 rounded-lg outline-none focus:border-blue-500 transition-colors text-[14px]"
+              />
             </div>
           </div>
 
-          <div class="flex items-center justify-end gap-2 pt-2 border-t border-zinc-100 dark:border-zinc-800">
-            <button type="button" @click="isSchoolModalOpen = false" class="px-4 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 font-bold hover:bg-zinc-100">Cancel</button>
-            <button type="button" @click="saveSchoolModal" class="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-md shadow-blue-500/20">Save Changes</button>
+          <!-- Footer Buttons -->
+          <div class="flex justify-end gap-2 mt-8">
+            <button
+              type="button"
+              @click="isSchoolModalOpen = false"
+              class="px-4 py-2 rounded-lg text-[13px] font-semibold text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+              :disabled="savingSchool"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              @click="saveSchoolModal"
+              class="px-4 py-2 rounded-lg text-[13px] font-semibold bg-blue-600 hover:bg-blue-700 text-white hover:opacity-90 transition-opacity flex items-center gap-2 shadow-xs cursor-pointer"
+              :disabled="savingSchool"
+            >
+              <Loader2 v-if="savingSchool" class="w-4 h-4 animate-spin" />
+              <span>{{ savingSchool ? 'Saving...' : 'Save Changes' }}</span>
+            </button>
           </div>
         </div>
       </div>
@@ -3250,7 +3822,7 @@ const handleRestoreStudent = () => {
           <div class="relative mb-5">
             <input
               v-model="tempMajorValue"
-              @input="onMajorInput"
+              @input="onUniMajorInput"
               type="text"
               placeholder="e.g. BUSINESS ADMINISTRATION"
               class="w-full rounded-xl border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 px-3.5 py-2.5 text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500 uppercase font-bold"
@@ -3260,14 +3832,14 @@ const handleRestoreStudent = () => {
             
             <!-- Live Suggestions matching MAJOR_SUGGESTIONS with high z-index and shadow -->
             <div
-              v-if="filteredMajorSuggestions.length > 0"
+              v-if="filteredUniMajorSuggestions.length > 0"
               class="absolute left-0 right-0 mt-1 max-h-56 overflow-y-auto border border-zinc-200 dark:border-zinc-700 rounded-xl bg-white dark:bg-zinc-800 shadow-2xl z-[9999] divide-y divide-zinc-100 dark:divide-zinc-700"
             >
               <button
-                v-for="sug in filteredMajorSuggestions"
+                v-for="sug in filteredUniMajorSuggestions"
                 :key="sug"
                 type="button"
-                @click="selectMajorSuggestion(sug)"
+                @click="selectUniMajorSuggestion(sug)"
                 class="w-full text-left px-3.5 py-2.5 text-xs font-semibold hover:bg-blue-50 dark:hover:bg-blue-950/40 text-zinc-800 dark:text-zinc-200 transition-colors cursor-pointer"
               >
                 {{ sug.toUpperCase() }}
