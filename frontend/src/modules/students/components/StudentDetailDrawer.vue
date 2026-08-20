@@ -29,8 +29,8 @@ const emit = defineEmits<{
 
 const { formatCurrency } = useCurrency()
 
-// Drawer fullscreen state - Always expanded
-const isExpanded = ref(true)
+// Drawer fullscreen state - Expand/Collapse toggle
+const isExpanded = ref(false)
 const copiedField = ref<string | null>(null)
 
 // Name Language Mode
@@ -705,7 +705,10 @@ const handleRestoreStudent = () => {
     >
       <div
         v-if="isOpen && student"
-        class="fixed inset-0 z-50 flex flex-col bg-[#f4f6f9] dark:bg-[#0e1114] shadow-2xl text-zinc-900 dark:text-zinc-100 overflow-hidden select-none transition-all duration-300 w-full"
+        class="fixed inset-y-0 right-0 z-50 flex flex-col bg-[#f4f6f9] dark:bg-[#0e1114] shadow-2xl text-zinc-900 dark:text-zinc-100 overflow-hidden select-none transition-all duration-300 pointer-events-auto"
+        :class="isExpanded
+          ? 'left-0 w-full rounded-none'
+          : 'w-full max-w-[calc(98vw+20px)] md:max-w-[calc(95vw+20px)] lg:max-w-[calc(90vw+20px)] xl:max-w-[calc(80vw+20px)] rounded-l-2xl border-l border-zinc-200 dark:border-zinc-800'"
         @click.stop
       >
         <!-- 1. Top Header Bar -->
