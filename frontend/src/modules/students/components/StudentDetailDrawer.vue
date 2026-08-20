@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
+import { useQuery } from '@tanstack/vue-query'
+import { settingsApi } from '@/api/settings'
 import type { Student } from '@/types'
 import { useCurrency } from '@/composables/useCurrency'
 import {
@@ -174,14 +176,26 @@ const MAJOR_SUGGESTIONS = [
   "Korean Tourism Service Department"
 ]
 
+const showMajorSuggestions = ref(false)
+
 const filteredMajorSuggestions = computed(() => {
-  if (!tempMajorValue.value.trim()) return []
+  if (!showMajorSuggestions.value) return []
   const query = tempMajorValue.value.toLowerCase().trim()
+  if (query.length < 3) return []
   const unique = Array.from(new Set(MAJOR_SUGGESTIONS.map(s => s.trim())))
-  const exactMatch = unique.some(s => s.toLowerCase() === query)
-  if (exactMatch) return []
-  return unique.filter(s => s.toLowerCase().includes(query))
+  const list = unique.filter(s => s.toLowerCase().includes(query)).slice(0, 15)
+  if (list.length === 1 && list[0].toLowerCase() === query) return []
+  return list
 })
+
+const selectMajorSuggestion = (sug: string) => {
+  tempMajorValue.value = sug.toUpperCase()
+  showMajorSuggestions.value = false
+}
+
+const onMajorInput = () => {
+  showMajorSuggestions.value = tempMajorValue.value.trim().length >= 3
+}
 
 // Status Options
 const universityStatusList = [
@@ -277,13 +291,105 @@ const computedBalance = computed(() => {
 const computedPaymentsDone = computed(() => Number(props.student?.payments_sum || 0))
 const computedDiscount = computed(() => Number(props.student?.discount || 0))
 
+// University Data from Settings
+const { data: settingsUniversitiesData } = useQuery({
+  queryKey: ['settings-universities'],
+  queryFn: () => settingsApi.getUniversities(),
+  staleTime: 1000 * 60 * 5,
+})
+
+const FALLBACK_UNIVERSITIES = [
+  "KONKUK UNIVERSITY (GWANGJIN, SEOUL)",
+  "SEJONG UNIVERSITY (GWANGJIN, SEOUL)",
+  "KOOKMIN UNIVERSITY (SEONGBUK, SEOUL)",
+  "GACHON UNIVERSITY (GLOBAL CAMPUS, SEONGNAM)",
+  "HANYANG UNIVERSITY (ERICA CAMPUS, ANSAN)",
+  "CHUNG-ANG UNIVERSITY (SEOUL CAMPUS)",
+  "DONGGUK UNIVERSITY (SEOUL CAMPUS)",
+  "INHA UNIVERSITY (INCHEON)",
+  "INCHEON NATIONAL UNIVERSITY (INCHEON)",
+  "KYUNG HEE UNIVERSITY (SEOUL/GLOBAL)",
+  "WOOSUK UNIVERSITY (WANJU / JINCHEON)",
+  "JEONJU UNIVERSITY (JEONJU)",
+  "SUN MOON UNIVERSITY (ASAN)",
+  "YEUNGNAM UNIVERSITY (GYEONGSAN)",
+  "KYUNGPOOK NATIONAL UNIVERSITY (DAEGU)",
+  "PUSAN NATIONAL UNIVERSITY (BUSAN)",
+  "DONG-A UNIVERSITY (BUSAN)",
+  "KYUNGSUNG UNIVERSITY (BUSAN)",
+  "HONGIK UNIVERSITY (SEOUL)",
+  "SOONGSIL UNIVERSITY (SEOUL)",
+  "AJOU UNIVERSITY (SUWON)",
+  "DANKOOK UNIVERSITY (JUKJEON)",
+  "MYONGJI UNIVERSITY (SEOUL / YONGIN)",
+  "SANGMYUNG UNIVERSITY (SEOUL)",
+  "HANSUNG UNIVERSITY (SEOUL)",
+  "SEOKYEONG UNIVERSITY (SEOUL)",
+  "CHUNGBUK NATIONAL UNIVERSITY (CHEONGJU)",
+  "CHONNAM NATIONAL UNIVERSITY (GWANGJU)",
+  "CHONBUK NATIONAL UNIVERSITY (JEONJU)",
+  "KANGWON NATIONAL UNIVERSITY (CHUNCHEON)",
+  "JEJU NATIONAL UNIVERSITY (JEJU)"
+]
+
+const allUniversities = computed<string[]>(() => {
+  const set = new Set<string>()
+
+  // From props.options.universities
+  if (Array.isArray(props.options?.universities)) {
+    props.options.universities.forEach((u: any) => {
+      if (typeof u === 'string' && u.trim()) set.add(u.trim().toUpperCase())
+      else if (u && typeof u === 'object' && 'name' in u && (u as any).name) {
+        set.add(String((u as any).name).trim().toUpperCase())
+      }
+    })
+  }
+
+  // From settingsApi.getUniversities()
+  const rawSettings = settingsUniversitiesData.value as Array<any> | undefined
+  if (Array.isArray(rawSettings)) {
+    rawSettings.forEach(u => {
+      if (u && typeof u === 'object' && 'name' in u && u.name) {
+        set.add(String(u.name).trim().toUpperCase())
+      } else if (typeof u === 'string' && (u as string).trim()) {
+        set.add((u as string).trim().toUpperCase())
+      }
+    })
+  }
+
+  // Add fallback partner universities
+  FALLBACK_UNIVERSITIES.forEach(u => set.add(u.toUpperCase()))
+
+  return Array.from(set).sort((a, b) => a.localeCompare(b))
+})
+
+const showUniSuggestions = ref(false)
+
+const filteredUniSuggestions = computed(() => {
+  if (!showUniSuggestions.value) return []
+  const query = tempUniName.value.trim().toLowerCase()
+  if (query.length < 3) return []
+  const list = allUniversities.value.filter(u => u.toLowerCase().includes(query)).slice(0, 15)
+  if (list.length === 1 && list[0].toLowerCase() === query) return []
+  return list
+})
+
+const selectUniSuggestion = (sug: string) => {
+  tempUniName.value = sug.toUpperCase()
+  showUniSuggestions.value = false
+}
+
+const onUniInput = () => {
+  showUniSuggestions.value = tempUniName.value.trim().length >= 3
+}
+
 // Option lists
 const tariffOptions = computed(() => (props.options?.tariffs || []).map((t: any) => typeof t === 'string' ? t : t.name))
 const levelOptions = computed(() => props.options?.levels || ['COLLEGE', 'BACHELOR', 'MASTERS', 'MASTER NO CERTIFICATE', 'LANGUAGE COURSE'])
 const groupOptions = computed(() => props.options?.groups || [])
 const leadByOptions = computed(() => props.options?.leads || [])
 const coordinatorOptions = computed(() => props.options?.coordinators || [])
-const universityOptions = computed(() => props.options?.universities || [])
+const universityOptions = computed(() => allUniversities.value)
 const officeOptions = computed(() => props.options?.offices || ['ANDIJON OFFIS', 'TOSHKENT OFFIS'])
 
 // University Status Badge Helper
@@ -308,6 +414,7 @@ const openMajorModal = (slot: number) => {
   majorModalSlot.value = slot
   const current = (props.student as any)[`university_${slot}_major`] || ''
   tempMajorValue.value = current
+  showMajorSuggestions.value = false
   isMajorModalOpen.value = true
 }
 
@@ -343,23 +450,28 @@ const clearUniversitySlot = (slot: number) => {
   emit('update-student', patch)
 }
 
-// University Edit Modal Handlers
+// University Edit Modal Handlers (Show ONLY University Name with live suggestions)
 const openUniversityModal = (slot: number) => {
   if (!props.student) return
+  activeStatusDropdown.value = null
   uniModalSlot.value = slot
   const s = props.student as any
   tempUniName.value = s[`university_${slot}`] || ''
-  tempUniStatus.value = s[`university_${slot}_status`] || 'APPLYING'
-  tempUniMajor.value = s[`university_${slot}_major`] || ''
+  showUniSuggestions.value = false
   isUniModalOpen.value = true
 }
 
 const saveUniversityModal = () => {
+  if (!props.student) return
   const slot = uniModalSlot.value
   const patch: Record<string, any> = {}
-  patch[`university_${slot}`] = tempUniName.value.trim() ? tempUniName.value.trim().toUpperCase() : null
-  patch[`university_${slot}_status`] = tempUniStatus.value || 'APPLYING'
-  patch[`university_${slot}_major`] = tempUniMajor.value.trim() ? tempUniMajor.value.trim().toUpperCase() : null
+  const val = tempUniName.value.trim() ? tempUniName.value.trim().toUpperCase() : null
+  patch[`university_${slot}`] = val
+  // If assigning a university and status is currently empty, default to Chosen
+  const currentStatus = (props.student as any)[`university_${slot}_status`]
+  if (val && !currentStatus) {
+    patch[`university_${slot}_status`] = 'Chosen'
+  }
   emit('update-student', patch)
   isUniModalOpen.value = false
 }
@@ -2836,7 +2948,7 @@ const handleRestoreStudent = () => {
     </transition>
 
     <!-- ═════════════════════════════════════════════════════════════
-         MODAL 3: University Name / Status / Major Modal
+         MODAL 3: Dedicated University Name Modal with Live Suggestions
          ═════════════════════════════════════════════════════════════ -->
     <transition
       enter-active-class="transition duration-200 ease-out"
@@ -2851,46 +2963,69 @@ const handleRestoreStudent = () => {
         class="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs"
         @click.self="isUniModalOpen = false"
       >
-        <div class="relative w-full max-w-md overflow-hidden rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-2xl p-6 space-y-4 text-xs z-[80]">
-          <div class="flex items-center justify-between pb-2 border-b border-zinc-100 dark:border-zinc-800">
-            <h3 class="text-base font-bold text-zinc-900 dark:text-zinc-100">Edit University {{ uniModalSlot }}</h3>
-            <button @click="isUniModalOpen = false" class="rounded-lg p-1 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200">
-              <X class="w-4 h-4" />
+        <div class="relative w-full max-w-md overflow-visible rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-2xl p-6 z-[80]">
+          <button
+            type="button"
+            @click="isUniModalOpen = false"
+            class="absolute right-4 top-4 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 p-1 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded transition-all cursor-pointer"
+          >
+            <X class="w-4 h-4" />
+          </button>
+
+          <h3 class="text-base font-bold text-zinc-900 dark:text-zinc-100 mb-1 flex items-center gap-2">
+            <Landmark class="h-5 w-5 text-blue-600" />
+            <span>Edit University {{ uniModalSlot }}</span>
+          </h3>
+          <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-3">
+            Enter or select the university name for <strong>University {{ uniModalSlot }}</strong>.
+          </p>
+
+          <div class="relative mb-5">
+            <label class="block text-[11px] font-bold uppercase text-zinc-500 mb-1.5 tracking-wider">
+              University Name
+            </label>
+            <input
+              v-model="tempUniName"
+              @input="onUniInput"
+              type="text"
+              placeholder="e.g. KONKUK UNIVERSITY (GWANGJIN, SEOUL)"
+              class="w-full rounded-xl border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 px-3.5 py-2.5 text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500 uppercase font-bold"
+              autoFocus
+              @keydown.enter="saveUniversityModal"
+            />
+
+            <!-- Live Suggestions matching all universities from Settings & options -->
+            <div
+              v-if="filteredUniSuggestions.length > 0"
+              class="absolute left-0 right-0 mt-1 max-h-56 overflow-y-auto border border-zinc-200 dark:border-zinc-700 rounded-xl bg-white dark:bg-zinc-800 shadow-2xl z-[9999] divide-y divide-zinc-100 dark:divide-zinc-700"
+            >
+              <button
+                v-for="sug in filteredUniSuggestions"
+                :key="sug"
+                type="button"
+                @click="selectUniSuggestion(sug)"
+                class="w-full text-left px-3.5 py-2.5 text-xs font-semibold hover:bg-blue-50 dark:hover:bg-blue-950/40 text-zinc-800 dark:text-zinc-200 transition-colors cursor-pointer"
+              >
+                {{ sug.toUpperCase() }}
+              </button>
+            </div>
+          </div>
+
+          <div class="flex justify-end gap-2">
+            <button
+              type="button"
+              @click="isUniModalOpen = false"
+              class="px-4 py-2 text-xs font-bold rounded-xl bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:opacity-90 active:scale-[0.98] transition-all cursor-pointer"
+            >
+              Cancel
             </button>
-          </div>
-
-          <div class="space-y-3">
-            <div>
-              <label class="block text-[10.5px] font-bold uppercase text-zinc-500 mb-1">University Name</label>
-              <input
-                v-model="tempUniName"
-                type="text"
-                placeholder="e.g. KONKUK UNIVERSITY (GWANGJIN, SEOUL)"
-                class="w-full px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 font-bold uppercase"
-              />
-            </div>
-
-            <div>
-              <label class="block text-[10.5px] font-bold uppercase text-zinc-500 mb-1">Application Status</label>
-              <select v-model="tempUniStatus" class="w-full px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 font-bold">
-                <option v-for="st in universityStatusList" :key="st.name" :value="st.name">{{ st.name }}</option>
-              </select>
-            </div>
-
-            <div>
-              <label class="block text-[10.5px] font-bold uppercase text-zinc-500 mb-1">Major / Faculty</label>
-              <input
-                v-model="tempUniMajor"
-                type="text"
-                placeholder="e.g. BUSINESS ADMINISTRATION"
-                class="w-full px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 font-bold uppercase"
-              />
-            </div>
-          </div>
-
-          <div class="flex items-center justify-end gap-2 pt-2 border-t border-zinc-100 dark:border-zinc-800">
-            <button type="button" @click="isUniModalOpen = false" class="px-4 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 font-bold hover:bg-zinc-100">Cancel</button>
-            <button type="button" @click="saveUniversityModal" class="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-md shadow-blue-500/20">Save University</button>
+            <button
+              type="button"
+              @click="saveUniversityModal"
+              class="px-4 py-2 text-xs font-bold rounded-xl bg-blue-600 hover:bg-blue-700 text-white active:scale-[0.98] transition-all cursor-pointer flex items-center gap-1.5 shadow-md shadow-blue-500/20"
+            >
+              <span>Save</span>
+            </button>
           </div>
         </div>
       </div>
@@ -2932,6 +3067,7 @@ const handleRestoreStudent = () => {
           <div class="relative mb-5">
             <input
               v-model="tempMajorValue"
+              @input="onMajorInput"
               type="text"
               placeholder="e.g. BUSINESS ADMINISTRATION"
               class="w-full rounded-xl border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 px-3.5 py-2.5 text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500 uppercase font-bold"
@@ -2948,7 +3084,7 @@ const handleRestoreStudent = () => {
                 v-for="sug in filteredMajorSuggestions"
                 :key="sug"
                 type="button"
-                @click="tempMajorValue = sug.toUpperCase()"
+                @click="selectMajorSuggestion(sug)"
                 class="w-full text-left px-3.5 py-2.5 text-xs font-semibold hover:bg-blue-50 dark:hover:bg-blue-950/40 text-zinc-800 dark:text-zinc-200 transition-colors cursor-pointer"
               >
                 {{ sug.toUpperCase() }}
