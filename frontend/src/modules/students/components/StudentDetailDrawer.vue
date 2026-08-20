@@ -109,6 +109,44 @@ const formatPhoneValue = (value?: string | null) => {
   return [first, second, third, fourth].filter(Boolean).join('-')
 }
 
+const formatSchoolPhone = (value?: string | null): string => {
+  if (!value) return ''
+  const trimmed = value.trim()
+  if (!trimmed) return ''
+
+  // If already starts with '+'
+  if (trimmed.startsWith('+')) {
+    // If it starts with +998 and is 12 continuous digits, format with clean spaces
+    const digitsOnly = trimmed.replace(/\D/g, '')
+    if (digitsOnly.startsWith('998') && digitsOnly.length === 12 && !trimmed.includes(' ')) {
+      return `+998 ${digitsOnly.slice(3, 5)} ${digitsOnly.slice(5, 8)} ${digitsOnly.slice(8, 10)} ${digitsOnly.slice(10, 12)}`
+    }
+    return trimmed
+  }
+
+  // Strip all non-digit characters
+  const digits = trimmed.replace(/\D/g, '')
+  if (!digits) return trimmed
+
+  // 12 digits starting with 998: e.g. 998742000025 -> +998 74 200 00 25
+  if (digits.startsWith('998') && digits.length === 12) {
+    return `+998 ${digits.slice(3, 5)} ${digits.slice(5, 8)} ${digits.slice(8, 10)} ${digits.slice(10, 12)}`
+  }
+
+  // 9 digits (Uzbek local number): e.g. 742000025 -> +998 74 200 00 25
+  if (digits.length === 9) {
+    return `+998 ${digits.slice(0, 2)} ${digits.slice(2, 5)} ${digits.slice(5, 7)} ${digits.slice(7, 9)}`
+  }
+
+  // If it starts with 998 but unexpected length: +998...
+  if (digits.startsWith('998')) {
+    return `+${digits}`
+  }
+
+  // Otherwise prefix with +998
+  return `+998 ${trimmed}`
+}
+
 const formatPassportValue = (value?: string | null) => {
   if (!value) return ''
   const clean = value.toUpperCase().replace(/[^A-Z0-9]/g, '')
@@ -709,13 +747,19 @@ const applySchoolDefaults = (schoolName: string, replace = false) => {
   if (replace) {
     schoolForm.value.school_address = known?.address || ''
     schoolForm.value.school_website = known?.website || ''
-    schoolForm.value.school_phone = known?.phone || ''
+    schoolForm.value.school_phone = formatSchoolPhone(known?.phone || '')
     schoolForm.value.school_email = known?.email || ''
   } else {
     if (!schoolForm.value.school_address && known?.address) schoolForm.value.school_address = known.address
     if (!schoolForm.value.school_website && known?.website) schoolForm.value.school_website = known.website
-    if (!schoolForm.value.school_phone && known?.phone) schoolForm.value.school_phone = known.phone
+    if (!schoolForm.value.school_phone && known?.phone) schoolForm.value.school_phone = formatSchoolPhone(known.phone)
     if (!schoolForm.value.school_email && known?.email) schoolForm.value.school_email = known.email
+  }
+}
+
+const onSchoolPhoneBlur = () => {
+  if (schoolForm.value.school_phone) {
+    schoolForm.value.school_phone = formatSchoolPhone(schoolForm.value.school_phone)
   }
 }
 
@@ -862,7 +906,7 @@ const openSchoolModal = () => {
     date_of_graduation: s.date_of_graduation || '',
     school_address: s.school_address || '',
     school_website: s.school_website || '',
-    school_phone: s.school_phone || '',
+    school_phone: formatSchoolPhone(s.school_phone || ''),
     school_email: s.school_email || ''
   }
   showSchoolSuggestions.value = false
@@ -883,7 +927,7 @@ const saveSchoolModal = async () => {
         name: schoolName,
         address: (schoolForm.value.school_address || '').trim(),
         website: (schoolForm.value.school_website || '').trim(),
-        phone: (schoolForm.value.school_phone || '').trim(),
+        phone: formatSchoolPhone(schoolForm.value.school_phone || '').trim(),
         email: (schoolForm.value.school_email || '').trim()
       }
       
@@ -3469,6 +3513,7 @@ const handleRestoreStudent = () => {
               <input
                 type="tel"
                 v-model="schoolForm.school_phone"
+                @blur="onSchoolPhoneBlur"
                 placeholder="+998 XX XXX XX XX"
                 class="w-full bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 px-3 py-2 rounded-lg outline-none focus:border-blue-500 transition-colors text-[14px] font-mono"
               />

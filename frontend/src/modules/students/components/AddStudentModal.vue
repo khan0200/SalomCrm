@@ -3,8 +3,9 @@ import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useQuery } from '@tanstack/vue-query'
 import { settingsApi } from '@/api/settings'
 import {
-  Sparkles, X, AlertCircle, CheckCircle2, Landmark, User, Building2,
-  Award, GraduationCap, School, Users, UserCheck, ShieldCheck, Loader2, Check
+  UserPlus, X, AlertCircle, CheckCircle2, Hash, User, Building2,
+  Award, GraduationCap, School, Users, UserCheck, ShieldCheck,
+  Loader2, Check, Sparkles, Command, ArrowRight
 } from 'lucide-vue-next'
 
 const props = defineProps<{
@@ -55,7 +56,7 @@ const officeOptions = computed(() => props.options?.offices || ['ANDIJON OFFIS',
 const tariffOptions = computed(() => {
   return (props.options?.tariffs || []).map(t => (typeof t === 'string' ? t : t.name))
 })
-const levelOptions = computed(() => props.options?.levels || [])
+const levelOptions = computed(() => props.options?.levels || ['COLLEGE', 'BACHELOR', 'MASTERS', 'MASTER NO CERTIFICATE', 'LANGUAGE COURSE'])
 const groupOptions = computed(() => props.options?.groups || [])
 const leadByOptions = computed(() => props.options?.leads || [])
 const coordinatorOptions = computed(() => props.options?.coordinators || [])
@@ -155,7 +156,16 @@ watch(() => props.isOpen, (newVal) => {
 })
 
 const handleKeyDown = (e: KeyboardEvent) => {
-  if (e.key === 'Escape' && props.isOpen && !submitting.value) {
+  if (!props.isOpen) return
+
+  // Ctrl+Enter or Cmd+Enter to Submit quickly
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && !submitting.value) {
+    e.preventDefault()
+    handleSubmit()
+    return
+  }
+
+  if (e.key === 'Escape' && !submitting.value) {
     if (isUniversityDropdownOpen.value) {
       isUniversityDropdownOpen.value = false
     } else {
@@ -189,11 +199,11 @@ const handleSubmit = async () => {
     return
   }
   if (!fullName.value.trim()) {
-    modalError.value = 'Student Name is required.'
+    modalError.value = 'Student Full Name is required.'
     return
   }
   if (!office.value) {
-    modalError.value = 'Office Branch is required.'
+    modalError.value = 'Office Branch selection is required.'
     return
   }
 
@@ -223,324 +233,284 @@ const handleSubmit = async () => {
 <template>
   <Teleport to="body">
     <transition
-      enter-active-class="transition duration-200 ease-out"
+      enter-active-class="transition duration-150 ease-out"
       enter-from-class="opacity-0"
       enter-to-class="opacity-100"
-      leave-active-class="transition duration-150 ease-in"
+      leave-active-class="transition duration-100 ease-in"
       leave-from-class="opacity-100"
       leave-to-class="opacity-0"
     >
       <div
         v-if="isOpen"
-        class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto"
+        class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs"
         @click.self="() => { if (!submitting) emit('close') }"
       >
         <transition
-          enter-active-class="transition duration-200 ease-out"
-          enter-from-class="transform scale-95 opacity-0 translate-y-3"
-          enter-to-class="transform scale-100 opacity-100 translate-y-0"
-          leave-active-class="transition duration-150 ease-in"
-          leave-from-class="transform scale-100 opacity-100 translate-y-0"
-          leave-to-class="transform scale-95 opacity-0 translate-y-3"
+          enter-active-class="transition duration-150 ease-out"
+          enter-from-class="transform scale-95 opacity-0"
+          enter-to-class="transform scale-100 opacity-100"
+          leave-active-class="transition duration-100 ease-in"
+          leave-from-class="transform scale-100 opacity-100"
+          leave-to-class="transform scale-95 opacity-0"
         >
           <div
-            class="relative w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-2xl z-10 my-auto"
+            class="relative w-full max-w-[700px] flex flex-col rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-xl overflow-hidden"
           >
             <!-- Modal Header -->
-            <div class="p-5 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between shrink-0 bg-zinc-50/80 dark:bg-zinc-850/60">
-              <div>
-                <h2 class="text-lg font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-                  <Sparkles class="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                  Add New Student
-                </h2>
-                <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-                  Fill in the required information to register a new student in the CRM.
-                </p>
+            <div class="px-5 py-3.5 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between bg-zinc-50/75 dark:bg-zinc-850/50 shrink-0">
+              <div class="flex items-center gap-2.5">
+                <div class="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-950/50 border border-blue-200/60 dark:border-blue-800/60 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+                  <UserPlus class="w-4 h-4" />
+                </div>
+                <div>
+                  <h2 class="text-sm font-bold text-zinc-900 dark:text-zinc-100 leading-tight">
+                    Add New Student
+                  </h2>
+                  <p class="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">
+                    Register a new student in the CRM
+                  </p>
+                </div>
               </div>
-              <button
-                type="button"
-                :disabled="submitting"
-                @click="emit('close')"
-                class="rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-200/60 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200 transition-colors cursor-pointer disabled:opacity-50"
-              >
-                <X class="h-5 w-5" />
-              </button>
+
+              <div class="flex items-center gap-2">
+                <span class="text-[10px] font-mono text-zinc-400 dark:text-zinc-500 px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700">
+                  ESC
+                </span>
+                <button
+                  type="button"
+                  :disabled="submitting"
+                  @click="emit('close')"
+                  class="rounded-md p-1 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+                  title="Close"
+                >
+                  <X class="w-4 h-4" />
+                </button>
+              </div>
             </div>
 
-            <!-- Modal Body / Scrollable Form -->
-            <div class="p-6 overflow-y-auto flex-1 space-y-4">
+            <!-- Modal Body (Compact Form) -->
+            <form id="add-student-form" @submit.prevent="handleSubmit" class="p-5 space-y-3.5">
               <!-- Error Alert -->
               <div
                 v-if="modalError"
-                class="flex items-start gap-2.5 rounded-xl bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-900/30 p-3.5 text-sm text-rose-800 dark:text-rose-300"
+                class="flex items-center gap-2 rounded-lg bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/40 px-3 py-2 text-xs text-rose-700 dark:text-rose-300"
               >
-                <AlertCircle class="h-4 w-4 shrink-0 mt-0.5" />
-                <p>{{ modalError }}</p>
+                <AlertCircle class="h-4 w-4 shrink-0 text-rose-500" />
+                <span>{{ modalError }}</span>
               </div>
 
               <!-- Success Alert -->
               <div
                 v-if="modalSuccess"
-                class="flex items-center gap-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/30 p-3.5 text-sm text-emerald-800 dark:text-emerald-300"
+                class="flex items-center gap-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900/40 px-3 py-2 text-xs text-emerald-700 dark:text-emerald-300"
               >
-                <CheckCircle2 class="h-4 w-4 shrink-0" />
-                <p>Student successfully registered!</p>
+                <CheckCircle2 class="h-4 w-4 shrink-0 text-emerald-500" />
+                <span>Student successfully registered!</span>
               </div>
 
-              <form id="add-student-form" @submit.prevent="handleSubmit" class="space-y-4">
-                <!-- 1. Required Information Section -->
-                <div class="bg-zinc-50/90 dark:bg-zinc-800/40 p-4 rounded-xl border border-zinc-200/80 dark:border-zinc-700/60 space-y-3">
-                  <span class="text-[11px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 block">
-                    1. Required Information *
+              <!-- Row 1: Student ID (compact ~105px), Student Name (expanded flex-1), Office Branch -->
+              <div class="flex items-center gap-3">
+                <div class="w-24 sm:w-28 shrink-0">
+                  <label class="block text-[11px] font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 mb-1 flex items-center justify-between">
+                    <span>Student ID</span>
+                    <span class="text-rose-500">*</span>
+                  </label>
+                  <input
+                    v-model="studentId"
+                    type="text"
+                    required
+                    :disabled="submitting || modalSuccess"
+                    placeholder="e.g. F101"
+                    @input="studentId = studentId.toUpperCase()"
+                    class="w-full h-9 px-2.5 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-850 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-1.5 focus:ring-blue-500 focus:border-blue-500 transition-all font-mono font-bold text-xs uppercase"
+                  />
+                </div>
+
+                <div class="flex-1 min-w-0">
+                  <label class="block text-[11px] font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 mb-1 flex items-center justify-between">
+                    <span>Student Name</span>
+                    <span class="text-rose-500">*</span>
+                  </label>
+                  <input
+                    v-model="fullName"
+                    type="text"
+                    required
+                    :disabled="submitting || modalSuccess"
+                    placeholder="BAXTIYOR ALIMOV"
+                    @input="fullName = fullName.toUpperCase()"
+                    class="w-full h-9 px-3 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-850 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-1.5 focus:ring-blue-500 focus:border-blue-500 transition-all font-semibold text-xs uppercase"
+                  />
+                </div>
+
+                <div class="w-44 sm:w-48 shrink-0">
+                  <label class="block text-[11px] font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 mb-1 flex items-center justify-between">
+                    <span>Office Branch</span>
+                    <span class="text-rose-500">*</span>
+                  </label>
+                  <select
+                    v-model="office"
+                    required
+                    :disabled="submitting || modalSuccess"
+                    class="w-full h-9 px-2.5 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-850 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-1.5 focus:ring-blue-500 focus:border-blue-500 transition-all text-xs font-medium cursor-pointer"
+                  >
+                    <option value="">Select</option>
+                    <option v-for="opt in officeOptions" :key="opt" :value="opt">{{ opt }}</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- Row 2: Tariff & Level to Study (2 columns with generous width) -->
+              <div class="grid grid-cols-12 gap-3">
+                <div class="col-span-6">
+                  <label class="block text-[11px] font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 mb-1">
+                    Tariff
+                  </label>
+                  <select
+                    v-model="tariff"
+                    :disabled="submitting || modalSuccess"
+                    class="w-full h-9 px-2.5 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-850 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-1.5 focus:ring-blue-500 focus:border-blue-500 transition-all text-xs font-medium cursor-pointer"
+                  >
+                    <option value="">Select</option>
+                    <option v-for="t in tariffOptions" :key="t" :value="t">{{ t }}</option>
+                  </select>
+                </div>
+
+                <div class="col-span-6">
+                  <label class="block text-[11px] font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 mb-1">
+                    Level to Study
+                  </label>
+                  <select
+                    v-model="level"
+                    :disabled="submitting || modalSuccess"
+                    class="w-full h-9 px-2.5 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-850 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-1.5 focus:ring-blue-500 focus:border-blue-500 transition-all text-xs font-medium cursor-pointer"
+                  >
+                    <option value="">Select</option>
+                    <option v-for="lvl in levelOptions" :key="lvl" :value="lvl">{{ lvl }}</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- Row 3: University 1 (Interactive Auto-Suggest) -->
+              <div ref="universityInputContainerRef" class="relative">
+                <div class="flex items-center justify-between mb-1">
+                  <label class="block text-[11px] font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-400">
+                    University 1
+                  </label>
+                  <span v-if="allUniversities.length > 0" class="text-[10px] text-zinc-400 dark:text-zinc-500">
+                    {{ allUniversities.length }} universities
                   </span>
+                </div>
 
-                  <div class="flex items-center gap-3">
-                    <!-- Student ID (Required - Compact width) -->
-                    <div class="w-36 shrink-0">
-                      <label class="block text-xs font-semibold text-zinc-600 dark:text-zinc-400 mb-1 flex items-center justify-between">
-                        <span class="flex items-center gap-1">
-                          <Landmark class="h-3 w-3 text-blue-600 dark:text-blue-400" />
-                          Student ID
-                        </span>
-                        <span class="text-rose-500 font-bold">*</span>
-                      </label>
-                      <input
-                        v-model="studentId"
-                        type="text"
-                        required
-                        :disabled="submitting || modalSuccess"
-                        placeholder="e.g. F101"
-                        @input="studentId = studentId.toUpperCase()"
-                        class="w-full px-3 py-2 border border-zinc-200 dark:border-zinc-700 rounded-xl bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all font-mono font-bold text-sm"
-                      />
-                    </div>
+                <div class="relative">
+                  <input
+                    v-model="university1"
+                    type="text"
+                    :disabled="submitting || modalSuccess"
+                    placeholder="Type university name (e.g. SEJONG)..."
+                    @input="() => { university1 = university1.toUpperCase(); isUniversityDropdownOpen = true; highlightedUniversityIndex = 0; }"
+                    @focus="isUniversityDropdownOpen = true"
+                    @keydown="handleUniversityKeyDown"
+                    class="w-full h-9 px-3 pr-8 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-850 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-1.5 focus:ring-blue-500 focus:border-blue-500 transition-all text-xs font-medium uppercase"
+                    autocomplete="off"
+                  />
 
-                    <!-- Student Name (Required - Expanded width) -->
-                    <div class="flex-1 min-w-0">
-                      <label class="block text-xs font-semibold text-zinc-600 dark:text-zinc-400 mb-1 flex items-center justify-between">
-                        <span class="flex items-center gap-1">
-                          <User class="h-3 w-3 text-blue-600 dark:text-blue-400" />
-                          Student Name
-                        </span>
-                        <span class="text-rose-500 font-bold">*</span>
-                      </label>
-                      <input
-                        v-model="fullName"
-                        type="text"
-                        required
-                        :disabled="submitting || modalSuccess"
-                        placeholder="BAXTIYOR"
-                        @input="fullName = fullName.toUpperCase()"
-                        class="w-full px-3 py-2 border border-zinc-200 dark:border-zinc-700 rounded-xl bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all font-semibold text-sm"
-                      />
-                    </div>
-                  </div>
+                  <!-- Clear Button -->
+                  <button
+                    v-if="university1"
+                    type="button"
+                    @click="() => { university1 = ''; isUniversityDropdownOpen = true; }"
+                    class="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 p-0.5 rounded cursor-pointer"
+                    title="Clear"
+                  >
+                    <X class="w-3.5 h-3.5" />
+                  </button>
+                </div>
 
-                  <!-- Office Branch (Required) -->
-                  <div>
-                    <label class="block text-xs font-semibold text-zinc-600 dark:text-zinc-400 mb-1 flex items-center justify-between">
-                      <span class="flex items-center gap-1">
-                        <Building2 class="h-3 w-3 text-blue-600 dark:text-blue-400" />
-                        Office Branch
-                      </span>
-                      <span class="text-rose-500 font-bold">*</span>
-                    </label>
-                    <select
-                      v-model="office"
-                      required
-                      :disabled="submitting || modalSuccess"
-                      class="w-full px-3 py-2 border border-zinc-200 dark:border-zinc-700 rounded-xl bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all text-sm font-medium cursor-pointer"
+                <!-- Autocomplete Dropdown -->
+                <div
+                  v-if="isUniversityDropdownOpen && (filteredUniversities.length > 0 || (university1.trim() && allUniversities.length > 0))"
+                  class="absolute left-0 right-0 top-full mt-1 z-50 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-850 shadow-xl overflow-hidden"
+                >
+                  <ul class="max-h-44 overflow-y-auto py-1 divide-y divide-zinc-100 dark:divide-zinc-800">
+                    <li
+                      v-for="(uni, index) in filteredUniversities"
+                      :key="uni"
+                      @mousedown.prevent="selectUniversity(uni)"
+                      @mouseenter="highlightedUniversityIndex = index"
+                      class="px-3 py-1.5 text-xs flex items-center justify-between cursor-pointer transition-colors"
+                      :class="highlightedUniversityIndex === index || university1 === uni
+                        ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 font-semibold'
+                        : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800'"
                     >
-                      <option value="">Select Office Branch</option>
-                      <option v-for="opt in officeOptions" :key="opt" :value="opt">{{ opt }}</option>
-                    </select>
-                  </div>
+                      <span class="truncate uppercase">{{ uni }}</span>
+                      <Check v-if="university1 === uni" class="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 shrink-0 ml-2" />
+                    </li>
+
+                    <li v-if="filteredUniversities.length === 0" class="px-3 py-2 text-xs text-zinc-400 italic text-center">
+                      No matching universities. Custom entry "{{ university1 }}" will be used.
+                    </li>
+                  </ul>
+                </div>
+              </div>
+
+              <!-- Row 4: Group, Lead By, Coordinator -->
+              <div class="grid grid-cols-12 gap-3">
+                <div class="col-span-4">
+                  <label class="block text-[11px] font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 mb-1">
+                    Group
+                  </label>
+                  <select
+                    v-model="studentGroup"
+                    :disabled="submitting || modalSuccess"
+                    class="w-full h-9 px-2.5 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-850 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-1.5 focus:ring-blue-500 focus:border-blue-500 transition-all text-xs font-medium cursor-pointer"
+                  >
+                    <option value="">Select Group</option>
+                    <option v-for="g in groupOptions" :key="g" :value="g">{{ g }}</option>
+                  </select>
                 </div>
 
-                <!-- 2. Academic & Tariff Details Section -->
-                <div class="bg-zinc-50/90 dark:bg-zinc-800/40 p-4 rounded-xl border border-zinc-200/80 dark:border-zinc-700/60 space-y-3">
-                  <span class="text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 block">
-                    2. Academic & Tariff Details
-                  </span>
-
-                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <!-- Tariff -->
-                    <div>
-                       <label class="block text-xs font-semibold text-zinc-600 dark:text-zinc-400 mb-1 flex items-center gap-1">
-                        <Award class="h-3 w-3 text-blue-600 dark:text-blue-400" />
-                        Tariff
-                      </label>
-                      <select
-                        v-model="tariff"
-                        :disabled="submitting || modalSuccess"
-                        class="w-full px-3 py-2 border border-zinc-200 dark:border-zinc-700 rounded-xl bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all text-sm cursor-pointer"
-                      >
-                        <option value="">Select</option>
-                        <option v-for="t in tariffOptions" :key="t" :value="t">{{ t }}</option>
-                      </select>
-                    </div>
-
-                    <!-- Level to Study -->
-                    <div>
-                      <label class="block text-xs font-semibold text-zinc-600 dark:text-zinc-400 mb-1 flex items-center gap-1">
-                        <GraduationCap class="h-3 w-3 text-blue-600 dark:text-blue-400" />
-                        Level to Study
-                      </label>
-                      <select
-                        v-model="level"
-                        :disabled="submitting || modalSuccess"
-                        class="w-full px-3 py-2 border border-zinc-200 dark:border-zinc-700 rounded-xl bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all text-sm cursor-pointer"
-                      >
-                        <option value="">Select</option>
-                        <option v-for="lvl in levelOptions" :key="lvl" :value="lvl">{{ lvl }}</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <!-- University 1 (Interactive Auto-Suggest from Settings) -->
-                  <div ref="universityInputContainerRef" class="relative">
-                    <label class="block text-xs font-semibold text-zinc-600 dark:text-zinc-400 mb-1 flex items-center justify-between">
-                      <span class="flex items-center gap-1">
-                        <School class="h-3 w-3 text-blue-600 dark:text-blue-400" />
-                        University 1
-                      </span>
-                      <span v-if="allUniversities.length > 0" class="text-[10.5px] text-zinc-400 dark:text-zinc-500 font-normal">
-                        {{ allUniversities.length }} universities from Settings
-                      </span>
-                    </label>
-
-                    <div class="relative">
-                      <input
-                        v-model="university1"
-                        type="text"
-                        :disabled="submitting || modalSuccess"
-                        placeholder="Type university name (e.g. SEJONG UNIVERSITY)..."
-                        @input="() => { university1 = university1.toUpperCase(); isUniversityDropdownOpen = true; highlightedUniversityIndex = 0; }"
-                        @focus="isUniversityDropdownOpen = true"
-                        @keydown="handleUniversityKeyDown"
-                        class="w-full px-3 py-2 pr-8 border border-zinc-200 dark:border-zinc-700 rounded-xl bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all text-sm font-medium uppercase"
-                        autocomplete="off"
-                      />
-
-                      <!-- Clear / Dropdown Trigger Icon -->
-                      <button
-                        v-if="university1"
-                        type="button"
-                        @click="() => { university1 = ''; isUniversityDropdownOpen = true; }"
-                        class="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 p-0.5 rounded cursor-pointer transition-colors"
-                        title="Clear university"
-                      >
-                        <X class="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-
-                    <!-- Autocomplete Suggestions Dropdown -->
-                    <div
-                      v-if="isUniversityDropdownOpen && (filteredUniversities.length > 0 || (university1.trim() && allUniversities.length > 0))"
-                      class="absolute left-0 right-0 top-full mt-1.5 z-50 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-850 shadow-xl overflow-hidden backdrop-blur-md"
-                    >
-                      <div class="px-3 py-1.5 text-[10.5px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50/75 dark:bg-zinc-900/60 flex items-center justify-between select-none">
-                        <span>Universities from Settings</span>
-                        <span class="text-[10px] bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 px-1.5 py-0.5 rounded font-mono font-semibold">
-                          {{ filteredUniversities.length }} matching
-                        </span>
-                      </div>
-
-                      <ul class="max-h-48 overflow-y-auto py-1 scrollbar-thin divide-y divide-zinc-50 dark:divide-zinc-800/40">
-                        <li
-                          v-for="(uni, index) in filteredUniversities"
-                          :key="uni"
-                          @mousedown.prevent="selectUniversity(uni)"
-                          @mouseenter="highlightedUniversityIndex = index"
-                          class="px-3 py-2 text-xs flex items-center gap-2 cursor-pointer transition-colors select-none"
-                          :class="highlightedUniversityIndex === index || university1 === uni
-                            ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 font-bold'
-                            : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800'"
-                        >
-                          <School class="w-3.5 h-3.5 shrink-0" :class="highlightedUniversityIndex === index || university1 === uni ? 'text-blue-600 dark:text-blue-400' : 'text-zinc-400'" />
-                          <span class="truncate uppercase flex-1">{{ uni }}</span>
-                          <Check v-if="university1 === uni" class="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
-                        </li>
-
-                        <li v-if="filteredUniversities.length === 0" class="px-3 py-3 text-xs text-zinc-400 italic text-center select-none">
-                          No matching universities in Settings. You can still use "{{ university1 }}".
-                        </li>
-                      </ul>
-                    </div>
-                  </div>
+                <div class="col-span-4">
+                  <label class="block text-[11px] font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 mb-1">
+                    Lead By
+                  </label>
+                  <select
+                    v-model="leadBy"
+                    :disabled="submitting || modalSuccess"
+                    class="w-full h-9 px-2.5 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-850 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-1.5 focus:ring-blue-500 focus:border-blue-500 transition-all text-xs font-medium cursor-pointer"
+                  >
+                    <option value="">Select Lead By</option>
+                    <option v-for="l in leadByOptions" :key="l" :value="l">{{ l }}</option>
+                  </select>
                 </div>
 
-                <!-- 3. Management & Group Assignment Section -->
-                <div class="bg-zinc-50/90 dark:bg-zinc-800/40 p-4 rounded-xl border border-zinc-200/80 dark:border-zinc-700/60 space-y-3">
-                  <span class="text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 block">
-                    3. Group & Staff Assignment
-                  </span>
-
-                  <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <!-- Group -->
-                    <div>
-                      <label class="block text-xs font-semibold text-zinc-600 dark:text-zinc-400 mb-1 flex items-center gap-1">
-                        <Users class="h-3 w-3 text-blue-600 dark:text-blue-400" />
-                        Group
-                      </label>
-                      <select
-                        v-model="studentGroup"
-                        :disabled="submitting || modalSuccess"
-                        class="w-full px-3 py-2 border border-zinc-200 dark:border-zinc-700 rounded-xl bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all text-xs font-semibold cursor-pointer"
-                      >
-                        <option value="">Select Group</option>
-                        <option v-for="g in groupOptions" :key="g" :value="g">{{ g }}</option>
-                      </select>
-                    </div>
-
-                    <!-- Lead By -->
-                    <div>
-                      <label class="block text-xs font-semibold text-zinc-600 dark:text-zinc-400 mb-1 flex items-center gap-1">
-                        <UserCheck class="h-3 w-3 text-blue-600 dark:text-blue-400" />
-                        Lead By
-                      </label>
-                      <select
-                        v-model="leadBy"
-                        :disabled="submitting || modalSuccess"
-                        class="w-full px-3 py-2 border border-zinc-200 dark:border-zinc-700 rounded-xl bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all text-xs font-semibold cursor-pointer"
-                      >
-                        <option value="">Select Lead By</option>
-                        <option v-for="l in leadByOptions" :key="l" :value="l">{{ l }}</option>
-                      </select>
-                    </div>
-
-                    <!-- Coordinator -->
-                    <div>
-                      <label class="block text-xs font-semibold text-zinc-600 dark:text-zinc-400 mb-1 flex items-center gap-1">
-                        <ShieldCheck class="h-3 w-3 text-blue-600 dark:text-blue-400" />
-                        Coordinator
-                      </label>
-                      <select
-                        v-model="coordinator"
-                        :disabled="submitting || modalSuccess"
-                        class="w-full px-3 py-2 border border-zinc-200 dark:border-zinc-700 rounded-xl bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all text-xs font-semibold cursor-pointer"
-                      >
-                        <option value="">Select Coordinator</option>
-                        <option v-for="c in coordinatorOptions" :key="c" :value="c">{{ c }}</option>
-                      </select>
-                    </div>
-                  </div>
+                <div class="col-span-4">
+                  <label class="block text-[11px] font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 mb-1">
+                    Coordinator
+                  </label>
+                  <select
+                    v-model="coordinator"
+                    :disabled="submitting || modalSuccess"
+                    class="w-full h-9 px-2.5 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-850 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-1.5 focus:ring-blue-500 focus:border-blue-500 transition-all text-xs font-medium cursor-pointer"
+                  >
+                    <option value="">Select Coordinator</option>
+                    <option v-for="c in coordinatorOptions" :key="c" :value="c">{{ c }}</option>
+                  </select>
                 </div>
-              </form>
-            </div>
+              </div>
+            </form>
 
-            <!-- Modal Footer / Action Buttons -->
-            <div class="p-4 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between gap-3 shrink-0 bg-zinc-50/80 dark:bg-zinc-850/60">
+            <!-- Modal Footer -->
+            <div class="px-5 py-3.5 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between bg-zinc-50/75 dark:bg-zinc-850/50 shrink-0">
               <span class="text-xs text-zinc-500 dark:text-zinc-400">
-                Fields marked with <span class="text-rose-500 font-bold">*</span> are required.
+                Fields with <span class="text-rose-500 font-bold">*</span> are required
               </span>
 
-              <div class="flex items-center gap-3">
+              <div class="flex items-center gap-2">
                 <button
                   type="button"
                   :disabled="submitting || modalSuccess"
                   @click="emit('close')"
-                  class="px-4 py-2 border border-zinc-200 dark:border-zinc-700 rounded-xl bg-transparent text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold transition-all active:scale-[0.96] cursor-pointer disabled:opacity-50"
+                  class="px-4 py-2 rounded-lg text-[13px] font-semibold text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer disabled:opacity-50"
                 >
                   Cancel
                 </button>
@@ -548,10 +518,10 @@ const handleSubmit = async () => {
                   type="submit"
                   form="add-student-form"
                   :disabled="submitting || modalSuccess"
-                  class="flex items-center justify-center gap-1.5 px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-all active:scale-[0.96] cursor-pointer select-none disabled:opacity-50 shadow-md shadow-blue-500/25"
+                  class="px-4 py-2 rounded-lg text-[13px] font-semibold bg-blue-600 hover:bg-blue-700 text-white transition-colors cursor-pointer select-none disabled:opacity-50 flex items-center gap-2 shadow-xs"
                 >
-                  <Loader2 v-if="submitting" class="h-3.5 w-3.5 animate-spin" />
-                  <span>{{ submitting ? 'Saving Student...' : 'Save Student' }}</span>
+                  <Loader2 v-if="submitting" class="w-4 h-4 animate-spin" />
+                  <span>{{ submitting ? 'Saving...' : 'Save Student' }}</span>
                 </button>
               </div>
             </div>
@@ -561,3 +531,4 @@ const handleSubmit = async () => {
     </transition>
   </Teleport>
 </template>
+
