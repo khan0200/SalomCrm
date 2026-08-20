@@ -34,16 +34,26 @@
   --accent: #007aff;
 }
 
-/* Universal 100% Plus Jakarta Sans enforcement for entire application */
+/* Universal 100% Plus Jakarta Sans & typography scale matching UniApp2 */
 *, *::before, *::after {
   font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
 }
 
-html, body, #app {
-  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+html {
+  font-size: 110%;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
   font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+}
+
+body {
+  font-size: 15.4px;
+  line-height: 1.5;
+}
+
+html, body, #app {
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
 }
 
 button, input, select, textarea, optgroup, pre, code, kbd, samp, table, tr, th, td, span, p, h1, h2, h3, h4, h5, h6, label {
