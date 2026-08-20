@@ -29,8 +29,8 @@ const emit = defineEmits<{
 
 const { formatCurrency } = useCurrency()
 
-// Drawer fullscreen state - Expand/Collapse toggle
-const isExpanded = ref(false)
+// Drawer fullscreen state - Expanded by default
+const isExpanded = ref(true)
 const copiedField = ref<string | null>(null)
 
 // Name Language Mode
@@ -843,16 +843,16 @@ const handleRestoreStudent = () => {
         </div>
 
         <!-- 2. Main 3-Column Dashboard Body -->
-        <div class="flex-1 overflow-y-auto p-3.5 lg:p-4.5">
-          <div class="grid grid-cols-1 lg:grid-cols-[1.42fr_1.28fr_0.8fr] gap-3.5">
+        <div class="flex-1 overflow-y-auto p-2.5 lg:p-3">
+          <div class="grid grid-cols-1 lg:grid-cols-[1.42fr_1.28fr_0.8fr] gap-2.5">
             
             <!-- ═════════════════════════════════════════════════════════════
                  COLUMN 1: Passport Details, Contact & Educational Background
                  ═════════════════════════════════════════════════════════════ -->
-            <div class="flex flex-col gap-3.5">
+            <div class="flex flex-col gap-2">
               
               <!-- 1.1 Passport Details Section Header & Cards -->
-              <div class="flex flex-col gap-2">
+              <div class="flex flex-col gap-1.5">
                 <div class="flex items-center justify-between px-1">
                   <div class="flex items-center gap-1.5 text-zinc-500 dark:text-zinc-400 font-bold uppercase tracking-wider text-[11.5px]">
                     <User class="w-3.5 h-3.5 text-blue-600" />
@@ -880,10 +880,10 @@ const handleRestoreStudent = () => {
                   </div>
                 </div>
 
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-1">
                   <!-- FULL NAME -->
                   <div
-                    class="sm:col-span-2 relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 border-l-[3.5px] rounded-lg p-2.5 shadow-2xs hover:bg-zinc-50/70 transition-all cursor-pointer group/card"
+                    class="sm:col-span-2 relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 border-l-[3.5px] rounded-lg px-2.5 py-1.5 shadow-2xs hover:bg-zinc-50/70 transition-all cursor-pointer group/card"
                     :class="(nameLanguage === 'KR' ? student.korean_name : student.full_name) ? 'border-l-blue-600' : 'border-l-rose-500'"
                     @click="handleCopy('full_name', (nameLanguage === 'KR' ? student.korean_name : student.full_name))"
                   >
@@ -1392,64 +1392,64 @@ const handleRestoreStudent = () => {
                     </div>
                   </div>
 
-                  <!-- EMAIL & ADDRESS (Expanded Only) -->
-                  <template v-if="contactExpanded">
-                    <div
-                      class="sm:col-span-2 relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 border-l-[3.5px] rounded-lg p-2.5 shadow-2xs hover:bg-zinc-50/70 transition-all group/card"
-                      :class="student.email ? 'border-l-blue-600' : 'border-l-rose-500'"
-                      @click="handleCopy('email', student.email)"
-                    >
-                      <div class="flex items-center justify-between">
-                        <span class="text-[10.5px] font-bold uppercase tracking-wider text-[#0066cc] dark:text-[#38bdf8]">EMAIL</span>
-                        <div class="flex items-center gap-1">
-                          <button type="button" class="p-0.5 text-zinc-400 hover:text-zinc-700 opacity-0 group-hover/card:opacity-100">
-                            <Check v-if="copiedField === 'email'" class="w-3.5 h-3.5 text-emerald-500" />
-                            <Copy v-else class="w-3.5 h-3.5" />
-                          </button>
-                          <button type="button" @click.stop="startInlineEdit('email', student.email)" class="p-0.5 text-zinc-400 hover:text-zinc-700">
-                            <Pencil class="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
-                      <div class="mt-1">
-                        <template v-if="editingField === 'email'">
-                          <div class="relative w-full min-w-0" @click.stop @keydown.enter="saveInlineEdit('email')" @keydown.esc="cancelInlineEdit">
-                            <input
-                              v-model="editValue"
-                              type="email"
-                              class="w-full pl-2 pr-14 py-1 text-xs font-medium bg-zinc-50 dark:bg-zinc-800 border border-blue-500 rounded outline-none"
-                              autoFocus
-                            />
-                            <div class="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                              <button
-                                type="button"
-                                @click="saveInlineEdit('email')"
-                                class="h-5 w-5 inline-flex items-center justify-center rounded bg-emerald-500 hover:bg-emerald-600 text-white cursor-pointer active:scale-90 transition-all shadow-2xs"
-                                title="Save"
-                              >
-                                <Check class="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                type="button"
-                                @click="cancelInlineEdit"
-                                class="h-5 w-5 inline-flex items-center justify-center rounded bg-rose-500 hover:bg-rose-600 text-white cursor-pointer active:scale-90 transition-all shadow-2xs"
-                                title="Cancel"
-                              >
-                                <X class="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </div>
-                        </template>
-                        <template v-else>
-                          <span v-if="student.email" class="text-[13px] font-semibold text-[#0f172a] dark:text-zinc-100">{{ student.email }}</span>
-                          <span v-else class="text-[13px] font-semibold text-rose-600">Not provided</span>
-                        </template>
+                  <!-- EMAIL (Always Visible) -->
+                  <div
+                    class="sm:col-span-2 relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 border-l-[3.5px] rounded-lg px-2.5 py-1.5 shadow-2xs hover:bg-zinc-50/70 transition-all group/card"
+                    :class="student.email ? 'border-l-blue-600' : 'border-l-rose-500'"
+                    @click="handleCopy('email', student.email)"
+                  >
+                    <div class="flex items-center justify-between">
+                      <span class="text-[10.5px] font-bold uppercase tracking-wider text-[#0066cc] dark:text-[#38bdf8]">EMAIL</span>
+                      <div class="flex items-center gap-1">
+                        <button type="button" class="p-0.5 text-zinc-400 hover:text-zinc-700 opacity-0 group-hover/card:opacity-100">
+                          <Check v-if="copiedField === 'email'" class="w-3.5 h-3.5 text-emerald-500" />
+                          <Copy v-else class="w-3.5 h-3.5" />
+                        </button>
+                        <button type="button" @click.stop="startInlineEdit('email', student.email)" class="p-0.5 text-zinc-400 hover:text-zinc-700">
+                          <Pencil class="w-3.5 h-3.5" />
+                        </button>
                       </div>
                     </div>
+                    <div class="mt-0.5">
+                      <template v-if="editingField === 'email'">
+                        <div class="relative w-full min-w-0" @click.stop @keydown.enter="saveInlineEdit('email')" @keydown.esc="cancelInlineEdit">
+                          <input
+                            v-model="editValue"
+                            type="email"
+                            class="w-full pl-2 pr-14 py-1 text-xs font-medium bg-zinc-50 dark:bg-zinc-800 border border-blue-500 rounded outline-none"
+                            autoFocus
+                          />
+                          <div class="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                            <button
+                              type="button"
+                              @click="saveInlineEdit('email')"
+                              class="h-5 w-5 inline-flex items-center justify-center rounded bg-emerald-500 hover:bg-emerald-600 text-white cursor-pointer active:scale-90 transition-all shadow-2xs"
+                              title="Save"
+                            >
+                              <Check class="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              @click="cancelInlineEdit"
+                              class="h-5 w-5 inline-flex items-center justify-center rounded bg-rose-500 hover:bg-rose-600 text-white cursor-pointer active:scale-90 transition-all shadow-2xs"
+                              title="Cancel"
+                            >
+                              <X class="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      </template>
+                      <template v-else>
+                        <span v-if="student.email" class="text-[13px] font-semibold text-[#0f172a] dark:text-zinc-100">{{ student.email }}</span>
+                        <span v-else class="text-[13px] font-semibold text-rose-600">Not provided</span>
+                      </template>
+                    </div>
+                  </div>
 
-                    <!-- ADDRESS -->
+                  <!-- ADDRESS (Expanded Only) -->
+                  <template v-if="contactExpanded">
                     <div
-                      class="sm:col-span-2 relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 border-l-[3.5px] rounded-lg p-2.5 shadow-2xs hover:bg-zinc-50/70 transition-all group/card"
+                      class="sm:col-span-2 relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 border-l-[3.5px] rounded-lg px-2.5 py-1.5 shadow-2xs hover:bg-zinc-50/70 transition-all group/card"
                       :class="student.address ? 'border-l-blue-600' : 'border-l-rose-500'"
                       @click="handleCopy('address', student.address)"
                     >
@@ -1465,7 +1465,7 @@ const handleRestoreStudent = () => {
                           </button>
                         </div>
                       </div>
-                      <div class="mt-1">
+                      <div class="mt-0.5">
                         <template v-if="editingField === 'address'">
                           <div class="relative w-full min-w-0" @click.stop @keydown.esc="cancelInlineEdit">
                             <textarea
