@@ -131,10 +131,57 @@ def normalize_phone_number(raw_phone: str) -> str:
     return raw_phone
 
 
+def normalize_patronymic(raw_father_name: str) -> str:
+    """
+    Normalizes Uzbek and Central Asian patronymics:
+    - 'ABDULKHOSHIMAUGN' or 'ABDULKHOSHIMAUGL' -> 'ABDULKHOSHIM UGLI'
+    - 'RUSTAMQIZI' or 'RUSTAM QIZ' -> 'RUSTAM QIZI'
+    """
+    clean = re.sub(r'[^A-ZА-Я\s\'-]', '', str(raw_father_name).upper())
+    clean = re.sub(r'\s+', ' ', clean).strip()
+
+    # Handle male suffixes: AUGN, AUGL, AUGLI, UGLI, OGLI, UGIL, OGIL, UGL, O'G'LI, UG'LI
+    male_suffix_pattern = r'[\s_-]*(?:AUGN|AUGL|AUGLI|UGLI|OGLI|UGIL|OGIL|UGL|O[\'\`\"]?G[\'\`\"]?LI|U[\'\`\"]?G[\'\`\"]?LI)$'
+    if re.search(male_suffix_pattern, clean, re.IGNORECASE):
+        base_name = re.sub(male_suffix_pattern, '', clean, flags=re.IGNORECASE).strip()
+        if base_name:
+            return f"{base_name} UGLI"
+
+    # Handle female suffixes: QIZI, KIZI, KYZY, QIZ, KIZ
+    female_suffix_pattern = r'[\s_-]*(?:QIZI|KIZI|KYZY|QIZ|KIZ)$'
+    if re.search(female_suffix_pattern, clean, re.IGNORECASE):
+        base_name = re.sub(female_suffix_pattern, '', clean, flags=re.IGNORECASE).strip()
+        if base_name:
+            return f"{base_name} QIZI"
+
+    return clean
+
+
 def normalize_name(raw_name: str) -> str:
     """
-    Normalizes names by stripping OCR artifacts and standardizing spaces.
+    Normalizes full names by fixing joined patronymics and stripping artifacts.
     """
     clean = re.sub(r'[^A-ZА-Яa-zа-я\s\'-]', '', str(raw_name))
     clean = re.sub(r'\s+', ' ', clean).strip().upper()
+
+    parts = clean.split()
+    if parts:
+        last_part = parts[-1]
+        norm_last = normalize_patronymic(last_part)
+        parts[-1] = norm_last
+    return ' '.join(parts)
+
+
+def normalize_address(raw_addr: str) -> str:
+    """
+    Normalizes address and region strings by adding spaces between joined words.
+    e.g. 'ANDIJANREGION' -> 'ANDIJAN REGION'
+    """
+    clean = re.sub(r'[^A-ZА-Яa-zа-я0-9\s\'-]', '', str(raw_addr)).strip().upper()
+    clean = re.sub(
+        r'([A-ZА-Я]{3,})(REGION|CITY|DISTRICT|VILOYATI|VILOYAT|TUMANI|TUMAN|SHAHRI|SHAHAR|RESPUBLIKASI)',
+        r'\1 \2',
+        clean
+    )
+    clean = re.sub(r'\s+', ' ', clean).strip()
     return clean

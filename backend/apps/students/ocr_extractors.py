@@ -9,6 +9,8 @@ from .ocr_normalizer import (
     normalize_gender,
     normalize_phone_number,
     normalize_name,
+    normalize_patronymic,
+    normalize_address,
 )
 
 
@@ -128,13 +130,13 @@ class PassportExtractor:
                 after = re.sub(r'^.*?(OTASININGISMI|FATHERSNAME|FATHERNAME|ОТЧЕСТВО)[/:\s]*', '', up).strip()
                 after_clean = re.sub(r'[^A-ZА-Я0-9]', '', after)
                 if after and not is_passport_header_label(after_clean) and len(after) >= 2:
-                    viz_father = after
+                    viz_father = normalize_patronymic(after)
                 else:
                     for j in range(i + 1, min(i + 4, len(all_raw_lines))):
                         cand = all_raw_lines[j].strip().upper()
                         cand_clean = re.sub(r'[^A-ZА-Я0-9]', '', cand)
                         if not is_passport_header_label(cand_clean) and re.match(r'^[A-ZА-Я\s\'-]{2,}$', cand):
-                            viz_father = cand
+                            viz_father = normalize_patronymic(cand)
                             break
 
             # Date of Birth (TUG'ILGAN SANASI / DATE OF BIRTH)
@@ -161,8 +163,8 @@ class PassportExtractor:
                         viz_doe = d
                         break
 
-            # Sex (JINSI / SEX)
-            if any(k in clean_l for k in ['JINSI', 'SEX', 'POL']) and not viz_sex:
+            # Sex (JINSI / SEX - handles OCR reading JINSLSEX / JINSI/SEX)
+            if any(k in clean_l for k in ['JINSI', 'JINSL', 'SEX', 'POL']) and not viz_sex:
                 for j in range(i, min(i + 4, len(all_raw_lines))):
                     g = normalize_gender(all_raw_lines[j])
                     if g:
@@ -170,13 +172,21 @@ class PassportExtractor:
                         break
 
             # Place of Birth (TUG'ILGAN JOYI / PLACE OF BIRTH)
-            if any(k in clean_l for k in ['TUGILGANJOYI', 'PLACEOFBIRTH']) and not viz_address:
+            if any(k in clean_l for k in ['TUGILGANJOYI', 'TUGILGANJOY', 'PLACEOFBIRTH']) and not viz_address:
                 for j in range(i + 1, min(i + 4, len(all_raw_lines))):
                     cand = all_raw_lines[j].strip().upper()
                     cand_clean = re.sub(r'[^A-ZА-Я0-9]', '', cand)
                     if not is_passport_header_label(cand_clean) and len(cand) >= 3 and not cand.isdigit():
-                        viz_address = cand
+                        viz_address = normalize_address(cand)
                         break
+
+        # Standalone sex fallback (search for isolated 'M' or 'F' lines)
+        if not viz_sex:
+            for line in all_raw_lines:
+                clean_single = line.strip().upper()
+                if clean_single in ('M', 'F'):
+                    viz_sex = 'MALE' if clean_single == 'M' else 'FEMALE'
+                    break
 
         # Fallback date collection in chronological order [DOB, DOI, DOE]
         all_found_dates = []
@@ -194,6 +204,14 @@ class PassportExtractor:
             if not viz_doi and len(sorted_dates) >= 3:
                 viz_doi = sorted_dates[1]
 
+        # Standalone address fallback if contains REGION/VILOYAT
+        if not viz_address:
+            for line in all_raw_lines:
+                up_l = line.strip().upper()
+                if any(rk in up_l for rk in ['REGION', 'VILOYAT', 'DISTRICT', 'TUMAN']) and not is_passport_header_label(re.sub(r'[^A-ZА-Я0-9]', '', up_l)):
+                    viz_address = normalize_address(up_l)
+                    break
+
         # Assemble Full Name (Surname + Given Names + Father's Name)
         if viz_surname or viz_given or viz_father:
             viz_name_parts = [p for p in [viz_surname, viz_given, viz_father] if p]
@@ -210,7 +228,7 @@ class PassportExtractor:
         if viz_sex:
             fields['SEX'] = ExtractedField(viz_sex, 0.98, True, 'VIZ')
         if viz_address:
-            fields['ADDRESS'] = ExtractedField(viz_address, 0.90, False, 'VIZ')
+            fields['ADDRESS'] = ExtractedField(viz_address, 0.92, True, 'VIZ')
 
         return fields
 
