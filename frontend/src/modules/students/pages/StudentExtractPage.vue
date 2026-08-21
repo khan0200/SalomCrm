@@ -126,6 +126,8 @@ const handleFileInput = (e: Event) => {
   }
 }
 
+const isPdf = ref(false)
+
 const processFile = (file: File) => {
   selectedFile.value = file
   extractError.value = null
@@ -136,13 +138,8 @@ const processFile = (file: File) => {
   ocrEngineUsed.value = null
   savedFields.value = {}
 
-  if (file.type.startsWith('image/')) {
-    previewUrl.value = URL.createObjectURL(file)
-  } else if (file.type === 'application/pdf') {
-    previewUrl.value = 'pdf'
-  } else {
-    previewUrl.value = 'doc'
-  }
+  isPdf.value = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
+  previewUrl.value = URL.createObjectURL(file)
 }
 
 // Global Ctrl+V Screenshot Paste Handler
@@ -189,8 +186,12 @@ const removeFile = () => {
   }
   selectedFile.value = null
   previewUrl.value = null
+  isPdf.value = false
   extractedDocType.value = null
   extractedFieldsList.value = []
+  rawOcrText.value = ''
+  extractionLatency.value = null
+  ocrEngineUsed.value = null
   extractError.value = null
   savedFields.value = {}
 }
@@ -507,19 +508,31 @@ const getInitials = (name?: string) => {
                 <X class="w-4 h-4" />
               </button>
 
+              <!-- Image Visual Preview -->
               <img
-                v-if="previewUrl && previewUrl !== 'pdf' && previewUrl !== 'doc'"
+                v-if="!isPdf && previewUrl"
                 :src="previewUrl"
                 alt="Document Preview"
-                class="max-h-[360px] w-auto object-contain rounded-xl shadow-sm"
+                class="max-h-[380px] w-auto object-contain rounded-xl shadow-sm"
               />
+
+              <!-- PDF Visual Preview -->
+              <div v-else-if="isPdf && previewUrl" class="w-full h-[380px] flex flex-col rounded-xl overflow-hidden bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-inner">
+                <iframe
+                  :src="previewUrl + '#toolbar=0&navpanes=0&scrollbar=1&view=FitH'"
+                  class="w-full flex-1 border-0 rounded-xl bg-white"
+                  title="PDF Preview"
+                />
+              </div>
+
+              <!-- Fallback -->
               <div v-else class="text-center space-y-2 p-6">
                 <FileText class="w-12 h-12 text-brand-500 mx-auto" />
                 <p class="text-xs font-bold text-zinc-800 dark:text-zinc-200">
-                  {{ selectedFile.name }}
+                  {{ selectedFile?.name }}
                 </p>
                 <p class="text-[10px] text-zinc-400 font-mono">
-                  {{ (selectedFile.size / 1024).toFixed(1) }} KB
+                  {{ selectedFile ? (selectedFile.size / 1024).toFixed(1) : '0' }} KB
                 </p>
               </div>
             </div>
