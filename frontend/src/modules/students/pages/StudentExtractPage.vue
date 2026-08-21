@@ -677,7 +677,7 @@ const getInitials = (name?: string) => {
                   </span>
                 </div>
                 <span
-                  class="text-xs font-bold text-zinc-900 dark:text-zinc-100 block truncate max-w-sm"
+                  class="text-xs font-bold text-zinc-900 dark:text-zinc-100 block break-words"
                   :title="field.value"
                 >
                   {{ field.value }}

@@ -2143,11 +2143,11 @@ const handleRestoreStudent = () => {
                     <div
                       class="flex items-baseline justify-between gap-3 pt-1 border-t border-zinc-100 dark:border-zinc-800 cursor-pointer hover:bg-zinc-50/80 dark:hover:bg-zinc-800/60 p-1 -m-1 rounded transition-all duration-150"
                       :class="[copiedField === 'gpa' && 'animate-copy-press']"
-                      @click="handleCopy('gpa', `${student.gpa || ''} (${student.gpa_system || '4.5'})`)"
+                      @click="handleCopy('gpa', student.gpa ? `${student.gpa} (${student.gpa_system || '5'})` : '')"
                       title="Single-click to copy GPA"
                     >
                       <span class="text-[10.5px] font-bold uppercase tracking-wider text-zinc-400">GPA</span>
-                      <span class="text-xs font-bold font-mono">{{ student.gpa || '—' }} ({{ student.gpa_system || '4.5' }})</span>
+                      <span class="text-xs font-bold font-mono">{{ student.gpa ? `${student.gpa} (${student.gpa_system || '5'})` : '—' }}</span>
                     </div>
 
                     <div

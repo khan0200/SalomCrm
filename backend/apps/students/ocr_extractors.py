@@ -430,6 +430,31 @@ class DiplomaExtractor:
             region = attestat_m.group(3).strip().upper()
             fields['FINAL_SCHOOL_NAME'] = ExtractedField(f"SECONDARY SCHOOL NO. {num} OF {region} REGION, {city} CITY", 0.96, True, 'LAYOUT')
         else:
+            # Helper: connective endings that signal a multi-line school name
+            _SCHOOL_NAME_CONTINUATIONS = ['NAMED AFTER', 'NAMED', 'AFTER', 'OF', 'AND', 'IM.', 'IM']
+            _SCHOOL_BREAK_KW = ['DIPLOM', 'DIPLOMA', 'SHAHODATNOMA', 'CERTIFICATE', 'BERILGAN', 'YILDA', 'YEAR',
+                                'IN ACCORDANCE', 'COMMISSION', 'DECISION', 'AWARDED', 'BACHELOR', 'MASTER']
+
+            def _needs_continuation(text: str) -> bool:
+                """True when the accumulated school name ends with a connective word."""
+                t = text.upper().strip().rstrip('.,;:')
+                return any(t.endswith(ce) for ce in _SCHOOL_NAME_CONTINUATIONS)
+
+            def _collect_continuation(start_idx: int, initial_text: str) -> str:
+                """Append subsequent lines to *initial_text* while the name looks incomplete."""
+                result = initial_text
+                for j in range(start_idx, min(start_idx + 3, len(all_raw_lines))):
+                    nxt = all_raw_lines[j].strip()
+                    if not nxt or is_form_subtitle(nxt):
+                        break
+                    nxt_up = nxt.upper()
+                    if any(k in nxt_up for k in _SCHOOL_BREAK_KW):
+                        break
+                    result = result + ' ' + nxt
+                    if not _needs_continuation(result):
+                        break
+                return re.sub(r'\s+', ' ', result).strip()
+
             for i, line in enumerate(all_raw_lines):
                 l_up = line.upper()
 
@@ -437,14 +462,22 @@ class DiplomaExtractor:
                 if any(sk in l_up for sk in ['EDUCATIONAL ORGANIZATION', 'TA\'LIM TASHKILOTI', 'TA LIM TASHKLON', 'TALIM TASHKILOTI', 'EDUCATIONAL INSTITUTION', 'TA\'LIM MUASSASASI', 'THE EDUCATIONAL INSTITUTION']):
                     if i > 0:
                         cand = all_raw_lines[i-1].strip()
-                        if len(cand) >= 4 and not is_form_subtitle(cand) and not any(k in cand.upper() for k in ['DIPLOM', 'DIPLOMA', 'SHAHODATNOMA', 'CERTIFICATE', 'BERILGAN', 'YILDA', 'YEAR']):
-                            extracted_school = cand
+                        if len(cand) >= 4 and not is_form_subtitle(cand) and not any(k in cand.upper() for k in _SCHOOL_BREAK_KW):
+                            # Walk upward to collect multi-line names (e.g. "NAMED AFTER" on the line above)
+                            if i >= 2 and _needs_continuation(all_raw_lines[i-2].strip()):
+                                upper_cand = all_raw_lines[i-2].strip()
+                                if not is_form_subtitle(upper_cand) and not any(k in upper_cand.upper() for k in _SCHOOL_BREAK_KW):
+                                    cand = upper_cand + ' ' + cand
+                            extracted_school = re.sub(r'\s+', ' ', cand).strip()
                             break
 
                 # Direct keyword match
                 if any(sk in l_up for sk in school_keywords) and not is_form_subtitle(line):
                     cand = re.sub(r'\s+', ' ', line).strip()
-                    if len(cand) >= 5 and not any(k in cand.upper() for k in ['DIPLOM', 'DIPLOMA', 'SHAHODATNOMA', 'CERTIFICATE', 'BERILGAN']):
+                    if len(cand) >= 5 and not any(k in cand.upper() for k in _SCHOOL_BREAK_KW):
+                        # Collect continuation lines for multi-line names
+                        if _needs_continuation(cand):
+                            cand = _collect_continuation(i + 1, cand)
                         extracted_school = cand
                         break
 
@@ -485,28 +518,11 @@ class DiplomaExtractor:
                 full_major = re.sub(r'\s+', ' ', full_major).strip()
                 fields['MAJOR'] = ExtractedField(full_major, 0.90, True, 'LAYOUT')
 
-        # 5. Student Full Name on Certificate / Diploma
-        for i, line in enumerate(all_raw_lines):
-            l_up = line.upper()
-            if any(nk in l_up for nk in ['SURNAME, GIVEN', 'SWNAME, GNEN', 'FAMILYASI, ISMI', 'FAMLYASI, ISMI', 'FATHERSNAME', 'PATRONYMIC', 'PARORYMIC', 'GRADUATE\'S FULL NAME', 'BITIRUVCHINING FAMILIYASI', 'COMMISSION', 'DECISION', 'GRADUATES SURNAME', 'GRADUATE\'S SURNAME']):
-                if i > 0:
-                    cand = all_raw_lines[i-1].strip().upper()
-                    if re.match(r'^[A-ZА-Я\s\'-]{6,}$', cand) and not is_form_subtitle(cand):
-                        if not any(k in cand for k in ['COMMISSION', 'DECISION', 'STATE', 'DIPLOMA', 'SHAHODATNOMA', 'CERTIFICATE', 'RESPUBLIKASI', 'REPUBLIC', 'YILDA', 'YEAR']):
-                            fields['FULL_NAME'] = ExtractedField(normalize_name(cand), 0.95, True, 'LAYOUT')
-                            break
+        # NOTE: FULL_NAME is intentionally NOT extracted from diplomas/certificates.
+        # The student's name is already captured from their passport scan.
 
-        # 6. Student Date of Birth on Certificate
-        for i, line in enumerate(all_raw_lines):
-            l_up = line.upper()
-            if any(dk in l_up for dk in ['DATE OF BIRTH', 'TUG\'ILGAN SANASI', 'TUGILGAN SANASI', 'TUGLLGAN SANASI', 'TUG LLGAN', 'CARE OF BURTH']):
-                for j in range(max(0, i-2), min(i+2, len(all_raw_lines))):
-                    d = normalize_date(all_raw_lines[j])
-                    if d:
-                        fields['DATE_OF_BIRTH'] = ExtractedField(d, 0.95, True, 'LAYOUT')
-                        break
-                if 'DATE_OF_BIRTH' in fields:
-                    break
+        # NOTE: DATE_OF_BIRTH is intentionally NOT extracted from diplomas/certificates.
+        # The student's DOB is already captured from their passport scan.
 
         # 7. Graduation Date & Computed Entry Date
         grad_match = re.search(r'\b(20[1-2][0-9])[\s\-yY]*(?:-?yilda|yil|year|г|y)?\b', upper_text)
