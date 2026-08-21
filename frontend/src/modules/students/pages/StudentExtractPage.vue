@@ -397,54 +397,37 @@ const getInitials = (name?: string) => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-zinc-50 dark:bg-zinc-950 p-4 md:p-6 space-y-5">
-    <!-- Top Action Bar -->
-    <div class="flex items-center justify-between gap-4">
+  <div class="min-h-screen bg-zinc-50 dark:bg-zinc-950 p-4 md:p-6 space-y-4">
+    <!-- Student Header Banner with Back Button -->
+    <div
+      v-if="student"
+      class="p-3.5 sm:p-4 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs flex items-center justify-between gap-4"
+    >
       <div class="flex items-center gap-3">
+        <!-- Back Button next to Square Avatar -->
         <button
           @click="router.push('/students')"
-          class="p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-all cursor-pointer shadow-xs"
+          class="p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-850 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 transition-all cursor-pointer shadow-2xs hover:scale-[1.02] active:scale-[0.98]"
+          title="Back to Students Dashboard"
         >
           <ArrowLeft class="w-4 h-4" />
         </button>
-        <div>
-          <h1 class="text-lg font-black text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-            <Cpu class="w-5 h-5 text-brand-500" />
-            Fill By Document (Python OCR)
-          </h1>
-          <p class="text-xs font-medium text-zinc-500 dark:text-zinc-400">
-            Upload passports, diplomas, or contact cards to automatically extract and populate student details.
-          </p>
-        </div>
-      </div>
-    </div>
 
-    <!-- Student Header Banner -->
-    <div
-      v-if="student"
-      class="p-4 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs flex items-center justify-between gap-4"
-    >
-      <div class="flex items-center gap-4">
-        <div class="w-12 h-12 rounded-2xl bg-brand-500/10 border border-brand-500/20 text-brand-500 flex items-center justify-center font-black text-lg">
+        <div class="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-brand-500/10 border border-brand-500/20 text-brand-500 flex items-center justify-center font-black text-base sm:text-lg shrink-0">
           {{ getInitials(student.full_name) }}
         </div>
-        <div>
-          <h2 class="text-base font-extrabold text-zinc-900 dark:text-zinc-100 tracking-tight">
+        <div class="min-w-0">
+          <h2 class="text-sm sm:text-base font-extrabold text-zinc-900 dark:text-zinc-100 tracking-tight truncate">
             {{ student.full_name || 'Unnamed Student' }}
           </h2>
-          <div class="flex items-center gap-3 text-xs font-semibold text-zinc-500 dark:text-zinc-400 mt-0.5">
+          <div class="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs font-semibold text-zinc-500 dark:text-zinc-400 mt-0.5">
             <span>ID: <strong class="text-brand-500 font-mono">{{ student.id }}</strong></span>
-            <span class="w-1 h-1 rounded-full bg-zinc-300 dark:bg-zinc-700" />
+            <span class="w-1 h-1 rounded-full bg-zinc-300 dark:bg-zinc-700 hidden sm:inline-block" />
             <span>Passport: <strong class="text-zinc-800 dark:text-zinc-200">{{ student.passport || '—' }}</strong></span>
-            <span class="w-1 h-1 rounded-full bg-zinc-300 dark:bg-zinc-700" />
+            <span class="w-1 h-1 rounded-full bg-zinc-300 dark:bg-zinc-700 hidden sm:inline-block" />
             <span>Tariff: <strong class="text-zinc-800 dark:text-zinc-200">{{ student.tariff || '—' }}</strong></span>
           </div>
         </div>
-      </div>
-      <div class="hidden sm:flex items-center gap-2">
-        <span class="px-3 py-1 rounded-full bg-zinc-100 dark:bg-zinc-800 text-[11px] font-bold text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700">
-          RAM In-Memory OCR
-        </span>
       </div>
     </div>
 
