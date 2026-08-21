@@ -1,6 +1,5 @@
 import re
 from dataclasses import dataclass, asdict
-from datetime import datetime
 from typing import Optional, Dict, Any
 
 
@@ -28,7 +27,7 @@ def normalize_date(raw_date: str) -> Optional[str]:
     if not raw_date:
         return None
 
-    clean = re.sub(r'[^\d\.\-\/\s]', '', str(raw_date).strip())
+    clean = re.sub(r'[^\d\.\-\/\s]', '', raw_date.strip())
     parts = [p for p in re.split(r'[\s\.\-\/]+', clean) if p]
 
     # 3 parts (e.g. DD MM YYYY or YYYY MM DD)
@@ -68,7 +67,7 @@ def normalize_date(raw_date: str) -> Optional[str]:
                 pass
 
     # 1 continuous digit string (8 digits)
-    digits = re.sub(r'\D', '', str(raw_date))
+    digits = re.sub(r'\D', '', raw_date)
     if len(digits) == 8:
         try:
             # Try DDMMYYYY
@@ -91,7 +90,7 @@ def normalize_passport_number(raw_pass: str) -> Optional[str]:
     """
     if not raw_pass:
         return None
-    clean = re.sub(r'[^A-Z0-9]', '', str(raw_pass).upper())
+    clean = re.sub(r'[^A-Z0-9]', '', raw_pass.upper())
     # Match standard 2-letter prefix + 7-digit number
     m = re.search(r'([A-Z]{2}\d{7})', clean)
     if m:
@@ -108,7 +107,7 @@ def normalize_gender(raw_sex: str) -> Optional[str]:
     """
     if not raw_sex:
         return None
-    s = str(raw_sex).strip().upper()
+    s = raw_sex.strip().upper()
     if s in ('M', 'MALE', 'ERKAK', 'МУЖ', 'МУЖСКОЙ'):
         return 'MALE'
     if s in ('F', 'FEMALE', 'AYOL', 'ЖЕН', 'ЖЕНСКИЙ'):
@@ -120,7 +119,7 @@ def normalize_phone_number(raw_phone: str) -> str:
     """
     Formats phone numbers to standard 9-digit mask: XX-XXX-XX-XX.
     """
-    digits = re.sub(r'\D', '', str(raw_phone))
+    digits = re.sub(r'\D', '', raw_phone)
     if digits.startswith('998') and len(digits) == 12:
         digits = digits[3:]
     elif len(digits) > 9:
@@ -137,7 +136,7 @@ def normalize_patronymic(raw_father_name: str) -> str:
     - 'ABDULKHOSHIMAUGN' or 'ABDULKHOSHIMAUGL' -> 'ABDULKHOSHIM UGLI'
     - 'RUSTAMQIZI' or 'RUSTAM QIZ' -> 'RUSTAM QIZI'
     """
-    clean = re.sub(r'[^A-ZА-Я\s\'-]', '', str(raw_father_name).upper())
+    clean = re.sub(r'[^A-ZА-Я\s\'-]', '', raw_father_name.upper())
     clean = re.sub(r'\s+', ' ', clean).strip()
 
     # Handle male suffixes: AUGN, AUGL, AUGLI, UGLI, OGLI, UGIL, OGIL, UGL, O'G'LI, UG'LI
@@ -161,7 +160,7 @@ def normalize_name(raw_name: str) -> str:
     """
     Normalizes full names by fixing joined patronymics and stripping artifacts.
     """
-    clean = re.sub(r'[^A-ZА-Яa-zа-я\s\'-]', '', str(raw_name))
+    clean = re.sub(r'[^A-ZА-Яa-zа-я\s\'-]', '', raw_name)
     clean = re.sub(r'\s+', ' ', clean).strip().upper()
 
     parts = clean.split()
@@ -177,7 +176,7 @@ def normalize_address(raw_addr: str) -> str:
     Normalizes address and region strings by adding spaces between joined words.
     e.g. 'ANDIJANREGION' -> 'ANDIJAN REGION'
     """
-    clean = re.sub(r'[^A-ZА-Яa-zа-я0-9\s\'-]', '', str(raw_addr)).strip().upper()
+    clean = re.sub(r'[^A-ZА-Яa-zа-я0-9\s\'-]', '', raw_addr).strip().upper()
     clean = re.sub(
         r'([A-ZА-Я]{3,})(REGION|CITY|DISTRICT|VILOYATI|VILOYAT|TUMANI|TUMAN|SHAHRI|SHAHAR|RESPUBLIKASI)',
         r'\1 \2',
