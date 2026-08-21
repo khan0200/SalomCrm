@@ -122,6 +122,28 @@ class OCRPipelineTests(TestCase):
         self.assertTrue(dob_detail['validated'])
         self.assertIn(dob_detail['source'], ('VIZ', 'MRZ'))
 
+    def create_shahodatnoma_image(self) -> bytes:
+        img = Image.new('RGB', (1000, 800), color=(255, 255, 255))
+        draw = ImageDraw.Draw(img)
+        draw.text((30, 30), 'UMUMIY O\'RTA TA\'LIM TO\'G\'RISIDA SHAHODATNOMA', fill=(0, 0, 0))
+        draw.text((30, 70), 'CERTIFICATE OF GENERAL SECONDARY EDUCATION', fill=(0, 0, 0))
+        draw.text((30, 110), 'UM № 03565142', fill=(0, 0, 0))
+        draw.text((30, 150), '03.11.2008 -yilda tug\'ilgan', fill=(0, 0, 0))
+        draw.text((30, 180), '(tug\'ilgan sanasi / date of birth)', fill=(0, 0, 0))
+        draw.text((30, 220), 'INOMOV MUHAMMADYUSUF XUSNIDDIN O\'G\'LI', fill=(0, 0, 0))
+        draw.text((30, 250), '(familiyasi, ismi, otasining ismi / surname, given name(s), patronymic)', fill=(0, 0, 0))
+        draw.text((30, 290), '2026 -yilda', fill=(0, 0, 0))
+        draw.text((30, 320), 'Andijon viloyati, Shahrixon tumani', fill=(0, 0, 0))
+        draw.text((30, 350), 'Ixtisoslashtirilgan maktabini', fill=(0, 0, 0))
+        draw.text((30, 380), '(ta\'lim tashkiloti / educational organization)', fill=(0, 0, 0))
+        draw.text((30, 420), 'Algebra 5 (a\'lo)', fill=(0, 0, 0))
+        draw.text((30, 450), 'Geometriya 5 (a\'lo)', fill=(0, 0, 0))
+        draw.text((30, 480), 'Fizika 5 (a\'lo)', fill=(0, 0, 0))
+        draw.text((30, 510), 'Geografiya 4 (yaxshi)', fill=(0, 0, 0))
+        buf = io.BytesIO()
+        img.save(buf, format='JPEG')
+        return buf.getvalue()
+
     # 3. Diploma Extraction Test
     def test_diploma_extraction_success(self):
         img_bytes = self.create_diploma_image()
@@ -134,6 +156,23 @@ class OCRPipelineTests(TestCase):
         self.assertEqual(fields.get('DATE_OF_GRADUATION'), '2024-07-20')
         self.assertEqual(fields.get('DATE_OF_ENTRY'), '2020-09-02')  # 2024 - 4 years
         self.assertIn('1234567', fields.get('DEGREE_NO', ''))
+
+    # 4. Shahodatnoma Extraction & GPA Test
+    def test_shahodatnoma_extraction_and_gpa(self):
+        img_bytes = self.create_shahodatnoma_image()
+        result = process_document_ephemeral(img_bytes, 'shahodatnoma.jpg')
+
+        self.assertEqual(result['document_type'], 'SCHOOL_CERTIFICATE')
+        fields = result['fields']
+
+        self.assertIn('SPECIALIZED SCHOOL', fields.get('FINAL_SCHOOL_NAME', ''))
+        self.assertIn('ANDIJON REGION', fields.get('FINAL_SCHOOL_NAME', ''))
+        self.assertEqual(fields.get('DATE_OF_GRADUATION'), '2026-07-20')
+        self.assertEqual(fields.get('DATE_OF_ENTRY'), '2023-09-02')  # 2026 - 3 years dynamically!
+        self.assertIn('INOMOV', fields.get('FULL_NAME', ''))
+        self.assertEqual(fields.get('MAJOR'), 'GENERAL SECONDARY EDUCATION')
+        self.assertEqual(fields.get('GPA'), '4.75')  # (5+5+5+4)/4 = 4.75!
+
 
     # 4. Multi-Page PDF Processing
     def test_pdf_extraction(self):
