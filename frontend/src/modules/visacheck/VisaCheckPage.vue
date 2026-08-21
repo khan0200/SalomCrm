@@ -541,7 +541,7 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
             @click="onRowClick(st, $event)"
           >
             <!-- Top row: name + checkbox -->
-            <div class="flex items-start justify-between gap-2">
+            <div class="flex items-start justify-between gap-3">
               <div class="min-w-0">
                 <div class="font-bold text-zinc-900 dark:text-white flex items-center gap-1.5 flex-wrap">
                   <CopyField :value="st.full_name" label="Copy name" class="text-sm">{{ st.full_name }}</CopyField>
@@ -552,14 +552,15 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
                   <span v-if="st.student_id || st.id" class="text-xs text-zinc-400 font-mono">#{{ st.student_id || st.id }}</span>
                 </div>
               </div>
-              <input
-                v-if="showSelectColumn"
-                type="checkbox"
-                class="mt-1 size-4 shrink-0 rounded border-neutral-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                :checked="selectedPassports.has(st.passport)"
-                @click.stop
-                @change="toggleSelect(st, ($event.target as HTMLInputElement).checked)"
-              />
+              <div v-if="showSelectColumn" class="flex items-center justify-center shrink-0 pt-0.5">
+                <input
+                  type="checkbox"
+                  class="size-6 rounded-md border-2 border-neutral-300 dark:border-neutral-600 text-blue-600 focus:ring-2 focus:ring-blue-500 cursor-pointer transition-all"
+                  :checked="selectedPassports.has(st.passport)"
+                  @click.stop
+                  @change="toggleSelect(st, ($event.target as HTMLInputElement).checked)"
+                />
+              </div>
             </div>
 
             <!-- Passport + Status -->
@@ -629,9 +630,9 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
                 <th v-if="showAppliedColumn" class="px-4 py-2 w-28">Applied</th>
                 <th v-if="showStatusDateColumn" class="px-4 py-2 w-32">Status Date</th>
                 <th v-else class="px-4 py-2 w-44">Checked</th>
-                <th v-if="showSelectColumn" class="px-4 py-2 w-20 text-center">
-                  <div class="flex items-center justify-center gap-1">
-                    Select
+                <th v-if="showSelectColumn" class="px-4 py-2 w-24 text-center align-middle">
+                  <div class="flex items-center justify-center gap-1.5">
+                    <span>Select</span>
                     <button
                       v-if="hasAnySelected"
                       type="button"
@@ -728,12 +729,15 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
 
                 <!-- Select Column -->
                 <td v-if="showSelectColumn" class="px-4 py-3 align-middle text-center">
-                  <input
-                    type="checkbox"
-                    class="size-5 rounded border-neutral-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                    :checked="selectedPassports.has(st.passport)"
-                    @change="toggleSelect(st, ($event.target as HTMLInputElement).checked)"
-                  />
+                  <div class="flex items-center justify-center h-full">
+                    <input
+                      type="checkbox"
+                      class="size-6 rounded-md border-2 border-neutral-300 dark:border-neutral-600 text-blue-600 focus:ring-2 focus:ring-blue-500 focus:ring-offset-0 cursor-pointer transition-all hover:border-blue-500"
+                      :checked="selectedPassports.has(st.passport)"
+                      @click.stop
+                      @change="toggleSelect(st, ($event.target as HTMLInputElement).checked)"
+                    />
+                  </div>
                 </td>
 
                 <!-- PDF Column -->
