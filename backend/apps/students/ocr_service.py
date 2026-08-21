@@ -30,13 +30,75 @@ def parse_mrz_date(yy_mm_dd: str, is_expiration: bool = False) -> Optional[str]:
     dd = yy_mm_dd[4:6]
     current_year_last2 = datetime.now().year % 100
     if is_expiration:
-        # Expiry is almost always 2000s
         century = 2000 if yy <= 80 else 1900
     else:
-        # Birth date: if yy > current year, it's 1900s, else 2000s
         century = 2000 if yy <= current_year_last2 else 1900
     full_year = century + yy
     return f"{full_year:04d}-{mm}-{dd}"
+
+
+def normalize_date_string(date_str: str) -> Optional[str]:
+    """
+    Parses dates in formats:
+    - '02 04 2009', '02.04.2009', '02/04/2009', '02-04-2009' -> '2009-04-02'
+    - '2009 04 02', '2009.04.02', '2009/04/02', '2009-04-02' -> '2009-04-02'
+    - '02042009' -> '2009-04-02'
+    - '2006 2028' (e.g. 20 06 2028 where first space missed) -> '2028-06-20'
+    - '21062023' -> '2023-06-21'
+    """
+    if not date_str:
+        return None
+    
+    clean = re.sub(r'[^\d\.\-\/\s]', '', date_str.strip())
+    parts = [p for p in re.split(r'[\s\.\-\/]+', clean) if p]
+    
+    if len(parts) == 3:
+        p1, p2, p3 = parts
+        if len(p1) == 4 and len(p2) in (1, 2) and len(p3) in (1, 2):
+            try:
+                y, m, d = int(p1), int(p2), int(p3)
+                if 1900 <= y <= 2100 and 1 <= m <= 12 and 1 <= d <= 31:
+                    return f"{y:04d}-{m:02d}-{d:02d}"
+            except Exception:
+                pass
+        elif len(p3) == 4 and len(p1) in (1, 2) and len(p2) in (1, 2):
+            try:
+                d, m, y = int(p1), int(p2), int(p3)
+                if 1900 <= y <= 2100 and 1 <= m <= 12 and 1 <= d <= 31:
+                    return f"{y:04d}-{m:02d}-{d:02d}"
+            except Exception:
+                pass
+
+    if len(parts) == 2:
+        p1, p2 = parts
+        if len(p1) == 4 and len(p2) == 4:
+            try:
+                d, m, y = int(p1[:2]), int(p1[2:]), int(p2)
+                if 1900 <= y <= 2100 and 1 <= m <= 12 and 1 <= d <= 31:
+                    return f"{y:04d}-{m:02d}-{d:02d}"
+            except Exception:
+                pass
+        elif len(p1) == 2 and len(p2) == 6:
+            try:
+                d, m, y = int(p1), int(p2[:2]), int(p2[2:])
+                if 1900 <= y <= 2100 and 1 <= m <= 12 and 1 <= d <= 31:
+                    return f"{y:04d}-{m:02d}-{d:02d}"
+            except Exception:
+                pass
+
+    digits = re.sub(r'\D', '', date_str)
+    if len(digits) == 8:
+        try:
+            d, m, y = int(digits[:2]), int(digits[2:4]), int(digits[4:])
+            if 1900 <= y <= 2100 and 1 <= m <= 12 and 1 <= d <= 31:
+                return f"{y:04d}-{m:02d}-{d:02d}"
+            y, m, d = int(digits[:4]), int(digits[4:6]), int(digits[6:])
+            if 1900 <= y <= 2100 and 1 <= m <= 12 and 1 <= d <= 31:
+                return f"{y:04d}-{m:02d}-{d:02d}"
+        except Exception:
+            pass
+
+    return None
 
 
 def format_phone_number(raw_phone: str) -> str:
@@ -52,22 +114,33 @@ def format_phone_number(raw_phone: str) -> str:
     return raw_phone
 
 
+def is_passport_label(line_up: str) -> bool:
+    """Returns True if the line is a passport field header/label."""
+    clean = re.sub(r'[^A-ZА-Я]', '', line_up.upper())
+    if not clean:
+        return True
+    labels = [
+        'TURI', 'TYPE', 'DAVLATKODI', 'COUNTRYCODE', 'PASPORTRAQAMI', 'PASSPORTNO',
+        'PASSPORT', 'PASPORT', 'FAMILIYASI', 'SURNAME', 'ISMI', 'GIVENNAMES', 'GIVENNAME',
+        'OTASININGISMI', 'FATHERSNAME', 'FATHERNAME', 'FUQAROLIGI', 'NATIONALITY',
+        'TUGILGANSANASI', 'DATEOFBIRTH', 'JINSI', 'SEX', 'POL',
+        'TUGILGANJOYI', 'PLACEOFBIRTH', 'BERILGANSANASI', 'DATEOFISSUE',
+        'AMALQILISHMUDDATI', 'DATEOFEXPIRY', 'DATEOFEXPIRATION', 'KIMTOMONIDAN',
+        'AUTHORITY', 'REPUBLICOFUZBEKISTAN', 'OZBEKISTONRESPUBLIKASI', 'RESPUBLIKASI'
+    ]
+    return any(lbl in clean for lbl in labels)
+
+
 def extract_document_from_bytes(file_bytes: bytes, filename: str = '') -> Dict[str, Any]:
     """
     Extracts text and structured fields from an uploaded image or PDF in RAM memory.
-    Returns:
-    {
-        "document_type": "PASSPORT" | "BACHELOR'S DIPLOMA" | "SHAHODATNOMA" | "CONTACT INFO" | "GENERAL DOCUMENT",
-        "fields": { ... },
-        "ocr_text": "..."
-    }
     """
     is_pdf = filename.lower().endswith('.pdf') or file_bytes.startswith(b'%PDF')
     images: List[Image.Image] = []
 
     if is_pdf:
         doc = pymupdf.open(stream=file_bytes, filetype="pdf")
-        for page_num in range(min(len(doc), 3)):  # process up to 3 pages
+        for page_num in range(min(len(doc), 3)):
             page = doc[page_num]
             pix = page.get_pixmap(dpi=200)
             img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
@@ -84,7 +157,6 @@ def extract_document_from_bytes(file_bytes: bytes, filename: str = '') -> Dict[s
         result, _ = engine(img_np)
         if result:
             for item in result:
-                # item is [box, text, score]
                 text = item[1].strip()
                 if text:
                     all_raw_lines.append(text)
@@ -98,23 +170,20 @@ def extract_document_from_bytes(file_bytes: bytes, filename: str = '') -> Dict[s
     # =========================================================================
     # 1. PASSPORT & MRZ DETECTION
     # =========================================================================
-    # Look for TD3 MRZ (2 lines of 44 chars) or TD1 MRZ (3 lines of 30 chars)
     mrz_lines = []
     for line in all_raw_lines:
         clean = line.replace(' ', '').upper()
-        # MRZ lines usually have multiple << and are >= 28 chars
         if '<<' in clean and len(clean) >= 28:
             mrz_lines.append(clean)
 
     mrz_success = False
 
-    # Check TD3 (standard passport: line 1 starts with P<, line 2 has numbers and <<)
+    # Check TD3 MRZ (2 lines of 44 chars)
     if len(mrz_lines) >= 2:
         for i in range(len(mrz_lines) - 1):
             l1 = mrz_lines[i]
             l2 = mrz_lines[i+1]
-            if (l1.startswith('P<') or l1.startswith('P')) and len(l1) >= 40 and len(l2) >= 40:
-                # Pad to 44 if needed
+            if (l1.startswith('P<') or l1.startswith('P')) and len(l1) >= 38 and len(l2) >= 38:
                 l1_pad = (l1 + '<'*44)[:44]
                 l2_pad = (l2 + '<'*44)[:44]
                 try:
@@ -149,44 +218,142 @@ def extract_document_from_bytes(file_bytes: bytes, filename: str = '') -> Dict[s
                 except Exception:
                     pass
 
-    # If MRZ parsed or text clearly says PASSPORT / PASSPORT OF UZBEKISTAN
-    if not mrz_success and ('PASSPORT' in upper_text or 'PASPORT' in upper_text or 'REPUBLIC OF UZBEKISTAN' in upper_text):
+    # =========================================================================
+    # 2. VISUAL INSPECTION ZONE (VIZ) PARSING (Cropped or clear photo scans)
+    # =========================================================================
+    is_passport_doc = (
+        mrz_success or
+        any(k in upper_text for k in ['PASSPORT', 'PASPORT', 'REPUBLIC OF UZBEKISTAN', 'O\'ZBEKISTON RESPUBLIKASI', 'FAMILIYASI', 'SURNAME', 'FA7', 'FA8', 'FA9', 'AA', 'AB'])
+    )
+
+    if is_passport_doc:
         doc_type = "PASSPORT"
-        
-        # Passport number regex (e.g. FA1234567, AA1234567)
-        pass_match = re.search(r'\b([A-Z]{2}\s*\d{7})\b', upper_text)
-        if pass_match:
-            extracted_fields['PASSPORT_NUMBER'] = pass_match.group(1).replace(' ', '')
 
-        # Date of birth regex
-        dob_match = re.search(r'(?:DATE OF BIRTH|TUG\'ILGAN SANASI|TUGILGAN SANASI|ДАТА РОЖДЕНИЯ)[\s:]*([0-9]{2}[\.\/\-][0-9]{2}[\.\/\-][0-9]{4}|[0-9]{4}[\.\/\-][0-9]{2}[\.\/\-][0-9]{2})', upper_text)
-        if dob_match:
-            raw_d = dob_match.group(1).replace('/', '-').replace('.', '-')
-            if len(raw_d.split('-')[0]) == 4:
-                extracted_fields['DATE_OF_BIRTH'] = raw_d
-            else:
-                p = raw_d.split('-')
-                extracted_fields['DATE_OF_BIRTH'] = f"{p[2]}-{p[1]}-{p[0]}"
+        # 2.1 Passport Number (e.g. FA7958189, FA 7958189, AB1234567)
+        if 'PASSPORT_NUMBER' not in extracted_fields:
+            pass_match = re.search(r'\b([A-Z]{2}\s*\d{7})\b', upper_text)
+            if pass_match:
+                extracted_fields['PASSPORT_NUMBER'] = pass_match.group(1).replace(' ', '')
 
-        # Sex
-        if re.search(r'\b(SEX|JINSI|ПОЛ)[\s:]*\bM\b|\bMALE\b|\bERKAK\b', upper_text):
-            extracted_fields['SEX'] = 'MALE'
-        elif re.search(r'\b(SEX|JINSI|ПОЛ)[\s:]*\bF\b|\bFEMALE\b|\bAYOL\b', upper_text):
-            extracted_fields['SEX'] = 'FEMALE'
+        # 2.2 Visual Inspection Zone: Surname, Given Names, Father's Name, Dates, Sex
+        viz_surname = None
+        viz_given = None
+        viz_father = None
+        viz_dob = None
+        viz_doi = None
+        viz_doe = None
+        viz_sex = None
+        viz_address = None
 
-    # If passport, search for Date of Issue
-    if doc_type == "PASSPORT":
-        issue_match = re.search(r'(?:DATE OF ISSUE|BERILGAN SANASI|ДАТА ВЫДАЧИ)[\s:]*([0-9]{2}[\.\/\-][0-9]{2}[\.\/\-][0-9]{4}|[0-9]{4}[\.\/\-][0-9]{2}[\.\/\-][0-9]{2})', upper_text)
-        if issue_match:
-            raw_i = issue_match.group(1).replace('/', '-').replace('.', '-')
-            if len(raw_i.split('-')[0]) == 4:
-                extracted_fields['DATE_OF_ISSUE'] = raw_i
-            else:
-                p = raw_i.split('-')
-                extracted_fields['DATE_OF_ISSUE'] = f"{p[2]}-{p[1]}-{p[0]}"
+        for i, raw_l in enumerate(all_raw_lines):
+            l = raw_l.strip()
+            up = l.upper()
+            up_clean = re.sub(r'[^A-ZА-Я0-9]', '', up)
+
+            # SURNAME
+            if any(k in up_clean for k in ['FAMILIYASI', 'SURNAME', 'ФАМИЛИЯ']) and not viz_surname:
+                for j in range(i + 1, min(i + 4, len(all_raw_lines))):
+                    cand = all_raw_lines[j].strip().upper()
+                    if not is_passport_label(cand) and re.match(r'^[A-ZА-Я\s\'-]{2,}$', cand):
+                        viz_surname = cand
+                        break
+
+            # GIVEN NAMES
+            if any(k in up_clean for k in ['ISMI', 'GIVENNAMES', 'GIVENNAME', 'ИМЯ']) and 'OTASINING' not in up_clean and not viz_given:
+                for j in range(i + 1, min(i + 4, len(all_raw_lines))):
+                    cand = all_raw_lines[j].strip().upper()
+                    if not is_passport_label(cand) and re.match(r'^[A-ZА-Я\s\'-]{2,}$', cand):
+                        viz_given = cand
+                        break
+
+            # FATHER'S NAME / PATRONYMIC
+            if any(k in up_clean for k in ['OTASININGISMI', 'FATHERSNAME', 'FATHERNAME', 'ОТЧЕСТВО']) and not viz_father:
+                for j in range(i + 1, min(i + 4, len(all_raw_lines))):
+                    cand = all_raw_lines[j].strip().upper()
+                    if not is_passport_label(cand) and re.match(r'^[A-ZА-Я\s\'-]{2,}$', cand):
+                        viz_father = cand
+                        break
+
+            # DATE OF BIRTH
+            if any(k in up_clean for k in ['TUGILGANSANASI', 'DATEOFBIRTH', 'ДАТАРОЖДЕНИЯ']) and not viz_dob:
+                for j in range(i, min(i + 4, len(all_raw_lines))):
+                    d = normalize_date_string(all_raw_lines[j])
+                    if d:
+                        viz_dob = d
+                        break
+
+            # DATE OF ISSUE
+            if any(k in up_clean for k in ['BERILGANSANASI', 'DATEOFISSUE', 'ДАТАВЫДАЧИ']) and not viz_doi:
+                for j in range(i, min(i + 4, len(all_raw_lines))):
+                    d = normalize_date_string(all_raw_lines[j])
+                    if d:
+                        viz_doi = d
+                        break
+
+            # DATE OF EXPIRY
+            if any(k in up_clean for k in ['AMALQILISHMUDDATI', 'DATEOFEXPIRY', 'DATEOFEXPIRATION', 'СРОКДЕЙСТВИЯ']) and not viz_doe:
+                for j in range(i, min(i + 4, len(all_raw_lines))):
+                    d = normalize_date_string(all_raw_lines[j])
+                    if d:
+                        viz_doe = d
+                        break
+
+            # SEX
+            if any(k in up_clean for k in ['JINSI', 'SEX', 'POL']) and not viz_sex:
+                for j in range(i, min(i + 4, len(all_raw_lines))):
+                    cand = all_raw_lines[j].strip().upper()
+                    if cand in ('M', 'MALE', 'ERKAK'):
+                        viz_sex = 'MALE'
+                        break
+                    elif cand in ('F', 'FEMALE', 'AYOL'):
+                        viz_sex = 'FEMALE'
+                        break
+
+            # PLACE OF BIRTH / ADDRESS
+            if any(k in up_clean for k in ['TUGILGANJOYI', 'PLACEOFBIRTH']) and not viz_address:
+                for j in range(i + 1, min(i + 4, len(all_raw_lines))):
+                    cand = all_raw_lines[j].strip().upper()
+                    if not is_passport_label(cand) and len(cand) >= 3 and not cand.isdigit():
+                        viz_address = cand
+                        break
+
+        # Fallback for dates by scanning all 3-part dates in document if any missing
+        all_found_dates = []
+        for line in all_raw_lines:
+            d = normalize_date_string(line)
+            if d and d not in all_found_dates:
+                all_found_dates.append(d)
+
+        # In standard passports, dates ordered chronologically: [DOB, DOI, DOE]
+        if all_found_dates:
+            sorted_dates = sorted(all_found_dates)
+            if not viz_dob and len(sorted_dates) >= 1:
+                viz_dob = sorted_dates[0]
+            if not viz_doe and len(sorted_dates) >= 2:
+                viz_doe = sorted_dates[-1]
+            if not viz_doi and len(sorted_dates) >= 3:
+                viz_doi = sorted_dates[1]
+
+        # Assemble Full Name
+        if 'FULL_NAME' not in extracted_fields:
+            name_parts = [p for p in [viz_surname, viz_given, viz_father] if p]
+            if name_parts:
+                extracted_fields['FULL_NAME'] = ' '.join(name_parts)
+
+        # Dates & Attributes fallback
+        if 'DATE_OF_BIRTH' not in extracted_fields and viz_dob:
+            extracted_fields['DATE_OF_BIRTH'] = viz_dob
+        if 'DATE_OF_ISSUE' not in extracted_fields and viz_doi:
+            extracted_fields['DATE_OF_ISSUE'] = viz_doi
+        if 'DATE_OF_EXPIRATION' not in extracted_fields and viz_doe:
+            extracted_fields['DATE_OF_EXPIRATION'] = viz_doe
+        if 'SEX' not in extracted_fields and viz_sex:
+            extracted_fields['SEX'] = viz_sex
+        if 'ADDRESS' not in extracted_fields and viz_address:
+            extracted_fields['ADDRESS'] = viz_address
 
     # =========================================================================
-    # 2. DIPLOMA & SHAHODATNOMA DETECTION
+    # 3. DIPLOMA & SHAHODATNOMA DETECTION
     # =========================================================================
     if doc_type == "GENERAL DOCUMENT":
         is_diploma = any(kw in upper_text for kw in ['DIPLOM', 'DIPLOMA', 'BAKALAVR', 'MAGISTR', 'BACHELOR', 'MASTER'])
@@ -204,7 +371,7 @@ def extract_document_from_bytes(file_bytes: bytes, filename: str = '') -> Dict[s
                 doc_type = "BACHELOR'S DIPLOMA"
                 degree_duration = 4
 
-            # Degree / Certificate Serial Number (e.g. B № 00644212, UM №03565142, K № 123456)
+            # Degree / Certificate Serial Number
             deg_match = re.search(r'([A-ZА-Я]{1,3}\s*(?:№|N|NO\.?)\s*\d{6,8}|\b\d{7,8}\b)', upper_text)
             if deg_match:
                 extracted_fields['DEGREE_NO'] = deg_match.group(1)
@@ -216,7 +383,7 @@ def extract_document_from_bytes(file_bytes: bytes, filename: str = '') -> Dict[s
                     extracted_fields['FINAL_SCHOOL_NAME'] = line.strip().upper()
                     break
 
-            # Major Detection (if not shahodatnoma)
+            # Major Detection
             if doc_type != "SHAHODATNOMA":
                 for line in all_raw_lines:
                     l_up = line.upper()
@@ -240,7 +407,7 @@ def extract_document_from_bytes(file_bytes: bytes, filename: str = '') -> Dict[s
                 extracted_fields['GPA'] = gpa_match.group(1) or gpa_match.group(2)
 
     # =========================================================================
-    # 3. CONTACT INFO DETECTION
+    # 4. CONTACT INFO DETECTION
     # =========================================================================
     if doc_type == "GENERAL DOCUMENT":
         email_match = re.search(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b', full_ocr_text)
