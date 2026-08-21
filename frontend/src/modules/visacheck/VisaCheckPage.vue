@@ -10,6 +10,8 @@ import { useStudentDashboardStore } from '@/stores/studentDashboard'
 import StudentFormModal from './components/StudentFormModal.vue'
 import StudentDetailsModal from './components/StudentDetailsModal.vue'
 import StudentUniversityGroup from './components/StudentUniversityGroup.vue'
+import ChangeReportModal, { type SessionChange, type SessionNoAnswer, type SessionSummary } from './components/ChangeReportModal.vue'
+import IosBatchProgressBar from './components/IosBatchProgressBar.vue'
 import VisaTypeFilterTabs, { type VisaTypeFilter } from './components/VisaTypeFilterTabs.vue'
 import StatusBadge from './components/StatusBadge.vue'
 import VisaTypeBadge from './components/VisaTypeBadge.vue'
@@ -52,6 +54,27 @@ const downloadingPassports = ref<Set<string>>(new Set())
 const detailsModalOpen = ref(false)
 const detailsStudent = ref<VisaStudent | null>(null)
 const editingStudent = ref<VisaStudent | null>(null)
+
+// Report & Batch Progress state
+const showReportModal = ref(false)
+const isRetryingReport = ref(false)
+const sessionChanges = ref<SessionChange[]>([])
+const sessionNoAnswers = ref<SessionNoAnswer[]>([])
+const sessionSummary = ref<SessionSummary>({ total: 0, changed: 0, unchanged: 0, noAnswer: 0 })
+
+const batchProgress = ref<{
+  active: boolean
+  total: number
+  completed: number
+  failed: number
+  currentName: string
+}>({
+  active: false,
+  total: 0,
+  completed: 0,
+  failed: 0,
+  currentName: ''
+})
 
 // Delete confirm
 const showDeleteConfirm = ref(false)
@@ -298,16 +321,24 @@ function handleStudentUpdated(updated: VisaStudent) {
   }
 }
 
-// ─── Visa Check ───────────────────────────────────────────────────────────────
-async function checkStudentVisa(student: VisaStudent) {
+// ─── Single Visa Check ────────────────────────────────────────────────────────
+async function checkStudentVisa(
+  student: VisaStudent,
+  silent: boolean = false
+): Promise<{ success: boolean; error?: string; changed: boolean }> {
   const pass = (student.passport || '').trim().toUpperCase()
   const name = (student.full_name || '').trim().toUpperCase()
   const dob  = (student.birthday || '').trim()
   if (!pass || !name || !dob) {
-    uiStore.addToast({ type: 'warning', message: `${student.full_name}: Pasport, ism yoki tug'ilgan sana to'liq emas` })
-    return
+    if (!silent) {
+      uiStore.addToast({ type: 'warning', message: `${student.full_name}: Pasport, ism yoki tug'ilgan sana to'liq emas` })
+    }
+    return { success: false, error: "Pasport yoki tug'ilgan sana to'liq emas", changed: false }
   }
+
   checkingPassports.value.set(pass, 'processing')
+  const oldStatus = student.status || 'PENDING'
+
   try {
     const res = await visaApi.checkVisa({
       passport: pass,
@@ -316,6 +347,9 @@ async function checkStudentVisa(student: VisaStudent) {
       visa_type: student.visa_type || 'Embassy',
       application_no: student.application_no
     })
+
+    const newStatus = (res.latest_status || (res.found ? 'APP/RECEIVED' : 'PENDING')).toUpperCase()
+    const changed = res.found && oldStatus.toUpperCase() !== newStatus.toUpperCase()
 
     if (res.found && res.latest_status) {
       student.status = res.latest_status.toUpperCase()
@@ -326,33 +360,181 @@ async function checkStudentVisa(student: VisaStudent) {
     if (res.pdf_url) student.pdf_url = res.pdf_url
     student.last_checked = new Date().toISOString()
 
-    uiStore.addToast({
-      type: res.found ? 'success' : 'info',
-      message: res.found ? `${student.full_name}: ${res.latest_status}` : `${student.full_name}: Ariza topilmadi`
-    })
+    if (changed) {
+      const exists = sessionChanges.value.some(c => c.passport === student.passport)
+      if (!exists) {
+        sessionChanges.value.push({
+          fullName: student.full_name,
+          passport: student.passport,
+          oldStatus: oldStatus,
+          newStatus: newStatus
+        })
+      }
+      if (!silent) {
+        uiStore.addToast({
+          type: 'success',
+          message: `🎉 ${student.full_name}: Viza statusi o'zgardi! (${oldStatus} ➔ ${newStatus})`
+        })
+      }
+    } else if (!silent) {
+      uiStore.addToast({
+        type: res.found ? 'info' : 'warning',
+        message: res.found ? `${student.full_name}: ${student.status}` : `${student.full_name}: Ariza topilmadi`
+      })
+    }
+
+    return { success: true, changed }
   } catch (err: any) {
-    uiStore.addToast({ type: 'error', message: `${student.full_name}: Tekshirishda xatolik (${err.message})` })
+    const msg = err.message || 'Serverdan javob olinmadi'
+    if (!silent) {
+      uiStore.addToast({ type: 'error', message: `${student.full_name}: Tekshirishda xatolik (${msg})` })
+    }
+    return { success: false, error: msg, changed: false }
   } finally {
     checkingPassports.value.delete(pass)
   }
 }
 
-// Batch check selected
-const isBatchChecking = ref(false)
+// ─── High-Performance Concurrent Batch Check with 1x Auto-Retry ──────────────
+async function runBatchCheck(list: VisaStudent[]) {
+  const toCheck = list.filter(s => s.passport && !checkingPassports.value.has(s.passport))
+  if (toCheck.length === 0) return
+
+  sessionChanges.value = []
+  sessionNoAnswers.value = []
+  batchProgress.value = {
+    active: true,
+    total: toCheck.length,
+    completed: 0,
+    failed: 0,
+    currentName: toCheck[0]?.full_name || ''
+  }
+
+  // Mark all as processing
+  for (const s of toCheck) {
+    checkingPassports.value.set(s.passport, 'processing')
+  }
+
+  const CHUNK_SIZE = 5
+  const STAGGER_DELAY = 150
+  const firstPassFailed: { student: VisaStudent; reason?: string }[] = []
+  let completedCount = 0
+
+  // Pass 1: Chunked batches
+  for (let i = 0; i < toCheck.length; i += CHUNK_SIZE) {
+    const chunk = toCheck.slice(i, i + CHUNK_SIZE)
+    const inFlightPromises: Promise<void>[] = []
+
+    for (let j = 0; j < chunk.length; j++) {
+      const student = chunk[j]!
+      inFlightPromises.push(
+        (async () => {
+          batchProgress.value.currentName = student.full_name
+          const res = await checkStudentVisa(student, true)
+          if (res.success) {
+            completedCount++
+          } else {
+            firstPassFailed.push({ student, reason: res.error })
+          }
+          batchProgress.value.completed = completedCount
+          batchProgress.value.failed = firstPassFailed.length
+        })()
+      )
+      if (j < chunk.length - 1) {
+        await new Promise(r => setTimeout(r, STAGGER_DELAY))
+      }
+    }
+    await Promise.allSettled(inFlightPromises)
+  }
+
+  // Pass 2: 1x Automatic Retry for Failed ones
+  const stillFailed: { student: VisaStudent; reason?: string }[] = []
+  if (firstPassFailed.length > 0) {
+    await new Promise(r => setTimeout(r, 400))
+    for (let i = 0; i < firstPassFailed.length; i += CHUNK_SIZE) {
+      const retryChunk = firstPassFailed.slice(i, i + CHUNK_SIZE)
+      const retryPromises: Promise<void>[] = []
+      for (let j = 0; j < retryChunk.length; j++) {
+        const { student } = retryChunk[j]!
+        retryPromises.push(
+          (async () => {
+            batchProgress.value.currentName = student.full_name
+            const res = await checkStudentVisa(student, true)
+            if (res.success) {
+              completedCount++
+              batchProgress.value.completed = completedCount
+              batchProgress.value.failed = Math.max(0, batchProgress.value.failed - 1)
+            } else {
+              stillFailed.push({ student, reason: res.error })
+            }
+          })()
+        )
+        if (j < retryChunk.length - 1) {
+          await new Promise(r => setTimeout(r, STAGGER_DELAY))
+        }
+      }
+      await Promise.allSettled(retryPromises)
+    }
+  }
+
+  // Clear checking status
+  for (const s of toCheck) {
+    checkingPassports.value.delete(s.passport)
+  }
+
+  // Compile Session Report
+  sessionNoAnswers.value = stillFailed.map(f => ({
+    fullName: f.student.full_name || f.student.passport,
+    passport: f.student.passport,
+    reason: f.reason || 'Serverdan javob olinmadi (Timeout)'
+  }))
+
+  const changedCount = sessionChanges.value.length
+  const noAnswerCount = stillFailed.length
+  const unchangedCount = Math.max(0, completedCount - changedCount)
+
+  sessionSummary.value = {
+    total: toCheck.length,
+    changed: changedCount,
+    unchanged: unchangedCount,
+    noAnswer: noAnswerCount
+  }
+
+  // Finish batch & open report modal
+  setTimeout(() => {
+    batchProgress.value.active = false
+    showReportModal.value = true
+    uiStore.addToast({
+      type: changedCount > 0 ? 'success' : 'info',
+      message: `Viza tekshiruvi yakunlandi: ${completedCount}/${toCheck.length} ta tekshirildi (${changedCount} ta o'zgarish).`
+    })
+  }, 600)
+}
+
+// Batch check selected in table
 async function handleBatchCheck() {
   if (!selectedInCurrentTab.value.length) return
-  isBatchChecking.value = true
-  for (const s of selectedInCurrentTab.value) await checkStudentVisa(s)
-  isBatchChecking.value = false
-  uiStore.addToast({ type: 'info', message: `${selectedInCurrentTab.value.length} ta talabaning viza holati tekshirildi.` })
+  await runBatchCheck(selectedInCurrentTab.value)
 }
 
 // Group check
 async function handleGroupRefresh(groupList: VisaStudent[]) {
   if (!groupList.length) return
-  uiStore.addToast({ type: 'info', message: `${groupList.length} ta talabaning viza holati tekshirilmoqda...` })
-  for (const s of groupList) {
-    await checkStudentVisa(s)
+  await runBatchCheck(groupList)
+}
+
+// Retry failed from summary modal
+async function handleRetryNoAnswers() {
+  if (sessionNoAnswers.value.length === 0) return
+  const failedPassports = new Set(sessionNoAnswers.value.map(s => s.passport.toUpperCase().trim()))
+  const retryList = students.value.filter(s => failedPassports.has(s.passport.toUpperCase().trim()))
+  if (retryList.length === 0) return
+  isRetryingReport.value = true
+  showReportModal.value = false
+  try {
+    await runBatchCheck(retryList)
+  } finally {
+    isRetryingReport.value = false
   }
 }
 
@@ -559,11 +741,11 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
         <button
           v-if="selectedInCurrentTab.length > 0"
           type="button"
-          :disabled="isBatchChecking"
+          :disabled="batchProgress.active"
           @click="handleBatchCheck"
           class="h-11 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm shadow-xs transition-all flex items-center gap-2 disabled:opacity-50 cursor-pointer"
         >
-          <RefreshCw v-if="isBatchChecking" class="size-4 animate-spin" />
+          <RefreshCw v-if="batchProgress.active" class="size-4 animate-spin" />
           Check ({{ selectedInCurrentTab.length }})
         </button>
       </div>
@@ -969,6 +1151,26 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
         </div>
       </Transition>
     </Teleport>
+
+    <!-- ── Floating Dynamic Island Batch Progress Bar ── -->
+    <IosBatchProgressBar
+      :active="batchProgress.active"
+      :total="batchProgress.total"
+      :completed="batchProgress.completed"
+      :failed="batchProgress.failed"
+      :current-student-name="batchProgress.currentName"
+    />
+
+    <!-- ── Viza Hisoboti (Change Report Summary Modal) ── -->
+    <ChangeReportModal
+      :is-open="showReportModal"
+      :changes="sessionChanges"
+      :no-answers="sessionNoAnswers"
+      :summary="sessionSummary"
+      :is-retrying="isRetryingReport"
+      @close="showReportModal = false"
+      @retry-no-answers="handleRetryNoAnswers"
+    />
 
   </div>
 </template>
