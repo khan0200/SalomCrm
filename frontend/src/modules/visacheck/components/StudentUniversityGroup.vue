@@ -27,7 +27,9 @@ const emit = defineEmits<{
   (e: 'download-pdf', student: VisaStudent): void
   (e: 'toggle-select', student: VisaStudent, checked: boolean): void
   (e: 'toggle-pin', student: VisaStudent): void
+  (e: 'toggle-flag', student: VisaStudent): void
   (e: 'deselect-group', students: VisaStudent[]): void
+  (e: 'contextmenu', student: VisaStudent, event: MouseEvent): void
 }>()
 
 const isOpen = ref(true)
@@ -156,6 +158,7 @@ function formatTimestampCompact(ts: string | undefined | null): string {
           :key="st.passport"
           class="p-4 space-y-2.5 rounded-xl border border-neutral-300/90 dark:border-white/20 bg-white dark:bg-zinc-900 shadow-sm cursor-pointer active:bg-blue-50/60 dark:active:bg-white/[0.03]"
           @click="emit('details', st)"
+          @contextmenu.prevent="emit('contextmenu', st, $event)"
         >
           <div class="flex items-start justify-between gap-3">
             <div class="min-w-0">
@@ -257,6 +260,7 @@ function formatTimestampCompact(ts: string | undefined | null): string {
               class="cursor-pointer transition-colors hover:bg-blue-50/60 dark:hover:bg-white/[0.03]"
               :class="{ 'bg-blue-50/30 dark:bg-white/[0.02]': selectedPassports.has(st.passport) }"
               @click="emit('details', st)"
+              @contextmenu.prevent="emit('contextmenu', st, $event)"
             >
               <!-- Name Column -->
               <td class="px-4 py-3 align-top">

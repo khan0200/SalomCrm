@@ -10,6 +10,7 @@ import { useStudentDashboardStore } from '@/stores/studentDashboard'
 import StudentFormModal from './components/StudentFormModal.vue'
 import StudentDetailsModal from './components/StudentDetailsModal.vue'
 import StudentUniversityGroup from './components/StudentUniversityGroup.vue'
+import StudentContextMenu from './components/StudentContextMenu.vue'
 import ChangeReportModal, { type SessionChange, type SessionNoAnswer, type SessionSummary } from './components/ChangeReportModal.vue'
 import IosBatchProgressBar from './components/IosBatchProgressBar.vue'
 import VisaTypeFilterTabs, { type VisaTypeFilter } from './components/VisaTypeFilterTabs.vue'
@@ -75,6 +76,28 @@ const batchProgress = ref<{
   failed: 0,
   currentName: ''
 })
+
+// Context Menu state
+const contextMenuOpen = ref(false)
+const contextMenuX = ref(0)
+const contextMenuY = ref(0)
+const contextMenuStudent = ref<VisaStudent | null>(null)
+
+function onContextMenu(student: VisaStudent, event: MouseEvent) {
+  event.preventDefault()
+  event.stopPropagation()
+  contextMenuStudent.value = student
+  contextMenuX.value = event.clientX
+  contextMenuY.value = event.clientY
+  contextMenuOpen.value = true
+}
+
+async function handleFlagToggle(student: VisaStudent) {
+  student.flag = !student.flag
+  try {
+    await visaApi.updateVisaStudent(student.passport, { flag: student.flag })
+  } catch { /* ignore */ }
+}
 
 // Delete confirm
 const showDeleteConfirm = ref(false)
@@ -856,7 +879,9 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
         @download-pdf="handleDownloadPdf"
         @toggle-select="toggleSelect"
         @toggle-pin="handlePinToggle"
+        @toggle-flag="handleFlagToggle"
         @deselect-group="handleDeselectGroup"
+        @contextmenu="onContextMenu"
       />
     </div>
 
@@ -877,6 +902,7 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
           :key="st.passport"
           class="p-4 space-y-2.5 rounded-xl border border-neutral-300/90 dark:border-white/20 bg-white dark:bg-zinc-900 shadow-sm cursor-pointer active:bg-blue-50/60 dark:active:bg-white/[0.03]"
           @click="onRowClick(st, $event)"
+          @contextmenu.prevent="onContextMenu(st, $event)"
         >
           <div class="flex items-start justify-between gap-3">
             <div class="min-w-0">
@@ -989,6 +1015,7 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
               class="cursor-pointer transition-colors hover:bg-blue-50/60 dark:hover:bg-white/[0.03]"
               :class="{ 'bg-blue-50/30 dark:bg-white/[0.02]': selectedPassports.has(st.passport) }"
               @click="onRowClick(st, $event)"
+              @contextmenu.prevent="onContextMenu(st, $event)"
             >
               <!-- Name Column -->
               <td class="px-4 py-3 align-top">
@@ -1195,6 +1222,23 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
       :is-retrying="isRetryingReport"
       @close="showReportModal = false"
       @retry-no-answers="handleRetryNoAnswers"
+    />
+
+    <!-- ── Context Menu (Right Click Menu) ── -->
+    <StudentContextMenu
+      :is-open="contextMenuOpen"
+      :x="contextMenuX"
+      :y="contextMenuY"
+      :student="contextMenuStudent"
+      :is-checking="contextMenuStudent ? checkingPassports.has(contextMenuStudent.passport) : false"
+      @close="contextMenuOpen = false"
+      @check="checkStudentVisa"
+      @details="openDetails"
+      @edit="openEditModal"
+      @toggle-pin="handlePinToggle"
+      @toggle-flag="handleFlagToggle"
+      @download-pdf="handleDownloadPdf"
+      @delete="promptDelete"
     />
 
   </div>
