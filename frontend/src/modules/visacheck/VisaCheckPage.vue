@@ -64,14 +64,26 @@ async function loadStudents() {
 
 onMounted(loadStudents)
 
-// ─── Visa Status Helpers ──────────────────────────────────────────────────────
+// ─── Visa Status Helpers (Matching univisacheck /cabinet logic) ───────────────
+function bucketForStatus(statusValue: string | undefined | null): StatusFilter {
+  const status = (statusValue || '').toLowerCase().replace(/_/g, ' ').replace(/\s+/g, ' ').trim()
+  const isApproved = status.includes('approved') || status.includes('visa used') || status.includes('issued') || status.includes('허가') || status.includes('tasdiqlangan')
+  const isCancelled = status.includes('cancel') || status.includes('reject') || status.includes('return') || status.includes('expired') || status.includes('불허') || status.includes('rad etil') || status.includes('bekor')
+  const isPending = status === 'pending' || status === 'unknown' || status === '' || status.includes('error') || status.includes('not found') || status.includes('no application') || status.includes('topilmadi') || status.includes('mavjud emas')
+
+  if (isApproved) return 'approved'
+  if (isCancelled) return 'cancelled'
+  if (isPending) return 'pending'
+  return 'application'
+}
+
 function getStudentVisaStatus(student: VisaStudent): string {
   const raw = (student.status || '').toUpperCase()
-  if (raw.includes('APPROV') || raw.includes('PASSED') || raw.includes('ISSUED')) return 'APPROVED'
-  if (raw.includes('REJECT') || raw.includes('CANCEL') || raw.includes('RETURN') || raw.includes('EXPIRED')) return 'CANCELLED'
-  if (raw.includes('REVIEW') || raw.includes('PROCESSING') || raw.includes('SIMSA')) return 'UNDER REVIEW'
-  if (raw.includes('RECEIV') || raw.includes('SUBMIT') || raw.includes('JEOMSU')) return 'RECEIVED'
-  if (raw.includes('SUPPLEM')) return 'SUPPLEMENT NEEDED'
+  if (raw.includes('APPROV') || raw.includes('PASSED') || raw.includes('ISSUED') || raw.includes('허가')) return 'APPROVED'
+  if (raw.includes('REJECT') || raw.includes('CANCEL') || raw.includes('RETURN') || raw.includes('EXPIRED') || raw.includes('불허')) return 'CANCELLED'
+  if (raw.includes('REVIEW') || raw.includes('PROCESSING') || raw.includes('SIMSA') || raw.includes('심사중')) return 'UNDER REVIEW'
+  if (raw.includes('RECEIV') || raw.includes('SUBMIT') || raw.includes('JEOMSU') || raw.includes('접수') || raw.includes('APP/')) return 'RECEIVED'
+  if (raw.includes('SUPPLEM') || raw.includes('보완')) return 'SUPPLEMENT NEEDED'
   return raw || 'PENDING'
 }
 
@@ -80,17 +92,23 @@ function isPdfEligible(student: VisaStudent): boolean {
   return s.includes('APPROV') || s.includes('VISA USED')
 }
 
-// ─── Counts ───────────────────────────────────────────────────────────────────
+// ─── Counts (Mutually Exclusive 4 Tabs matching univisacheck) ────────────────
 const counts = computed(() => {
-  let pending = 0, application = 0, cancelled = 0, approved = 0
+  const result: Record<StatusFilter, number> = { pending: 0, application: 0, cancelled: 0, approved: 0 }
   for (const s of students.value) {
-    application++
-    const status = getStudentVisaStatus(s)
-    if (status.includes('APPROV') || status.includes('VISA USED')) approved++
-    else if (status.includes('CANCEL') || status.includes('REJECT') || status.includes('RETURN') || status.includes('EXPIRED')) cancelled++
-    else pending++
+    if (searchQuery.value) {
+      const q = searchQuery.value.toLowerCase().trim()
+      const name = (s.full_name || '').toLowerCase()
+      const pass = (s.passport || '').toLowerCase()
+      const id   = (s.student_id || s.id || '').toLowerCase()
+      const univ = (s.university || '').toLowerCase()
+      const tariff = (s.tariff || '').toLowerCase()
+      if (!name.includes(q) && !pass.includes(q) && !id.includes(q) && !univ.includes(q) && !tariff.includes(q)) continue
+    }
+    const bucket = bucketForStatus(s.status)
+    result[bucket]++
   }
-  return { pending, application, cancelled, approved }
+  return result
 })
 
 // ─── Filtered & Sorted Students ──────────────────────────────────────────────
@@ -105,18 +123,7 @@ const filteredStudents = computed(() => {
       const tariff = (s.tariff || '').toLowerCase()
       if (!name.includes(q) && !pass.includes(q) && !id.includes(q) && !univ.includes(q) && !tariff.includes(q)) return false
     }
-    const status = getStudentVisaStatus(s)
-    if (currentFilter.value === 'pending') {
-      return !status.includes('APPROV') && !status.includes('VISA USED') &&
-             !status.includes('CANCEL') && !status.includes('REJECT') &&
-             !status.includes('RETURN') && !status.includes('EXPIRED')
-    }
-    if (currentFilter.value === 'approved') return status.includes('APPROV') || status.includes('VISA USED')
-    if (currentFilter.value === 'cancelled') {
-      return status.includes('CANCEL') || status.includes('REJECT') ||
-             status.includes('RETURN') || status.includes('EXPIRED')
-    }
-    return true // application = all
+    return bucketForStatus(s.status) === currentFilter.value
   })
 
   list.sort((a, b) => {
@@ -139,7 +146,14 @@ const filteredStudents = computed(() => {
     if (sortBy.value === 'statusDate') {
       return (b.status_date || '').localeCompare(a.status_date || '')
     }
-    return (b.created_at || '').localeCompare(a.created_at || '')
+
+    if (currentFilter.value === 'application') {
+      const isUnderReviewA = (a.status || '').toUpperCase().includes('REVIEW') || (a.status || '').toUpperCase().includes('SUPPLEM') ? 1 : 0
+      const isUnderReviewB = (b.status || '').toUpperCase().includes('REVIEW') || (b.status || '').toUpperCase().includes('SUPPLEM') ? 1 : 0
+      if (isUnderReviewA !== isUnderReviewB) return isUnderReviewB - isUnderReviewA
+    }
+
+    return (b.application_date || b.created_at || '').localeCompare(a.application_date || a.created_at || '')
   })
   return list
 })
