@@ -86,6 +86,14 @@ async function loadStudents() {
   try {
     const res = await visaApi.getVisaStudents()
     students.value = res.results || []
+
+    // Restore selection state from database
+    selectedPassports.value.clear()
+    for (const s of students.value) {
+      if (s.batch_selected) {
+        selectedPassports.value.add(s.passport)
+      }
+    }
   } catch (err: any) {
     uiStore.addToast({ type: 'error', message: err.message || 'Viza ma\'lumotlarini yuklashda xatolik' })
   } finally {
@@ -268,17 +276,34 @@ const showStatusDateColumn = computed(() => currentFilter.value === 'approved')
 const hasAnySelected = computed(() => filteredStudents.value.some(s => selectedPassports.value.has(s.passport)))
 const selectedInCurrentTab = computed(() => filteredStudents.value.filter(s => selectedPassports.value.has(s.passport)))
 
-function toggleSelect(student: VisaStudent, checked: boolean) {
+async function toggleSelect(student: VisaStudent, checked: boolean) {
+  student.batch_selected = checked
   if (checked) selectedPassports.value.add(student.passport)
   else selectedPassports.value.delete(student.passport)
+
+  try {
+    await visaApi.updateVisaStudent(student.passport, { batch_selected: checked })
+  } catch (err) {
+    console.error('Failed to persist selection:', err)
+  }
 }
 
-function handleDeselectAll() {
-  for (const s of filteredStudents.value) selectedPassports.value.delete(s.passport)
+async function handleDeselectAll() {
+  const toDeselect = filteredStudents.value.filter(s => selectedPassports.value.has(s.passport))
+  for (const s of toDeselect) {
+    s.batch_selected = false
+    selectedPassports.value.delete(s.passport)
+    visaApi.updateVisaStudent(s.passport, { batch_selected: false }).catch(() => {})
+  }
 }
 
-function handleDeselectGroup(groupStudents: VisaStudent[]) {
-  for (const s of groupStudents) selectedPassports.value.delete(s.passport)
+async function handleDeselectGroup(groupStudents: VisaStudent[]) {
+  const toDeselect = groupStudents.filter(s => selectedPassports.value.has(s.passport))
+  for (const s of toDeselect) {
+    s.batch_selected = false
+    selectedPassports.value.delete(s.passport)
+    visaApi.updateVisaStudent(s.passport, { batch_selected: false }).catch(() => {})
+  }
 }
 
 // ─── Pin ─────────────────────────────────────────────────────────────────────
