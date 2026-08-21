@@ -51,11 +51,16 @@ const extractError = ref<string | null>(null)
 interface ExtractedField {
   key: string
   value: string
+  confidence?: number
+  validated?: boolean
+  source?: string
 }
 
 const extractedDocType = ref<string | null>(null)
 const extractedFieldsList = ref<ExtractedField[]>([])
 const rawOcrText = ref<string>('')
+const extractionLatency = ref<number | null>(null)
+const ocrEngineUsed = ref<string | null>(null)
 const savedFields = ref<Record<string, boolean>>({})
 
 // Modal / Edit state
@@ -127,6 +132,8 @@ const processFile = (file: File) => {
   extractedDocType.value = null
   extractedFieldsList.value = []
   rawOcrText.value = ''
+  extractionLatency.value = null
+  ocrEngineUsed.value = null
   savedFields.value = {}
 
   if (file.type.startsWith('image/')) {
@@ -159,7 +166,6 @@ const handlePaste = (e: ClipboardEvent) => {
           title: 'Screenshot Pasted',
           message: `Loaded image from clipboard (${(file.size / 1024).toFixed(1)} KB)`
         })
-        e.preventDefault()
         break
       }
     }
@@ -189,13 +195,12 @@ const removeFile = () => {
   savedFields.value = {}
 }
 
-// Trigger Document Extraction via Django Python OCR
+// Trigger in-memory OCR extraction
 const triggerExtraction = async () => {
   if (!selectedFile.value) return
 
   isExtracting.value = true
   extractError.value = null
-  extractedFieldsList.value = []
   savedFields.value = {}
 
   try {
@@ -207,12 +212,23 @@ const triggerExtraction = async () => {
 
     extractedDocType.value = response.document_type || 'GENERAL DOCUMENT'
     rawOcrText.value = response.ocr_text || ''
+    extractionLatency.value = response.metadata?.latency_ms || null
+    ocrEngineUsed.value = response.metadata?.ocr_engine || null
 
     const fieldsArr: ExtractedField[] = []
+    const details = response.field_details || {}
+
     if (response.fields && typeof response.fields === 'object') {
       for (const [k, v] of Object.entries(response.fields)) {
         if (v && String(v).trim()) {
-          fieldsArr.push({ key: k, value: String(v).trim() })
+          const detail = details[k]
+          fieldsArr.push({
+            key: k,
+            value: String(v).trim(),
+            confidence: detail?.confidence,
+            validated: detail?.validated,
+            source: detail?.source
+          })
         }
       }
     }
@@ -221,7 +237,7 @@ const triggerExtraction = async () => {
     uiStore.addToast({
       type: 'success',
       title: 'Extraction Complete',
-      message: `Extracted ${fieldsArr.length} field(s) from document scan.`
+      message: `Extracted ${fieldsArr.length} field(s) via ${ocrEngineUsed.value || 'PaddleOCR'}${extractionLatency.value ? ` in ${extractionLatency.value}ms` : ''}.`
     })
   } catch (err: any) {
     console.error('Extraction failed:', err)
@@ -550,12 +566,20 @@ const getInitials = (name?: string) => {
               <FileText class="w-4 h-4" />
               Extracted Profile Fields
             </h3>
-            <span
-              v-if="extractedDocType"
-              class="px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 text-[10px] uppercase font-extrabold tracking-wider"
-            >
-              Type: {{ extractedDocType }}
-            </span>
+            <div class="flex items-center gap-2">
+              <span
+                v-if="extractionLatency"
+                class="px-2 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500 text-[10px] font-mono font-bold"
+              >
+                {{ extractionLatency }}ms
+              </span>
+              <span
+                v-if="extractedDocType"
+                class="px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 text-[10px] uppercase font-extrabold tracking-wider"
+              >
+                Type: {{ extractedDocType }}
+              </span>
+            </div>
           </div>
 
           <!-- Empty State -->
@@ -602,11 +626,33 @@ const getInitials = (name?: string) => {
             >
               <!-- Field Details -->
               <div class="min-w-0 flex-1">
-                <span class="text-[10px] font-extrabold uppercase tracking-wider text-brand-500 block">
-                  {{ field.key.replace(/_/g, ' ') }}
-                </span>
+                <div class="flex items-center gap-1.5 flex-wrap mb-0.5">
+                  <span class="text-[10px] font-extrabold uppercase tracking-wider text-brand-500">
+                    {{ field.key.replace(/_/g, ' ') }}
+                  </span>
+                  <span
+                    v-if="field.source"
+                    class="px-1.5 py-0.2 rounded text-[9px] font-extrabold uppercase bg-zinc-200/80 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-300/40 dark:border-zinc-700"
+                  >
+                    {{ field.source }}
+                  </span>
+                  <span
+                    v-if="field.confidence"
+                    class="px-1.5 py-0.2 rounded text-[9px] font-extrabold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20"
+                    :title="`Confidence: ${(field.confidence * 100).toFixed(0)}%`"
+                  >
+                    {{ (field.confidence * 100).toFixed(0) }}%
+                  </span>
+                  <span
+                    v-if="field.validated"
+                    class="text-[10px] text-emerald-500 font-black"
+                    title="Format Validated"
+                  >
+                    ✓
+                  </span>
+                </div>
                 <span
-                  class="text-xs font-bold text-zinc-900 dark:text-zinc-100 mt-0.5 block truncate max-w-sm"
+                  class="text-xs font-bold text-zinc-900 dark:text-zinc-100 block truncate max-w-sm"
                   :title="field.value"
                 >
                   {{ field.value }}

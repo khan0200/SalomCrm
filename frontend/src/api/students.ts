@@ -141,7 +141,9 @@ export const studentsApi = {
   extractDocument: async (formData: FormData): Promise<{
     document_type: string
     fields: Record<string, string>
-    ocr_text: string
+    field_details?: Record<string, { value: string; confidence: number; validated: boolean; source: string }>
+    metadata?: { latency_ms: number; ocr_engine: string; pages_processed: number }
+    ocr_text?: string
     is_parent_passport?: boolean
   }> => {
     const response = await apiClient.post('/students/extract-document/', formData, {

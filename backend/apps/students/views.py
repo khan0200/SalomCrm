@@ -630,45 +630,54 @@ class MajorOptionViewSet(BaseOptionViewSet):
 
 class ExtractDocumentView(APIView):
     """
-    In-memory document extraction and OCR service for student profiles.
-    Zero permanent file storage - processes in RAM and returns structured JSON.
+    Enterprise in-memory document extraction and OCR service for student profiles.
+    Zero permanent file storage - processes in RAM with strict size and concurrency limits.
     """
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request: Request):
-        from .ocr_service import extract_document_from_bytes
-        import base64
+        from .ocr_service import process_document_ephemeral
+        from .ocr_preprocessor import PreprocessError
 
         file_obj = request.FILES.get('file')
-        file_bytes = None
-        filename = ''
+        if not file_obj:
+            return Response(
+                {'error': 'A document file (PDF, JPG, PNG, WEBP) must be uploaded via multipart/form-data.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
-        if file_obj:
-            file_bytes = file_obj.read()
-            filename = file_obj.name
-        else:
-            image_b64 = request.data.get('image') or request.data.get('data')
-            if image_b64:
-                filename = request.data.get('filename', 'document.jpg')
-                if ',' in image_b64:
-                    image_b64 = image_b64.split(',', 1)[1]
-                try:
-                    file_bytes = base64.b64decode(image_b64)
-                except Exception:
-                    return Response({'error': 'Invalid base64 image data'}, status=status.HTTP_400_BAD_REQUEST)
+        # Enforce maximum upload size (10 MB)
+        if file_obj.size > 10 * 1024 * 1024:
+            return Response(
+                {'error': 'File size exceeds maximum allowed limit of 10MB.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
+        # Enforce valid document extensions & magic bytes
+        filename = file_obj.name or ''
+        ext = filename.lower().split('.')[-1] if '.' in filename else ''
+        if ext not in ('pdf', 'jpg', 'jpeg', 'png', 'webp', 'bmp', 'tiff'):
+            return Response(
+                {'error': 'Unsupported file format. Supported formats: PDF, JPG, PNG, WEBP, BMP.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        file_bytes = file_obj.read()
         if not file_bytes:
-            return Response({'error': 'No document file or image provided'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': 'Uploaded file is empty.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Debug mode enabled for staff/superusers with ?debug=true
+        is_debug = request.user.is_staff and (request.query_params.get('debug') in ('1', 'true'))
 
         try:
-            extracted_data = extract_document_from_bytes(file_bytes, filename)
-            
+            extracted_data = process_document_ephemeral(file_bytes, filename, debug=is_debug)
+
             # Check student ID for parent passport intelligence
             student_id = request.data.get('student_id') or request.query_params.get('student_id')
             if student_id:
                 try:
                     student = Student.objects.filter(id=student_id).first()
-                    if student and student.birthday and extracted_data.get('document_type') == 'PASSPORT':
+                    if student and student.birthday and extracted_data.get('document_type') in ('PASSPORT', 'ID_CARD'):
                         extracted_dob = extracted_data.get('fields', {}).get('DATE_OF_BIRTH')
                         if extracted_dob and str(extracted_dob) < str(student.birthday):
                             # Parent passport detected!
@@ -683,6 +692,11 @@ class ExtractDocumentView(APIView):
                     pass
 
             return Response(extracted_data, status=status.HTTP_200_OK)
+        except PreprocessError as pe:
+            return Response({'error': str(pe)}, status=status.HTTP_400_BAD_REQUEST)
+        except TimeoutError as te:
+            return Response({'error': str(te)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
         except Exception as e:
-            return Response({'error': f'Failed to extract document: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({'error': f'Failed to process document: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
