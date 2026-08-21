@@ -1411,7 +1411,7 @@ const handleRestoreStudent = () => {
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-1">
                   <!-- FULL NAME -->
                   <div
-                    class="sm:col-span-2 relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 border-l-[3.5px] rounded-lg px-2.5 py-1.5 shadow-2xs hover:bg-zinc-50/70 transition-all duration-150 active:scale-[0.98] cursor-pointer group/card"
+                    class="sm:col-span-2 relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 border-l-[3.5px] rounded-lg px-2.5 py-1.5 shadow-2xs hover:bg-zinc-50/70 transition-all duration-150 cursor-pointer group/card"
                     :class="[
                       (nameLanguage === 'KR' ? student.korean_name : student.full_name) ? 'border-l-blue-600' : 'border-l-rose-500',
                       copiedField === 'full_name' && 'animate-copy-press'
@@ -1482,7 +1482,7 @@ const handleRestoreStudent = () => {
 
                   <!-- FAMILY NAME [AUTO] -->
                   <div
-                    class="relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 border-l-[3.5px] border-l-blue-600 rounded-lg p-2.5 shadow-2xs hover:bg-zinc-50/70 transition-all duration-150 active:scale-[0.98] cursor-pointer group/card"
+                    class="relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 border-l-[3.5px] border-l-blue-600 rounded-lg p-2.5 shadow-2xs hover:bg-zinc-50/70 transition-all duration-150 cursor-pointer group/card"
                     :class="[copiedField === 'family_name' && 'animate-copy-press']"
                     @click="handleCopy('family_name', student.full_name ? student.full_name.split(' ')[0] : '')"
                     title="Single-click to copy Family Name"
@@ -1507,7 +1507,7 @@ const handleRestoreStudent = () => {
 
                   <!-- GIVEN NAME [AUTO] -->
                   <div
-                    class="relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 border-l-[3.5px] border-l-blue-600 rounded-lg p-2.5 shadow-2xs hover:bg-zinc-50/70 transition-all duration-150 active:scale-[0.98] cursor-pointer group/card"
+                    class="relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 border-l-[3.5px] border-l-blue-600 rounded-lg p-2.5 shadow-2xs hover:bg-zinc-50/70 transition-all duration-150 cursor-pointer group/card"
                     :class="[copiedField === 'given_name' && 'animate-copy-press']"
                     @click="handleCopy('given_name', student.full_name ? student.full_name.split(' ').slice(1).join(' ') : '')"
                     title="Single-click to copy Given Name"
@@ -1534,7 +1534,7 @@ const handleRestoreStudent = () => {
                   <div class="sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-1">
                     <!-- SEX -->
                     <div
-                      class="relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 border-l-[3.5px] rounded-lg px-2.5 py-1.5 shadow-2xs hover:bg-zinc-50/70 transition-all duration-150 active:scale-[0.98] cursor-pointer group/card"
+                      class="relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 border-l-[3.5px] rounded-lg px-2.5 py-1.5 shadow-2xs hover:bg-zinc-50/70 transition-all duration-150 cursor-pointer group/card"
                       :class="[
                         student.gender ? 'border-l-blue-600' : 'border-l-rose-500',
                         copiedField === 'gender' && 'animate-copy-press'
@@ -1594,7 +1594,7 @@ const handleRestoreStudent = () => {
 
                     <!-- BIRTHDAY -->
                     <div
-                      class="relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 border-l-[3.5px] rounded-lg px-2.5 py-1.5 shadow-2xs hover:bg-zinc-50/70 transition-all duration-150 active:scale-[0.98] cursor-pointer group/card"
+                      class="relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 border-l-[3.5px] rounded-lg px-2.5 py-1.5 shadow-2xs hover:bg-zinc-50/70 transition-all duration-150 cursor-pointer group/card"
                       :class="[
                         student.birthday ? 'border-l-blue-600' : 'border-l-rose-500',
                         copiedField === 'birthday' && 'animate-copy-press'
@@ -1655,7 +1655,7 @@ const handleRestoreStudent = () => {
                   <div class="sm:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-1">
                     <!-- PASSPORT -->
                     <div
-                      class="relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 border-l-[3.5px] rounded-lg px-2.5 py-1.5 shadow-2xs hover:bg-zinc-50/70 transition-all duration-150 active:scale-[0.98] cursor-pointer group/card"
+                      class="relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 border-l-[3.5px] rounded-lg px-2.5 py-1.5 shadow-2xs hover:bg-zinc-50/70 transition-all duration-150 cursor-pointer group/card"
                       :class="[
                         student.passport ? 'border-l-blue-600' : 'border-l-rose-500',
                         copiedField === 'passport' && 'animate-copy-press'
@@ -1714,7 +1714,7 @@ const handleRestoreStudent = () => {
 
                     <!-- DATE OF ISSUE -->
                     <div
-                      class="relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 border-l-[3.5px] rounded-lg px-2.5 py-1.5 shadow-2xs hover:bg-zinc-50/70 transition-all duration-150 active:scale-[0.98] cursor-pointer group/card"
+                      class="relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 border-l-[3.5px] rounded-lg px-2.5 py-1.5 shadow-2xs hover:bg-zinc-50/70 transition-all duration-150 cursor-pointer group/card"
                       :class="[
                         student.passport_issue_date ? 'border-l-blue-600' : 'border-l-rose-500',
                         copiedField === 'passport_issue_date' && 'animate-copy-press'
@@ -1772,7 +1772,7 @@ const handleRestoreStudent = () => {
 
                     <!-- DATE OF EXPIRATION -->
                     <div
-                      class="relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 border-l-[3.5px] rounded-lg px-2.5 py-1.5 shadow-2xs hover:bg-zinc-50/70 transition-all duration-150 active:scale-[0.98] cursor-pointer group/card"
+                      class="relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 border-l-[3.5px] rounded-lg px-2.5 py-1.5 shadow-2xs hover:bg-zinc-50/70 transition-all duration-150 cursor-pointer group/card"
                       :class="[
                         student.passport_expire_date ? 'border-l-blue-600' : 'border-l-rose-500',
                         copiedField === 'passport_expire_date' && 'animate-copy-press'
@@ -1843,7 +1843,7 @@ const handleRestoreStudent = () => {
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                   <!-- PHONE 1 (Formatted) -->
                   <div
-                    class="relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 border-l-[3.5px] rounded-lg px-2.5 py-1.5 shadow-2xs hover:bg-zinc-50/70 transition-all duration-150 active:scale-[0.98] cursor-pointer group/card"
+                    class="relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 border-l-[3.5px] rounded-lg px-2.5 py-1.5 shadow-2xs hover:bg-zinc-50/70 transition-all duration-150 cursor-pointer group/card"
                     :class="[
                       student.phone1 ? 'border-l-blue-600' : 'border-l-rose-500',
                       copiedField === 'phone1' && 'animate-copy-press'
@@ -1903,7 +1903,7 @@ const handleRestoreStudent = () => {
 
                   <!-- PHONE 2 (Formatted) -->
                   <div
-                    class="relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 border-l-[3.5px] rounded-lg px-2.5 py-1.5 shadow-2xs hover:bg-zinc-50/70 transition-all duration-150 active:scale-[0.98] cursor-pointer group/card"
+                    class="relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 border-l-[3.5px] rounded-lg px-2.5 py-1.5 shadow-2xs hover:bg-zinc-50/70 transition-all duration-150 cursor-pointer group/card"
                     :class="[
                       student.phone2 ? 'border-l-blue-600' : 'border-l-rose-500',
                       copiedField === 'phone2' && 'animate-copy-press'
@@ -1963,7 +1963,7 @@ const handleRestoreStudent = () => {
 
                   <!-- EMAIL (Always Visible) -->
                   <div
-                    class="sm:col-span-2 relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 border-l-[3.5px] rounded-lg px-2.5 py-1.5 shadow-2xs hover:bg-zinc-50/70 transition-all duration-150 active:scale-[0.98] cursor-pointer group/card"
+                    class="sm:col-span-2 relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 border-l-[3.5px] rounded-lg px-2.5 py-1.5 shadow-2xs hover:bg-zinc-50/70 transition-all duration-150 cursor-pointer group/card"
                     :class="[
                       student.email ? 'border-l-blue-600' : 'border-l-rose-500',
                       copiedField === 'email' && 'animate-copy-press'
@@ -2022,7 +2022,7 @@ const handleRestoreStudent = () => {
                   <!-- ADDRESS (Expanded Only) -->
                   <template v-if="contactExpanded">
                     <div
-                      class="sm:col-span-2 relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 border-l-[3.5px] rounded-lg px-2.5 py-1.5 shadow-2xs hover:bg-zinc-50/70 transition-all duration-150 active:scale-[0.98] cursor-pointer group/card"
+                      class="sm:col-span-2 relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 border-l-[3.5px] rounded-lg px-2.5 py-1.5 shadow-2xs hover:bg-zinc-50/70 transition-all duration-150 cursor-pointer group/card"
                       :class="[
                         student.address ? 'border-l-blue-600' : 'border-l-rose-500',
                         copiedField === 'address' && 'animate-copy-press'
@@ -2110,7 +2110,7 @@ const handleRestoreStudent = () => {
 
                 <div class="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg px-2.5 py-2 shadow-2xs flex flex-col gap-1">
                   <div
-                    class="flex flex-col gap-0.5 cursor-pointer hover:bg-zinc-50/80 dark:hover:bg-zinc-800/60 p-1 -m-1 rounded transition-all duration-150 active:scale-[0.98]"
+                    class="flex flex-col gap-0.5 cursor-pointer hover:bg-zinc-50/80 dark:hover:bg-zinc-800/60 p-1 -m-1 rounded transition-all duration-150"
                     :class="[copiedField === 'final_school_name' && 'animate-copy-press']"
                     @click="handleCopy('final_school_name', student.final_school_name)"
                     title="Single-click to copy Final School Name"
@@ -2120,7 +2120,7 @@ const handleRestoreStudent = () => {
                   </div>
 
                   <div
-                    class="flex flex-col gap-0.5 pt-1 border-t border-zinc-100 dark:border-zinc-800 cursor-pointer hover:bg-zinc-50/80 dark:hover:bg-zinc-800/60 p-1 -m-1 rounded transition-all duration-150 active:scale-[0.98]"
+                    class="flex flex-col gap-0.5 pt-1 border-t border-zinc-100 dark:border-zinc-800 cursor-pointer hover:bg-zinc-50/80 dark:hover:bg-zinc-800/60 p-1 -m-1 rounded transition-all duration-150"
                     :class="[copiedField === 'major' && 'animate-copy-press']"
                     @click="handleCopy('major', student.major)"
                     title="Single-click to copy Major"
@@ -2131,7 +2131,7 @@ const handleRestoreStudent = () => {
 
                   <template v-if="eduExpanded">
                     <div
-                      class="flex items-baseline justify-between gap-3 pt-1 border-t border-zinc-100 dark:border-zinc-800 cursor-pointer hover:bg-zinc-50/80 dark:hover:bg-zinc-800/60 p-1 -m-1 rounded transition-all duration-150 active:scale-[0.98]"
+                      class="flex items-baseline justify-between gap-3 pt-1 border-t border-zinc-100 dark:border-zinc-800 cursor-pointer hover:bg-zinc-50/80 dark:hover:bg-zinc-800/60 p-1 -m-1 rounded transition-all duration-150"
                       :class="[copiedField === 'gpa' && 'animate-copy-press']"
                       @click="handleCopy('gpa', `${student.gpa || ''} (${student.gpa_system || '4.5'})`)"
                       title="Single-click to copy GPA"
@@ -2141,7 +2141,7 @@ const handleRestoreStudent = () => {
                     </div>
 
                     <div
-                      class="flex items-baseline justify-between gap-3 pt-1 border-t border-zinc-100 dark:border-zinc-800 cursor-pointer hover:bg-zinc-50/80 dark:hover:bg-zinc-800/60 p-1 -m-1 rounded transition-all duration-150 active:scale-[0.98]"
+                      class="flex items-baseline justify-between gap-3 pt-1 border-t border-zinc-100 dark:border-zinc-800 cursor-pointer hover:bg-zinc-50/80 dark:hover:bg-zinc-800/60 p-1 -m-1 rounded transition-all duration-150"
                       :class="[copiedField === 'degree_no' && 'animate-copy-press']"
                       @click="handleCopy('degree_no', student.degree_no)"
                       title="Single-click to copy Degree No"
@@ -2151,7 +2151,7 @@ const handleRestoreStudent = () => {
                     </div>
 
                     <div
-                      class="flex items-baseline justify-between gap-3 pt-1 border-t border-zinc-100 dark:border-zinc-800 cursor-pointer hover:bg-zinc-50/80 dark:hover:bg-zinc-800/60 p-1 -m-1 rounded transition-all duration-150 active:scale-[0.98]"
+                      class="flex items-baseline justify-between gap-3 pt-1 border-t border-zinc-100 dark:border-zinc-800 cursor-pointer hover:bg-zinc-50/80 dark:hover:bg-zinc-800/60 p-1 -m-1 rounded transition-all duration-150"
                       :class="[copiedField === 'date_of_entry' && 'animate-copy-press']"
                       @click="handleCopy('date_of_entry', student.date_of_entry)"
                       title="Single-click to copy Date of Entry"
@@ -2161,7 +2161,7 @@ const handleRestoreStudent = () => {
                     </div>
 
                     <div
-                      class="flex items-baseline justify-between gap-3 pt-1 border-t border-zinc-100 dark:border-zinc-800 cursor-pointer hover:bg-zinc-50/80 dark:hover:bg-zinc-800/60 p-1 -m-1 rounded transition-all duration-150 active:scale-[0.98]"
+                      class="flex items-baseline justify-between gap-3 pt-1 border-t border-zinc-100 dark:border-zinc-800 cursor-pointer hover:bg-zinc-50/80 dark:hover:bg-zinc-800/60 p-1 -m-1 rounded transition-all duration-150"
                       :class="[copiedField === 'date_of_graduation' && 'animate-copy-press']"
                       @click="handleCopy('date_of_graduation', student.date_of_graduation)"
                       title="Single-click to copy Date of Graduation"
@@ -2172,7 +2172,7 @@ const handleRestoreStudent = () => {
 
                     <div
                       v-if="student.school_address"
-                      class="flex flex-col gap-0.5 pt-1 border-t border-zinc-100 dark:border-zinc-800 cursor-pointer hover:bg-zinc-50/80 dark:hover:bg-zinc-800/60 p-1 -m-1 rounded transition-all duration-150 active:scale-[0.98]"
+                      class="flex flex-col gap-0.5 pt-1 border-t border-zinc-100 dark:border-zinc-800 cursor-pointer hover:bg-zinc-50/80 dark:hover:bg-zinc-800/60 p-1 -m-1 rounded transition-all duration-150"
                       :class="[copiedField === 'school_address' && 'animate-copy-press']"
                       @click="handleCopy('school_address', student.school_address)"
                       title="Single-click to copy School Address"
@@ -2183,7 +2183,7 @@ const handleRestoreStudent = () => {
 
                     <div
                       v-if="student.school_phone"
-                      class="flex items-baseline justify-between gap-3 pt-1 border-t border-zinc-100 dark:border-zinc-800 cursor-pointer hover:bg-zinc-50/80 dark:hover:bg-zinc-800/60 p-1 -m-1 rounded transition-all duration-150 active:scale-[0.98]"
+                      class="flex items-baseline justify-between gap-3 pt-1 border-t border-zinc-100 dark:border-zinc-800 cursor-pointer hover:bg-zinc-50/80 dark:hover:bg-zinc-800/60 p-1 -m-1 rounded transition-all duration-150"
                       :class="[copiedField === 'school_phone' && 'animate-copy-press']"
                       @click="handleCopy('school_phone', formatPhoneValue(student.school_phone))"
                       title="Single-click to copy School Phone"
@@ -2194,7 +2194,7 @@ const handleRestoreStudent = () => {
 
                     <div
                       v-if="student.school_email"
-                      class="flex items-baseline justify-between gap-3 pt-1 border-t border-zinc-100 dark:border-zinc-800 cursor-pointer hover:bg-zinc-50/80 dark:hover:bg-zinc-800/60 p-1 -m-1 rounded transition-all duration-150 active:scale-[0.98]"
+                      class="flex items-baseline justify-between gap-3 pt-1 border-t border-zinc-100 dark:border-zinc-800 cursor-pointer hover:bg-zinc-50/80 dark:hover:bg-zinc-800/60 p-1 -m-1 rounded transition-all duration-150"
                       :class="[copiedField === 'school_email' && 'animate-copy-press']"
                       @click="handleCopy('school_email', student.school_email)"
                       title="Single-click to copy School Email"
@@ -2232,7 +2232,7 @@ const handleRestoreStudent = () => {
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-1">
                   <!-- TARIFF CARD -->
                   <div
-                    class="relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 border-l-[3.5px] rounded-lg px-2.5 py-1.5 shadow-2xs hover:bg-zinc-50/70 transition-all duration-150 active:scale-[0.98] cursor-pointer group/card"
+                    class="relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 border-l-[3.5px] rounded-lg px-2.5 py-1.5 shadow-2xs hover:bg-zinc-50/70 transition-all duration-150 cursor-pointer group/card"
                     :class="[
                       student.tariff ? 'border-l-blue-600' : 'border-l-rose-500',
                       copiedField === 'tariff' && 'animate-copy-press'
@@ -2300,7 +2300,7 @@ const handleRestoreStudent = () => {
 
                   <!-- LEVEL TO STUDY 1 -->
                   <div
-                    class="relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 border-l-[3.5px] rounded-lg px-2.5 py-1.5 shadow-2xs hover:bg-zinc-50/70 transition-all duration-150 active:scale-[0.98] cursor-pointer group/card"
+                    class="relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 border-l-[3.5px] rounded-lg px-2.5 py-1.5 shadow-2xs hover:bg-zinc-50/70 transition-all duration-150 cursor-pointer group/card"
                     :class="[
                       student.level ? 'border-l-blue-600' : 'border-l-rose-500',
                       copiedField === 'level' && 'animate-copy-press'
@@ -2373,7 +2373,7 @@ const handleRestoreStudent = () => {
                   <!-- LEVEL TO STUDY 2 (Optional) -->
                   <div
                     v-if="showLevel2"
-                    class="relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 border-l-[3.5px] rounded-lg px-2.5 py-1.5 shadow-2xs hover:bg-zinc-50/70 transition-all duration-150 active:scale-[0.98] cursor-pointer group/card"
+                    class="relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 border-l-[3.5px] rounded-lg px-2.5 py-1.5 shadow-2xs hover:bg-zinc-50/70 transition-all duration-150 cursor-pointer group/card"
                     :class="[
                       student.level2 ? 'border-l-blue-600' : 'border-l-rose-500',
                       copiedField === 'level2' && 'animate-copy-press'
@@ -2439,7 +2439,7 @@ const handleRestoreStudent = () => {
 
                   <!-- LANGUAGE CERTIFICATE 1 (Split Badge Box) -->
                   <div
-                    class="sm:col-span-2 relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 border-l-[3.5px] rounded-lg px-2.5 py-1.5 shadow-2xs hover:bg-zinc-50/70 transition-all duration-150 active:scale-[0.98] cursor-pointer group/card"
+                    class="sm:col-span-2 relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 border-l-[3.5px] rounded-lg px-2.5 py-1.5 shadow-2xs hover:bg-zinc-50/70 transition-all duration-150 cursor-pointer group/card"
                     :class="[
                       (student.language_certificate && student.language_certificate !== 'NO CERTIFICATE') ? 'border-l-blue-600' : 'border-l-rose-500',
                       copiedField === 'cert1' && 'animate-copy-press'
@@ -2486,7 +2486,7 @@ const handleRestoreStudent = () => {
                   <!-- LANGUAGE CERTIFICATE 2 (Optional) -->
                   <div
                     v-if="showCert2"
-                    class="sm:col-span-2 relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 border-l-[3.5px] rounded-lg px-2.5 py-1.5 shadow-2xs hover:bg-zinc-50/70 transition-all duration-150 active:scale-[0.98] cursor-pointer group/card"
+                    class="sm:col-span-2 relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 border-l-[3.5px] rounded-lg px-2.5 py-1.5 shadow-2xs hover:bg-zinc-50/70 transition-all duration-150 cursor-pointer group/card"
                     :class="[
                       (student.language_certificate_2 && student.language_certificate_2 !== 'NO CERTIFICATE') ? 'border-l-blue-600' : 'border-l-rose-500',
                       copiedField === 'cert2' && 'animate-copy-press'
@@ -2536,7 +2536,7 @@ const handleRestoreStudent = () => {
                   <!-- LANGUAGE CERTIFICATE 3 (Optional) -->
                   <div
                     v-if="showCert3"
-                    class="sm:col-span-2 relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 border-l-[3.5px] rounded-lg px-2.5 py-1.5 shadow-2xs hover:bg-zinc-50/70 transition-all duration-150 active:scale-[0.98] cursor-pointer group/card"
+                    class="sm:col-span-2 relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 border-l-[3.5px] rounded-lg px-2.5 py-1.5 shadow-2xs hover:bg-zinc-50/70 transition-all duration-150 cursor-pointer group/card"
                     :class="[
                       (student.language_certificate_3 && student.language_certificate_3 !== 'NO CERTIFICATE') ? 'border-l-blue-600' : 'border-l-rose-500',
                       copiedField === 'cert3' && 'animate-copy-press'
@@ -2588,7 +2588,7 @@ const handleRestoreStudent = () => {
                   <template v-for="slot in 5" :key="slot">
                     <div
                       v-if="slot === 1 || (slot === 2 && showUni2) || (slot === 3 && showUni3) || (slot === 4 && showUni4) || (slot === 5 && showUni5)"
-                      class="relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 border-l-[3.5px] rounded-lg px-2.5 py-1.5 shadow-2xs hover:bg-zinc-50/70 transition-all duration-150 active:scale-[0.98] cursor-pointer group/card"
+                      class="relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 border-l-[3.5px] rounded-lg px-2.5 py-1.5 shadow-2xs hover:bg-zinc-50/70 transition-all duration-150 cursor-pointer group/card"
                       :class="[
                         (student as any)[`university_${slot}`] ? 'border-l-blue-600' : 'border-l-rose-500',
                         copiedField === `uni${slot}` && 'animate-copy-press'
@@ -2760,7 +2760,7 @@ const handleRestoreStudent = () => {
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                   <!-- FATHER FULLNAME -->
                   <div
-                    class="relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 border-l-[3.5px] rounded-lg px-2.5 py-1.5 shadow-2xs hover:bg-zinc-50/70 transition-all duration-150 active:scale-[0.98] cursor-pointer group/card"
+                    class="relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 border-l-[3.5px] rounded-lg px-2.5 py-1.5 shadow-2xs hover:bg-zinc-50/70 transition-all duration-150 cursor-pointer group/card"
                     :class="[
                       student.father_name ? 'border-l-blue-600' : 'border-l-rose-500',
                       copiedField === 'father_name' && 'animate-copy-press'
@@ -2799,7 +2799,7 @@ const handleRestoreStudent = () => {
 
                   <!-- MOTHER FULLNAME -->
                   <div
-                    class="relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 border-l-[3.5px] rounded-lg px-2.5 py-1.5 shadow-2xs hover:bg-zinc-50/70 transition-all duration-150 active:scale-[0.98] cursor-pointer group/card"
+                    class="relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 border-l-[3.5px] rounded-lg px-2.5 py-1.5 shadow-2xs hover:bg-zinc-50/70 transition-all duration-150 cursor-pointer group/card"
                     :class="[
                       student.mother_name ? 'border-l-blue-600' : 'border-l-rose-500',
                       copiedField === 'mother_name' && 'animate-copy-press'
@@ -2838,7 +2838,7 @@ const handleRestoreStudent = () => {
 
                   <!-- FATHER PHONE (Formatted) -->
                   <div
-                    class="relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 border-l-[3.5px] rounded-lg px-2.5 py-1.5 shadow-2xs hover:bg-zinc-50/70 transition-all duration-150 active:scale-[0.98] cursor-pointer group/card"
+                    class="relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 border-l-[3.5px] rounded-lg px-2.5 py-1.5 shadow-2xs hover:bg-zinc-50/70 transition-all duration-150 cursor-pointer group/card"
                     :class="[
                       student.father_phone ? 'border-l-blue-600' : 'border-l-rose-500',
                       copiedField === 'father_phone' && 'animate-copy-press'
@@ -2883,7 +2883,7 @@ const handleRestoreStudent = () => {
 
                   <!-- MOTHER PHONE (Formatted) -->
                   <div
-                    class="relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 border-l-[3.5px] rounded-lg px-2.5 py-1.5 shadow-2xs hover:bg-zinc-50/70 transition-all duration-150 active:scale-[0.98] cursor-pointer group/card"
+                    class="relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 border-l-[3.5px] rounded-lg px-2.5 py-1.5 shadow-2xs hover:bg-zinc-50/70 transition-all duration-150 cursor-pointer group/card"
                     :class="[
                       student.mother_phone ? 'border-l-blue-600' : 'border-l-rose-500',
                       copiedField === 'mother_phone' && 'animate-copy-press'
@@ -2928,7 +2928,7 @@ const handleRestoreStudent = () => {
 
                   <!-- FATHER JOB -->
                   <div
-                    class="relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 border-l-[3.5px] rounded-lg px-2.5 py-1.5 shadow-2xs hover:bg-zinc-50/70 transition-all duration-150 active:scale-[0.98] cursor-pointer group/card"
+                    class="relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 border-l-[3.5px] rounded-lg px-2.5 py-1.5 shadow-2xs hover:bg-zinc-50/70 transition-all duration-150 cursor-pointer group/card"
                     :class="[
                       student.father_job ? 'border-l-blue-600' : 'border-l-rose-500',
                       copiedField === 'father_job' && 'animate-copy-press'
@@ -2967,7 +2967,7 @@ const handleRestoreStudent = () => {
 
                   <!-- MOTHER JOB -->
                   <div
-                    class="relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 border-l-[3.5px] rounded-lg px-2.5 py-1.5 shadow-2xs hover:bg-zinc-50/70 transition-all duration-150 active:scale-[0.98] cursor-pointer group/card"
+                    class="relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 border-l-[3.5px] rounded-lg px-2.5 py-1.5 shadow-2xs hover:bg-zinc-50/70 transition-all duration-150 cursor-pointer group/card"
                     :class="[
                       student.mother_job ? 'border-l-blue-600' : 'border-l-rose-500',
                       copiedField === 'mother_job' && 'animate-copy-press'
@@ -3006,7 +3006,7 @@ const handleRestoreStudent = () => {
 
                   <!-- NOTES -->
                   <div
-                    class="sm:col-span-2 relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 border-l-[3.5px] rounded-lg px-2.5 py-1.5 shadow-2xs hover:bg-zinc-50/70 transition-all duration-150 active:scale-[0.98] cursor-pointer group/card"
+                    class="sm:col-span-2 relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 border-l-[3.5px] rounded-lg px-2.5 py-1.5 shadow-2xs hover:bg-zinc-50/70 transition-all duration-150 cursor-pointer group/card"
                     :class="[
                       student.notes ? 'border-l-blue-600' : 'border-l-rose-500',
                       copiedField === 'notes' && 'animate-copy-press'
@@ -3079,7 +3079,7 @@ const handleRestoreStudent = () => {
                 <div class="flex flex-col gap-2">
                   <!-- 3.1 OFFICE CARD (Solid Blue) -->
                   <div
-                    class="bg-[#1d70f2] rounded-xl px-3.5 py-2.5 text-white flex flex-col justify-between shadow-xs cursor-pointer hover:brightness-105 transition-all duration-150 active:scale-[0.98] group/card"
+                    class="bg-[#1d70f2] rounded-xl px-3.5 py-2.5 text-white flex flex-col justify-between shadow-xs cursor-pointer hover:brightness-105 transition-all duration-150 group/card"
                     :class="[copiedField === 'office' && 'animate-copy-press']"
                     @click="handleCopy('office', student.office)"
                     title="Single-click to copy Office"
@@ -3137,7 +3137,7 @@ const handleRestoreStudent = () => {
 
                   <!-- 3.2 BALANCE CARD (Solid Crimson / Green) -->
                   <div
-                    class="rounded-xl px-3.5 py-2.5 text-white flex flex-col justify-between shadow-xs cursor-pointer hover:brightness-105 transition-all duration-150 active:scale-[0.98] group/card"
+                    class="rounded-xl px-3.5 py-2.5 text-white flex flex-col justify-between shadow-xs cursor-pointer hover:brightness-105 transition-all duration-150 group/card"
                     :class="[
                       computedBalance < 0 ? 'bg-[#ff1853]' : 'bg-[#00b074]',
                       copiedField === 'balance' && 'animate-copy-press'
@@ -3162,7 +3162,7 @@ const handleRestoreStudent = () => {
 
                   <!-- 3.3 PAYMENTS DONE CARD (Solid Emerald) -->
                   <div
-                    class="bg-[#00b074] rounded-xl px-3.5 py-2.5 text-white flex flex-col justify-between shadow-xs cursor-pointer hover:brightness-105 transition-all duration-150 active:scale-[0.98] group/card"
+                    class="bg-[#00b074] rounded-xl px-3.5 py-2.5 text-white flex flex-col justify-between shadow-xs cursor-pointer hover:brightness-105 transition-all duration-150 group/card"
                     :class="[copiedField === 'payments_done' && 'animate-copy-press']"
                     @click="handleCopy('payments_done', String(computedPaymentsDone))"
                     title="Single-click to copy Payments Done"
@@ -3184,7 +3184,7 @@ const handleRestoreStudent = () => {
 
                   <!-- 3.4 DISCOUNT CARD (Solid Orange) -->
                   <div
-                    class="bg-[#ff6700] rounded-xl px-3.5 py-2.5 text-white flex flex-col justify-between shadow-xs cursor-pointer hover:brightness-105 transition-all duration-150 active:scale-[0.98] group/card"
+                    class="bg-[#ff6700] rounded-xl px-3.5 py-2.5 text-white flex flex-col justify-between shadow-xs cursor-pointer hover:brightness-105 transition-all duration-150 group/card"
                     :class="[copiedField === 'discount' && 'animate-copy-press']"
                     @click="handleCopy('discount', String(computedDiscount))"
                     title="Single-click to copy Discount"
@@ -3206,7 +3206,7 @@ const handleRestoreStudent = () => {
 
                   <!-- 3.5 STUDENT ID -->
                   <div
-                    class="relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 border-l-[3.5px] border-l-blue-600 rounded-lg px-2.5 py-1.5 shadow-2xs hover:bg-zinc-50/70 transition-all duration-150 active:scale-[0.98] cursor-pointer group/card"
+                    class="relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 border-l-[3.5px] border-l-blue-600 rounded-lg px-2.5 py-1.5 shadow-2xs hover:bg-zinc-50/70 transition-all duration-150 cursor-pointer group/card"
                     :class="[copiedField === 'student_id' && 'animate-copy-press']"
                     @click="handleCopy('student_id', student.id)"
                     title="Single-click to copy Student ID"
@@ -3241,7 +3241,7 @@ const handleRestoreStudent = () => {
 
                   <!-- 3.6 GROUP -->
                   <div
-                    class="relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 border-l-[3.5px] rounded-lg px-2.5 py-1.5 shadow-2xs hover:bg-zinc-50/70 transition-all duration-150 active:scale-[0.98] cursor-pointer group/card"
+                    class="relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 border-l-[3.5px] rounded-lg px-2.5 py-1.5 shadow-2xs hover:bg-zinc-50/70 transition-all duration-150 cursor-pointer group/card"
                     :class="[
                       student.student_group ? 'border-l-blue-600' : 'border-l-rose-500',
                       copiedField === 'student_group' && 'animate-copy-press'
@@ -3289,7 +3289,7 @@ const handleRestoreStudent = () => {
 
                   <!-- 3.7 LEAD BY -->
                   <div
-                    class="relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 border-l-[3.5px] rounded-lg px-2.5 py-1.5 shadow-2xs hover:bg-zinc-50/70 transition-all duration-150 active:scale-[0.98] cursor-pointer group/card"
+                    class="relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 border-l-[3.5px] rounded-lg px-2.5 py-1.5 shadow-2xs hover:bg-zinc-50/70 transition-all duration-150 cursor-pointer group/card"
                     :class="[
                       student.lead_by ? 'border-l-blue-600' : 'border-l-rose-500',
                       copiedField === 'lead_by' && 'animate-copy-press'
@@ -3337,7 +3337,7 @@ const handleRestoreStudent = () => {
 
                   <!-- 3.8 MISSING DOCUMENTS -->
                   <div
-                    class="relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 border-l-[3.5px] rounded-lg px-2.5 py-1.5 shadow-2xs hover:bg-zinc-50/70 transition-all duration-150 active:scale-[0.98] cursor-pointer group/card"
+                    class="relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 border-l-[3.5px] rounded-lg px-2.5 py-1.5 shadow-2xs hover:bg-zinc-50/70 transition-all duration-150 cursor-pointer group/card"
                     :class="[
                       (student.pick_needed && student.pick_needed.length > 0) ? 'border-l-rose-500' : 'border-l-blue-600',
                       copiedField === 'missing_docs' && 'animate-copy-press'
@@ -3370,7 +3370,7 @@ const handleRestoreStudent = () => {
 
                   <!-- 3.9 KORDINATOR -->
                   <div
-                    class="relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 border-l-[3.5px] rounded-lg px-2.5 py-1.5 shadow-2xs hover:bg-zinc-50/70 transition-all duration-150 active:scale-[0.98] cursor-pointer group/card"
+                    class="relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 border-l-[3.5px] rounded-lg px-2.5 py-1.5 shadow-2xs hover:bg-zinc-50/70 transition-all duration-150 cursor-pointer group/card"
                     :class="[
                       student.coordinator ? 'border-l-blue-600' : 'border-l-rose-500',
                       copiedField === 'coordinator' && 'animate-copy-press'
