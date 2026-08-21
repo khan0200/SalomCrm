@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import {
@@ -137,6 +137,45 @@ const processFile = (file: File) => {
     previewUrl.value = 'doc'
   }
 }
+
+// Global Ctrl+V Screenshot Paste Handler
+const handlePaste = (e: ClipboardEvent) => {
+  // If user is typing in a modal or input, let the browser handle it
+  if (isEditModalOpen.value) return
+  const target = e.target as HTMLElement
+  if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) return
+
+  const items = e.clipboardData?.items
+  if (!items) return
+
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i]
+    if (item.type.indexOf('image') !== -1) {
+      const file = item.getAsFile()
+      if (file) {
+        processFile(file)
+        uiStore.addToast({
+          type: 'info',
+          title: 'Screenshot Pasted',
+          message: `Loaded image from clipboard (${(file.size / 1024).toFixed(1)} KB)`
+        })
+        e.preventDefault()
+        break
+      }
+    }
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('paste', handlePaste)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('paste', handlePaste)
+  if (previewUrl.value && previewUrl.value.startsWith('blob:')) {
+    URL.revokeObjectURL(previewUrl.value)
+  }
+})
 
 const removeFile = () => {
   if (previewUrl.value && previewUrl.value.startsWith('blob:')) {
@@ -446,9 +485,15 @@ const getInitials = (name?: string) => {
             <h4 class="text-xs font-bold text-zinc-800 dark:text-zinc-200 mb-1">
               Click to browse or drop document scan
             </h4>
-            <p class="text-[11px] text-zinc-400 max-w-[220px]">
+            <p class="text-[11px] text-zinc-400 max-w-[240px] mb-3">
               Supports Passport photo, Diploma, Shahodatnoma, or PDF files.
             </p>
+            <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-[10px] font-bold text-zinc-500 dark:text-zinc-400">
+              <span>Paste screenshot:</span>
+              <kbd class="px-1.5 py-0.5 rounded bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 font-mono text-[9px] text-zinc-800 dark:text-zinc-200 shadow-2xs">Ctrl</kbd>
+              <span>+</span>
+              <kbd class="px-1.5 py-0.5 rounded bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 font-mono text-[9px] text-zinc-800 dark:text-zinc-200 shadow-2xs">V</kbd>
+            </div>
           </div>
 
           <!-- File Preview & Action (When file is selected) -->
