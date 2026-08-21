@@ -62,6 +62,8 @@ class User(AbstractBaseUser, PermissionsMixin):
     )
     avatar_url = models.URLField(max_length=500, blank=True, null=True)
     phone = models.CharField(max_length=50, blank=True, null=True)
+    telegram_id = models.CharField(max_length=64, unique=True, null=True, blank=True, db_index=True)
+    telegram_username = models.CharField(max_length=128, blank=True, null=True)
     is_active = models.BooleanField(default=True, db_index=True)
     is_staff = models.BooleanField(default=False)
     date_joined = models.DateTimeField(default=timezone.now)

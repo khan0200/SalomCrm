@@ -52,8 +52,9 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = (
             'id', 'email', 'full_name', 'role', 'tenant', 'tenant_name',
-            'branch', 'branch_name', 'avatar_url', 'phone', 'is_active',
-            'is_staff', 'date_joined'
+            'branch', 'branch_name', 'avatar_url', 'phone',
+            'telegram_id', 'telegram_username',
+            'is_active', 'is_staff', 'date_joined'
         )
         read_only_fields = ('id', 'date_joined')
 
@@ -65,7 +66,8 @@ class UserCreateUpdateSerializer(serializers.ModelSerializer):
         model = User
         fields = (
             'id', 'email', 'password', 'full_name', 'role', 'tenant',
-            'branch', 'avatar_url', 'phone', 'is_active'
+            'branch', 'avatar_url', 'phone',
+            'telegram_id', 'telegram_username', 'is_active'
         )
 
     def create(self, validated_data):

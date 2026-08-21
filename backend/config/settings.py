@@ -216,3 +216,8 @@ CORS_ALLOW_HEADERS = [
     'x-requested-with',
     'x-tenant-id',
 ]
+
+# Telegram OAuth Settings
+TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN', '8628603817:AAEDMIsRb0JRichfx_NmwhMszHpiNiUEI-4')
+TELEGRAM_BOT_USERNAME = os.getenv('TELEGRAM_BOT_USERNAME', 'Koreavizabot')
+

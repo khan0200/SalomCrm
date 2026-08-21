@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
@@ -16,6 +16,7 @@ const email = ref('')
 const password = ref('')
 const isLoading = ref(false)
 const error = ref<string | null>(null)
+const telegramContainer = ref<HTMLDivElement | null>(null)
 
 const handleLogin = async () => {
   if (!email.value.trim() || !password.value) {
@@ -42,6 +43,44 @@ const handleLogin = async () => {
     isLoading.value = false
   }
 }
+
+const handleTelegramAuth = async (user: any) => {
+  isLoading.value = true
+  error.value = null
+  try {
+    await authStore.loginWithTelegram(user)
+    uiStore.addToast({
+      type: 'success',
+      title: 'Welcome back!',
+      message: `Signed in via Telegram as ${authStore.user?.full_name}`
+    })
+    router.push('/students')
+  } catch (err: any) {
+    error.value = err.response?.data?.detail || 'Telegram authentication failed.'
+  } finally {
+    isLoading.value = false
+  }
+}
+
+onMounted(() => {
+  // Expose global onTelegramAuth handler for the Telegram Widget
+  ;(window as any).onTelegramAuth = (user: any) => {
+    handleTelegramAuth(user)
+  }
+
+  // Inject official Telegram Login Widget script
+  if (telegramContainer.value && !telegramContainer.value.hasChildNodes()) {
+    const script = document.createElement('script')
+    script.async = true
+    script.src = 'https://telegram.org/js/telegram-widget.js?22'
+    script.setAttribute('data-telegram-login', 'Koreavizabot')
+    script.setAttribute('data-size', 'large')
+    script.setAttribute('data-radius', '12')
+    script.setAttribute('data-onauth', 'onTelegramAuth(user)')
+    script.setAttribute('data-request-access', 'write')
+    telegramContainer.value.appendChild(script)
+  }
+})
 
 const fillCredentials = (e: string, p: string) => {
   email.value = e
@@ -124,6 +163,22 @@ const fillCredentials = (e: string, p: string) => {
           <ArrowRight class="w-4 h-4" />
         </button>
       </form>
+
+      <!-- Telegram Login Widget Section -->
+      <div class="space-y-3">
+        <div class="relative flex items-center justify-center">
+          <div class="border-t border-zinc-200 dark:border-zinc-800 w-full" />
+          <span class="bg-white dark:bg-zinc-900 px-3 text-[11px] font-bold uppercase tracking-wider text-zinc-400 shrink-0">
+            or sign in with
+          </span>
+          <div class="border-t border-zinc-200 dark:border-zinc-800 w-full" />
+        </div>
+
+        <!-- Official Telegram Login Widget Mount Container -->
+        <div class="flex justify-center items-center min-h-[44px]">
+          <div ref="telegramContainer" class="flex justify-center" />
+        </div>
+      </div>
 
       <!-- Quick Fill Demo Accounts -->
       <div class="pt-4 border-t border-zinc-100 dark:border-zinc-800 space-y-2">

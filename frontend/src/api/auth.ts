@@ -6,6 +6,10 @@ export const authApi = {
     const response = await apiClient.post('/auth/login/', credentials)
     return response.data
   },
+  loginWithTelegram: async (telegramData: any) => {
+    const response = await apiClient.post('/auth/telegram/', telegramData)
+    return response.data
+  },
   getMe: async (): Promise<UserProfile> => {
     const response = await apiClient.get('/auth/me/')
     return response.data

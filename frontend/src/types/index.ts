@@ -29,6 +29,8 @@ export interface UserProfile {
   role: UserRole
   avatar_url?: string | null
   phone?: string | null
+  telegram_id?: string | null
+  telegram_username?: string | null
   is_superuser: boolean
   tenant?: Tenant | null
   branch?: Branch | null

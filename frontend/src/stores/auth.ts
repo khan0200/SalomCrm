@@ -41,6 +41,21 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  const loginWithTelegram = async (telegramData: any) => {
+    const data = await authApi.loginWithTelegram(telegramData)
+    token.value = data.access
+    user.value = data.user
+
+    localStorage.setItem('access_token', data.access)
+    localStorage.setItem('refresh_token', data.refresh)
+    localStorage.setItem('user_profile', JSON.stringify(data.user))
+
+    if (data.user.tenant?.id) {
+      activeTenantId.value = data.user.tenant.id
+      localStorage.setItem('active_tenant_id', data.user.tenant.id)
+    }
+  }
+
   const logout = () => {
     user.value = null
     token.value = null
@@ -83,6 +98,7 @@ export const useAuthStore = defineStore('auth', () => {
     isManager,
     currentTenant,
     login,
+    loginWithTelegram,
     logout,
     setActiveTenant,
     fetchUser,
