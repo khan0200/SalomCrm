@@ -21,7 +21,11 @@ const dashboardStore = useStudentDashboardStore()
 // ─── State ────────────────────────────────────────────────────────────────────
 type StatusFilter = 'pending' | 'application' | 'cancelled' | 'approved'
 const currentFilter = ref<StatusFilter>('pending')
-const visaTypeFilter = ref<VisaTypeFilter>('all')
+
+const visaTypeFilter = computed({
+  get: () => dashboardStore.visaTypeFilter as VisaTypeFilter,
+  set: (v) => { dashboardStore.visaTypeFilter = v }
+})
 
 const searchQuery = computed({
   get: () => dashboardStore.searchQuery,
@@ -113,19 +117,10 @@ const matchingSearchAndType = computed(() => {
   })
 })
 
-// ─── Counts (Tabs matching univisacheck /cabinet) ─────────────────────────────
-const counts = computed(() => {
-  const result: Record<StatusFilter, number> = { pending: 0, application: 0, cancelled: 0, approved: 0 }
-  for (const s of matchingSearchAndType.value) {
-    const bucket = bucketForStatus(s.status)
-    result[bucket]++
-  }
-  return result
-})
-
-const visaTypeCounts = computed(() => {
+// ─── Sync visaTypeCounts to dashboardStore for Top Navbar ─────────────────────
+watch([students, searchQuery], () => {
   const q = searchQuery.value.toLowerCase().trim()
-  const result: Record<VisaTypeFilter, number> = { 'all': 0, 'Embassy': 0, 'E-Visa': 0, 'Regional': 0 }
+  const res: Record<string, number> = { all: 0, Embassy: 0, 'E-Visa': 0, Regional: 0 }
   for (const s of students.value) {
     if (q) {
       const name = (s.full_name || '').toLowerCase()
@@ -135,11 +130,21 @@ const visaTypeCounts = computed(() => {
       const tariff = (s.tariff || '').toLowerCase()
       if (!name.includes(q) && !pass.includes(q) && !id.includes(q) && !univ.includes(q) && !tariff.includes(q)) continue
     }
-    result.all++
+    res.all++
     const type = s.visa_type || 'Embassy'
-    if (type === 'E-Visa') result['E-Visa']++
-    else if (type === 'Regional') result.Regional++
-    else result.Embassy++
+    if (type === 'E-Visa') res['E-Visa']++
+    else if (type === 'Regional') res.Regional++
+    else res.Embassy++
+  }
+  dashboardStore.visaTypeCounts = res
+}, { immediate: true, deep: true })
+
+// ─── Counts (Tabs matching univisacheck /cabinet) ─────────────────────────────
+const counts = computed(() => {
+  const result: Record<StatusFilter, number> = { pending: 0, application: 0, cancelled: 0, approved: 0 }
+  for (const s of matchingSearchAndType.value) {
+    const bucket = bucketForStatus(s.status)
+    result[bucket]++
   }
   return result
 })
@@ -539,12 +544,6 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
             </div>
           </Transition>
         </div>
-
-        <!-- Visa Type Filter Tabs (All, Embassy, E-Visa, Regional) -->
-        <VisaTypeFilterTabs
-          v-model="visaTypeFilter"
-          :counts="visaTypeCounts"
-        />
 
         <!-- Undo (deselect) -->
         <button

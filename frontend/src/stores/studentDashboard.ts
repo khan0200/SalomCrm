@@ -50,6 +50,15 @@ export const useStudentDashboardStore = defineStore('studentDashboard', () => {
     }
   }
 
+  // Visa Check Filters
+  const visaTypeFilter = ref<'all' | 'Embassy' | 'E-Visa' | 'Regional'>('all')
+  const visaTypeCounts = ref<Record<string, number>>({
+    all: 0,
+    Embassy: 0,
+    'E-Visa': 0,
+    Regional: 0,
+  })
+
   return {
     searchQuery,
     searchMode,
@@ -57,6 +66,8 @@ export const useStudentDashboardStore = defineStore('studentDashboard', () => {
     isAddStudentModalOpen,
     isExcelModalOpen,
     isExcelExporting,
+    visaTypeFilter,
+    visaTypeCounts,
     selectedTariffs,
     selectedLevels,
     selectedGroups,

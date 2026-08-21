@@ -7,7 +7,13 @@ import {
   Filter,
   FileSpreadsheet,
   BookOpen,
-  X
+  X,
+  Layers,
+  Building2,
+  Globe,
+  Map,
+  ChevronDown,
+  Check
 } from 'lucide-vue-next'
 import { useStudentDashboardStore } from '@/stores/studentDashboard'
 
@@ -24,6 +30,19 @@ const isStudentOrStatusPage = computed(() => {
 const isMac = computed(() => {
   if (typeof navigator === 'undefined') return false
   return /(Mac|iPhone|iPod|iPad)/i.test(navigator.platform || navigator.userAgent)
+})
+
+const isVisaTypeDropdownOpen = ref(false)
+
+const visaTypeOptions = [
+  { value: 'all', label: 'All', icon: Layers },
+  { value: 'Embassy', label: 'Embassy', icon: Building2 },
+  { value: 'E-Visa', label: 'E-Visa', icon: Globe },
+  { value: 'Regional', label: 'Regional', icon: Map },
+]
+
+const activeVisaTypeOpt = computed(() => {
+  return visaTypeOptions.find(o => o.value === dashboardStore.visaTypeFilter) || visaTypeOptions[0]
 })
 
 const PAGE_TITLES: Record<string, string> = {
@@ -83,26 +102,95 @@ const handleGlobalKeyDown = (e: KeyboardEvent) => {
       dashboardStore.isExcelModalOpen = false
       return
     }
+    if (isVisaTypeDropdownOpen.value) {
+      isVisaTypeDropdownOpen.value = false
+      return
+    }
+  }
+}
+
+function onDocClick(e: MouseEvent) {
+  if (isVisaTypeDropdownOpen.value) {
+    const target = e.target as HTMLElement
+    if (!target.closest('[data-visa-type-menu]')) {
+      isVisaTypeDropdownOpen.value = false
+    }
   }
 }
 
 onMounted(() => {
   window.addEventListener('keydown', handleGlobalKeyDown)
+  document.addEventListener('click', onDocClick)
 })
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleGlobalKeyDown)
+  document.removeEventListener('click', onDocClick)
 })
 </script>
 
 <template>
-  <!-- 1-to-1 Top Navbar for /students, /status, /documents -->
+  <!-- 1-to-1 Top Navbar for /students, /status, /documents, /visacheck -->
   <header
     v-if="isStudentOrStatusPage"
     class="flex flex-col md:flex-row flex-shrink-0 items-stretch md:items-center justify-between gap-3 md:gap-4 px-4 md:px-6 h-auto py-2.5 md:h-14 md:py-0 border-b border-zinc-200/80 dark:border-zinc-800 bg-white/95 dark:bg-[#111315]/95 backdrop-blur-md sticky top-0 z-30 shadow-2xs"
   >
-    <!-- Left Side: Filter Button (Hidden on /visacheck) -->
-    <div v-if="pathname !== '/visacheck'" class="flex-shrink-0 flex items-center gap-2 flex-wrap">
+    <!-- Left Side: Visa Type Dropdown on /visacheck OR Filter Button on other pages -->
+    <div v-if="pathname === '/visacheck'" class="flex-shrink-0 relative" data-visa-type-menu>
+      <button
+        type="button"
+        @click.stop="isVisaTypeDropdownOpen = !isVisaTypeDropdownOpen"
+        class="flex items-center justify-center gap-2 px-3.5 lg:px-4 h-[34px] md:h-[36px] rounded-full border text-xs md:text-sm font-bold select-none cursor-pointer transition-all duration-200 shadow-xs hover:shadow-md outline-none whitespace-nowrap shrink-0 border-zinc-300 dark:border-zinc-700 bg-zinc-100/90 dark:bg-zinc-900 text-zinc-800 dark:text-zinc-100 hover:bg-zinc-200/80 dark:hover:bg-zinc-800"
+      >
+        <component :is="activeVisaTypeOpt.icon" class="size-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+        <span>{{ activeVisaTypeOpt.label }}</span>
+        <span class="text-[11px] font-bold rounded-md px-1.5 py-0.5 min-w-[1.25rem] text-center bg-[#0B4133] text-white">
+          {{ dashboardStore.visaTypeCounts[dashboardStore.visaTypeFilter] || 0 }}
+        </span>
+        <ChevronDown class="size-3.5 text-zinc-400" />
+      </button>
+
+      <Transition
+        enter-active-class="transition duration-100 ease-out"
+        enter-from-class="opacity-0 scale-95"
+        enter-to-class="opacity-100 scale-100"
+        leave-active-class="transition duration-75 ease-in"
+        leave-from-class="opacity-100 scale-100"
+        leave-to-class="opacity-0 scale-95"
+      >
+        <div
+          v-if="isVisaTypeDropdownOpen"
+          class="absolute left-0 mt-1 w-52 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-2xl py-2 z-50 text-xs"
+        >
+          <button
+            v-for="opt in visaTypeOptions"
+            :key="opt.value"
+            type="button"
+            @click="dashboardStore.visaTypeFilter = opt.value as any; isVisaTypeDropdownOpen = false"
+            class="w-full text-left px-3.5 py-2.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 flex items-center justify-between text-zinc-800 dark:text-zinc-200 font-semibold cursor-pointer transition-colors"
+          >
+            <div class="flex items-center gap-2">
+              <component :is="opt.icon" class="size-4 text-zinc-400" />
+              <span>{{ opt.label }}</span>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <span
+                class="text-[10px] font-bold rounded px-1.5 py-0.5 text-center"
+                :class="dashboardStore.visaTypeFilter === opt.value
+                  ? 'bg-[#0B4133] text-white'
+                  : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400'"
+              >
+                {{ dashboardStore.visaTypeCounts[opt.value] || 0 }}
+              </span>
+              <Check v-if="dashboardStore.visaTypeFilter === opt.value" class="size-3.5 text-emerald-500" />
+            </div>
+          </button>
+        </div>
+      </Transition>
+    </div>
+
+    <!-- Filter Button on other pages -->
+    <div v-else class="flex-shrink-0 flex items-center gap-2 flex-wrap">
       <button
         type="button"
         @click="dashboardStore.isFilterPanelOpen = !dashboardStore.isFilterPanelOpen"
