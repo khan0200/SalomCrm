@@ -145,7 +145,7 @@ onUnmounted(() => {
         <component :is="activeVisaTypeOpt.icon" class="size-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
         <span>{{ activeVisaTypeOpt.label }}</span>
         <span class="text-[11px] font-bold rounded-md px-1.5 py-0.5 min-w-[1.25rem] text-center bg-[#0B4133] text-white">
-          {{ dashboardStore.visaTypeCounts[dashboardStore.visaTypeFilter] || 0 }}
+          {{ dashboardStore.visaTypeCounts?.[dashboardStore.visaTypeFilter] ?? 0 }}
         </span>
         <ChevronDown class="size-3.5 text-zinc-400" />
       </button>
@@ -180,7 +180,7 @@ onUnmounted(() => {
                   ? 'bg-[#0B4133] text-white'
                   : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400'"
               >
-                {{ dashboardStore.visaTypeCounts[opt.value] || 0 }}
+                {{ dashboardStore.visaTypeCounts?.[opt.value] ?? 0 }}
               </span>
               <Check v-if="dashboardStore.visaTypeFilter === opt.value" class="size-3.5 text-emerald-500" />
             </div>

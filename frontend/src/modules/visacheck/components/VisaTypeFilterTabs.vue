@@ -5,10 +5,16 @@ import type { VisaType } from '@/api/visa'
 
 export type VisaTypeFilter = 'all' | VisaType
 
-const props = defineProps<{
-  modelValue: VisaTypeFilter
-  counts: Record<VisaTypeFilter, number>
-}>()
+const props = withDefaults(
+  defineProps<{
+    modelValue?: VisaTypeFilter
+    counts?: Record<string, number>
+  }>(),
+  {
+    modelValue: 'all',
+    counts: () => ({ all: 0, Embassy: 0, 'E-Visa': 0, Regional: 0 })
+  }
+)
 
 const emit = defineEmits<{
   (e: 'update:modelValue', value: VisaTypeFilter): void
@@ -45,7 +51,7 @@ const options: { value: VisaTypeFilter; label: string; icon: any }[] = [
           ? 'bg-[#0B4133] text-white'
           : 'bg-zinc-200/80 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-400'"
       >
-        {{ props.counts[opt.value] || 0 }}
+        {{ props.counts?.[opt.value] ?? 0 }}
       </span>
     </button>
   </div>
