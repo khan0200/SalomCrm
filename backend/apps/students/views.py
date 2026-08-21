@@ -700,3 +700,434 @@ class ExtractDocumentView(APIView):
             return Response({'error': f'Failed to process document: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+class VisaCheckView(APIView):
+    """
+    Checks visa application status directly from visa.go.kr.
+    Supports Embassy (gb03), E-Visa (gb01), and Regional (gb02).
+    """
+    permission_classes = [IsTenantUser]
+
+    def post(self, request: Request) -> Response:
+        passport = request.data.get('passport', '').strip()
+        full_name = (request.data.get('full_name') or request.data.get('name') or '').strip()
+        birth_date = (request.data.get('birth_date') or request.data.get('dob') or '').strip()
+        visa_type = request.data.get('visa_type', 'Embassy').strip()
+        application_no = (request.data.get('application_no') or request.data.get('app_no') or '').strip()
+
+        if not passport:
+            return Response({'error': 'Passport number is required.'}, status=status.HTTP_400_BAD_REQUEST)
+        if not full_name:
+            return Response({'error': 'Full name is required.'}, status=status.HTTP_400_BAD_REQUEST)
+        if not birth_date:
+            return Response({'error': 'Date of birth is required.'}, status=status.HTTP_400_BAD_REQUEST)
+        if visa_type in ('E-Visa', 'Regional') and not application_no:
+            return Response({'error': 'Application number is required for E-Visa/Regional visa.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            from .visa_service import check_visa_direct
+            from .models import VisaStudent
+            from django.utils import timezone
+
+            result = check_visa_direct(
+                passport=passport,
+                full_name=full_name,
+                birth_date=birth_date,
+                visa_type=visa_type,
+                application_no=application_no
+            )
+
+            # Persist check results to VisaStudent database if student exists
+            tenant = getattr(request.user, 'tenant', None)
+            vs = VisaStudent.objects.filter(is_deleted=False)
+            if tenant:
+                vs = vs.filter(tenant=tenant)
+            vs_obj = vs.filter(passport__iexact=passport).first()
+            if vs_obj:
+                if result.get('latest_status'):
+                    vs_obj.status = result.get('latest_status').upper()
+                if result.get('latest_date'):
+                    vs_obj.application_date = result.get('latest_date')
+                if result.get('entry_date'):
+                    vs_obj.status_date = result.get('entry_date')
+                vs_obj.rejection_reason = result.get('rejection_reason') or ''
+                vs_obj.pdf_url = result.get('pdf_url') or ''
+                vs_obj.api_response = result
+                vs_obj.last_checked = timezone.now()
+                vs_obj.save()
+
+            return Response(result, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response(
+                {'error': f'visa.go.kr checking failed: {str(e)}'},
+                status=status.HTTP_502_BAD_GATEWAY
+            )
+
+
+class VisaDownloadPdfView(APIView):
+    """
+    Downloads official visa certificate PDF from visa.go.kr.
+    """
+    permission_classes = [IsTenantUser]
+
+    def post(self, request: Request) -> HttpResponse | Response:
+        passport = request.data.get('passport', '').strip()
+        full_name = (request.data.get('full_name') or request.data.get('name') or '').strip()
+        birth_date = (request.data.get('birth_date') or request.data.get('dob') or '').strip()
+        visa_type = request.data.get('visa_type', 'Embassy').strip()
+        application_no = (request.data.get('application_no') or request.data.get('app_no') or '').strip()
+        pdf_url = request.data.get('pdf_url', '').strip()
+
+        if not passport or not full_name or not birth_date:
+            return Response({'error': 'Passport, full name, and birth date are required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            from .visa_service import download_visa_pdf
+            pdf_bytes = download_visa_pdf(
+                passport=passport,
+                full_name=full_name,
+                birth_date=birth_date,
+                visa_type=visa_type,
+                application_no=application_no,
+                pdf_url=pdf_url
+            )
+            resp = HttpResponse(pdf_bytes, content_type='application/pdf')
+            resp['Content-Disposition'] = f'attachment; filename="visa_{passport.upper()}.pdf"'
+            return resp
+        except Exception as e:
+            return Response({'error': f'Failed to download visa PDF: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    def get(self, request: Request) -> HttpResponse | Response:
+        passport = request.query_params.get('passport', '').strip()
+        full_name = (request.query_params.get('full_name') or request.query_params.get('name') or '').strip()
+        birth_date = (request.query_params.get('birth_date') or request.query_params.get('dob') or '').strip()
+        visa_type = request.query_params.get('visa_type', 'Embassy').strip()
+        application_no = (request.query_params.get('application_no') or request.query_params.get('app_no') or '').strip()
+        pdf_url = request.query_params.get('pdf_url', '').strip()
+
+        if not passport or not full_name or not birth_date:
+            return Response({'error': 'Passport, full name, and birth date are required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            from .visa_service import download_visa_pdf
+            pdf_bytes = download_visa_pdf(
+                passport=passport,
+                full_name=full_name,
+                birth_date=birth_date,
+                visa_type=visa_type,
+                application_no=application_no,
+                pdf_url=pdf_url
+            )
+            resp = HttpResponse(pdf_bytes, content_type='application/pdf')
+            resp['Content-Disposition'] = f'attachment; filename="visa_{passport.upper()}.pdf"'
+            return resp
+        except Exception as e:
+            return Response({'error': f'Failed to download visa PDF: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class VisaStudentQuickSearchView(APIView):
+    """
+    Returns quick student suggestions for autofilling visa check form.
+    """
+    permission_classes = [IsTenantUser]
+
+    def get(self, request: Request) -> Response:
+        q = request.query_params.get('q', '').strip()
+        if not q or len(q) < 2:
+            return Response([])
+
+        tenant = getattr(request.user, 'tenant', None)
+        qs = Student.objects.filter(is_deleted=False)
+        if tenant:
+            qs = qs.filter(tenant=tenant)
+
+        qs = qs.filter(
+            Q(full_name__icontains=q) |
+            Q(passport__icontains=q) |
+            Q(id__icontains=q)
+        )[:10]
+
+        results = []
+        for s in qs:
+            results.append({
+                'id': s.id,
+                'full_name': s.full_name,
+                'passport': s.passport or '',
+                'birthday': s.birthday or '',
+                'tariff': s.tariff or '',
+                'university': s.university_1 or s.invoice_university or '',
+                'coordinator': s.coordinator or '',
+                'embassy_visa_status': s.embassy or ''
+            })
+
+        return Response(results)
+
+
+class VisaStudentLookupView(APIView):
+    """
+    Looks up a passport in the MAIN Student CRM database.
+    Used for instant auto-filling New Student form.
+    """
+    permission_classes = [IsTenantUser]
+
+    def get(self, request: Request) -> Response:
+        passport = request.query_params.get('passport', '').strip()
+        if not passport:
+            return Response({'found': False})
+
+        tenant = getattr(request.user, 'tenant', None)
+        qs = Student.objects.filter(is_deleted=False)
+        if tenant:
+            qs = qs.filter(tenant=tenant)
+
+        student = qs.filter(passport__iexact=passport).first()
+        if not student:
+            return Response({'found': False})
+
+        return Response({
+            'found': True,
+            'student': {
+                'id': student.id or '',
+                'full_name': student.full_name or '',
+                'passport': student.passport or '',
+                'birthday': student.birthday or '',
+                'tariff': student.tariff or '',
+                'university': student.university_1 or student.invoice_university or '',
+                'coordinator': student.coordinator or '',
+                'phone1': student.phone1 or '',
+            }
+        })
+
+
+class VisaStudentListCreateView(APIView):
+    """
+    Dedicated endpoints for Visa Check database table (crm_visa_students).
+    Completely isolated from main Student table.
+    """
+    permission_classes = [IsTenantUser]
+
+    def get(self, request: Request) -> Response:
+        from .models import VisaStudent
+        from .serializers import VisaStudentSerializer
+
+        tenant = getattr(request.user, 'tenant', None)
+        qs = VisaStudent.objects.filter(is_deleted=False)
+        if tenant:
+            qs = qs.filter(tenant=tenant)
+
+        # Search filter
+        search = request.query_params.get('search', '').strip()
+        if search:
+            qs = qs.filter(
+                Q(full_name__icontains=search) |
+                Q(passport__icontains=search) |
+                Q(student_id__icontains=search) |
+                Q(university__icontains=search) |
+                Q(tariff__icontains=search)
+            )
+
+        # Status filter
+        status_filter = request.query_params.get('status', '').strip().lower()
+        if status_filter == 'pending':
+            qs = qs.exclude(
+                Q(status__icontains='APPROV') |
+                Q(status__icontains='VISA USED') |
+                Q(status__icontains='REJECT') |
+                Q(status__icontains='CANCEL') |
+                Q(status__icontains='RETURN') |
+                Q(status__icontains='EXPIRED')
+            )
+        elif status_filter == 'approved':
+            qs = qs.filter(
+                Q(status__icontains='APPROV') |
+                Q(status__icontains='VISA USED')
+            )
+        elif status_filter == 'cancelled':
+            qs = qs.filter(
+                Q(status__icontains='REJECT') |
+                Q(status__icontains='CANCEL') |
+                Q(status__icontains='RETURN') |
+                Q(status__icontains='EXPIRED')
+            )
+
+        # Sorting
+        sort_by = request.query_params.get('sort_by', 'date')
+        if sort_by == 'university':
+            qs = qs.order_by('-pinned', 'university', '-created_at')
+        elif sort_by == 'tariff':
+            qs = qs.order_by('-pinned', 'tariff', '-created_at')
+        elif sort_by == 'selected':
+            qs = qs.order_by('-pinned', '-batch_selected', '-created_at')
+        elif sort_by == 'statusDate':
+            qs = qs.order_by('-pinned', '-status_date', '-created_at')
+        else:
+            qs = qs.order_by('-pinned', '-created_at')
+
+        serializer = VisaStudentSerializer(qs, many=True)
+        return Response({
+            'count': qs.count(),
+            'results': serializer.data
+        })
+
+    def post(self, request: Request) -> Response:
+        from .models import VisaStudent
+        from .serializers import VisaStudentSerializer
+
+        tenant = getattr(request.user, 'tenant', None)
+        passport = request.data.get('passport', '').strip().upper()
+        if not passport:
+            return Response({'error': 'Passport is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        full_name = request.data.get('full_name', '').strip().upper()
+        if not full_name:
+            return Response({'error': 'Full name is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        s_id = (request.data.get('student_id') or request.data.get('id') or '').strip().upper()
+
+        visa_student, created = VisaStudent.objects.get_or_create(
+            tenant=tenant,
+            passport=passport,
+            defaults={
+                'student_id': s_id,
+                'full_name': full_name,
+                'birthday': request.data.get('birthday', '').strip(),
+                'visa_type': request.data.get('visa_type', 'Embassy'),
+                'application_no': request.data.get('application_no', '').strip().upper(),
+                'tariff': request.data.get('tariff', ''),
+                'university': request.data.get('university', ''),
+                'coordinator': request.data.get('coordinator', ''),
+                'b2b': request.data.get('b2b', ''),
+                'flag': bool(request.data.get('flag', False)),
+                'refund_application': bool(request.data.get('refund_application', False)),
+            }
+        )
+
+        if not created:
+            # Update existing
+            for field in ('full_name', 'birthday', 'visa_type', 'application_no', 'tariff', 'university', 'coordinator', 'b2b', 'flag', 'refund_application'):
+                if field in request.data:
+                    setattr(visa_student, field, request.data[field])
+            if s_id:
+                visa_student.student_id = s_id
+            visa_student.is_deleted = False
+            visa_student.save()
+
+        serializer = VisaStudentSerializer(visa_student)
+        return Response(serializer.data, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+
+
+class VisaStudentDetailView(APIView):
+    """
+    Retrieve, Patch individual management fields, or Delete a Visa Student.
+    Does NOT affect the main CRM Student database.
+    """
+    permission_classes = [IsTenantUser]
+
+    def _get_student(self, request: Request, passport: str):
+        from .models import VisaStudent
+        tenant = getattr(request.user, 'tenant', None)
+        qs = VisaStudent.objects.filter(is_deleted=False)
+        if tenant:
+            qs = qs.filter(tenant=tenant)
+        return qs.filter(Q(passport__iexact=passport) | Q(student_id__iexact=passport)).first()
+
+    def get(self, request: Request, passport: str) -> Response:
+        from .serializers import VisaStudentSerializer
+        student = self._get_student(request, passport)
+        if not student:
+            return Response({'error': 'Student not found in Visa database.'}, status=status.HTTP_404_NOT_FOUND)
+        return Response(VisaStudentSerializer(student).data)
+
+    def patch(self, request: Request, passport: str) -> Response:
+        from .serializers import VisaStudentSerializer
+        student = self._get_student(request, passport)
+        if not student:
+            return Response({'error': 'Student not found in Visa database.'}, status=status.HTTP_404_NOT_FOUND)
+
+        # Allow partial updating of any management or status fields
+        for field in (
+            'student_id', 'full_name', 'birthday', 'visa_type', 'application_no',
+            'tariff', 'university', 'coordinator', 'b2b',
+            'flag', 'refund_application', 'pinned', 'batch_selected',
+            'status', 'rejection_reason', 'pdf_url', 'application_date', 'status_date'
+        ):
+            if field in request.data:
+                val = request.data[field]
+                if field in ('flag', 'refund_application', 'pinned', 'batch_selected'):
+                    setattr(student, field, bool(val))
+                elif field in ('tariff', 'university', 'coordinator', 'b2b'):
+                    setattr(student, field, '' if val in ('none', 'None', None) else str(val))
+                else:
+                    setattr(student, field, val)
+
+        if 'id' in request.data and 'student_id' not in request.data:
+            student.student_id = request.data['id']
+
+        student.save()
+        return Response(VisaStudentSerializer(student).data)
+
+    def delete(self, request: Request, passport: str) -> Response:
+        student = self._get_student(request, passport)
+        if not student:
+            return Response({'error': 'Student not found in Visa database.'}, status=status.HTTP_404_NOT_FOUND)
+
+        # Hard delete from visa check database table
+        student.delete()
+        return Response({'message': f'Student {passport} removed from Visa database.'}, status=status.HTTP_200_OK)
+
+
+class VisaStudentBulkDeleteView(APIView):
+    """
+    Deletes multiple students from the Visa database table.
+    """
+    permission_classes = [IsTenantUser]
+
+    def post(self, request: Request) -> Response:
+        from .models import VisaStudent
+        tenant = getattr(request.user, 'tenant', None)
+        passports = request.data.get('passports', [])
+        if not passports or not isinstance(passports, list):
+            return Response({'error': 'Passports list is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        qs = VisaStudent.objects.all()
+        if tenant:
+            qs = qs.filter(tenant=tenant)
+
+        upper_passports = [str(p).strip().upper() for p in passports]
+        deleted_count, _ = qs.filter(passport__in=upper_passports).delete()
+        return Response({'deleted_count': deleted_count, 'message': f'{deleted_count} student(s) deleted.'})
+
+
+class VisaOptionsView(APIView):
+    """
+    Returns dropdown choices for Visa Check Management (Tariffs, Universities, Coordinators, B2B).
+    """
+    permission_classes = [IsTenantUser]
+
+    def get(self, request: Request) -> Response:
+        from .models import TariffOption, UniversityOption, CoordinatorOption, B2BOption
+
+        tenant = getattr(request.user, 'tenant', None)
+
+        def get_names(model_cls, defaults=None):
+            qs = model_cls.objects.all()
+            if tenant:
+                qs = qs.filter(tenant=tenant)
+            names = list(qs.values_list('name', flat=True))
+            if not names and defaults:
+                names = defaults
+            return [{'name': n} for n in names if n]
+
+        tariffs = get_names(TariffOption, ['STANDART', 'PREMIUM', 'VISA PLUS', 'E-VISA TIL SERTIFIKATSIZ', 'E-VISA TIL SERTIFIKATLI', 'REGIONAL', 'ZERO RISK'])
+        universities = get_names(UniversityOption, ['Baekseok University', 'Jeonju University', 'Anyang University', 'Hoseo University', 'Seoul National University'])
+        coordinators = get_names(CoordinatorOption, ['Coordinator 1', 'Coordinator 2'])
+        b2b = get_names(B2BOption, ['iTOP EDU', 'Global Edu', 'Direct Partner'])
+
+        return Response({
+            'tariffs': tariffs,
+            'universities': universities,
+            'coordinators': coordinators,
+            'b2b': b2b
+        })
+
+
+

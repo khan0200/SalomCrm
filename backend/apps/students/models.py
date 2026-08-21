@@ -294,3 +294,79 @@ class MajorOption(TenantAwareModel):
 
     def __str__(self):
         return f"{self.name} ({self.tenant.name})"
+
+
+class B2BOption(TenantAwareModel):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=255, db_index=True)
+
+    class Meta:
+        db_table = 'crm_b2b_partners'
+        unique_together = ('tenant', 'name')
+        ordering = ['name']
+
+    def __str__(self):
+        return f"{self.name} ({self.tenant.name})"
+
+
+class VisaStudent(TenantAwareModel):
+    """
+    Dedicated database table for Visa Check module (/visacheck).
+    Completely isolated from the main Student table so additions, edits,
+    and deletions in Visa Check do not affect the main CRM students database.
+    """
+    student_id = models.CharField(max_length=50, blank=True, null=True)  # Student ID e.g. "T3", "M445"
+    full_name = models.CharField(max_length=255, db_index=True)
+    passport = models.CharField(max_length=50, db_index=True)
+    birthday = models.CharField(max_length=50, blank=True, null=True)
+    visa_type = models.CharField(max_length=50, default='Embassy')  # 'Embassy', 'E-Visa', 'Regional'
+    application_no = models.CharField(max_length=100, blank=True, null=True)
+
+    # Status & visa check details
+    status = models.CharField(max_length=100, default='PENDING', db_index=True)
+    application_date = models.CharField(max_length=50, blank=True, null=True)
+    status_date = models.CharField(max_length=50, blank=True, null=True)
+    last_checked = models.DateTimeField(blank=True, null=True)
+    rejection_reason = models.TextField(blank=True, null=True)
+    pdf_url = models.TextField(blank=True, null=True)
+    api_response = models.JSONField(default=dict, blank=True)
+
+    # Management fields (matching univisacheck /cabinet)
+    tariff = models.CharField(max_length=100, blank=True, null=True)
+    university = models.CharField(max_length=255, blank=True, null=True)
+    coordinator = models.CharField(max_length=100, blank=True, null=True)
+    b2b = models.CharField(max_length=100, blank=True, null=True)
+    flag = models.BooleanField(default=False)
+    refund_application = models.BooleanField(default=False)
+    pinned = models.BooleanField(default=False)
+    batch_selected = models.BooleanField(default=False)
+
+    # Soft delete
+    is_deleted = models.BooleanField(default=False, db_index=True)
+
+    class Meta:
+        db_table = 'crm_visa_students'
+        verbose_name = 'Visa Student'
+        verbose_name_plural = 'Visa Students'
+        ordering = ['-created_at']
+        unique_together = ('tenant', 'passport')
+        indexes = [
+            models.Index(fields=['tenant', 'passport']),
+            models.Index(fields=['tenant', 'status']),
+            models.Index(fields=['tenant', 'is_deleted']),
+            models.Index(fields=['tenant', 'pinned']),
+        ]
+
+    def __str__(self):
+        return f"{self.passport} - {self.full_name} ({self.tenant.name})"
+
+    def save(self, *args, **kwargs):
+        if self.passport:
+            self.passport = self.passport.strip().upper()
+        if self.full_name:
+            self.full_name = self.full_name.strip().upper()
+        if self.student_id:
+            self.student_id = self.student_id.strip().upper()
+        if self.application_no:
+            self.application_no = self.application_no.strip().upper()
+        super().save(*args, **kwargs)

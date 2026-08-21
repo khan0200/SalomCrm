@@ -34,7 +34,7 @@ const navItems = computed<NavItem[]>(() => {
     { name: 'STATUS', path: '/status', icon: ClipboardList },
     { name: 'DOCUMENTS', path: '/students?tab=documents', icon: FileText },
     { name: 'PAYMENTS', path: '/payments', icon: CreditCard },
-    { name: 'VISACHECK', path: 'https://www.salomkorea.uz/cabinet', icon: ShieldCheck, isExternal: true, target: '_blank' },
+    { name: 'VISACHECK', path: '/visacheck', icon: ShieldCheck },
     { name: 'SETTINGS', path: '/settings', icon: Settings }
   ]
 

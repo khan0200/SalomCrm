@@ -51,6 +51,12 @@ const routes = [
         meta: { title: 'Settings' }
       },
       {
+        path: 'visacheck',
+        name: 'visacheck',
+        component: () => import('@/modules/visacheck/VisaCheckPage.vue'),
+        meta: { title: 'Visa Check' }
+      },
+      {
         path: 'tenants',
         name: 'tenants',
         component: TenantsPage,

@@ -176,3 +176,26 @@ class MajorOptionSerializer(serializers.ModelSerializer):
         fields = ('id', 'name', 'created_at')
         read_only_fields = ('id', 'created_at')
 
+
+class B2BOptionSerializer(serializers.ModelSerializer):
+    class Meta:
+        from .models import B2BOption
+        model = B2BOption
+        fields = ('id', 'name', 'created_at')
+        read_only_fields = ('id', 'created_at')
+
+
+class VisaStudentSerializer(serializers.ModelSerializer):
+    class Meta:
+        from .models import VisaStudent
+        model = VisaStudent
+        fields = (
+            'id', 'student_id', 'full_name', 'passport', 'birthday', 'visa_type',
+            'application_no', 'status', 'application_date', 'status_date',
+            'last_checked', 'rejection_reason', 'pdf_url', 'api_response',
+            'tariff', 'university', 'coordinator', 'b2b',
+            'flag', 'refund_application', 'pinned', 'batch_selected',
+            'is_deleted', 'created_at', 'updated_at'
+        )
+        read_only_fields = ('id', 'created_at', 'updated_at')
+

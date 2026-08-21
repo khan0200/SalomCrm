@@ -7,6 +7,8 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
+      'xlsx-js-style': path.resolve(__dirname, './node_modules/xlsx-js-style/dist/xlsx.min.js'),
+      'stream': path.resolve(__dirname, './src/shims/empty.ts'),
     },
   },
   server: {

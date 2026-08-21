@@ -17,7 +17,7 @@ const searchInputRef = ref<HTMLInputElement | null>(null)
 const pathname = computed(() => route.path)
 
 const isStudentOrStatusPage = computed(() => {
-  return pathname.value === '/students' || pathname.value === '/status' || pathname.value === '/documents'
+  return pathname.value === '/students' || pathname.value === '/status' || pathname.value === '/documents' || pathname.value === '/visacheck'
 })
 
 const isMac = computed(() => {
@@ -28,6 +28,7 @@ const isMac = computed(() => {
 const PAGE_TITLES: Record<string, string> = {
   '/students': 'Students',
   '/status': 'Status Board',
+  '/visacheck': 'Visa Check',
   '/payments': 'Payments',
   '/settings': 'Settings',
   '/tenants': 'Tenants Management',
@@ -99,8 +100,8 @@ onUnmounted(() => {
     v-if="isStudentOrStatusPage"
     class="flex flex-col md:flex-row flex-shrink-0 items-stretch md:items-center justify-between gap-3 md:gap-4 px-4 md:px-6 h-auto py-2.5 md:h-14 md:py-0 border-b border-zinc-200/80 dark:border-zinc-800/80 bg-white/80 dark:bg-[#111315]/80 backdrop-blur-md sticky top-0 z-30 shadow-2xs"
   >
-    <!-- Left Side: Filter Button -->
-    <div class="flex-shrink-0 flex items-center gap-2 flex-wrap">
+    <!-- Left Side: Filter Button (Hidden on /visacheck) -->
+    <div v-if="pathname !== '/visacheck'" class="flex-shrink-0 flex items-center gap-2 flex-wrap">
       <button
         type="button"
         @click="dashboardStore.isFilterPanelOpen = !dashboardStore.isFilterPanelOpen"
@@ -126,7 +127,7 @@ onUnmounted(() => {
           <input
             ref="searchInputRef"
             type="text"
-            :placeholder="dashboardStore.searchMode === 'id' ? 'Search ID (e.g. G54)...' : 'Search by name, ID, phone...'"
+            :placeholder="dashboardStore.searchMode === 'id' ? 'Search ID (e.g. G54)...' : 'Search by name, ID, passport...'"
             v-model="dashboardStore.searchQuery"
             class="w-full bg-transparent text-[15px] md:text-sm text-zinc-800 dark:text-zinc-100 placeholder-zinc-400 py-2 border-none focus:outline-none ring-0 outline-none"
           />
@@ -153,8 +154,9 @@ onUnmounted(() => {
 
     <!-- Right Side Actions -->
     <div class="flex items-center gap-2 md:gap-2.5 justify-end z-10 w-full md:w-auto md:shrink-0 mt-1 md:mt-0">
-      <!-- Admissions Link Button -->
+      <!-- Admissions Link Button (Hidden on /visacheck) -->
       <a
+        v-if="pathname !== '/visacheck'"
         href="https://www.salomkorea.uz/#admission"
         target="_blank"
         rel="noopener noreferrer"
@@ -165,8 +167,9 @@ onUnmounted(() => {
         <span class="hidden sm:inline md:hidden lg:inline">Admissions</span>
       </a>
 
-      <!-- Excel Download Button -->
+      <!-- Excel Download Button (Hidden on /visacheck) -->
       <button
+        v-if="pathname !== '/visacheck'"
         type="button"
         @click="dashboardStore.isExcelModalOpen = true"
         class="flex items-center justify-center gap-1.5 px-3 lg:px-4 h-[34px] rounded-full border border-emerald-600/30 bg-emerald-50 hover:bg-emerald-100/70 text-emerald-700 dark:bg-emerald-950/20 dark:border-emerald-800/40 dark:text-emerald-400 text-xs md:text-sm font-semibold select-none cursor-pointer transition-all duration-300 shadow-[0_8px_30px_rgba(0,0,0,0.06)] hover:shadow-md outline-none shrink-0 whitespace-nowrap"
