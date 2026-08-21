@@ -243,38 +243,95 @@ class DiplomaExtractor:
         all_raw_lines = [l.strip() for l in ocr_lines if l.strip()]
         upper_text = full_text.upper()
 
-        degree_duration = 3 if is_shahodatnoma else (2 if 'MAGISTR' in upper_text or 'MASTER' in upper_text else 4)
+        is_technicum_or_college = any(k in upper_text for k in ['TECHNICUM', 'TEXNIKUM', 'TEHNIKUM', 'KOLLEJ', 'COLLEGE'])
+        is_master = 'MAGISTR' in upper_text or 'MASTER' in upper_text
+
+        degree_duration = 3 if is_shahodatnoma else (2 if (is_technicum_or_college or is_master) else 4)
 
         if is_shahodatnoma:
             fields['MAJOR'] = ExtractedField("GENERAL SECONDARY EDUCATION", 0.98, True, 'CALCULATED')
 
-        # 1. Degree / Certificate Serial Number
-        deg_match = re.search(r'(?:SERIYA|SERIES|№|N|NO\.?)[:\s\-]*([A-ZА-Я]{0,3}\s*(?:№|N|NO\.?)?\s*\d{6,8})|\b([A-ZА-Я]{1,3}\s*\d{6,8})\b|\b(\d{7,8})\b', upper_text)
-        if deg_match:
-            deg_val = deg_match.group(1) or deg_match.group(2) or deg_match.group(3)
-            if deg_val:
-                fields['DEGREE_NO'] = ExtractedField(deg_val.strip(), 0.92, True, 'OCR_REGEX')
+        # Form Subtitle / Placeholder filter
+        FORM_SUBTITLE_PATTERNS = [
+            'THE NAME OF', 'EDUCATIONAL INSTITUTION', 'TA\'LIM MUASSASASI NOMI',
+            'TALIM MUASSASASI NOMI', 'O\'QUV YURTI NOMI', 'OQUV YURTI NOMI',
+            'MUASSASA NOMI', 'GRADUATE\'S', 'GRADUATES', 'FULL NAME',
+            'FAMILYASI, ISMI', 'SPECIALIZATION OF', 'QUALIFICATION(S)', 'QUALIFICATIONS'
+        ]
+
+        def is_form_subtitle(line_str: str) -> bool:
+            t = line_str.upper().strip()
+            if (t.startswith('(') and t.endswith(')')) or (t.startswith('(') and any(sp in t for sp in FORM_SUBTITLE_PATTERNS)):
+                return True
+            clean_str = re.sub(r'[^A-ZА-Я0-9]', '', t)
+            return any(re.sub(r'[^A-ZА-Я0-9]', '', sp) in clean_str for sp in FORM_SUBTITLE_PATTERNS)
+
+        # 1. Degree / Certificate / Registration Serial Number
+        reg_match = re.search(r'(?:REGISTRATION NUMBER|RO\'YXATGA OLISH RAQAMI|REGISTRATION NO\.?|RO\'YXAT RAQAMI)[:\s\-]*([A-Z0-9\-]+)', upper_text)
+        serial_match = re.search(r'(?:SERIYA|SERIES|№)[:\s\-]*([A-ZА-Я]{1,3}\s*(?:№|N|NO\.?)?\s*\d{6,8})|\b([A-ZА-Я]{1,3}\s*\d{6,8})\b|\b(\d{6,8})\b', upper_text)
+
+        if reg_match:
+            fields['DEGREE_NO'] = ExtractedField(reg_match.group(1).strip(), 0.95, True, 'OCR_REGEX')
+        elif serial_match:
+            s_val = serial_match.group(1) or serial_match.group(2) or serial_match.group(3)
+            if s_val and len(s_val.strip()) >= 4:
+                fields['DEGREE_NO'] = ExtractedField(s_val.strip(), 0.92, True, 'OCR_REGEX')
 
         # 2. School Name
-        for line in all_raw_lines:
+        school_keywords = [
+            'TECHNICUM', 'TEXNIKUM', 'TEHNIKUM', 'KOLLEJ', 'COLLEGE', 'LITSEY', 'LYCEUM',
+            'UNIVERSITET', 'UNIVERSITY', 'INSTITUT', 'INSTITUTE', 'AKADEMIYA', 'ACADEMY',
+            'MAKTAB', 'SCHOOL', 'GIMNAZIYA', 'GYMNASIUM'
+        ]
+
+        extracted_school = None
+        for i, line in enumerate(all_raw_lines):
             l_up = line.upper()
-            if any(sk in l_up for sk in ['UNIVERSITET', 'UNIVERSITY', 'INSTITUT', 'INSTITUTE', 'AKADEMIYA', 'ACADEMY', 'MAKTAB', 'SCHOOL', 'KOLLEJ', 'COLLEGE', 'LITSEY', 'LYCEUM']):
-                clean_sch = re.sub(r'\s+', ' ', line).strip().upper()
-                if len(clean_sch) >= 6:
-                    fields['FINAL_SCHOOL_NAME'] = ExtractedField(clean_sch, 0.90, False, 'LAYOUT')
+
+            # Check if line is a form subtitle (e.g. '(the name of educational institution)')
+            if is_form_subtitle(line):
+                # The school name is on the previous line
+                if i > 0 and not is_form_subtitle(all_raw_lines[i-1]):
+                    cand = all_raw_lines[i-1].strip()
+                    if len(cand) >= 5 and not any(k in cand.upper() for k in ['DIPLOM', 'DIPLOMA', 'CERTIFICATE']):
+                        extracted_school = re.sub(r'\s+', ' ', cand).strip().upper()
+                        break
+
+            # Direct keyword match (make sure it's not a subtitle like '(the name of educational institution)')
+            if any(sk in l_up for sk in school_keywords) and not is_form_subtitle(line):
+                cand = re.sub(r'\s+', ' ', line).strip().upper()
+                if len(cand) >= 6:
+                    extracted_school = cand
                     break
 
-        # 3. Major
+        if extracted_school:
+            fields['FINAL_SCHOOL_NAME'] = ExtractedField(extracted_school, 0.92, True, 'LAYOUT')
+
+        # 3. Major / Specialization
         if not is_shahodatnoma:
             for line in all_raw_lines:
                 l_up = line.upper()
-                if any(mk in l_up for mk in ['MUTAXASSISLIGI', 'YO\'NALISHI', 'YONALISHI', 'MAJOR', 'SPECIALTY', 'SPECIALITY', 'FIELD OF STUDY']):
-                    clean_major = re.sub(r'^(MUTAXASSISLIGI|YO\'NALISHI|YONALISHI|MAJOR|SPECIALTY|SPECIALITY)[:\s\-]+', '', l_up).strip()
-                    if clean_major and len(clean_major) >= 3:
+                if any(mk in l_up for mk in ['COMPLETED', 'TAMOMLADI', 'MUTAXASSISLIGI', 'YO\'NALISHI', 'YONALISHI', 'MAJOR', 'SPECIALIZATION', 'SPECIALTY', 'QUALIFICATION']):
+                    clean_major = re.sub(r'^(COMPLETED|TAMOMLADI|MUTAXASSISLIGI|YO\'NALISHI|YONALISHI|MAJOR|SPECIALIZATION OF|SPECIALTY|QUALIFICATION\(S\))[:\s\-]+', '', l_up).strip()
+                    clean_major = re.sub(r'\(.*?\)', '', clean_major).strip()
+                    if clean_major and len(clean_major) >= 4 and not is_form_subtitle(clean_major):
                         fields['MAJOR'] = ExtractedField(clean_major, 0.88, False, 'LAYOUT')
                         break
 
-        # 4. Graduation Date & Computed Entry Date
+        # 4. Student Name on Diploma
+        for i, line in enumerate(all_raw_lines):
+            l_up = line.upper()
+            if any(ck in l_up for ck in ['COMMISSION', 'QARORI BILAN', 'DECISION OF']) or is_form_subtitle(line):
+                for j in range(max(0, i - 1), min(i + 3, len(all_raw_lines))):
+                    cand = all_raw_lines[j].strip().upper()
+                    if re.match(r'^[A-ZА-Я]{3,}\s+[A-ZА-Я]{3,}(?:\s+[A-ZА-Я]{3,})?$', cand):
+                        if not is_form_subtitle(cand) and not any(k in cand for k in ['COMMISSION', 'DECISION', 'STATE', 'DIPLOMA', 'TECHNICUM', 'UNIVERSITY', 'INSTITUTE', 'COLLEGE']):
+                            fields['FULL_NAME'] = ExtractedField(normalize_name(cand), 0.90, False, 'LAYOUT')
+                            break
+                if 'FULL_NAME' in fields:
+                    break
+
+        # 5. Graduation Date & Computed Entry Date
         grad_match = re.search(r'\b(20[1-2][0-9])[\s\-yY]*(?:yil|year|г|y)?\b', upper_text)
         if grad_match:
             grad_year = int(grad_match.group(1))
@@ -282,7 +339,7 @@ class DiplomaExtractor:
             entry_year = grad_year - degree_duration
             fields['DATE_OF_ENTRY'] = ExtractedField(f"{entry_year}-09-02", 0.95, True, 'CALCULATED')
 
-        # 5. GPA
+        # 6. GPA
         gpa_match = re.search(r'\bGPA[\s:]*([0-5]\.[0-9]{1,2})\b|\b([3-5]\.[0-9]{1,2})\b', upper_text)
         if gpa_match:
             gpa_val = gpa_match.group(1) or gpa_match.group(2)
