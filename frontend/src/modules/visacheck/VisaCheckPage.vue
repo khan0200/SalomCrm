@@ -424,11 +424,6 @@ async function checkStudentVisa(
           message: `🎉 ${student.full_name}: Viza statusi o'zgardi! (${oldStatus} ➔ ${newStatus})`
         })
       }
-    } else if (!silent) {
-      uiStore.addToast({
-        type: res.found ? 'info' : 'warning',
-        message: res.found ? `${student.full_name}: ${student.status}` : `${student.full_name}: Ariza topilmadi`
-      })
     }
 
     return { success: true, changed }
