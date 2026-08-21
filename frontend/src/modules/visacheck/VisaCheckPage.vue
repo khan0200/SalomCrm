@@ -9,6 +9,8 @@ import { useUiStore } from '@/stores/ui'
 import { useStudentDashboardStore } from '@/stores/studentDashboard'
 import StudentFormModal from './components/StudentFormModal.vue'
 import StudentDetailsModal from './components/StudentDetailsModal.vue'
+import StudentUniversityGroup from './components/StudentUniversityGroup.vue'
+import VisaTypeFilterTabs, { type VisaTypeFilter } from './components/VisaTypeFilterTabs.vue'
 import StatusBadge from './components/StatusBadge.vue'
 import VisaTypeBadge from './components/VisaTypeBadge.vue'
 import CopyField from './components/CopyField.vue'
@@ -19,6 +21,7 @@ const dashboardStore = useStudentDashboardStore()
 // ─── State ────────────────────────────────────────────────────────────────────
 type StatusFilter = 'pending' | 'application' | 'cancelled' | 'approved'
 const currentFilter = ref<StatusFilter>('pending')
+const visaTypeFilter = ref<VisaTypeFilter>('all')
 
 const searchQuery = computed({
   get: () => dashboardStore.searchQuery,
@@ -30,7 +33,8 @@ const isAddModalOpen = computed({
   set: (v) => { dashboardStore.isAddStudentModalOpen = v }
 })
 
-const sortBy = ref<'university' | 'tariff' | 'date' | 'statusDate' | 'underReview' | 'selected'>('date')
+type SortOption = 'university' | 'tariff' | 'date' | 'statusDate' | 'underReview' | 'selected'
+const sortBy = ref<SortOption>('university')
 const isSortMenuOpen = ref(false)
 
 const students = ref<VisaStudent[]>([])
@@ -92,12 +96,38 @@ function isPdfEligible(student: VisaStudent): boolean {
   return s.includes('APPROV') || s.includes('VISA USED')
 }
 
-// ─── Counts (Mutually Exclusive 4 Tabs matching univisacheck) ────────────────
+// ─── Filtered by Search & Visa Type ───────────────────────────────────────────
+const matchingSearchAndType = computed(() => {
+  const q = searchQuery.value.toLowerCase().trim()
+  const vType = visaTypeFilter.value
+  return students.value.filter(s => {
+    const sType = s.visa_type || 'Embassy'
+    if (vType !== 'all' && sType !== vType) return false
+    if (!q) return true
+    const name = (s.full_name || '').toLowerCase()
+    const pass = (s.passport || '').toLowerCase()
+    const id   = (s.student_id || s.id || '').toLowerCase()
+    const univ = (s.university || '').toLowerCase()
+    const tariff = (s.tariff || '').toLowerCase()
+    return name.includes(q) || pass.includes(q) || id.includes(q) || univ.includes(q) || tariff.includes(q)
+  })
+})
+
+// ─── Counts (Tabs matching univisacheck /cabinet) ─────────────────────────────
 const counts = computed(() => {
   const result: Record<StatusFilter, number> = { pending: 0, application: 0, cancelled: 0, approved: 0 }
+  for (const s of matchingSearchAndType.value) {
+    const bucket = bucketForStatus(s.status)
+    result[bucket]++
+  }
+  return result
+})
+
+const visaTypeCounts = computed(() => {
+  const q = searchQuery.value.toLowerCase().trim()
+  const result: Record<VisaTypeFilter, number> = { 'all': 0, 'Embassy': 0, 'E-Visa': 0, 'Regional': 0 }
   for (const s of students.value) {
-    if (searchQuery.value) {
-      const q = searchQuery.value.toLowerCase().trim()
+    if (q) {
       const name = (s.full_name || '').toLowerCase()
       const pass = (s.passport || '').toLowerCase()
       const id   = (s.student_id || s.id || '').toLowerCase()
@@ -105,46 +135,24 @@ const counts = computed(() => {
       const tariff = (s.tariff || '').toLowerCase()
       if (!name.includes(q) && !pass.includes(q) && !id.includes(q) && !univ.includes(q) && !tariff.includes(q)) continue
     }
-    const bucket = bucketForStatus(s.status)
-    result[bucket]++
+    result.all++
+    const type = s.visa_type || 'Embassy'
+    if (type === 'E-Visa') result['E-Visa']++
+    else if (type === 'Regional') result.Regional++
+    else result.Embassy++
   }
   return result
 })
 
-// ─── Filtered & Sorted Students ──────────────────────────────────────────────
+// ─── Filtered Students for Current Status Tab ─────────────────────────────────
 const filteredStudents = computed(() => {
-  let list = students.value.filter(s => {
-    if (searchQuery.value) {
-      const q = searchQuery.value.toLowerCase().trim()
-      const name = (s.full_name || '').toLowerCase()
-      const pass = (s.passport || '').toLowerCase()
-      const id   = (s.student_id || s.id || '').toLowerCase()
-      const univ = (s.university || '').toLowerCase()
-      const tariff = (s.tariff || '').toLowerCase()
-      if (!name.includes(q) && !pass.includes(q) && !id.includes(q) && !univ.includes(q) && !tariff.includes(q)) return false
-    }
-    return bucketForStatus(s.status) === currentFilter.value
-  })
+  const list = matchingSearchAndType.value.filter(s => bucketForStatus(s.status) === currentFilter.value)
 
-  list.sort((a, b) => {
-    const aPin = a.pinned ? 1 : 0
-    const bPin = b.pinned ? 1 : 0
-    if (aPin !== bPin) return bPin - aPin
-
-    if (sortBy.value === 'university') return (a.university || '').localeCompare(b.university || '')
-    if (sortBy.value === 'tariff') return (a.tariff || '').localeCompare(b.tariff || '')
+  return [...list].sort((a, b) => {
     if (sortBy.value === 'selected') {
       const aS = selectedPassports.value.has(a.passport) ? 1 : 0
       const bS = selectedPassports.value.has(b.passport) ? 1 : 0
-      return bS - aS
-    }
-    if (sortBy.value === 'underReview') {
-      const aR = getStudentVisaStatus(a).includes('REVIEW') ? 1 : 0
-      const bR = getStudentVisaStatus(b).includes('REVIEW') ? 1 : 0
-      return bR - aR
-    }
-    if (sortBy.value === 'statusDate') {
-      return (b.status_date || '').localeCompare(a.status_date || '')
+      if (aS !== bS) return bS - aS
     }
 
     if (currentFilter.value === 'application') {
@@ -153,17 +161,78 @@ const filteredStudents = computed(() => {
       if (isUnderReviewA !== isUnderReviewB) return isUnderReviewB - isUnderReviewA
     }
 
-    return (b.application_date || b.created_at || '').localeCompare(a.application_date || a.created_at || '')
+    if (a.pinned && !b.pinned) return -1
+    if (!a.pinned && b.pinned) return 1
+
+    if (sortBy.value === 'statusDate') {
+      const dateA = a.status_date || '9999-99-99'
+      const dateB = b.status_date || '9999-99-99'
+      if (dateA !== dateB) return dateB.localeCompare(dateA)
+    }
+
+    if (sortBy.value === 'university') return (a.university || '').localeCompare(b.university || '')
+    if (sortBy.value === 'tariff') return (a.tariff || '').localeCompare(b.tariff || '')
+
+    const dateA = a.application_date || a.created_at || '9999-99-99'
+    const dateB = b.application_date || b.created_at || '9999-99-99'
+    return dateB.localeCompare(dateA)
   })
-  return list
 })
 
-// ─── Show/Hide Columns (matching cabinet logic) ───────────────────────────────
+// ─── Grouping Logic (Accordion matching /cabinet) ─────────────────────────────
+const hasAnyGroup = computed(() => {
+  const sort = sortBy.value
+  if (sort === 'university') return filteredStudents.value.some(s => !!s.university)
+  if (sort === 'tariff') return filteredStudents.value.some(s => !!s.tariff)
+  if (sort === 'date') return filteredStudents.value.some(s => !!s.application_date)
+  if (sort === 'statusDate') return filteredStudents.value.some(s => !!s.status_date)
+  if (sort === 'underReview') return filteredStudents.value.some(s => (s.status || '').toUpperCase().includes('REVIEW') || (s.status || '').toUpperCase().includes('SUPPLEM'))
+  return false
+})
+
+const groupedStudents = computed((): { groupName: string; students: VisaStudent[] }[] => {
+  const map = new Map<string, VisaStudent[]>()
+  const sort = sortBy.value
+
+  for (const s of filteredStudents.value) {
+    let key = ''
+    if (sort === 'university') key = s.university?.trim() || ''
+    else if (sort === 'tariff') key = s.tariff?.trim() || ''
+    else if (sort === 'date') key = s.application_date?.trim() || ''
+    else if (sort === 'statusDate') key = s.status_date?.trim() || ''
+    else if (sort === 'underReview') {
+      const st = (s.status || '').toUpperCase()
+      if (st.includes('SUPPLEM') && st.includes('SUBMIT')) key = 'Supplement Submitted'
+      else if (st.includes('SUPPLEM')) key = 'Supplement Needed'
+      else if (st.includes('REVIEW')) key = 'Under Review'
+    }
+
+    if (!map.has(key)) map.set(key, [])
+    map.get(key)!.push(s)
+  }
+
+  return [...map.entries()]
+    .sort(([a], [b]) => {
+      if (sort === 'underReview') {
+        if (a === 'Supplement Needed') return -1
+        if (b === 'Supplement Needed') return 1
+        if (a === 'Supplement Submitted') return -1
+        if (b === 'Supplement Submitted') return 1
+        if (a === 'Under Review') return -1
+        if (b === 'Under Review') return 1
+      }
+      if (a === '') return 1
+      if (b === '') return -1
+      return a.localeCompare(b)
+    })
+    .map(([groupName, groupStudents]) => ({ groupName, students: groupStudents }))
+})
+
+// ─── Show/Hide Columns ────────────────────────────────────────────────────────
 const showSelectColumn = computed(() => currentFilter.value === 'application' || currentFilter.value === 'pending')
 const showAppliedColumn = computed(() => currentFilter.value !== 'pending')
 const showPdfColumn = computed(() =>
-  currentFilter.value === 'approved' ||
-  filteredStudents.value.some(s => isPdfEligible(s))
+  currentFilter.value === 'approved' || filteredStudents.value.some(s => isPdfEligible(s))
 )
 const showStatusDateColumn = computed(() => currentFilter.value === 'approved')
 
@@ -178,6 +247,10 @@ function toggleSelect(student: VisaStudent, checked: boolean) {
 
 function handleDeselectAll() {
   for (const s of filteredStudents.value) selectedPassports.value.delete(s.passport)
+}
+
+function handleDeselectGroup(groupStudents: VisaStudent[]) {
+  for (const s of groupStudents) selectedPassports.value.delete(s.passport)
 }
 
 // ─── Pin ─────────────────────────────────────────────────────────────────────
@@ -259,6 +332,7 @@ async function checkStudentVisa(student: VisaStudent) {
   }
 }
 
+// Batch check selected
 const isBatchChecking = ref(false)
 async function handleBatchCheck() {
   if (!selectedInCurrentTab.value.length) return
@@ -266,6 +340,15 @@ async function handleBatchCheck() {
   for (const s of selectedInCurrentTab.value) await checkStudentVisa(s)
   isBatchChecking.value = false
   uiStore.addToast({ type: 'info', message: `${selectedInCurrentTab.value.length} ta talabaning viza holati tekshirildi.` })
+}
+
+// Group check
+async function handleGroupRefresh(groupList: VisaStudent[]) {
+  if (!groupList.length) return
+  uiStore.addToast({ type: 'info', message: `${groupList.length} ta talabaning viza holati tekshirilmoqda...` })
+  for (const s of groupList) {
+    await checkStudentVisa(s)
+  }
 }
 
 // ─── PDF Download ─────────────────────────────────────────────────────────────
@@ -405,23 +488,23 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
 </script>
 
 <template>
-  <div class="space-y-5 p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto min-w-0">
+  <div class="space-y-4 p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto min-w-0">
 
-    <!-- ── Top Action Row ── -->
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 min-w-0">
+    <!-- ── Top Filter & Action Bar (Matching /cabinet layout) ── -->
+    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 min-w-0">
 
-      <!-- Left Buttons -->
-      <div class="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
+      <!-- Left Action Buttons + Visa Type Tabs -->
+      <div class="flex flex-wrap items-center gap-2.5 w-full lg:w-auto">
 
         <!-- Sort Dropdown -->
         <div class="relative" data-sort-menu>
           <button
             type="button"
             @click.stop="isSortMenuOpen = !isSortMenuOpen"
-            class="h-11 px-4 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200 font-semibold text-sm flex items-center gap-2 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors shadow-xs"
+            class="h-11 px-4 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200 font-bold text-sm flex items-center gap-2 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors shadow-xs cursor-pointer"
           >
             <ArrowUpDown class="size-4 text-zinc-400" />
-            Sort
+            <span>Sort: <span class="text-blue-600 dark:text-blue-400 capitalize">{{ sortBy }}</span></span>
             <ChevronDown class="size-3.5 text-zinc-400" />
           </button>
           <Transition
@@ -434,35 +517,41 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
           >
             <div
               v-if="isSortMenuOpen"
-              class="absolute left-0 mt-1 w-48 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xl py-1.5 z-30 text-xs"
+              class="absolute left-0 mt-1 w-52 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-2xl py-2 z-40 text-xs"
             >
               <button
                 v-for="opt in [
-                  { id: 'university', label: 'University' },
-                  { id: 'tariff',    label: 'Tariff' },
-                  { id: 'date',      label: 'Date' },
-                  { id: 'statusDate', label: 'Status Date' },
-                  { id: 'underReview', label: 'Under review' },
-                  { id: 'selected',  label: 'Selected' }
+                  { id: 'university',  label: 'University (Guruhlash)' },
+                  { id: 'tariff',      label: 'Tariff (Guruhlash)' },
+                  { id: 'date',        label: 'Date (Guruhlash)' },
+                  { id: 'statusDate',  label: 'Status Date (Guruhlash)' },
+                  { id: 'underReview', label: 'Under Review (Guruhlash)' },
+                  { id: 'selected',    label: 'Selected (Tanlanganlar)' }
                 ]"
                 :key="opt.id"
                 type="button"
                 @click="sortBy = opt.id as any; isSortMenuOpen = false"
-                class="w-full text-left px-3.5 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 flex items-center justify-between text-zinc-700 dark:text-zinc-200 font-medium"
+                class="w-full text-left px-4 py-2.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 flex items-center justify-between text-zinc-700 dark:text-zinc-200 font-semibold cursor-pointer transition-colors"
               >
-                {{ opt.label }}
-                <Check v-if="sortBy === opt.id" class="size-3.5 text-emerald-500" />
+                <span>{{ opt.label }}</span>
+                <Check v-if="sortBy === opt.id" class="size-4 text-emerald-500" />
               </button>
             </div>
           </Transition>
         </div>
+
+        <!-- Visa Type Filter Tabs (All, Embassy, E-Visa, Regional) -->
+        <VisaTypeFilterTabs
+          v-model="visaTypeFilter"
+          :counts="visaTypeCounts"
+        />
 
         <!-- Undo (deselect) -->
         <button
           v-if="selectedInCurrentTab.length > 0"
           type="button"
           @click="handleDeselectAll"
-          class="h-11 px-4 rounded-xl bg-[#FBBF24] hover:bg-[#F59E0B] text-[#0B4133] font-bold text-sm shadow-xs transition-all flex items-center gap-1.5"
+          class="h-11 px-4 rounded-xl bg-[#FBBF24] hover:bg-[#F59E0B] text-[#0B4133] font-bold text-sm shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
         >
           Undo ({{ selectedInCurrentTab.length }})
         </button>
@@ -473,15 +562,15 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
           type="button"
           :disabled="isBatchChecking"
           @click="handleBatchCheck"
-          class="h-11 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm shadow-xs transition-all flex items-center gap-2 disabled:opacity-50"
+          class="h-11 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm shadow-xs transition-all flex items-center gap-2 disabled:opacity-50 cursor-pointer"
         >
           <RefreshCw v-if="isBatchChecking" class="size-4 animate-spin" />
           Check ({{ selectedInCurrentTab.length }})
         </button>
       </div>
 
-      <!-- Status Tabs (dark green pill) -->
-      <div class="w-full sm:w-auto shrink-0">
+      <!-- Status Tabs (4 mutually exclusive tabs in dark green pill) -->
+      <div class="w-full lg:w-auto shrink-0">
         <div class="grid grid-cols-4 sm:inline-flex sm:items-center gap-1 p-1 rounded-xl bg-[#0B4133] w-full sm:w-auto shadow-sm">
           <button
             v-for="tab in [
@@ -493,8 +582,8 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
             :key="tab.value"
             type="button"
             @click="currentFilter = tab.value as StatusFilter"
-            class="relative flex flex-col sm:flex-row items-center justify-center gap-1 rounded-lg px-2.5 sm:px-3.5 py-1.5 text-xs sm:text-sm font-semibold transition-all"
-            :class="currentFilter === tab.value ? 'bg-white text-[#0B4133] shadow-sm' : 'text-white/85 hover:text-white hover:bg-white/10'"
+            class="relative flex flex-col sm:flex-row items-center justify-center gap-1 rounded-lg px-2.5 sm:px-3.5 py-1.5 text-xs sm:text-sm font-semibold transition-all cursor-pointer"
+            :class="currentFilter === tab.value ? 'bg-white text-[#0B4133] shadow-sm font-bold' : 'text-white/85 hover:text-white hover:bg-white/10'"
           >
             <span>{{ tab.label }}</span>
             <span
@@ -508,7 +597,7 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
       </div>
     </div>
 
-    <!-- Search alert bar -->
+    <!-- Search Alert Bar -->
     <div
       v-if="searchQuery"
       class="flex items-center justify-between px-4 py-2.5 rounded-xl bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 text-xs text-blue-700 dark:text-blue-300"
@@ -517,289 +606,298 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
         <Search class="size-4 text-blue-500" />
         <span>Qidiruv: "<strong>{{ searchQuery }}</strong>" — {{ filteredStudents.length }} ta talaba</span>
       </div>
-      <button type="button" @click="searchQuery = ''" class="text-blue-500 hover:text-blue-700 font-semibold underline">Tozalash</button>
+      <button type="button" @click="searchQuery = ''" class="text-blue-500 hover:text-blue-700 font-bold underline cursor-pointer">Tozalash</button>
     </div>
 
-    <!-- ── Main Card ── -->
+    <!-- Loading -->
+    <div v-if="isLoading" class="p-8 space-y-4 animate-pulse">
+      <div v-for="i in 6" :key="i" class="h-16 bg-zinc-100 dark:bg-zinc-800/60 rounded-2xl" />
+    </div>
+
+    <!-- Empty State -->
     <div
+      v-else-if="filteredStudents.length === 0"
+      class="rounded-2xl border border-neutral-300 dark:border-white/20 bg-white dark:bg-zinc-900 py-16 px-6 text-center space-y-3 shadow-sm"
+    >
+      <div class="w-14 h-14 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center mx-auto text-zinc-400">
+        <ArchiveRestore class="size-7" />
+      </div>
+      <p class="font-bold text-zinc-800 dark:text-zinc-200">Talabalar topilmadi</p>
+      <p class="text-xs text-zinc-500 dark:text-zinc-400 max-w-sm mx-auto">
+        Ushbu statusda talabalar mavjud emas yoki tanlangan filtrlar bo'yicha natija chiqmadi.
+      </p>
+    </div>
+
+    <!-- ── Grouped Accordion List (when hasAnyGroup is true) ── -->
+    <div
+      v-else-if="hasAnyGroup"
+      class="space-y-3.5"
+    >
+      <StudentUniversityGroup
+        v-for="group in groupedStudents"
+        :key="`${currentFilter}-${sortBy}-${group.groupName}`"
+        :group-name="group.groupName"
+        :students="group.students"
+        :current-filter="currentFilter"
+        :checking-passports="checkingPassports"
+        :selected-passports="selectedPassports"
+        :downloading-passports="downloadingPassports"
+        @edit="openEditModal"
+        @details="openDetails"
+        @delete="promptDelete"
+        @refresh="checkStudentVisa"
+        @refresh-group="handleGroupRefresh"
+        @download-pdf="handleDownloadPdf"
+        @toggle-select="toggleSelect"
+        @toggle-pin="handlePinToggle"
+        @deselect-group="handleDeselectGroup"
+      />
+    </div>
+
+    <!-- ── Flat Table Card (when hasAnyGroup is false / selected mode) ── -->
+    <div
+      v-else
       class="rounded-2xl border border-neutral-300 dark:border-white/20 bg-white dark:bg-zinc-900 shadow-[0_8px_30px_rgba(15,23,42,0.1),0_2px_8px_rgba(15,23,42,0.06)] dark:shadow-[0_12px_40px_rgba(0,0,0,0.7)] overflow-hidden"
     >
-      <!-- Loading -->
-      <div v-if="isLoading" class="p-8 space-y-4 animate-pulse">
-        <div v-for="i in 6" :key="i" class="h-14 bg-zinc-100 dark:bg-zinc-800/60 rounded-xl" />
-      </div>
-
-      <!-- Empty State -->
-      <div v-else-if="filteredStudents.length === 0" class="py-16 px-6 text-center space-y-3">
-        <div class="w-14 h-14 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center mx-auto text-zinc-400">
-          <ArchiveRestore class="size-7" />
-        </div>
-        <p class="font-bold text-zinc-800 dark:text-zinc-200">Talabalar topilmadi</p>
-        <p class="text-xs text-zinc-500 dark:text-zinc-400 max-w-sm mx-auto">
-          Ushbu statusda talabalar mavjud emas yoki qidiruv bo'yicha natija chiqmadi.
-        </p>
-      </div>
-
-      <template v-else>
-        <!-- ── Mobile Cards (md:hidden) ── -->
+      <!-- Mobile Cards -->
+      <div
+        ref="containerRef"
+        :key="`m-${currentFilter}`"
+        class="md:hidden space-y-3 p-3"
+      >
+        <div v-if="mTopSpacerH > 0" :style="{ height: `${mTopSpacerH}px` }" />
         <div
-          ref="containerRef"
-          :key="`m-${currentFilter}`"
-          class="md:hidden space-y-3 p-3"
+          v-for="st in visibleMobileStudents"
+          :key="st.passport"
+          class="p-4 space-y-2.5 rounded-xl border border-neutral-300/90 dark:border-white/20 bg-white dark:bg-zinc-900 shadow-sm cursor-pointer active:bg-blue-50/60 dark:active:bg-white/[0.03]"
+          @click="onRowClick(st, $event)"
         >
-          <div v-if="mTopSpacerH > 0" :style="{ height: `${mTopSpacerH}px` }" />
-          <div
-            v-for="st in visibleMobileStudents"
-            :key="st.passport"
-            class="p-4 space-y-2.5 rounded-xl border border-neutral-300/90 dark:border-white/20 bg-white dark:bg-zinc-900 shadow-sm cursor-pointer active:bg-blue-50/60 dark:active:bg-white/[0.03]"
-            @click="onRowClick(st, $event)"
-          >
-            <!-- Top row: name + checkbox -->
-            <div class="flex items-start justify-between gap-3">
-              <div class="min-w-0">
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+              <div class="font-bold text-zinc-900 dark:text-white flex items-center gap-1.5 flex-wrap">
+                <CopyField :value="st.full_name" label="Copy name" class="text-sm">{{ st.full_name }}</CopyField>
+                <Pin v-if="st.pinned" class="size-3.5 text-amber-500 fill-amber-500 shrink-0" />
+              </div>
+              <div class="flex flex-wrap items-center gap-1.5 mt-1">
+                <VisaTypeBadge :visa-type="st.visa_type" />
+                <span v-if="st.student_id || st.id" class="text-xs text-zinc-400 font-mono">#{{ st.student_id || st.id }}</span>
+              </div>
+            </div>
+            <div v-if="showSelectColumn" class="flex items-center justify-center shrink-0 pt-0.5">
+              <input
+                type="checkbox"
+                class="size-6 rounded-md border-2 border-neutral-300 dark:border-neutral-600 text-blue-600 focus:ring-2 focus:ring-blue-500 cursor-pointer transition-all"
+                :checked="selectedPassports.has(st.passport)"
+                @click.stop
+                @change="toggleSelect(st, ($event.target as HTMLInputElement).checked)"
+              />
+            </div>
+          </div>
+
+          <div class="flex items-center justify-between text-sm">
+            <div>
+              <CopyField :value="st.passport" label="Copy passport" class="font-bold font-mono text-zinc-700 dark:text-zinc-300">{{ st.passport }}</CopyField>
+              <CopyField :value="st.birthday" label="Copy birthday" class="text-xs font-bold font-mono text-zinc-400 mt-0.5">{{ st.birthday }}</CopyField>
+            </div>
+            <StatusBadge :status="getStudentVisaStatus(st)" />
+          </div>
+
+          <div v-if="st.rejection_reason" class="text-[11px] text-rose-500 font-medium truncate">
+            Sabab: {{ st.rejection_reason }}
+          </div>
+
+          <div class="flex items-center justify-between text-xs text-zinc-400">
+            <span v-if="showAppliedColumn">Applied: {{ st.application_date || st.created_at?.slice(0, 10) || '--' }}</span>
+            <span v-if="checkingPassports.has(st.passport)" class="inline-flex items-center gap-1 text-blue-600 dark:text-blue-400 font-medium">
+              <RefreshCw class="size-3 animate-spin" />Checking...
+            </span>
+            <span v-else>Checked: {{ formatTimestampCompact(st.last_checked) }}</span>
+          </div>
+
+          <div class="grid grid-cols-2 gap-1.5 pt-2.5 border-t border-zinc-100 dark:border-zinc-800">
+            <button
+              type="button"
+              :disabled="checkingPassports.has(st.passport)"
+              @click.stop="checkStudentVisa(st)"
+              class="h-9 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 disabled:opacity-50 transition-colors"
+            >
+              <RefreshCw class="size-3.5" :class="{ 'animate-spin': checkingPassports.has(st.passport) }" />
+              Check
+            </button>
+            <button
+              type="button"
+              @click.stop="openDetails(st)"
+              class="h-9 rounded-lg bg-amber-400 hover:bg-amber-500 text-amber-950 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors"
+            >
+              <Eye class="size-3.5" />
+              View
+            </button>
+          </div>
+        </div>
+        <div v-if="mBottomSpacerH > 0" :style="{ height: `${mBottomSpacerH}px` }" />
+      </div>
+
+      <!-- Desktop Table -->
+      <div
+        ref="containerRef"
+        class="hidden md:block overflow-x-auto"
+      >
+        <table
+          :key="`t-${currentFilter}`"
+          class="w-full min-w-[900px] text-sm border-collapse table-fixed"
+        >
+          <thead class="sticky top-0 z-10 bg-neutral-100/90 dark:bg-[#111928] backdrop-blur">
+            <tr class="border-b border-neutral-300 dark:border-white/20 text-left text-[10px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-neutral-300">
+              <th class="px-4 py-2 min-w-[220px]">Name</th>
+              <th class="px-4 py-2 w-36">Passport</th>
+              <th class="px-4 py-2 w-44">Status</th>
+              <th v-if="showAppliedColumn" class="px-4 py-2 w-28">Applied</th>
+              <th v-if="showStatusDateColumn" class="px-4 py-2 w-32">Status Date</th>
+              <th v-else class="px-4 py-2 w-44">Checked</th>
+              <th v-if="showSelectColumn" class="px-4 py-2 w-24 text-center align-middle">
+                <div class="flex items-center justify-center gap-1.5">
+                  <span>Select</span>
+                  <button
+                    v-if="hasAnySelected"
+                    type="button"
+                    class="p-0.5 rounded text-zinc-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-zinc-200 dark:hover:bg-white/10 transition-colors"
+                    title="Deselect all"
+                    @click.stop="handleDeselectAll"
+                  >
+                    <X class="size-3.5" />
+                  </button>
+                </div>
+              </th>
+              <th v-if="showPdfColumn" class="px-4 py-2 w-14 text-center">PDF</th>
+              <th class="px-4 py-2 w-32 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-neutral-200 dark:divide-white/10">
+            <tr v-if="topSpacerH > 0" key="__top" :style="{ height: `${topSpacerH}px` }">
+              <td :colspan="columnCount" style="padding:0;border:0" />
+            </tr>
+
+            <tr
+              v-for="st in visibleStudents"
+              :key="st.passport"
+              class="cursor-pointer transition-colors hover:bg-blue-50/60 dark:hover:bg-white/[0.03]"
+              :class="{ 'bg-blue-50/30 dark:bg-white/[0.02]': selectedPassports.has(st.passport) }"
+              @click="onRowClick(st, $event)"
+            >
+              <!-- Name Column -->
+              <td class="px-4 py-3 align-top">
                 <div class="font-bold text-zinc-900 dark:text-white flex items-center gap-1.5 flex-wrap">
-                  <CopyField :value="st.full_name" label="Copy name" class="text-sm">{{ st.full_name }}</CopyField>
+                  <CopyField :value="st.full_name" label="Copy name">{{ st.full_name }}</CopyField>
                   <Pin v-if="st.pinned" class="size-3.5 text-amber-500 fill-amber-500 shrink-0" />
                 </div>
                 <div class="flex flex-wrap items-center gap-1.5 mt-1">
                   <VisaTypeBadge :visa-type="st.visa_type" />
-                  <span v-if="st.student_id || st.id" class="text-xs text-zinc-400 font-mono">#{{ st.student_id || st.id }}</span>
+                  <span v-if="st.student_id || st.id" class="text-xs text-zinc-400 font-mono">
+                    <CopyField :value="st.student_id || st.id" label="Copy ID">#{{ st.student_id || st.id }}</CopyField>
+                  </span>
+                  <span v-if="st.application_no" class="text-xs text-zinc-400 font-mono">
+                    <CopyField :value="st.application_no" label="Copy app no">{{ st.application_no }}</CopyField>
+                  </span>
                 </div>
-              </div>
-              <div v-if="showSelectColumn" class="flex items-center justify-center shrink-0 pt-0.5">
-                <input
-                  type="checkbox"
-                  class="size-6 rounded-md border-2 border-neutral-300 dark:border-neutral-600 text-blue-600 focus:ring-2 focus:ring-blue-500 cursor-pointer transition-all"
-                  :checked="selectedPassports.has(st.passport)"
-                  @click.stop
-                  @change="toggleSelect(st, ($event.target as HTMLInputElement).checked)"
-                />
-              </div>
-            </div>
+                <p v-if="st.rejection_reason" class="text-[11px] text-rose-500 font-medium mt-0.5 line-clamp-1 max-w-xs">
+                  {{ st.rejection_reason }}
+                </p>
+              </td>
 
-            <!-- Passport + Status -->
-            <div class="flex items-center justify-between text-sm">
-              <div>
-                <CopyField :value="st.passport" label="Copy passport" class="font-bold font-mono text-zinc-700 dark:text-zinc-300">{{ st.passport }}</CopyField>
-                <CopyField :value="st.birthday" label="Copy birthday" class="text-xs font-bold font-mono text-zinc-400 mt-0.5">{{ st.birthday }}</CopyField>
-              </div>
-              <StatusBadge :status="getStudentVisaStatus(st)" />
-            </div>
+              <!-- Passport Column -->
+              <td class="px-4 py-3 align-middle whitespace-nowrap">
+                <div class="font-bold text-zinc-900 dark:text-white font-mono text-[13px]">
+                  <CopyField :value="st.passport" label="Copy passport">{{ st.passport || '—' }}</CopyField>
+                </div>
+                <div class="text-xs font-mono text-zinc-400 mt-0.5">
+                  <CopyField :value="st.birthday" label="Copy birthday">{{ st.birthday || '—' }}</CopyField>
+                </div>
+              </td>
 
-            <!-- Rejection reason -->
-            <div
-              v-if="st.rejection_reason"
-              class="text-[11px] text-rose-500 font-medium truncate"
-            >
-              Sabab: {{ st.rejection_reason }}
-            </div>
+              <!-- Status Column -->
+              <td class="px-4 py-3 align-middle">
+                <StatusBadge :status="getStudentVisaStatus(st)" />
+              </td>
 
-            <!-- Meta row -->
-            <div class="flex items-center justify-between text-xs text-zinc-400">
-              <span v-if="showAppliedColumn">Applied: {{ st.application_date || st.created_at?.slice(0, 10) || '--' }}</span>
-              <span v-if="checkingPassports.has(st.passport)" class="inline-flex items-center gap-1 text-blue-600 dark:text-blue-400 font-medium">
-                <RefreshCw class="size-3 animate-spin" />Checking...
-              </span>
-              <span v-else>Checked: {{ formatTimestampCompact(st.last_checked) }}</span>
-            </div>
+              <!-- Applied Column -->
+              <td v-if="showAppliedColumn" class="px-4 py-3 align-middle whitespace-nowrap text-zinc-500 dark:text-zinc-400 text-xs">
+                {{ st.application_date || st.created_at?.slice(0, 10) || '--' }}
+              </td>
 
-            <!-- Action buttons -->
-            <div class="grid grid-cols-2 gap-1.5 pt-2.5 border-t border-zinc-100 dark:border-zinc-800">
-              <button
-                type="button"
-                :disabled="checkingPassports.has(st.passport)"
-                @click.stop="checkStudentVisa(st)"
-                class="h-9 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 disabled:opacity-50 transition-colors"
-              >
-                <RefreshCw class="size-3.5" :class="{ 'animate-spin': checkingPassports.has(st.passport) }" />
-                Check
-              </button>
-              <button
-                type="button"
-                @click.stop="openDetails(st)"
-                class="h-9 rounded-lg bg-amber-400 hover:bg-amber-500 text-amber-950 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors"
-              >
-                <Eye class="size-3.5" />
-                View
-              </button>
-            </div>
-          </div>
-          <div v-if="mBottomSpacerH > 0" :style="{ height: `${mBottomSpacerH}px` }" />
-        </div>
+              <!-- Status Date / Checked Column -->
+              <td v-if="showStatusDateColumn" class="px-4 py-3 align-middle whitespace-nowrap text-zinc-500 dark:text-zinc-400 text-xs">
+                {{ st.status_date || '--' }}
+              </td>
+              <td v-else class="px-4 py-3 align-middle whitespace-nowrap text-xs">
+                <span
+                  v-if="checkingPassports.has(st.passport)"
+                  class="inline-flex items-center gap-1.5"
+                >
+                  <RefreshCw class="size-3.5 animate-spin text-blue-500" />
+                  <span class="text-blue-600 dark:text-blue-400 font-medium">Checking...</span>
+                </span>
+                <span v-else class="text-zinc-400">
+                  {{ formatTimestampCompact(st.last_checked) }}
+                </span>
+              </td>
 
-        <!-- ── Desktop Table (hidden md:block) ── -->
-        <div
-          ref="containerRef"
-          class="hidden md:block overflow-x-auto"
-        >
-          <table
-            :key="`t-${currentFilter}`"
-            class="w-full min-w-[900px] text-sm border-collapse table-fixed"
-          >
-            <thead class="sticky top-0 z-10 bg-neutral-100/90 dark:bg-[#111928] backdrop-blur">
-              <tr class="border-b border-neutral-300 dark:border-white/20 text-left text-[10px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-neutral-300">
-                <th class="px-4 py-2 min-w-[220px]">Name</th>
-                <th class="px-4 py-2 w-36">Passport</th>
-                <th class="px-4 py-2 w-44">Status</th>
-                <th v-if="showAppliedColumn" class="px-4 py-2 w-28">Applied</th>
-                <th v-if="showStatusDateColumn" class="px-4 py-2 w-32">Status Date</th>
-                <th v-else class="px-4 py-2 w-44">Checked</th>
-                <th v-if="showSelectColumn" class="px-4 py-2 w-24 text-center align-middle">
-                  <div class="flex items-center justify-center gap-1.5">
-                    <span>Select</span>
-                    <button
-                      v-if="hasAnySelected"
-                      type="button"
-                      class="p-0.5 rounded text-zinc-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-zinc-200 dark:hover:bg-white/10 transition-colors"
-                      title="Deselect all"
-                      @click.stop="handleDeselectAll"
-                    >
-                      <X class="size-3.5" />
-                    </button>
-                  </div>
-                </th>
-                <th v-if="showPdfColumn" class="px-4 py-2 w-14 text-center">PDF</th>
-                <th class="px-4 py-2 w-32 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-neutral-200 dark:divide-white/10">
-              <!-- Top virtual spacer -->
-              <tr v-if="topSpacerH > 0" key="__top" :style="{ height: `${topSpacerH}px` }">
-                <td :colspan="columnCount" style="padding:0;border:0" />
-              </tr>
+              <!-- Select Column -->
+              <td v-if="showSelectColumn" class="px-4 py-3 align-middle text-center">
+                <div class="flex items-center justify-center h-full">
+                  <input
+                    type="checkbox"
+                    class="size-6 rounded-md border-2 border-neutral-300 dark:border-neutral-600 text-blue-600 focus:ring-2 focus:ring-blue-500 focus:ring-offset-0 cursor-pointer transition-all hover:border-blue-500"
+                    :checked="selectedPassports.has(st.passport)"
+                    @click.stop
+                    @change="toggleSelect(st, ($event.target as HTMLInputElement).checked)"
+                  />
+                </div>
+              </td>
 
-              <!-- Rows -->
-              <tr
-                v-for="st in visibleStudents"
-                :key="st.passport"
-                class="cursor-pointer transition-colors hover:bg-blue-50/60 dark:hover:bg-white/[0.03]"
-                :class="{ 'bg-blue-50/30 dark:bg-white/[0.02]': selectedPassports.has(st.passport) }"
-                @click="onRowClick(st, $event)"
-              >
-                <!-- Name Column -->
-                <td class="px-4 py-3 align-top">
-                  <div class="font-bold text-zinc-900 dark:text-white flex items-center gap-1.5 flex-wrap">
-                    <CopyField :value="st.full_name" label="Copy name">{{ st.full_name }}</CopyField>
-                    <Pin v-if="st.pinned" class="size-3.5 text-amber-500 fill-amber-500 shrink-0" />
-                  </div>
-                  <div class="flex flex-wrap items-center gap-1.5 mt-1">
-                    <VisaTypeBadge :visa-type="st.visa_type" />
-                    <span v-if="st.student_id || st.id" class="text-xs text-zinc-400 font-mono">
-                      <CopyField :value="st.student_id || st.id" label="Copy ID">#{{ st.student_id || st.id }}</CopyField>
-                    </span>
-                    <span v-if="st.application_no" class="text-xs text-zinc-400 font-mono">
-                      <CopyField :value="st.application_no" label="Copy app no">
-                        {{ st.application_no }}
-                      </CopyField>
-                    </span>
-                  </div>
-                  <!-- Rejection reason compact -->
-                  <p v-if="st.rejection_reason" class="text-[11px] text-rose-500 font-medium mt-0.5 line-clamp-1 max-w-xs">
-                    {{ st.rejection_reason }}
-                  </p>
-                </td>
+              <!-- PDF Column -->
+              <td v-if="showPdfColumn" class="px-4 py-3 align-middle text-center">
+                <button
+                  v-if="isPdfEligible(st)"
+                  type="button"
+                  :disabled="downloadingPassports.has(st.passport)"
+                  class="text-emerald-600 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-200 transition-colors disabled:opacity-40 cursor-pointer"
+                  title="Viza PDF yuklab olish"
+                  @click.stop="handleDownloadPdf(st)"
+                >
+                  <FileDown class="size-5" />
+                </button>
+              </td>
 
-                <!-- Passport + Birthday Column -->
-                <td class="px-4 py-3 align-middle whitespace-nowrap">
-                  <div class="font-bold text-zinc-900 dark:text-white font-mono text-[13px]">
-                    <CopyField :value="st.passport" label="Copy passport">{{ st.passport || '—' }}</CopyField>
-                  </div>
-                  <div class="text-xs font-mono text-zinc-400 mt-0.5">
-                    <CopyField :value="st.birthday" label="Copy birthday">{{ st.birthday || '—' }}</CopyField>
-                  </div>
-                </td>
-
-                <!-- Status Column -->
-                <td class="px-4 py-3 align-middle">
-                  <StatusBadge :status="getStudentVisaStatus(st)" />
-                </td>
-
-                <!-- Applied Column -->
-                <td v-if="showAppliedColumn" class="px-4 py-3 align-middle whitespace-nowrap text-zinc-500 dark:text-zinc-400 text-xs">
-                  {{ st.application_date || st.created_at?.slice(0, 10) || '--' }}
-                </td>
-
-                <!-- Status Date / Checked Column -->
-                <td v-if="showStatusDateColumn" class="px-4 py-3 align-middle whitespace-nowrap text-zinc-500 dark:text-zinc-400 text-xs">
-                  {{ st.status_date || '--' }}
-                </td>
-                <td v-else class="px-4 py-3 align-middle whitespace-nowrap text-xs">
-                  <span
-                    v-if="checkingPassports.has(st.passport)"
-                    class="inline-flex items-center gap-1.5"
-                  >
-                    <template v-if="checkingPassports.get(st.passport) === 'processing'">
-                      <RefreshCw class="size-3.5 animate-spin text-blue-500" />
-                      <span class="text-blue-600 dark:text-blue-400 font-medium">Checking...</span>
-                    </template>
-                    <template v-else>
-                      <span class="text-zinc-400">Queued</span>
-                    </template>
-                  </span>
-                  <span v-else class="text-zinc-400">
-                    {{ formatTimestampCompact(st.last_checked) }}
-                  </span>
-                </td>
-
-                <!-- Select Column -->
-                <td v-if="showSelectColumn" class="px-4 py-3 align-middle text-center">
-                  <div class="flex items-center justify-center h-full">
-                    <input
-                      type="checkbox"
-                      class="size-6 rounded-md border-2 border-neutral-300 dark:border-neutral-600 text-blue-600 focus:ring-2 focus:ring-blue-500 focus:ring-offset-0 cursor-pointer transition-all hover:border-blue-500"
-                      :checked="selectedPassports.has(st.passport)"
-                      @click.stop
-                      @change="toggleSelect(st, ($event.target as HTMLInputElement).checked)"
-                    />
-                  </div>
-                </td>
-
-                <!-- PDF Column -->
-                <td v-if="showPdfColumn" class="px-4 py-3 align-middle text-center">
+              <!-- Actions Column -->
+              <td class="p-0 align-top w-px h-px" style="border-top-width:0">
+                <div class="flex items-stretch justify-end h-full">
                   <button
-                    v-if="isPdfEligible(st)"
                     type="button"
-                    :disabled="downloadingPassports.has(st.passport)"
-                    class="text-emerald-600 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-200 transition-colors disabled:opacity-40"
-                    title="Viza PDF yuklab olish"
-                    @click.stop="handleDownloadPdf(st)"
+                    :disabled="checkingPassports.has(st.passport)"
+                    class="px-5 py-2 h-full font-bold text-white text-xs bg-blue-600 hover:bg-blue-500 transition-colors rounded-none disabled:opacity-50 flex items-center gap-1.5 whitespace-nowrap cursor-pointer"
+                    @click.stop="checkStudentVisa(st)"
                   >
-                    <FileDown class="size-5" />
+                    <RefreshCw class="size-3.5" :class="{ 'animate-spin': checkingPassports.has(st.passport) }" />
+                    Check
                   </button>
-                </td>
+                  <button
+                    type="button"
+                    class="px-4 py-2 h-full bg-amber-400 hover:bg-amber-500 dark:bg-amber-500 dark:hover:bg-amber-400 text-amber-950 dark:text-slate-950 rounded-none transition-colors cursor-pointer"
+                    aria-label="View details"
+                    @click.stop="openDetails(st)"
+                  >
+                    <Eye class="size-5" />
+                  </button>
+                </div>
+              </td>
+            </tr>
 
-                <!-- Actions Column — Check + amber Eye -->
-                <td class="p-0 align-top w-px h-px" style="border-top-width:0">
-                  <div class="flex items-stretch justify-end h-full">
-                    <button
-                      type="button"
-                      :disabled="checkingPassports.has(st.passport)"
-                      class="px-5 py-2 h-full font-bold text-white text-xs bg-blue-600 hover:bg-blue-500 transition-colors rounded-none disabled:opacity-50 flex items-center gap-1.5 whitespace-nowrap"
-                      @click.stop="checkStudentVisa(st)"
-                    >
-                      <RefreshCw class="size-3.5" :class="{ 'animate-spin': checkingPassports.has(st.passport) }" />
-                      Check
-                    </button>
-                    <button
-                      type="button"
-                      class="px-4 py-2 h-full bg-amber-400 hover:bg-amber-500 dark:bg-amber-500 dark:hover:bg-amber-400 text-amber-950 dark:text-slate-950 rounded-none transition-colors"
-                      aria-label="View details"
-                      @click.stop="openDetails(st)"
-                    >
-                      <Eye class="size-5" />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-
-              <!-- Bottom virtual spacer -->
-              <tr v-if="bottomSpacerH > 0" key="__bottom" :style="{ height: `${bottomSpacerH}px` }">
-                <td :colspan="columnCount" style="padding:0;border:0" />
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </template>
+            <tr v-if="bottomSpacerH > 0" key="__bottom" :style="{ height: `${bottomSpacerH}px` }">
+              <td :colspan="columnCount" style="padding:0;border:0" />
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
 
     <!-- ── Modals ── -->
