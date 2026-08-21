@@ -7,6 +7,7 @@ import {
   Filter,
   FileSpreadsheet,
   BookOpen,
+  X
 } from 'lucide-vue-next'
 import { useStudentDashboardStore } from '@/stores/studentDashboard'
 
@@ -98,54 +99,65 @@ onUnmounted(() => {
   <!-- 1-to-1 Top Navbar for /students, /status, /documents -->
   <header
     v-if="isStudentOrStatusPage"
-    class="flex flex-col md:flex-row flex-shrink-0 items-stretch md:items-center justify-between gap-3 md:gap-4 px-4 md:px-6 h-auto py-2.5 md:h-14 md:py-0 border-b border-zinc-200/80 dark:border-zinc-800/80 bg-white/80 dark:bg-[#111315]/80 backdrop-blur-md sticky top-0 z-30 shadow-2xs"
+    class="flex flex-col md:flex-row flex-shrink-0 items-stretch md:items-center justify-between gap-3 md:gap-4 px-4 md:px-6 h-auto py-2.5 md:h-14 md:py-0 border-b border-zinc-200/80 dark:border-zinc-800 bg-white/95 dark:bg-[#111315]/95 backdrop-blur-md sticky top-0 z-30 shadow-2xs"
   >
     <!-- Left Side: Filter Button (Hidden on /visacheck) -->
     <div v-if="pathname !== '/visacheck'" class="flex-shrink-0 flex items-center gap-2 flex-wrap">
       <button
         type="button"
         @click="dashboardStore.isFilterPanelOpen = !dashboardStore.isFilterPanelOpen"
-        class="flex items-center justify-center gap-1.5 px-3 lg:px-4 h-[34px] md:h-[36px] rounded-full border text-xs md:text-sm font-semibold select-none cursor-pointer transition-all duration-300 shadow-[0_8px_30px_rgba(0,0,0,0.06)] hover:shadow-md outline-none whitespace-nowrap shrink-0"
+        class="flex items-center justify-center gap-1.5 px-3 lg:px-4 h-[34px] md:h-[36px] rounded-full border text-xs md:text-sm font-semibold select-none cursor-pointer transition-all duration-200 shadow-xs hover:shadow-md outline-none whitespace-nowrap shrink-0"
         :class="[
           dashboardStore.isFilterPanelOpen || dashboardStore.activeFiltersCount > 0
-            ? 'border-blue-500 bg-blue-50/50 dark:bg-blue-950/20 text-blue-600 dark:text-blue-400 font-bold'
-            : 'border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-850 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800'
+            ? 'border-blue-500 bg-blue-50/80 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 font-bold ring-2 ring-blue-500/20'
+            : 'border-zinc-200 dark:border-zinc-700/80 bg-zinc-100/80 dark:bg-zinc-900 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-200/70 dark:hover:bg-zinc-800'
         ]"
       >
-        <Filter class="h-4.5 w-4.5" />
+        <Filter class="h-4 w-4" />
         <span>Filter{{ dashboardStore.activeFiltersCount > 0 ? ` (${dashboardStore.activeFiltersCount})` : '' }}</span>
       </button>
     </div>
 
-    <!-- Center: iOS Dynamic Island Search Bar -->
-    <div class="flex items-center gap-2.5 z-30 w-full h-auto md:flex-1 md:min-w-0 md:mx-3 max-w-full md:max-w-[460px]">
+    <!-- Center: Sleek Search Bar -->
+    <div class="flex items-center gap-2.5 z-30 w-full h-auto md:flex-1 md:min-w-0 md:mx-3 max-w-full md:max-w-[480px]">
       <div
-        class="relative flex-1 flex items-center rounded-full border border-zinc-200 dark:border-zinc-700 bg-white/70 dark:bg-zinc-850/80 backdrop-blur-md shadow-[0_8px_30px_rgba(0,0,0,0.06)] hover:bg-white dark:hover:bg-zinc-800 hover:shadow-[0_12px_40px_rgba(0,0,0,0.08)] transition-all duration-300 ease-out h-[38px] md:h-[42px] focus-within:border-zinc-400 dark:focus-within:border-zinc-500 focus-within:bg-white dark:focus-within:bg-zinc-850 focus-within:shadow-[0_16px_36px_rgba(0,0,0,0.08)]"
+        class="relative flex-1 flex items-center rounded-full border border-zinc-200 dark:border-zinc-700/80 bg-zinc-100/90 dark:bg-zinc-900 backdrop-blur-md shadow-xs hover:border-zinc-300 dark:hover:border-zinc-600 dark:hover:bg-zinc-850 transition-all duration-200 ease-out h-[38px] md:h-[40px] focus-within:border-blue-500 dark:focus-within:border-blue-500 focus-within:bg-white dark:focus-within:bg-zinc-900 focus-within:ring-2 focus-within:ring-blue-500/20"
       >
-        <div class="relative flex items-center w-full h-full rounded-full pl-4 md:pl-5 pr-2 bg-transparent gap-1.5">
-          <Search class="h-4.5 w-4.5 text-zinc-400 flex-shrink-0 mr-1" />
+        <div class="relative flex items-center w-full h-full rounded-full pl-3.5 md:pl-4 pr-2.5 bg-transparent gap-2">
+          <Search class="h-4 w-4 text-zinc-400 dark:text-zinc-400 flex-shrink-0" />
           <input
             ref="searchInputRef"
             type="text"
             :placeholder="dashboardStore.searchMode === 'id' ? 'Search ID (e.g. G54)...' : 'Search by name, ID, passport...'"
             v-model="dashboardStore.searchQuery"
-            class="w-full bg-transparent text-[15px] md:text-sm text-zinc-800 dark:text-zinc-100 placeholder-zinc-400 py-2 border-none focus:outline-none ring-0 outline-none"
+            class="w-full bg-transparent text-[14px] md:text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-400 py-2 border-none focus:outline-none ring-0 outline-none font-medium"
           />
 
-          <!-- iOS / macOS style Hotkey Badge -->
-          <div class="hidden sm:flex items-center gap-1 shrink-0 select-none mr-1">
-            <kbd class="inline-flex items-center justify-center px-1.5 py-0.5 text-[10px] font-bold text-zinc-400 dark:text-zinc-500 bg-zinc-100 dark:bg-zinc-800/80 border border-zinc-200/80 dark:border-zinc-700/80 rounded shadow-2xs font-mono">
+          <!-- Clear Button -->
+          <button
+            v-if="dashboardStore.searchQuery"
+            type="button"
+            @click="dashboardStore.searchQuery = ''"
+            class="p-0.5 rounded-full text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 transition-colors"
+            title="Clear search"
+          >
+            <X class="size-3.5" />
+          </button>
+
+          <!-- Hotkey Badge -->
+          <div class="hidden sm:flex items-center gap-1 shrink-0 select-none">
+            <kbd class="inline-flex items-center justify-center px-1.5 py-0.5 text-[10px] font-bold text-zinc-500 dark:text-zinc-400 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded shadow-2xs font-mono">
               {{ isMac ? '⌘K' : 'Ctrl+K' }}
             </kbd>
           </div>
 
-          <div class="flex items-center shrink-0 border-l border-zinc-200 dark:border-zinc-700 pl-2 pr-1 py-0.5">
+          <div class="flex items-center shrink-0 border-l border-zinc-200 dark:border-zinc-700/80 pl-2 pr-0.5 py-0.5">
             <select
               v-model="dashboardStore.searchMode"
-              class="bg-transparent text-xs font-semibold text-zinc-700 dark:text-zinc-300 cursor-pointer focus:outline-none border-none py-1 pr-1"
+              class="bg-transparent text-xs font-bold text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white cursor-pointer focus:outline-none border-none py-1 pr-1"
             >
-              <option value="all" class="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100">All</option>
-              <option value="id" class="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100">ID only</option>
+              <option value="all" class="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 font-medium">All</option>
+              <option value="id" class="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 font-medium">ID only</option>
             </select>
           </div>
         </div>

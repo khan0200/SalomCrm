@@ -20,6 +20,11 @@ export default {
           800: '#004593',
           900: '#003a7a',
         },
+        zinc: {
+          750: '#30343a',
+          850: '#1c1f24',
+          950: '#0c0e12',
+        },
       },
       fontFamily: {
         sans: ['"Plus Jakarta Sans"', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],

@@ -149,12 +149,12 @@ const openEmbassyDrawer = (student: Student) => {
     <!-- Search & Filter Controls -->
     <div class="p-3 bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-xs flex flex-wrap items-center justify-between gap-3 text-xs select-none">
       <div class="relative flex-1 min-w-[240px]">
-        <Search class="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
+        <Search class="w-4 h-4 text-zinc-400 dark:text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
         <input
           v-model="searchQuery"
           type="text"
           placeholder="Search by student name, ID, or phone..."
-          class="w-full pl-9 pr-3 py-1.5 rounded-xl bg-zinc-50 dark:bg-zinc-800 border-transparent focus:border-brand-500 focus:bg-white dark:focus:bg-zinc-800 focus:ring-2 focus:ring-brand-500/20 outline-none text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400"
+          class="w-full pl-9 pr-3 py-1.5 rounded-xl bg-zinc-100/90 dark:bg-zinc-800/90 border border-zinc-200 dark:border-zinc-700/80 focus:border-blue-500 focus:bg-white dark:focus:bg-zinc-800 focus:ring-2 focus:ring-blue-500/20 outline-none text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-400 transition-all font-medium"
         />
       </div>
 

@@ -56,13 +56,13 @@ const toggleItem = (list: string[], item: string, emitName: any) => {
       <!-- Search & Status -->
       <div class="flex items-center gap-2.5 flex-1 min-w-[260px]">
         <div class="relative flex-1">
-          <Search class="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <Search class="w-4 h-4 text-zinc-400 dark:text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             :value="searchQuery"
             @input="emit('update:searchQuery', ($event.target as HTMLInputElement).value)"
             type="text"
             placeholder="Search student by name, ID, or phone..."
-            class="w-full pl-9 pr-3 py-1.5 rounded-xl bg-zinc-50 dark:bg-zinc-800 border-transparent focus:border-brand-500 focus:bg-white dark:focus:bg-zinc-800 focus:ring-2 focus:ring-brand-500/20 outline-none text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400"
+            class="w-full pl-9 pr-3 py-1.5 rounded-xl bg-zinc-100/90 dark:bg-zinc-800/90 border border-zinc-200 dark:border-zinc-700/80 focus:border-blue-500 focus:bg-white dark:focus:bg-zinc-800 focus:ring-2 focus:ring-blue-500/20 outline-none text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-400 transition-all font-medium"
           />
         </div>
 
