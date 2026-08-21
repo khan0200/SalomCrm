@@ -170,16 +170,6 @@ class PassportExtractor:
                     if g:
                         viz_sex = g
                         break
-
-            # Place of Birth (TUG'ILGAN JOYI / PLACE OF BIRTH)
-            if any(k in clean_l for k in ['TUGILGANJOYI', 'TUGILGANJOY', 'PLACEOFBIRTH']) and not viz_address:
-                for j in range(i + 1, min(i + 4, len(all_raw_lines))):
-                    cand = all_raw_lines[j].strip().upper()
-                    cand_clean = re.sub(r'[^A-ZА-Я0-9]', '', cand)
-                    if not is_passport_header_label(cand_clean) and len(cand) >= 3 and not cand.isdigit():
-                        viz_address = normalize_address(cand)
-                        break
-
         # Standalone sex fallback (search for isolated 'M' or 'F' lines)
         if not viz_sex:
             for line in all_raw_lines:
@@ -204,14 +194,6 @@ class PassportExtractor:
             if not viz_doi and len(sorted_dates) >= 3:
                 viz_doi = sorted_dates[1]
 
-        # Standalone address fallback if contains REGION/VILOYAT
-        if not viz_address:
-            for line in all_raw_lines:
-                up_l = line.strip().upper()
-                if any(rk in up_l for rk in ['REGION', 'VILOYAT', 'DISTRICT', 'TUMAN']) and not is_passport_header_label(re.sub(r'[^A-ZА-Я0-9]', '', up_l)):
-                    viz_address = normalize_address(up_l)
-                    break
-
         # Assemble Full Name (Surname + Given Names + Father's Name)
         if viz_surname or viz_given or viz_father:
             viz_name_parts = [p for p in [viz_surname, viz_given, viz_father] if p]
@@ -227,8 +209,6 @@ class PassportExtractor:
             fields['DATE_OF_EXPIRATION'] = ExtractedField(viz_doe, 0.95, True, 'VIZ')
         if viz_sex:
             fields['SEX'] = ExtractedField(viz_sex, 0.98, True, 'VIZ')
-        if viz_address:
-            fields['ADDRESS'] = ExtractedField(viz_address, 0.92, True, 'VIZ')
 
         return fields
 
