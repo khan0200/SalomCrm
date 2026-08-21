@@ -1230,15 +1230,10 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
       :x="contextMenuX"
       :y="contextMenuY"
       :student="contextMenuStudent"
-      :is-checking="contextMenuStudent ? checkingPassports.has(contextMenuStudent.passport) : false"
       @close="contextMenuOpen = false"
-      @check="checkStudentVisa"
       @details="openDetails"
       @edit="openEditModal"
       @toggle-pin="handlePinToggle"
-      @toggle-flag="handleFlagToggle"
-      @download-pdf="handleDownloadPdf"
-      @delete="promptDelete"
     />
 
   </div>
