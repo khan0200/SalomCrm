@@ -2,7 +2,9 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useQuery } from '@tanstack/vue-query'
 import { settingsApi } from '@/api/settings'
-import type { Student } from '@/types'
+import { paymentsApi } from '@/api/payments'
+import { getTariffPrice } from '@/utils/tariff'
+import type { Student, Payment } from '@/types'
 import { useCurrency } from '@/composables/useCurrency'
 import { UNIVERSITY_SUGGESTIONS, BUILTIN_SCHOOL_DIRECTORY, UZ_MAJOR_SUGGESTIONS, type SchoolEntry } from '@/data/schoolsData'
 import {
@@ -380,23 +382,60 @@ onUnmounted(() => {
   window.removeEventListener('keydown', handleGlobalKeyDown)
 })
 
-// Financial Calculations
+// Student Payments Query (Fetching live payments history for student)
+const studentId = computed(() => props.student?.id)
+
+const { data: studentPaymentsData } = useQuery({
+  queryKey: ['student-payments', studentId],
+  queryFn: () => paymentsApi.getPaymentHistory({ student_id: studentId.value, page_size: 100 }),
+  enabled: computed(() => !!studentId.value && props.isOpen),
+  staleTime: 1000 * 30,
+})
+
+const studentPayments = computed<Payment[]>(() => {
+  return studentPaymentsData.value?.results || []
+})
+
+// Financial Calculations matching UniApp2
 const computedTariffPrice = computed(() => {
-  const tariffName = props.student?.tariff
-  if (!tariffName || !props.options?.tariffs) return 0
-  const found = props.options.tariffs.find((t: any) => t.name === tariffName)
-  return found?.price ? Number(found.price) : 0
+  return getTariffPrice(
+    props.student?.tariff,
+    props.student?.language_certificate,
+    props.options?.tariffs || []
+  )
+})
+
+const computedPaymentsDone = computed(() => {
+  if (studentPayments.value && studentPayments.value.length > 0) {
+    return studentPayments.value
+      .filter(p => !p.is_discount)
+      .reduce((sum, p) => {
+        const val = Number(p.amount) || 0
+        return p.is_withdrawal ? sum - Math.abs(val) : sum + val
+      }, 0)
+  }
+  return Number((props.student as any)?.payments_sum || 0)
+})
+
+const computedDiscount = computed(() => {
+  if (studentPayments.value && studentPayments.value.length > 0) {
+    const fromPayments = studentPayments.value
+      .filter(p => p.is_discount && Number(p.amount) > 0)
+      .reduce((sum, p) => sum + Number(p.amount), 0)
+    if (fromPayments > 0) return fromPayments
+  }
+  return Number(props.student?.discount || 0)
 })
 
 const computedBalance = computed(() => {
-  const invoice = Number(props.student?.invoice_sum || props.student?.balance || 0)
-  const payments = Number(props.student?.payments_sum || 0)
-  const discount = Number(props.student?.discount || 0)
-  return invoice - payments - discount
+  // Balance formula matching UniApp2: (Payments Done + Discount) - Tariff Price
+  // If Tariff is not set: fallback to student.balance
+  if (!props.student?.tariff || props.student.tariff === 'Select' || props.student.tariff === '—') {
+    return Number(props.student?.balance || 0)
+  }
+  const balance = (computedPaymentsDone.value + computedDiscount.value) - computedTariffPrice.value
+  return Math.abs(balance) < 0.01 ? 0 : balance
 })
-
-const computedPaymentsDone = computed(() => Number(props.student?.payments_sum || 0))
-const computedDiscount = computed(() => Number(props.student?.discount || 0))
 
 // University Data from Settings
 const { data: settingsUniversitiesData } = useQuery({
@@ -2189,10 +2228,15 @@ const handleRestoreStudent = () => {
                         </div>
                       </template>
                       <template v-else>
-                        <span v-if="student.tariff" class="inline-flex px-2 py-0.5 rounded text-xs font-bold uppercase bg-[#00875a] text-white shadow-2xs">
-                          {{ student.tariff }}
-                        </span>
-                        <span v-else class="text-[13px] font-semibold text-rose-600">Not provided</span>
+                        <div class="flex flex-col gap-1">
+                          <span v-if="student.tariff" class="inline-flex self-start px-2 py-0.5 rounded text-xs font-bold uppercase bg-[#00875a] text-white shadow-2xs">
+                            {{ student.tariff }}
+                          </span>
+                          <span v-else class="text-[13px] font-semibold text-rose-600">Not provided</span>
+                          <span v-if="student.tariff && computedTariffPrice > 0" class="text-[12px] font-semibold text-zinc-400 font-mono tracking-tight">
+                            {{ formatCurrency(computedTariffPrice) }}
+                          </span>
+                        </div>
                       </template>
                     </div>
                   </div>
@@ -2918,33 +2962,33 @@ const handleRestoreStudent = () => {
                  ============================================================= -->
             <div class="flex flex-col gap-3.5">
               <div class="flex flex-col gap-2">
-                <div class="flex items-center gap-1.5 px-1 text-zinc-500 dark:text-zinc-400 font-bold uppercase tracking-wider text-[11.5px]">
-                  <Landmark class="w-3.5 h-3.5 text-blue-600" />
+                <div class="flex items-center gap-1.5 px-1 text-slate-500 dark:text-zinc-400 font-bold uppercase tracking-wider text-[11.5px]">
+                  <Landmark class="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
                   <span>SYSTEM & FINANCE</span>
                 </div>
 
-                <div class="flex flex-col gap-1.5">
+                <div class="flex flex-col gap-2">
                   <!-- 3.1 OFFICE CARD (Solid Blue) -->
                   <div
-                    class="bg-[#1d70f2] rounded-lg px-2.5 py-2 text-white flex flex-col justify-between shadow-xs cursor-pointer hover:brightness-105 transition-all group/card"
+                    class="bg-[#1d70f2] rounded-xl px-3.5 py-2.5 text-white flex flex-col justify-between shadow-xs cursor-pointer hover:brightness-105 transition-all group/card"
                     @click="handleCopy('office', student.office)"
                   >
                     <div class="flex items-center justify-between">
-                      <span class="text-[11px] uppercase font-bold tracking-wider text-blue-100 flex items-center gap-1">
-                        <Building2 class="w-3 h-3" />
+                      <span class="text-[11px] uppercase font-extrabold tracking-wider text-blue-100 flex items-center gap-1.5">
+                        <Building2 class="w-3.5 h-3.5" />
                         OFFICE
                       </span>
-                      <div class="flex items-center gap-1">
-                        <button type="button" @click.stop="handleCopy('office', student.office)" class="p-0.5 text-blue-200 hover:text-white opacity-0 group-hover/card:opacity-100" title="Copy Office">
+                      <div class="flex items-center gap-1.5">
+                        <button type="button" @click.stop="handleCopy('office', student.office)" class="p-0.5 text-blue-200 hover:text-white transition-colors" title="Copy Office">
                           <Check v-if="copiedField === 'office'" class="w-3.5 h-3.5 text-white" />
                           <Copy v-else class="w-3.5 h-3.5" />
                         </button>
-                        <button type="button" @click.stop="startInlineEdit('office', student.office)" class="p-0.5 text-blue-200 hover:text-white" title="Edit Office">
+                        <button type="button" @click.stop="startInlineEdit('office', student.office)" class="p-0.5 text-blue-200 hover:text-white transition-colors" title="Edit Office">
                           <Pencil class="w-3.5 h-3.5" />
                         </button>
                       </div>
                     </div>
-                    <div class="mt-0.5">
+                    <div class="mt-1">
                       <template v-if="editingField === 'office'">
                         <div class="relative w-full min-w-0" @click.stop @keydown.esc="cancelInlineEdit">
                           <select
@@ -2975,68 +3019,68 @@ const handleRestoreStudent = () => {
                         </div>
                       </template>
                       <template v-else>
-                        <span class="text-[14px] font-extrabold tracking-wide uppercase">{{ student.office || 'Not provided' }}</span>
+                        <span class="text-[15.5px] font-extrabold tracking-wide uppercase">{{ student.office || 'Not provided' }}</span>
                       </template>
                     </div>
                   </div>
 
-                  <!-- 3.2 BALANCE CARD (Solid Green / Rose) -->
+                  <!-- 3.2 BALANCE CARD (Solid Crimson / Green) -->
                   <div
-                    class="rounded-lg px-2.5 py-2 text-white flex flex-col justify-between shadow-xs cursor-pointer hover:brightness-105 transition-all group/card"
-                    :class="computedBalance < 0 ? 'bg-[#e11d48]' : 'bg-[#059669]'"
+                    class="rounded-xl px-3.5 py-2.5 text-white flex flex-col justify-between shadow-xs cursor-pointer hover:brightness-105 transition-all group/card"
+                    :class="computedBalance < 0 ? 'bg-[#ff1853]' : 'bg-[#00b074]'"
                     @click="handleCopy('balance', String(computedBalance))"
                   >
                     <div class="flex items-center justify-between">
-                      <span class="text-[11px] uppercase font-bold tracking-wider text-white/90 flex items-center gap-1">
-                        <Landmark class="w-3 h-3" />
+                      <span class="text-[11px] uppercase font-extrabold tracking-wider text-white/95 flex items-center gap-1.5">
+                        <Landmark class="w-3.5 h-3.5" />
                         BALANCE
                       </span>
-                      <button type="button" @click.stop="handleCopy('balance', String(computedBalance))" class="p-0.5 text-white/80 hover:text-white opacity-0 group-hover/card:opacity-100" title="Copy Balance">
+                      <button type="button" @click.stop="handleCopy('balance', String(computedBalance))" class="p-0.5 text-white/80 hover:text-white transition-colors" title="Copy Balance">
                         <Check v-if="copiedField === 'balance'" class="w-3.5 h-3.5 text-white" />
                         <Copy v-else class="w-3.5 h-3.5" />
                       </button>
                     </div>
-                    <div class="mt-0.5 text-[15px] font-black tracking-wide font-mono">
+                    <div class="mt-1 text-[16px] font-extrabold tracking-wide font-mono">
                       {{ formatCurrency(computedBalance) }}
                     </div>
                   </div>
 
                   <!-- 3.3 PAYMENTS DONE CARD (Solid Emerald) -->
                   <div
-                    class="bg-[#00875a] rounded-lg px-2.5 py-2 text-white flex flex-col justify-between shadow-xs cursor-pointer hover:brightness-105 transition-all group/card"
+                    class="bg-[#00b074] rounded-xl px-3.5 py-2.5 text-white flex flex-col justify-between shadow-xs cursor-pointer hover:brightness-105 transition-all group/card"
                     @click="handleCopy('payments_done', String(computedPaymentsDone))"
                   >
                     <div class="flex items-center justify-between">
-                      <span class="text-[11px] uppercase font-bold tracking-wider text-emerald-100 flex items-center gap-1">
-                        <CheckSquare class="w-3 h-3" />
+                      <span class="text-[11px] uppercase font-extrabold tracking-wider text-emerald-100 flex items-center gap-1.5">
+                        <CheckSquare class="w-3.5 h-3.5" />
                         PAYMENTS DONE
                       </span>
-                      <button type="button" @click.stop="handleCopy('payments_done', String(computedPaymentsDone))" class="p-0.5 text-emerald-200 hover:text-white opacity-0 group-hover/card:opacity-100" title="Copy Payments Done">
+                      <button type="button" @click.stop="handleCopy('payments_done', String(computedPaymentsDone))" class="p-0.5 text-emerald-200 hover:text-white transition-colors" title="Copy Payments Done">
                         <Check v-if="copiedField === 'payments_done'" class="w-3.5 h-3.5 text-white" />
                         <Copy v-else class="w-3.5 h-3.5" />
                       </button>
                     </div>
-                    <div class="mt-0.5 text-[15px] font-black tracking-wide font-mono">
+                    <div class="mt-1 text-[16px] font-extrabold tracking-wide font-mono">
                       {{ formatCurrency(computedPaymentsDone) }}
                     </div>
                   </div>
 
                   <!-- 3.4 DISCOUNT CARD (Solid Orange) -->
                   <div
-                    class="bg-[#ff5630] rounded-lg px-2.5 py-2 text-white flex flex-col justify-between shadow-xs cursor-pointer hover:brightness-105 transition-all group/card"
+                    class="bg-[#ff6700] rounded-xl px-3.5 py-2.5 text-white flex flex-col justify-between shadow-xs cursor-pointer hover:brightness-105 transition-all group/card"
                     @click="handleCopy('discount', String(computedDiscount))"
                   >
                     <div class="flex items-center justify-between">
-                      <span class="text-[11px] uppercase font-bold tracking-wider text-orange-100 flex items-center gap-1">
-                        <Tag class="w-3 h-3" />
+                      <span class="text-[11px] uppercase font-extrabold tracking-wider text-orange-100 flex items-center gap-1.5">
+                        <Tag class="w-3.5 h-3.5" />
                         DISCOUNT
                       </span>
-                      <button type="button" @click.stop="handleCopy('discount', String(computedDiscount))" class="p-0.5 text-orange-200 hover:text-white opacity-0 group-hover/card:opacity-100" title="Copy Discount">
+                      <button type="button" @click.stop="handleCopy('discount', String(computedDiscount))" class="p-0.5 text-orange-200 hover:text-white transition-colors" title="Copy Discount">
                         <Check v-if="copiedField === 'discount'" class="w-3.5 h-3.5 text-white" />
                         <Copy v-else class="w-3.5 h-3.5" />
                       </button>
                     </div>
-                    <div class="mt-0.5 text-[15px] font-black tracking-wide font-mono">
+                    <div class="mt-1 text-[16px] font-extrabold tracking-wide font-mono">
                       {{ formatCurrency(computedDiscount) }}
                     </div>
                   </div>

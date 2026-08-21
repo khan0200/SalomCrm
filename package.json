@@ -4,12 +4,12 @@
   "private": true,
   "scripts": {
     "dev": "concurrently --kill-others -n \"backend,frontend\" -c \"blue.bold,green.bold\" \"npm run dev:backend\" \"npm run dev:frontend\"",
-    "dev:backend": "venv\\Scripts\\python backend/manage.py runserver 127.0.0.1:8000",
+    "dev:backend": ".venv\\Scripts\\python backend/manage.py runserver 127.0.0.1:8000",
     "dev:frontend": "npm --prefix frontend run dev",
     "build": "npm --prefix frontend run build",
-    "migrate": "venv\\Scripts\\python backend/manage.py migrate",
-    "seed": "venv\\Scripts\\python backend/manage.py seed_data",
-    "test": "venv\\Scripts\\python backend/manage.py test apps.tenants.tests apps.payments.tests apps.students.tests"
+    "migrate": ".venv\\Scripts\\python backend/manage.py migrate",
+    "seed": ".venv\\Scripts\\python backend/manage.py seed_data",
+    "test": ".venv\\Scripts\\python backend/manage.py test apps.tenants.tests apps.payments.tests apps.students.tests"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

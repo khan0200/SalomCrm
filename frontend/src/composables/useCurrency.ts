@@ -1,7 +1,7 @@
 export function useCurrency() {
   const formatAmount = (val: number | string | null | undefined): string => {
     if (val === null || val === undefined || isNaN(Number(val))) return '0'
-    return new Intl.NumberFormat('uz-UZ').format(Math.round(Number(val)))
+    return new Intl.NumberFormat('en-US').format(Math.round(Number(val)))
   }
 
   const formatCurrency = (val: number | string | null | undefined): string => {
@@ -18,7 +18,7 @@ export function useCurrency() {
     const cleaned = val.replace(/[^\d.]/g, '')
     if (!cleaned) return ''
     const [intPart, ...rest] = cleaned.split('.')
-    const formattedInt = intPart === '' ? '' : new Intl.NumberFormat('uz-UZ').format(Number(intPart))
+    const formattedInt = intPart === '' ? '' : new Intl.NumberFormat('en-US').format(Number(intPart))
     return rest.length > 0 ? `${formattedInt}.${rest.join('').slice(0, 2)}` : formattedInt
   }
 

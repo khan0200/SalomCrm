@@ -9,7 +9,7 @@ from apps.students.models import (
     UniversityOption, UniversityStatusOption
 )
 from apps.payments.models import (
-    PaymentMethodTemplate, PaymentReceiverTemplate, PaymentNotePill
+    Payment, PaymentMethodTemplate, PaymentReceiverTemplate, PaymentNotePill
 )
 
 class Command(BaseCommand):
@@ -332,4 +332,55 @@ class Command(BaseCommand):
 
             synced_count += 1
 
-        self.stdout.write(self.style.SUCCESS(f"Successfully synced {synced_count} students, {len(supabase_folders)} folders, and all settings options from Supabase into Salom CRM!"))
+        self.stdout.write(self.style.SUCCESS(f"Successfully synced {synced_count} students, {len(supabase_folders)} folders!"))
+
+        # 4. Fetch and Sync All Payments
+        self.stdout.write("Fetching Payments from Supabase...")
+        sb_payments = fetch_table('payments')
+        self.stdout.write(f"Fetched {len(sb_payments)} payments. Syncing...")
+
+        payment_methods_set = set()
+        receivers_set = set()
+        synced_payments_count = 0
+
+        for p in sb_payments:
+            p_id = p.get('id')
+            if not p_id:
+                continue
+
+            student_id = (p.get('student_id') or '').strip().upper()
+            student_ref = None
+            if student_id:
+                student_ref = Student.objects.filter(id=student_id, tenant=tenant_ub).first()
+
+            method = str(p.get('method') or 'Naqd').strip()
+            received_by = str(p.get('received_by') or 'Admin').strip()
+            notes = str(p.get('notes') or '').strip()
+
+            if method: payment_methods_set.add(method)
+            if received_by: receivers_set.add(received_by)
+
+            Payment.objects.update_or_create(
+                id=p_id,
+                defaults={
+                    'tenant': tenant_ub,
+                    'student': student_ref,
+                    'student_name': p.get('student_name') or (student_ref.full_name if student_ref else None),
+                    'amount': Decimal(str(p.get('amount', 0) or 0)),
+                    'method': method,
+                    'received_by': received_by,
+                    'notes': notes or None,
+                    'is_discount': bool(p.get('is_discount', False) or (notes and 'DISCOUNT' in notes.upper())),
+                    'is_withdrawal': bool(p.get('is_withdrawal', False) or (notes and 'WITHDRAW' in notes.upper())),
+                    'created_at': p.get('created_at')
+                }
+            )
+            synced_payments_count += 1
+
+        for m in payment_methods_set:
+            PaymentMethodTemplate.objects.get_or_create(tenant=tenant_ub, name=m)
+        for r in receivers_set:
+            PaymentReceiverTemplate.objects.get_or_create(tenant=tenant_ub, name=r)
+
+        self.stdout.write(self.style.SUCCESS(f"Successfully synced {synced_payments_count} payments into Salom CRM!"))
+        self.stdout.write(self.style.SUCCESS("ALL SUPABASE DATA FULLY SYNCHRONIZED!"))
