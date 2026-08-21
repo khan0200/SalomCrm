@@ -19,6 +19,7 @@ import {
 import { studentsApi } from '@/api/students'
 import { settingsApi } from '@/api/settings'
 import { useUiStore } from '@/stores/ui'
+import { BUILTIN_SCHOOL_DIRECTORY } from '@/data/schoolsData'
 import type { Student } from '@/types'
 
 const route = useRoute()
@@ -358,13 +359,24 @@ const handleSaveFieldToProfile = async (fieldKey: string, value: string) => {
     }
 
     // Auto-lookup schools directory if saving final_school_name
-    if (dbField === 'final_school_name' && dbSchools.value && Array.isArray(dbSchools.value)) {
+    if (dbField === 'final_school_name') {
       updatePayload.educational_background = finalValue
       const cleanSchool = finalValue.toUpperCase().trim()
-      const match = dbSchools.value.find((s: any) => {
-        const name = (s.name || '').toUpperCase().trim()
-        return name === cleanSchool || cleanSchool.includes(name) || name.includes(cleanSchool)
-      })
+
+      let match: any = null
+      if (dbSchools.value && Array.isArray(dbSchools.value)) {
+        match = dbSchools.value.find((s: any) => {
+          const name = (s.name || '').toUpperCase().trim()
+          return name === cleanSchool || cleanSchool.includes(name) || name.includes(cleanSchool)
+        })
+      }
+      if (!match) {
+        match = Object.values(BUILTIN_SCHOOL_DIRECTORY).find((s: any) => {
+          const name = (s.name || '').toUpperCase().trim()
+          return name === cleanSchool || cleanSchool.includes(name) || name.includes(cleanSchool)
+        })
+      }
+
       if (match) {
         if (match.address) updatePayload.school_address = match.address
         if (match.website) updatePayload.school_website = match.website

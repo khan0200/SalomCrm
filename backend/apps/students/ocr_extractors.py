@@ -37,19 +37,19 @@ class DocumentClassifier:
         up = full_text.upper()
         up_clean = re.sub(r'[^A-ZА-Я0-9]', '', up)
 
-        # 1. Check School Certificate keywords
-        if any(k in up_clean for k in ['SHAHODATNOMA', 'ATTESTAT', 'GENERALSECONDARYEDUCATION', 'ORTATALIM', 'TALIMTOGRISIDA', 'USHBUSHAHODATNOMA', 'AVERAGEOF6YEARGRADES', 'BAHOLARIORTACHA']):
-            return "SCHOOL_CERTIFICATE"
-
-        # 2. Check Diploma & Technicum keywords
-        if any(k in up_clean for k in ['DIPLOM', 'DIPLOMA', 'BAKALAVR', 'MAGISTR', 'BACHELOR', 'MASTER', 'TECHNICUM', 'TEXNIKUM', 'TEHNIKUM', 'ATTESTATIONCOMMISSION']):
+        # 1. Check Diploma & University/College keywords first (Bachelor, Master, Diploma)
+        if any(k in up_clean for k in ['BACHELORDIPLOMA', 'BACHELORSDIPLOMA', 'BACHELOR', 'BAKALAVR', 'MASTERDIPLOMA', 'MAGISTR', 'DIPLOM', 'DIPLOMA', 'TECHNICUM', 'TEXNIKUM', 'TEHNIKUM', 'KOLLEJ', 'ACADEMICLYCEUM']):
             return "DIPLOMA"
+
+        # 2. Check School Certificate & Attestat keywords
+        if any(k in up_clean for k in ['SHAHODATNOMA', 'ATTESTAT', 'ATTECTAT', 'GENERALSECONDARYEDUCATION', 'ORTATALIM', 'TALIMTOGRISIDA', 'USHBUSHAHODATNOMA', 'AVERAGEOF6YEARGRADES', 'BAHOLARIORTACHA']):
+            return "SCHOOL_CERTIFICATE"
 
         # 3. Check ID Card keywords
         if any(k in up_clean for k in ['IDCARD', 'IDENTIFICATIONCARD', 'IDKARTA']):
             return "ID_CARD"
 
-        # 4. Check Passport keywords (specific to passport, not generic republic header)
+        # 4. Check Passport keywords
         if any(k in up_clean for k in ['PASSPORT', 'PASPORT', 'PASPORTRAQAMI', 'PASSPORTNO', 'DAVLATKODI', 'COUNTRYCODE', 'AMALQILISHMUDDATI']):
             return "PASSPORT"
 
@@ -217,17 +217,43 @@ class PassportExtractor:
 def translate_uzbek_school_name(raw_school_text: str, place_of_issue: str = '') -> str:
     """
     Translates Uzbek and Russian school names & locations into clean English.
-    e.g.:
-    - '46-sonli ayrim fanlar chuqur o'qitiladigan sinflari mavjud umumiy o'rta ta'lim maktabini'
-      + 'Qoraqalpog'iston Respublikasi, Nukus shahar'
-      -> 'SECONDARY SCHOOL NO. 46 OF REPUBLIC OF KARAKALPAKSTAN, NUKUS CITY'
-    - 'Ixtisoslashtirilgan maktabini' + 'Andijon viloyati, Shahrixon tumani'
-      -> 'SPECIALIZED SCHOOL OF ANDIJON REGION, SHAHRIXON DISTRICT'
     """
     s = raw_school_text.strip()
-    
+    s = re.sub(r'\bANDIIAN\b', 'ANDIJAN', s, flags=re.IGNORECASE)
+    s = re.sub(r'\bSAMARQANI\b', 'SAMARQAND', s, flags=re.IGNORECASE)
+
+    # Check English in-text pattern from secondary attestats (handle potential OCR word merges and Ne/N prefixes):
+    m_eng = re.search(
+        r'\b(?:Secondary\s*(?:General\s*)?School|School)\s*(?:[Nn][a-zA-Z\.]*|№)?\s*(\d+)\s+in\s+the\s+city\s+of\s+([A-Za-z]+)\s+([A-Za-z]+)\s+region',
+        s,
+        re.IGNORECASE
+    )
+    if m_eng:
+        num = m_eng.group(1)
+        city = m_eng.group(2).strip().upper()
+        region = m_eng.group(3).strip().upper()
+        return f"SECONDARY SCHOOL NO. {num} OF {region} REGION, {city} CITY"
+
+    # Check Russian in-text pattern from secondary attestats:
+    m_rus = re.search(
+        r'средн(?:юю|яя)\s*общеобразовательн(?:ую|ая)?\s*школ(?:у|а)\s*(?:[Nn][a-zA-Z\.]*|№)?\s*(\d+)\s+города\s+([A-Za-zА-Яа-я]+)\s+([A-Za-zА-Яа-я]+)\s+области',
+        s,
+        re.IGNORECASE
+    )
+    if m_rus:
+        num = m_rus.group(1)
+        city = m_rus.group(2).strip().upper()
+        region = m_rus.group(3).strip().upper()
+        return f"SECONDARY SCHOOL NO. {num} OF {region} REGION, {city} CITY"
+
     num_match = re.search(r'\b(\d+)[\s-]*(?:sonli|son|maktab|№|no\.?)\b', s, re.IGNORECASE)
     school_num = num_match.group(1) if num_match else None
+
+    # If it's already a full institute/university name (e.g. ANDIJAN MACHINE-BUILDING INSTITUTE)
+    if any(k in s.upper() for k in ['INSTITUTE', 'UNIVERSITY', 'INSTITUT', 'UNIVERSITET', 'AKADEMIYA', 'ACADEMY']):
+        clean_univ = re.sub(r'[\(\)\{\}\[\]\.,;:]', ' ', s).strip()
+        clean_univ = re.sub(r'\s+', ' ', clean_univ)
+        return clean_univ.upper()
 
     if re.search(r'(ixtisoslashtirilgan|specialized)', s, re.IGNORECASE):
         base_type = "Specialized School"
@@ -278,18 +304,17 @@ def calculate_gpa_from_text(full_text: str) -> Optional[str]:
     Extracts explicit average grade or calculates the arithmetic mean of all assessed subjects.
     e.g. 5.00 or 4.91
     """
-    # 1. Check for explicit 6-year average or average grade line
+    # 1. Check for explicit average or average grade line (including OCR typos like o-year)
     avg_m = re.search(
-        r'(?:average of 6-year grades|o[\'\`]?rtacha ko[\'\`]?rsatkichi|average grade|gpa)[\s:]*([3-5](?:\.\d{1,2})?)',
+        r'(?:average of [0-9oOa-z\-]+ grades|o[\'\`]?rtacha ko[\'\`]?rsatkichi|average grade|gpa)[\s:]*([3-5](?:\.\d{1,2})?)',
         full_text,
         re.IGNORECASE
     )
     if avg_m:
         return f"{float(avg_m.group(1)):.2f}"
 
-    # Check for isolated decimal number following 'average of 6-year grades'
     avg_block = re.search(
-        r'average of 6-year grades[\s\S]{0,60}\b([3-5]\.\d{2})\b',
+        r'(?:average of [0-9oOa-z\-]+ grades|o[\'\`]?rtacha ko[\'\`]?rsatkichi)[\s\S]{0,60}\b([3-5]\.\d{2})\b',
         full_text,
         re.IGNORECASE
     )
@@ -339,7 +364,8 @@ class DiplomaExtractor:
             'MUASSASA NOMI', 'GRADUATE\'S', 'GRADUATES', 'FULL NAME',
             'FAMILYASI, ISMI', 'SPECIALIZATION OF', 'QUALIFICATION(S)', 'QUALIFICATIONS',
             'TA\'LIM TASHKILOTI', 'EDUCATIONAL ORGANIZATION', 'YEAR OF ISSUE', 'PLACE OF ISSUE',
-            'BERILGAN YILI', 'BERILGAN JOYI', 'BERIGAN JOUI', 'BERIGAN YILI'
+            'BERILGAN YILI', 'BERILGAN JOYI', 'BERIGAN JOUI', 'BERIGAN YILI',
+            'THE EDUCATIONAL INSTITUTION', 'GRADUATE\'S SURNAME', 'GRADUATES SURNAME'
         ]
 
         def is_form_subtitle(line_str: str) -> bool:
@@ -350,16 +376,27 @@ class DiplomaExtractor:
             return any(re.sub(r'[^A-ZА-Я0-9]', '', sp) in clean_str for sp in FORM_SUBTITLE_PATTERNS)
 
         # 1. Degree / Certificate / Registration Serial Number
-        reg_match = re.search(r'(?:REGISTRATION NUMBER|RO\'YXATGA OLISH RAQAMI|REGISTRATION NO\.?|RO\'YXAT RAQAMI)[:\s\-]*([A-Z0-9\-]+)', upper_text)
-        serial_match = re.search(r'(?:UM\s*(?:N[:\s]|№|NO\.?)?\s*\d{6,8}|(?:SERIYA|SERIES|№)[:\s\-]*[A-ZА-Я]{1,3}\s*(?:№|N|NO\.?)?\s*\d{6,8}|\b[A-ZА-Я]{1,3}\s*\d{6,8}\b|\b\d{6,8}\b)', upper_text)
-
-        if reg_match:
-            fields['DEGREE_NO'] = ExtractedField(reg_match.group(1).strip(), 0.95, True, 'OCR_REGEX')
-        elif serial_match:
-            s_val = serial_match.group(0).strip()
-            if s_val and len(s_val) >= 4 and not any(k in s_val for k in ['DIPLOMA', 'SHAHODATNOMA']):
-                clean_ser = re.sub(r'^UM\s*(?:N[:\s]|№|NO\.?)\s*', 'UM ', s_val, flags=re.IGNORECASE)
-                fields['DEGREE_NO'] = ExtractedField(clean_ser, 0.95, True, 'OCR_REGEX')
+        serial_match = re.search(
+            r'\b(UM|B|M|K)\s*(?:[Nn][A-Za-z:\s]{0,2}|№|[Nn][Oo]\.?|[Gg])?\s*(\d{6,8})\b',
+            upper_text
+        )
+        if serial_match:
+            prefix = serial_match.group(1).upper()
+            digits = serial_match.group(2)
+            fields['DEGREE_NO'] = ExtractedField(f"{prefix} {digits}", 0.96, True, 'OCR_REGEX')
+        else:
+            reg_match = re.search(
+                r'(?:REGISTRATION NUMBER|RO\'YXATGA OLISH RAQAMI|REGISTRATION NO\.?|RO\'YXAT RAQAMI)[:\s\-]*([A-Z0-9\-]+)',
+                upper_text
+            )
+            if reg_match:
+                fields['DEGREE_NO'] = ExtractedField(reg_match.group(1).strip(), 0.95, True, 'OCR_REGEX')
+            else:
+                other_serial = re.search(r'(?:SERIYA|SERIES|№)[:\s\-]*([A-ZА-Я]{1,3}\s*\d{6,8})|\b([A-ZА-Я]{1,3}\s*\d{6,8})\b|\b(\d{6,8})\b', upper_text)
+                if other_serial:
+                    s_val = other_serial.group(1) or other_serial.group(2) or other_serial.group(3)
+                    if s_val and len(s_val.strip()) >= 4 and not any(k in s_val for k in ['DIPLOMA', 'SHAHODATNOMA']):
+                        fields['DEGREE_NO'] = ExtractedField(s_val.strip(), 0.92, True, 'OCR_REGEX')
 
         # 2. Extract Place of Issue / Location (for Shahodatnoma)
         place_of_issue = ''
@@ -369,7 +406,7 @@ class DiplomaExtractor:
             l_up = line.upper()
             if is_form_subtitle(line) or any(k in l_up for k in ['TA\'LIM TASHKILOTI', 'YEAR OF ISSUE', 'PLACE OF ISSUE', 'BERILGAN', 'BERIGAN']):
                 continue
-            if any(pk in l_up for pk in ['VILOYATI', 'TUMANI', 'SHAHAR', 'SHAHRI', 'QORAQALPOG', 'KARAKALPAK', 'NUKUS', 'ANDIJON', 'TOSHKENT', 'SAMARQAND']):
+            if any(pk in l_up for pk in ['VILOYATI', 'TUMANI', 'SHAHAR', 'SHAHRI', 'QORAQALPOG', 'KARAKALPAK', 'NUKUS', 'ANDIJON', 'TOSHKENT', 'SAMARQAND', 'FERGANA', 'FARG\'ONA', 'MARGILAN']):
                 if not any(sk in l_up for sk in ['MAKTAB', 'SCHOOL', 'DIPLOM', 'SHAHODATNOMA', 'TASHKILOTI', 'ORGANIZATION']):
                     place_of_issue = line.strip()
                     break
@@ -382,43 +419,76 @@ class DiplomaExtractor:
         ]
 
         extracted_school = None
-        for i, line in enumerate(all_raw_lines):
-            l_up = line.upper()
+        attestat_m = re.search(
+            r'\b(?:Secondary\s*(?:General\s*)?School|School)\s*(?:[Nn][a-zA-Z\.]*|№)?\s*(\d+)\s+in\s+the\s+city\s+of\s+([A-Za-z]+)\s+([A-Za-z]+)\s+region',
+            full_text,
+            re.IGNORECASE
+        )
+        if attestat_m:
+            num = attestat_m.group(1)
+            city = attestat_m.group(2).strip().upper()
+            region = attestat_m.group(3).strip().upper()
+            fields['FINAL_SCHOOL_NAME'] = ExtractedField(f"SECONDARY SCHOOL NO. {num} OF {region} REGION, {city} CITY", 0.96, True, 'LAYOUT')
+        else:
+            for i, line in enumerate(all_raw_lines):
+                l_up = line.upper()
 
-            # Check if line is a school organization subtitle
-            if any(sk in l_up for sk in ['EDUCATIONAL ORGANIZATION', 'TA\'LIM TASHKILOTI', 'TA LIM TASHKLON', 'TALIM TASHKILOTI', 'EDUCATIONAL INSTITUTION', 'TA\'LIM MUASSASASI']):
-                if i > 0:
-                    cand = all_raw_lines[i-1].strip()
-                    if len(cand) >= 4 and not is_form_subtitle(cand) and not any(k in cand.upper() for k in ['DIPLOM', 'DIPLOMA', 'SHAHODATNOMA', 'CERTIFICATE', 'BERILGAN', 'YILDA', 'YEAR']):
+                # Check if line is a school organization subtitle
+                if any(sk in l_up for sk in ['EDUCATIONAL ORGANIZATION', 'TA\'LIM TASHKILOTI', 'TA LIM TASHKLON', 'TALIM TASHKILOTI', 'EDUCATIONAL INSTITUTION', 'TA\'LIM MUASSASASI', 'THE EDUCATIONAL INSTITUTION']):
+                    if i > 0:
+                        cand = all_raw_lines[i-1].strip()
+                        if len(cand) >= 4 and not is_form_subtitle(cand) and not any(k in cand.upper() for k in ['DIPLOM', 'DIPLOMA', 'SHAHODATNOMA', 'CERTIFICATE', 'BERILGAN', 'YILDA', 'YEAR']):
+                            extracted_school = cand
+                            break
+
+                # Direct keyword match
+                if any(sk in l_up for sk in school_keywords) and not is_form_subtitle(line):
+                    cand = re.sub(r'\s+', ' ', line).strip()
+                    if len(cand) >= 5 and not any(k in cand.upper() for k in ['DIPLOM', 'DIPLOMA', 'SHAHODATNOMA', 'CERTIFICATE', 'BERILGAN']):
                         extracted_school = cand
                         break
 
-            # Direct keyword match
-            if any(sk in l_up for sk in school_keywords) and not is_form_subtitle(line):
-                cand = re.sub(r'\s+', ' ', line).strip()
-                if len(cand) >= 5 and not any(k in cand.upper() for k in ['DIPLOM', 'DIPLOMA', 'SHAHODATNOMA', 'CERTIFICATE', 'BERILGAN']):
-                    extracted_school = cand
-                    break
+            if extracted_school:
+                eng_school = translate_uzbek_school_name(extracted_school, place_of_issue)
+                fields['FINAL_SCHOOL_NAME'] = ExtractedField(eng_school, 0.95, True, 'LAYOUT')
 
-        if extracted_school:
-            eng_school = translate_uzbek_school_name(extracted_school, place_of_issue)
-            fields['FINAL_SCHOOL_NAME'] = ExtractedField(eng_school, 0.95, True, 'LAYOUT')
-
-        # 4. Major / Specialization
+        # 4. Major / Specialization (Single or Multi-line)
         if not is_shahodatnoma:
+            major_lines = []
+            in_major = False
             for line in all_raw_lines:
                 l_up = line.upper()
-                if any(mk in l_up for mk in ['COMPLETED', 'TAMOMLADI', 'MUTAXASSISLIGI', 'YO\'NALISHI', 'YONALISHI', 'MAJOR', 'SPECIALIZATION', 'SPECIALTY', 'QUALIFICATION']):
-                    clean_major = re.sub(r'^(COMPLETED|TAMOMLADI|MUTAXASSISLIGI|YO\'NALISHI|YONALISHI|MAJOR|SPECIALIZATION OF|SPECIALTY|QUALIFICATION\(S\))[:\s\-]+', '', l_up).strip()
-                    clean_major = re.sub(r'\(.*?\)', '', clean_major).strip()
+                clean_l_up = re.sub(r'[^A-ZА-Я0-9]', '', l_up)
+
+                if any(mk in clean_l_up for mk in ['ISAWARDEDWITH', 'AWARDEDWITH', 'COMPLETED', 'TAMOMLADI', 'MUTAXASSISLIGI', 'YONALISHI', 'MAJOR', 'SPECIALIZATION', 'SPECIALTY', 'QUALIFICATION']):
+                    in_major = True
+                    clean_major = re.sub(r'^(?:IS\s*AWARDED\s*WITH|COMPLETED|TAMOMLADI|MUTAXASSISLIGI|YO[\'\`]?NALISHI|YONALISHI|MAJOR|SPECIALIZATION\s*OF|SPECIALTY|QUALIFICATION\(S\))[:\s\-]*', '', line, flags=re.IGNORECASE).strip()
+                    clean_major = re.sub(r'^\s*[\(\[]\s*(?:IN[-\s]*THE\s+SPECIALITY|SPECIALITY|SPECIALTY|MUTAXASSISLIK|FIELD|DIRECTION)\s*[\)\]]', '', clean_major, flags=re.IGNORECASE).strip()
                     if clean_major and len(clean_major) >= 4 and not is_form_subtitle(clean_major):
-                        fields['MAJOR'] = ExtractedField(clean_major, 0.88, False, 'LAYOUT')
+                        major_lines.append(clean_major)
+                    continue
+
+                if in_major:
+                    if any(k in clean_l_up for k in ['BACHELOR', 'MAGISTR', 'MASTER', 'QUALIFIEDAS', 'QUALIFICATION', 'RECTOR', 'REGISTRATION', 'JULY', 'AUGUST', 'JUNE', 'SEPTEMBER', 'OCTOBER', 'NOVEMBER', 'DECEMBER', 'JANUARY', 'FEBRUARY', 'MARCH', 'APRIL', 'MAY']):
                         break
+                    if re.search(r'\b(20[1-2][0-9])\b', line):
+                        break
+                    if any(k == clean_l_up for k in ['INTHESPECIALITY', 'INTHESPECIALTY', 'SPECIALITY', 'SPECIALTY', 'MUTAXASSISLIGI', 'MUTAXASSISLIK', 'FIELD', 'DIRECTION']):
+                        continue
+                    clean_line = re.sub(r'[\(\[]\s*(?:IN[-\s]*THE\s+SPECIALITY|SPECIALITY|SPECIALTY|MUTAXASSISLIK|FIELD|DIRECTION)\s*[\)\]]?', '', line, flags=re.IGNORECASE).strip()
+                    if clean_line and not is_form_subtitle(clean_line) and not clean_line.startswith('('):
+                        major_lines.append(clean_line)
+
+            if major_lines:
+                full_major = " ".join(major_lines).strip().upper()
+                full_major = re.sub(r'[\.\,]', ' ', full_major)
+                full_major = re.sub(r'\s+', ' ', full_major).strip()
+                fields['MAJOR'] = ExtractedField(full_major, 0.90, True, 'LAYOUT')
 
         # 5. Student Full Name on Certificate / Diploma
         for i, line in enumerate(all_raw_lines):
             l_up = line.upper()
-            if any(nk in l_up for nk in ['SURNAME, GIVEN', 'SWNAME, GNEN', 'FAMILYASI, ISMI', 'FAMLYASI, ISMI', 'FATHERSNAME', 'PATRONYMIC', 'PARORYMIC', 'GRADUATE\'S FULL NAME', 'BITIRUVCHINING FAMILIYASI', 'COMMISSION', 'DECISION']):
+            if any(nk in l_up for nk in ['SURNAME, GIVEN', 'SWNAME, GNEN', 'FAMILYASI, ISMI', 'FAMLYASI, ISMI', 'FATHERSNAME', 'PATRONYMIC', 'PARORYMIC', 'GRADUATE\'S FULL NAME', 'BITIRUVCHINING FAMILIYASI', 'COMMISSION', 'DECISION', 'GRADUATES SURNAME', 'GRADUATE\'S SURNAME']):
                 if i > 0:
                     cand = all_raw_lines[i-1].strip().upper()
                     if re.match(r'^[A-ZА-Я\s\'-]{6,}$', cand) and not is_form_subtitle(cand):
@@ -438,7 +508,7 @@ class DiplomaExtractor:
                 if 'DATE_OF_BIRTH' in fields:
                     break
 
-        # 7. Graduation Date & Computed Entry Date (Graduation Year - 3 for Shahodatnoma)
+        # 7. Graduation Date & Computed Entry Date
         grad_match = re.search(r'\b(20[1-2][0-9])[\s\-yY]*(?:-?yilda|yil|year|г|y)?\b', upper_text)
         if grad_match:
             grad_year = int(grad_match.group(1))

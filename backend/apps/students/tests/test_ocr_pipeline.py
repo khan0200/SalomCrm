@@ -174,19 +174,72 @@ class OCRPipelineTests(TestCase):
         self.assertEqual(fields.get('GPA'), '4.75')  # (5+5+5+4)/4 = 4.75!
 
 
-    # 4. Multi-Page PDF Processing
+    # 5. Russian/English Secondary Attestat Test
+    def test_secondary_attestat_russian_english(self):
+        img = Image.new('RGB', (1000, 700), color=(255, 255, 255))
+        draw = ImageDraw.Draw(img)
+        draw.text((30, 30), 'PECHIVbJIKA V36EKNCTAH / REPUBLIC OF UZBEKISTAN', fill=(0, 0, 0))
+        draw.text((30, 70), 'ATTESTAT of General Secondary Education', fill=(0, 0, 0))
+        draw.text((30, 110), 'UM № 1495454', fill=(0, 0, 0))
+        draw.text((30, 150), 'SHAVKATOV MUKHAMMADUMAR', fill=(0, 0, 0))
+        draw.text((30, 190), 'completed a course of study in 2022 at Secondary General School N15 in the city of Margilan Fergana region', fill=(0, 0, 0))
+        draw.text((30, 230), 'and received General Secondary Education', fill=(0, 0, 0))
+        draw.text((30, 270), 'Registration No 79', fill=(0, 0, 0))
+        buf = io.BytesIO()
+        img.save(buf, format='JPEG')
+
+        result = process_document_ephemeral(buf.getvalue(), 'attestat.jpg')
+        self.assertEqual(result['document_type'], 'SCHOOL_CERTIFICATE')
+        fields = result['fields']
+        self.assertEqual(fields.get('DEGREE_NO'), 'UM 1495454')
+        self.assertIn('SECONDARY SCHOOL NO. 15', fields.get('FINAL_SCHOOL_NAME', ''))
+        self.assertIn('FERGANA REGION', fields.get('FINAL_SCHOOL_NAME', ''))
+        self.assertIn('MARGILAN CITY', fields.get('FINAL_SCHOOL_NAME', ''))
+        self.assertEqual(fields.get('DATE_OF_GRADUATION'), '2022-07-20')
+        self.assertEqual(fields.get('DATE_OF_ENTRY'), '2019-09-02')  # 2022 - 3 years
+        self.assertEqual(fields.get('MAJOR'), 'GENERAL SECONDARY EDUCATION')
+
+    # 6. Bachelor Diploma with Multi-line Major Test
+    def test_bachelor_diploma_extraction(self):
+        img = Image.new('RGB', (1000, 700), color=(255, 255, 255))
+        draw = ImageDraw.Draw(img)
+        draw.text((30, 30), 'REPUBLIC OF UZBEKISTAN', fill=(0, 0, 0))
+        draw.text((30, 70), 'BACHELOR\'S DIPLOMA', fill=(0, 0, 0))
+        draw.text((30, 110), 'B № 00034192', fill=(0, 0, 0))
+        draw.text((30, 150), 'ANDIJAN MACHINE-BUILDING INSTITUTE', fill=(0, 0, 0))
+        draw.text((30, 180), '(the educational institution)', fill=(0, 0, 0))
+        draw.text((30, 220), 'ABDURAZZAKOV JASURBEK', fill=(0, 0, 0))
+        draw.text((30, 250), '(graduate\'s surname, name, first name)', fill=(0, 0, 0))
+        draw.text((30, 290), 'is awarded with', fill=(0, 0, 0))
+        draw.text((30, 320), 'Electrical engineering, electrical mechanics and', fill=(0, 0, 0))
+        draw.text((30, 350), '(in the speciality)', fill=(0, 0, 0))
+        draw.text((30, 380), 'electrical technologies (mechanical engineering)', fill=(0, 0, 0))
+        draw.text((30, 420), 'July 15, 2020, Andijan', fill=(0, 0, 0))
+        buf = io.BytesIO()
+        img.save(buf, format='JPEG')
+
+        result = process_document_ephemeral(buf.getvalue(), 'bachelor.jpg')
+        self.assertEqual(result['document_type'], 'DIPLOMA')
+        fields = result['fields']
+        self.assertEqual(fields.get('DEGREE_NO'), 'B 00034192')
+        self.assertIn('ELECTRICAL', fields.get('MAJOR', ''))
+        self.assertIn('MECHANICAL', fields.get('MAJOR', ''))
+        self.assertEqual(fields.get('DATE_OF_GRADUATION'), '2020-07-20')
+        self.assertEqual(fields.get('DATE_OF_ENTRY'), '2016-09-02')  # 2020 - 4 years
+
+    # 7. Multi-Page PDF Processing
     def test_pdf_extraction(self):
         pdf_bytes = self.create_sample_pdf(num_pages=2)
         images = prepare_document_images(pdf_bytes, 'test.pdf', max_pages=3)
         self.assertEqual(len(images), 2)
 
-    # 5. Invalid and Corrupted File Handling
+    # 8. Invalid and Corrupted File Handling
     def test_invalid_corrupted_file_error(self):
         corrupted_bytes = b"corrupted random data not an image"
         with self.assertRaises(PreprocessError):
             prepare_document_images(corrupted_bytes, 'bad.jpg')
 
-    # 6. API Endpoint Multipart Upload Test
+    # 9. API Endpoint Multipart Upload Test
     def test_api_extract_document_endpoint(self):
         img_bytes = self.create_passport_image()
         uploaded = SimpleUploadedFile('passport.jpg', img_bytes, content_type='image/jpeg')
@@ -201,7 +254,7 @@ class OCRPipelineTests(TestCase):
         self.assertIn('metadata', data)
         self.assertTrue(data['metadata']['latency_ms'] > 0)
 
-    # 7. Concurrency Test
+    # 10. Concurrency Test
     def test_concurrent_extractions(self):
         img_bytes = self.create_passport_image()
 
