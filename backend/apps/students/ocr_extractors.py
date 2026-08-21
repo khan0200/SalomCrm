@@ -2,10 +2,6 @@ import re
 from datetime import datetime
 from typing import Dict, Any, List, Optional, Tuple
 
-from mrz.checker.td3 import TD3CodeChecker
-from mrz.checker.td1 import TD1CodeChecker
-from mrz.checker.td2 import TD2CodeChecker
-
 from .ocr_normalizer import (
     ExtractedField,
     normalize_date,
@@ -14,22 +10,6 @@ from .ocr_normalizer import (
     normalize_phone_number,
     normalize_name,
 )
-
-
-def parse_mrz_date(yy_mm_dd: str, is_expiration: bool = False) -> Optional[str]:
-    """Converts YYMMDD from MRZ to YYYY-MM-DD."""
-    if not yy_mm_dd or len(yy_mm_dd) != 6 or not yy_mm_dd.isdigit():
-        return None
-    yy = int(yy_mm_dd[:2])
-    mm = yy_mm_dd[2:4]
-    dd = yy_mm_dd[4:6]
-    current_year_last2 = datetime.now().year % 100
-    if is_expiration:
-        century = 2000 if yy <= 80 else 1900
-    else:
-        century = 2000 if yy <= current_year_last2 else 1900
-    full_year = century + yy
-    return f"{full_year:04d}-{mm}-{dd}"
 
 
 def is_passport_header_label(clean_up: str) -> bool:
@@ -55,13 +35,8 @@ class DocumentClassifier:
         up = full_text.upper()
         up_clean = re.sub(r'[^A-ZА-Я0-9]', '', up)
 
-        # Check for MRZ lines
-        mrz_count = sum(1 for line in ocr_lines if '<<' in line.replace(' ', '') and len(line.replace(' ', '')) >= 26)
-        if mrz_count >= 2:
-            return "PASSPORT"
-
-        # Check Passport / ID Card keywords
-        if any(k in up_clean for k in ['PASSPORT', 'PASPORT', 'REPUBLICOFUZBEKISTAN', 'OZBEKISTONRESPUBLIKASI', 'FAMILIYASI', 'TUGILGANSANASI']):
+        # Check Passport / ID Card keywords from visual inspection text
+        if any(k in up_clean for k in ['PASSPORT', 'PASPORT', 'REPUBLICOFUZBEKISTAN', 'OZBEKISTONRESPUBLIKASI', 'FAMILIYASI', 'TUGILGANSANASI', 'OTASININGISMI', 'BERILGANSANASI']):
             return "PASSPORT"
 
         if any(k in up_clean for k in ['IDCARD', 'IDENTIFICATIONCARD', 'IDKARTA']):
@@ -85,59 +60,19 @@ class DocumentClassifier:
 
 
 # =========================================================================
-# 2. PASSPORT EXTRACTOR
+# 2. PASSPORT EXTRACTOR (100% Visual Inspection Zone - No MRZ)
 # =========================================================================
 class PassportExtractor:
     @staticmethod
     def extract(ocr_lines: List[str], full_text: str, line_scores: Optional[List[float]] = None) -> Dict[str, ExtractedField]:
         fields: Dict[str, ExtractedField] = {}
-        all_raw_lines = [l.strip() for l in ocr_lines if l.strip()]
-        upper_text = full_text.upper()
+        # Filter out any raw MRZ lines (<< or starting with P<) so they don't interfere
+        all_raw_lines = [
+            l.strip() for l in ocr_lines 
+            if l.strip() and '<<' not in l and not (l.startswith('P<') or l.startswith('I<'))
+        ]
+        upper_text = "\n".join(all_raw_lines).upper()
 
-        # Step 1: MRZ Parsing & Check Digit Verification
-        mrz_lines = [l.replace(' ', '').upper() for l in all_raw_lines if '<<' in l.replace(' ', '') and len(l.replace(' ', '')) >= 26]
-        mrz_success = False
-
-        if len(mrz_lines) >= 2:
-            for i in range(len(mrz_lines) - 1):
-                l1 = mrz_lines[i]
-                l2 = mrz_lines[i+1]
-                if (l1.startswith('P<') or l1.startswith('P')) and len(l1) >= 36 and len(l2) >= 36:
-                    l1_pad = (l1 + '<'*44)[:44]
-                    l2_pad = (l2 + '<'*44)[:44]
-                    try:
-                        checker = TD3CodeChecker(f"{l1_pad}\n{l2_pad}")
-                        mrz_fields = checker.fields()
-                        check_digits_valid = bool(checker.result)
-
-                        surname = (mrz_fields.surname or '').replace('<', ' ').strip()
-                        given = (mrz_fields.names or '').replace('<', ' ').strip()
-                        full_name = normalize_name(f"{surname} {given}".strip())
-
-                        passport_num = normalize_passport_number(mrz_fields.document_number or '')
-                        sex = normalize_gender(mrz_fields.sex or '')
-                        dob = parse_mrz_date(mrz_fields.birth_date, is_expiration=False)
-                        expiry = parse_mrz_date(mrz_fields.expiry_date, is_expiration=True)
-
-                        base_conf = 0.98 if check_digits_valid else 0.85
-
-                        if full_name:
-                            fields['FULL_NAME'] = ExtractedField(full_name, base_conf, check_digits_valid, 'MRZ')
-                        if passport_num:
-                            fields['PASSPORT_NUMBER'] = ExtractedField(passport_num, base_conf, check_digits_valid, 'MRZ')
-                        if dob:
-                            fields['DATE_OF_BIRTH'] = ExtractedField(dob, base_conf, check_digits_valid, 'MRZ')
-                        if expiry:
-                            fields['DATE_OF_EXPIRATION'] = ExtractedField(expiry, base_conf, check_digits_valid, 'MRZ')
-                        if sex:
-                            fields['SEX'] = ExtractedField(sex, base_conf, check_digits_valid, 'MRZ')
-
-                        mrz_success = True
-                        break
-                    except Exception:
-                        pass
-
-        # Step 2: Visual Inspection Zone (VIZ) Association
         viz_surname = None
         viz_given = None
         viz_father = None
@@ -147,46 +82,62 @@ class PassportExtractor:
         viz_sex = None
         viz_address = None
 
-        # Direct Passport Number regex
-        if 'PASSPORT_NUMBER' not in fields:
-            pass_m = re.search(r'\b([A-Z]{2}\s*[\d\s]{7,10})\b', upper_text)
-            if pass_m:
-                clean_p = normalize_passport_number(pass_m.group(1))
-                if clean_p:
-                    fields['PASSPORT_NUMBER'] = ExtractedField(clean_p, 0.95, True, 'VIZ')
+        # 1. Direct Passport Number regex (e.g. FA7958189, FA 7958189, AA1234567)
+        pass_m = re.search(r'\b([A-Z]{2}\s*[\d\s]{7,10})\b', upper_text)
+        if pass_m:
+            clean_p = normalize_passport_number(pass_m.group(1))
+            if clean_p:
+                fields['PASSPORT_NUMBER'] = ExtractedField(clean_p, 0.98, True, 'VIZ')
 
+        # 2. Visual Inspection Zone (VIZ) Label Association
         for i, raw_l in enumerate(all_raw_lines):
             up = raw_l.upper()
             clean_l = re.sub(r'[^A-ZА-Я0-9]', '', up)
 
-            # Surname
+            # Surname (FAMILIYASI / SURNAME)
             if any(k in clean_l for k in ['FAMILIYASI', 'SURNAME', 'ФАМИЛИЯ']) and not viz_surname:
-                for j in range(i + 1, min(i + 4, len(all_raw_lines))):
-                    cand = all_raw_lines[j].strip().upper()
-                    cand_clean = re.sub(r'[^A-ZА-Я0-9]', '', cand)
-                    if not is_passport_header_label(cand_clean) and re.match(r'^[A-ZА-Я\s\'-]{2,}$', cand):
-                        viz_surname = cand
-                        break
+                # Check line itself if value follows label
+                after = re.sub(r'^.*?(FAMILIYASI|SURNAME|ФАМИЛИЯ)[/:\s]*', '', up).strip()
+                after_clean = re.sub(r'[^A-ZА-Я0-9]', '', after)
+                if after and not is_passport_header_label(after_clean) and len(after) >= 2:
+                    viz_surname = after
+                else:
+                    for j in range(i + 1, min(i + 4, len(all_raw_lines))):
+                        cand = all_raw_lines[j].strip().upper()
+                        cand_clean = re.sub(r'[^A-ZА-Я0-9]', '', cand)
+                        if not is_passport_header_label(cand_clean) and re.match(r'^[A-ZА-Я\s\'-]{2,}$', cand):
+                            viz_surname = cand
+                            break
 
-            # Given Name
+            # Given Names (ISMI / GIVEN NAMES)
             if any(k in clean_l for k in ['ISMI', 'GIVENNAMES', 'GIVENNAME', 'ИМЯ']) and 'OTASINING' not in clean_l and not viz_given:
-                for j in range(i + 1, min(i + 4, len(all_raw_lines))):
-                    cand = all_raw_lines[j].strip().upper()
-                    cand_clean = re.sub(r'[^A-ZА-Я0-9]', '', cand)
-                    if not is_passport_header_label(cand_clean) and re.match(r'^[A-ZА-Я\s\'-]{2,}$', cand):
-                        viz_given = cand
-                        break
+                after = re.sub(r'^.*?(ISMI|GIVENNAMES|GIVENNAME|ИМЯ)[/:\s]*', '', up).strip()
+                after_clean = re.sub(r'[^A-ZА-Я0-9]', '', after)
+                if after and not is_passport_header_label(after_clean) and len(after) >= 2:
+                    viz_given = after
+                else:
+                    for j in range(i + 1, min(i + 4, len(all_raw_lines))):
+                        cand = all_raw_lines[j].strip().upper()
+                        cand_clean = re.sub(r'[^A-ZА-Я0-9]', '', cand)
+                        if not is_passport_header_label(cand_clean) and re.match(r'^[A-ZА-Я\s\'-]{2,}$', cand):
+                            viz_given = cand
+                            break
 
-            # Father's Name / Patronymic
+            # Father's Name / Patronymic (OTASINING ISMI / FATHER'S NAME)
             if any(k in clean_l for k in ['OTASININGISMI', 'FATHERSNAME', 'FATHERNAME', 'ОТЧЕСТВО']) and not viz_father:
-                for j in range(i + 1, min(i + 4, len(all_raw_lines))):
-                    cand = all_raw_lines[j].strip().upper()
-                    cand_clean = re.sub(r'[^A-ZА-Я0-9]', '', cand)
-                    if not is_passport_header_label(cand_clean) and re.match(r'^[A-ZА-Я\s\'-]{2,}$', cand):
-                        viz_father = cand
-                        break
+                after = re.sub(r'^.*?(OTASININGISMI|FATHERSNAME|FATHERNAME|ОТЧЕСТВО)[/:\s]*', '', up).strip()
+                after_clean = re.sub(r'[^A-ZА-Я0-9]', '', after)
+                if after and not is_passport_header_label(after_clean) and len(after) >= 2:
+                    viz_father = after
+                else:
+                    for j in range(i + 1, min(i + 4, len(all_raw_lines))):
+                        cand = all_raw_lines[j].strip().upper()
+                        cand_clean = re.sub(r'[^A-ZА-Я0-9]', '', cand)
+                        if not is_passport_header_label(cand_clean) and re.match(r'^[A-ZА-Я\s\'-]{2,}$', cand):
+                            viz_father = cand
+                            break
 
-            # Date of Birth
+            # Date of Birth (TUG'ILGAN SANASI / DATE OF BIRTH)
             if any(k in clean_l for k in ['TUGILGANSANASI', 'DATEOFBIRTH', 'ДАТАРОЖДЕНИЯ']) and not viz_dob:
                 for j in range(i, min(i + 4, len(all_raw_lines))):
                     d = normalize_date(all_raw_lines[j])
@@ -194,7 +145,7 @@ class PassportExtractor:
                         viz_dob = d
                         break
 
-            # Date of Issue
+            # Date of Issue (BERILGAN SANASI / DATE OF ISSUE)
             if any(k in clean_l for k in ['BERILGANSANASI', 'DATEOFISSUE', 'ДАТАВЫДАЧИ']) and not viz_doi:
                 for j in range(i, min(i + 4, len(all_raw_lines))):
                     d = normalize_date(all_raw_lines[j])
@@ -202,7 +153,7 @@ class PassportExtractor:
                         viz_doi = d
                         break
 
-            # Date of Expiry
+            # Date of Expiry (AMAL QILISH MUDDATI / DATE OF EXPIRY)
             if any(k in clean_l for k in ['AMALQILISHMUDDATI', 'DATEOFEXPIRY', 'DATEOFEXPIRATION', 'СРОКДЕЙСТВИЯ']) and not viz_doe:
                 for j in range(i, min(i + 4, len(all_raw_lines))):
                     d = normalize_date(all_raw_lines[j])
@@ -210,7 +161,7 @@ class PassportExtractor:
                         viz_doe = d
                         break
 
-            # Sex
+            # Sex (JINSI / SEX)
             if any(k in clean_l for k in ['JINSI', 'SEX', 'POL']) and not viz_sex:
                 for j in range(i, min(i + 4, len(all_raw_lines))):
                     g = normalize_gender(all_raw_lines[j])
@@ -218,7 +169,7 @@ class PassportExtractor:
                         viz_sex = g
                         break
 
-            # Place of Birth
+            # Place of Birth (TUG'ILGAN JOYI / PLACE OF BIRTH)
             if any(k in clean_l for k in ['TUGILGANJOYI', 'PLACEOFBIRTH']) and not viz_address:
                 for j in range(i + 1, min(i + 4, len(all_raw_lines))):
                     cand = all_raw_lines[j].strip().upper()
@@ -227,7 +178,7 @@ class PassportExtractor:
                         viz_address = cand
                         break
 
-        # Fallback date collection in chronological order
+        # Fallback date collection in chronological order [DOB, DOI, DOE]
         all_found_dates = []
         for line in all_raw_lines:
             d = normalize_date(line)
@@ -243,24 +194,23 @@ class PassportExtractor:
             if not viz_doi and len(sorted_dates) >= 3:
                 viz_doi = sorted_dates[1]
 
-        # Combine VIZ Full Name (with Patronymic)
+        # Assemble Full Name (Surname + Given Names + Father's Name)
         if viz_surname or viz_given or viz_father:
             viz_name_parts = [p for p in [viz_surname, viz_given, viz_father] if p]
             full_viz_name = normalize_name(' '.join(viz_name_parts))
-            # If MRZ only had surname + given, replace with richer VIZ full name including patronymic
             if full_viz_name:
-                fields['FULL_NAME'] = ExtractedField(full_viz_name, 0.96, True, 'VIZ')
+                fields['FULL_NAME'] = ExtractedField(full_viz_name, 0.98, True, 'VIZ')
 
-        if 'DATE_OF_BIRTH' not in fields and viz_dob:
-            fields['DATE_OF_BIRTH'] = ExtractedField(viz_dob, 0.94, True, 'VIZ')
-        if 'DATE_OF_ISSUE' not in fields and viz_doi:
-            fields['DATE_OF_ISSUE'] = ExtractedField(viz_doi, 0.93, True, 'VIZ')
-        if 'DATE_OF_EXPIRATION' not in fields and viz_doe:
-            fields['DATE_OF_EXPIRATION'] = ExtractedField(viz_doe, 0.93, True, 'VIZ')
-        if 'SEX' not in fields and viz_sex:
-            fields['SEX'] = ExtractedField(viz_sex, 0.95, True, 'VIZ')
-        if 'ADDRESS' not in fields and viz_address:
-            fields['ADDRESS'] = ExtractedField(viz_address, 0.88, False, 'VIZ')
+        if viz_dob:
+            fields['DATE_OF_BIRTH'] = ExtractedField(viz_dob, 0.97, True, 'VIZ')
+        if viz_doi:
+            fields['DATE_OF_ISSUE'] = ExtractedField(viz_doi, 0.95, True, 'VIZ')
+        if viz_doe:
+            fields['DATE_OF_EXPIRATION'] = ExtractedField(viz_doe, 0.95, True, 'VIZ')
+        if viz_sex:
+            fields['SEX'] = ExtractedField(viz_sex, 0.98, True, 'VIZ')
+        if viz_address:
+            fields['ADDRESS'] = ExtractedField(viz_address, 0.90, False, 'VIZ')
 
         return fields
 

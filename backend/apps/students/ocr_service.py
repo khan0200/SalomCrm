@@ -129,8 +129,9 @@ def process_document_ephemeral(
             if engine_name not in engines_used:
                 engines_used.append(engine_name)
 
-            # Early stopping check: if we already extracted enough passport lines from page 1, don't waste time on page 2/3
-            if len(all_raw_lines) >= 15 and any('<<' in l.replace(' ', '') for l in all_raw_lines):
+            # Early stopping check: if we already extracted enough document lines from page 1, don't waste time on subsequent pages
+            text_so_far = "\n".join(all_raw_lines).upper()
+            if len(all_raw_lines) >= 12 and any(k in text_so_far for k in ['PASSPORT', 'PASPORT', 'FAMILIYASI', 'DIPLOM', 'SHAHODATNOMA']):
                 break
     finally:
         _ocr_semaphore.release()
