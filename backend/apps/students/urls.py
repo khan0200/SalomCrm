@@ -5,7 +5,7 @@ from .views import (
     TariffOptionViewSet, EducationLevelOptionViewSet, StudentGroupOptionViewSet,
     LeadSourceOptionViewSet, CoordinatorOptionViewSet,
     UniversityOptionViewSet, UniversityStatusOptionViewSet,
-    SchoolDirectoryViewSet, MajorOptionViewSet
+    SchoolDirectoryViewSet, MajorOptionViewSet, ExtractDocumentView
 )
 
 router = DefaultRouter()
@@ -23,6 +23,7 @@ router.register(r'majors', MajorOptionViewSet, basename='major')
 
 urlpatterns = [
     path('students/export/excel/', StudentExportView.as_view(), name='student-export-excel'),
+    path('students/extract-document/', ExtractDocumentView.as_view(), name='student-extract-document'),
     path('student-options/', StudentOptionsViewSet.as_view({'get': 'list'}), name='student-options'),
     path('', include(router.urls)),
 ]

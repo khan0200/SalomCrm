@@ -137,5 +137,19 @@ export const studentsApi = {
     link.remove()
     window.URL.revokeObjectURL(url)
   },
+
+  extractDocument: async (formData: FormData): Promise<{
+    document_type: string
+    fields: Record<string, string>
+    ocr_text: string
+    is_parent_passport?: boolean
+  }> => {
+    const response = await apiClient.post('/students/extract-document/', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    })
+    return response.data
+  },
 }
 

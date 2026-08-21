@@ -27,6 +27,12 @@ const routes = [
         meta: { title: 'Students' }
       },
       {
+        path: 'students/:id/extract',
+        name: 'student-extract',
+        component: () => import('@/modules/students/pages/StudentExtractPage.vue'),
+        meta: { title: 'Fill By Document' }
+      },
+      {
         path: 'payments',
         name: 'payments',
         component: PaymentsPage,

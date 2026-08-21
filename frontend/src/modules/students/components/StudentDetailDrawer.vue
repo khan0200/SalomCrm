@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { useQuery } from '@tanstack/vue-query'
 import { settingsApi } from '@/api/settings'
 import { paymentsApi } from '@/api/payments'
@@ -15,6 +16,8 @@ import {
   BookOpen, ArrowLeft, FileText, Eraser, Loader2
 } from 'lucide-vue-next'
 
+const router = useRouter()
+
 const props = defineProps<{
   isOpen: boolean
   student: Student | null
@@ -29,6 +32,12 @@ const emit = defineEmits<{
   (e: 'permanent-delete'): void
   (e: 'open-add-payment', studentId: string): void
 }>()
+
+const navigateToExtract = () => {
+  if (props.student) {
+    router.push(`/students/${props.student.id}/extract`)
+  }
+}
 
 const { formatCurrency } = useCurrency()
 
@@ -1302,8 +1311,9 @@ const handleRestoreStudent = () => {
             <!-- Fill By Document -->
             <button
               type="button"
-              class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-zinc-800 hover:bg-zinc-50 border border-zinc-200 dark:border-zinc-700 rounded-lg text-xs font-semibold text-zinc-700 dark:text-zinc-300 transition-all shadow-2xs cursor-pointer"
-              title="Fill student details from document"
+              @click="navigateToExtract"
+              class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-zinc-800 hover:bg-zinc-50 border border-zinc-200 dark:border-zinc-700 rounded-lg text-xs font-semibold text-zinc-700 dark:text-zinc-300 transition-all shadow-2xs cursor-pointer hover:border-blue-500/50"
+              title="Fill student details from document scan (Python OCR)"
             >
               <FileText class="w-3.5 h-3.5 text-blue-600" />
               <span class="hidden sm:inline">Fill By Document</span>

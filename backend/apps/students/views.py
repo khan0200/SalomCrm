@@ -626,3 +626,63 @@ class MajorOptionViewSet(BaseOptionViewSet):
             defaults={'created_by': request.user if request.user.is_authenticated else None}
         )
         return Response(MajorOptionSerializer(major).data, status=status.HTTP_200_OK)
+
+
+class ExtractDocumentView(APIView):
+    """
+    In-memory document extraction and OCR service for student profiles.
+    Zero permanent file storage - processes in RAM and returns structured JSON.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request: Request):
+        from .ocr_service import extract_document_from_bytes
+        import base64
+
+        file_obj = request.FILES.get('file')
+        file_bytes = None
+        filename = ''
+
+        if file_obj:
+            file_bytes = file_obj.read()
+            filename = file_obj.name
+        else:
+            image_b64 = request.data.get('image') or request.data.get('data')
+            if image_b64:
+                filename = request.data.get('filename', 'document.jpg')
+                if ',' in image_b64:
+                    image_b64 = image_b64.split(',', 1)[1]
+                try:
+                    file_bytes = base64.b64decode(image_b64)
+                except Exception:
+                    return Response({'error': 'Invalid base64 image data'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not file_bytes:
+            return Response({'error': 'No document file or image provided'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            extracted_data = extract_document_from_bytes(file_bytes, filename)
+            
+            # Check student ID for parent passport intelligence
+            student_id = request.data.get('student_id') or request.query_params.get('student_id')
+            if student_id:
+                try:
+                    student = Student.objects.filter(id=student_id).first()
+                    if student and student.birthday and extracted_data.get('document_type') == 'PASSPORT':
+                        extracted_dob = extracted_data.get('fields', {}).get('DATE_OF_BIRTH')
+                        if extracted_dob and str(extracted_dob) < str(student.birthday):
+                            # Parent passport detected!
+                            extracted_data['is_parent_passport'] = True
+                            sex = extracted_data.get('fields', {}).get('SEX', '')
+                            full_name = extracted_data.get('fields', {}).get('FULL_NAME', '')
+                            if sex == 'MALE' and full_name:
+                                extracted_data['fields']['FATHER_FULLNAME'] = full_name
+                            elif sex == 'FEMALE' and full_name:
+                                extracted_data['fields']['MOTHER_FULLNAME'] = full_name
+                except Exception:
+                    pass
+
+            return Response(extracted_data, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'error': f'Failed to extract document: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
