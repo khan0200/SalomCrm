@@ -167,3 +167,79 @@ button, input, select, textarea, optgroup, pre, code, kbd, samp, table, tr, th, 
   box-shadow: none !important;
   background-color: transparent !important;
 }
+
+/* ── VisaCheck Page Scoped 10% Font Size Reduction ── */
+.visacheck-page {
+  font-size: calc(15.4px * 0.9);
+}
+
+.visacheck-page .text-xs {
+  font-size: 0.675rem !important;
+  line-height: 0.9rem !important;
+}
+.visacheck-page .text-sm {
+  font-size: 0.7875rem !important;
+  line-height: 1.125rem !important;
+}
+.visacheck-page .text-base {
+  font-size: 0.9rem !important;
+  line-height: 1.35rem !important;
+}
+.visacheck-page .text-lg {
+  font-size: 1.0125rem !important;
+  line-height: 1.575rem !important;
+}
+.visacheck-page .text-xl {
+  font-size: 1.125rem !important;
+  line-height: 1.575rem !important;
+}
+.visacheck-page .text-2xl {
+  font-size: 1.35rem !important;
+  line-height: 1.8rem !important;
+}
+.visacheck-page .text-3xl {
+  font-size: 1.6875rem !important;
+  line-height: 2.025rem !important;
+}
+
+.visacheck-page .text-\[10px\] {
+  font-size: 9px !important;
+}
+.visacheck-page .text-\[10\.5px\] {
+  font-size: 9.45px !important;
+}
+.visacheck-page .text-\[11px\] {
+  font-size: 9.9px !important;
+}
+.visacheck-page .text-\[12px\] {
+  font-size: 10.8px !important;
+}
+.visacheck-page .text-\[13px\] {
+  font-size: 11.7px !important;
+}
+
+@media (min-width: 640px) {
+  .visacheck-page .sm\:text-xs {
+    font-size: 0.675rem !important;
+    line-height: 0.9rem !important;
+  }
+  .visacheck-page .sm\:text-sm {
+    font-size: 0.7875rem !important;
+    line-height: 1.125rem !important;
+  }
+  .visacheck-page .sm\:text-base {
+    font-size: 0.9rem !important;
+    line-height: 1.35rem !important;
+  }
+  .visacheck-page .sm\:text-lg {
+    font-size: 1.0125rem !important;
+    line-height: 1.575rem !important;
+  }
+  .visacheck-page .sm\:text-\[11px\] {
+    font-size: 9.9px !important;
+  }
+  .visacheck-page .sm\:text-\[13px\] {
+    font-size: 11.7px !important;
+  }
+}
+

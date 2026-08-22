@@ -72,17 +72,17 @@ function getStatusBadgeType(statusValue: string): 'success' | 'error' | 'warning
     >
       <div
         v-if="isOpen"
-        class="fixed inset-0 z-[80] flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-sm select-none"
+        class="visacheck-page fixed inset-0 z-[80] flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-sm select-none"
         @mousedown.self="emit('close')"
       >
         <div
-          class="w-full max-w-2xl bg-white dark:bg-[#121824] border border-zinc-200 dark:border-white/10 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+          class="w-full max-w-2xl bg-white dark:bg-[#121824] border border-zinc-200 dark:border-white/10 rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
         >
           <!-- Header -->
           <div class="p-5 sm:p-6 pb-4 border-b border-zinc-100 dark:border-white/10 flex items-start justify-between gap-4">
             <div class="flex items-start gap-3.5">
               <div
-                class="flex items-center justify-center size-12 rounded-2xl shrink-0 shadow-inner"
+                class="flex items-center justify-center size-12 rounded-lg shrink-0 shadow-inner"
                 :class="noAnswers.length > 0 ? 'bg-amber-500/10 text-amber-500' : 'bg-emerald-500/10 text-emerald-500'"
               >
                 <AlertTriangle v-if="noAnswers.length > 0" class="size-6" />
@@ -100,7 +100,7 @@ function getStatusBadgeType(statusValue: string): 'success' | 'error' | 'warning
 
             <button
               type="button"
-              class="p-2 rounded-xl text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-white/10 transition-colors cursor-pointer"
+              class="p-2 rounded-md text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-white/10 transition-colors cursor-pointer"
               aria-label="Yopish"
               @click="emit('close')"
             >
@@ -113,13 +113,13 @@ function getStatusBadgeType(statusValue: string): 'success' | 'error' | 'warning
             <!-- 4 Summary KPI Metric Cards -->
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
               <!-- Total Checked -->
-              <div class="p-3.5 rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-white/[0.02] flex flex-col justify-between">
+              <div class="p-3.5 rounded-lg border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-white/[0.02] flex flex-col justify-between">
                 <span class="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Jami</span>
                 <span class="text-2xl font-black text-zinc-900 dark:text-white mt-1">{{ summary.total }}</span>
               </div>
 
               <!-- Status Changed -->
-              <div class="p-3.5 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 flex flex-col justify-between">
+              <div class="p-3.5 rounded-lg border border-emerald-500/20 bg-emerald-500/5 flex flex-col justify-between">
                 <span class="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">O'zgargan</span>
                 <div class="flex items-center gap-1.5 mt-1">
                   <span class="text-2xl font-black text-emerald-600 dark:text-emerald-400">{{ changes.length }}</span>
@@ -128,14 +128,14 @@ function getStatusBadgeType(statusValue: string): 'success' | 'error' | 'warning
               </div>
 
               <!-- Unchanged -->
-              <div class="p-3.5 rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-white/[0.02] flex flex-col justify-between">
+              <div class="p-3.5 rounded-lg border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-white/[0.02] flex flex-col justify-between">
                 <span class="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">O'zgarmagan</span>
                 <span class="text-2xl font-black text-zinc-700 dark:text-zinc-300 mt-1">{{ summary.unchanged }}</span>
               </div>
 
               <!-- No Answer / Timeout -->
               <div
-                class="p-3.5 rounded-2xl border flex flex-col justify-between"
+                class="p-3.5 rounded-lg border flex flex-col justify-between"
                 :class="noAnswers.length > 0 ? 'border-rose-500/30 bg-rose-500/5' : 'border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-white/[0.02]'"
               >
                 <span
@@ -160,7 +160,7 @@ function getStatusBadgeType(statusValue: string): 'success' | 'error' | 'warning
             <div class="flex items-center gap-2 border-b border-zinc-200 dark:border-white/10 pb-2">
               <button
                 type="button"
-                class="flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                class="flex items-center gap-2 px-3.5 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer"
                 :class="activeTab === 'changes'
                   ? 'bg-emerald-600 text-white shadow-xs'
                   : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-white/5'"
@@ -169,7 +169,7 @@ function getStatusBadgeType(statusValue: string): 'success' | 'error' | 'warning
                 <Sparkles class="size-3.5" />
                 <span>Viza o'zgarishlari</span>
                 <span
-                  class="px-1.5 py-0.5 rounded-full text-[10px] font-bold"
+                  class="px-1.5 py-0.5 rounded text-[10px] font-bold"
                   :class="activeTab === 'changes' ? 'bg-white/20 text-white' : 'bg-zinc-200 dark:bg-white/10 text-zinc-700 dark:text-zinc-300'"
                 >
                   {{ changes.length }}
@@ -178,7 +178,7 @@ function getStatusBadgeType(statusValue: string): 'success' | 'error' | 'warning
 
               <button
                 type="button"
-                class="flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                class="flex items-center gap-2 px-3.5 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer"
                 :class="activeTab === 'no-answers'
                   ? 'bg-rose-600 text-white shadow-xs'
                   : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-white/5'"
@@ -187,7 +187,7 @@ function getStatusBadgeType(statusValue: string): 'success' | 'error' | 'warning
                 <AlertCircle class="size-3.5" />
                 <span>Javob olinmaganlar</span>
                 <span
-                  class="px-1.5 py-0.5 rounded-full text-[10px] font-bold"
+                  class="px-1.5 py-0.5 rounded text-[10px] font-bold"
                   :class="activeTab === 'no-answers' ? 'bg-white/20 text-white' : 'bg-zinc-200 dark:bg-white/10 text-zinc-700 dark:text-zinc-300'"
                 >
                   {{ noAnswers.length }}
@@ -202,7 +202,7 @@ function getStatusBadgeType(statusValue: string): 'success' | 'error' | 'warning
             >
               <div
                 v-if="changes.length === 0"
-                class="py-10 text-center space-y-2 border border-dashed border-zinc-200 dark:border-white/10 rounded-2xl bg-zinc-50/50 dark:bg-white/[0.01]"
+                class="py-10 text-center space-y-2 border border-dashed border-zinc-200 dark:border-white/10 rounded-lg bg-zinc-50/50 dark:bg-white/[0.01]"
               >
                 <CheckCircle2 class="size-8 text-zinc-400 mx-auto" />
                 <p class="text-xs text-zinc-500 dark:text-zinc-400 font-medium">
@@ -213,7 +213,7 @@ function getStatusBadgeType(statusValue: string): 'success' | 'error' | 'warning
               <div
                 v-for="change in changes"
                 :key="change.passport || change.fullName"
-                class="group relative overflow-hidden rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50/50 dark:bg-white/[0.02] p-3.5 transition-all flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-l-4"
+                class="group relative overflow-hidden rounded-lg border border-zinc-200 dark:border-white/10 bg-zinc-50/50 dark:bg-white/[0.02] p-3.5 transition-all flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-l-4"
                 :class="{
                   'border-l-emerald-500': getStatusBadgeType(change.newStatus) === 'success',
                   'border-l-rose-500': getStatusBadgeType(change.newStatus) === 'error',
@@ -239,12 +239,12 @@ function getStatusBadgeType(statusValue: string): 'success' | 'error' | 'warning
 
                 <!-- Right: Old -> New status pill -->
                 <div class="flex items-center gap-2 self-start sm:self-center shrink-0">
-                  <span class="px-2.5 py-1 rounded-lg text-xs font-semibold bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+                  <span class="px-2.5 py-1 rounded-md text-xs font-semibold bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
                     {{ change.oldStatus }}
                   </span>
                   <ArrowRight class="size-3.5 text-zinc-400 shrink-0" />
                   <span
-                    class="px-2.5 py-1 rounded-lg text-xs font-bold shadow-xs"
+                    class="px-2.5 py-1 rounded-md text-xs font-bold shadow-xs"
                     :class="{
                       'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20': getStatusBadgeType(change.newStatus) === 'success',
                       'bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-500/20': getStatusBadgeType(change.newStatus) === 'error',
@@ -265,7 +265,7 @@ function getStatusBadgeType(statusValue: string): 'success' | 'error' | 'warning
             >
               <div
                 v-if="noAnswers.length === 0"
-                class="py-10 text-center space-y-2 border border-dashed border-emerald-500/20 rounded-2xl bg-emerald-500/5"
+                class="py-10 text-center space-y-2 border border-dashed border-emerald-500/20 rounded-lg bg-emerald-500/5"
               >
                 <ShieldCheck class="size-8 text-emerald-500 mx-auto" />
                 <p class="text-xs text-emerald-700 dark:text-emerald-400 font-bold">
@@ -276,7 +276,7 @@ function getStatusBadgeType(statusValue: string): 'success' | 'error' | 'warning
               <div
                 v-for="noAns in noAnswers"
                 :key="noAns.passport"
-                class="group relative overflow-hidden rounded-2xl border border-rose-500/20 bg-rose-500/[0.03] dark:bg-rose-500/[0.05] p-3.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-l-4 border-l-rose-500"
+                class="group relative overflow-hidden rounded-lg border border-rose-500/20 bg-rose-500/[0.03] dark:bg-rose-500/[0.05] p-3.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-l-4 border-l-rose-500"
               >
                 <div class="space-y-1">
                   <div class="flex items-center gap-2">
@@ -295,7 +295,7 @@ function getStatusBadgeType(statusValue: string): 'success' | 'error' | 'warning
                 </div>
 
                 <div class="self-start sm:self-center shrink-0">
-                  <span class="px-2.5 py-1 rounded-lg text-xs font-bold bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-500/20">
+                  <span class="px-2.5 py-1 rounded-md text-xs font-bold bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-500/20">
                     Javob olinmadi
                   </span>
                 </div>
@@ -310,7 +310,7 @@ function getStatusBadgeType(statusValue: string): 'success' | 'error' | 'warning
                 v-if="noAnswers.length > 0"
                 type="button"
                 :disabled="isRetrying"
-                class="px-4 py-2.5 rounded-xl font-bold text-xs bg-amber-500 hover:bg-amber-600 text-white flex items-center gap-1.5 transition-colors disabled:opacity-50 cursor-pointer shadow-xs"
+                class="px-4 py-2.5 rounded-md font-bold text-xs bg-amber-500 hover:bg-amber-600 text-white flex items-center gap-1.5 transition-colors disabled:opacity-50 cursor-pointer shadow-xs"
                 @click="emit('retry-no-answers')"
               >
                 <RotateCcw class="size-3.5" :class="{ 'animate-spin': isRetrying }" />
@@ -320,7 +320,7 @@ function getStatusBadgeType(statusValue: string): 'success' | 'error' | 'warning
 
             <button
               type="button"
-              class="px-6 py-2.5 rounded-xl font-bold text-xs bg-[#0B4133] hover:bg-[#0d4e3d] text-white transition-colors cursor-pointer shadow-md"
+              class="px-6 py-2.5 rounded-md font-bold text-xs bg-[#0B4133] hover:bg-[#0d4e3d] text-white transition-colors cursor-pointer shadow-md"
               @click="emit('close')"
             >
               Tushunarli

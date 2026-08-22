@@ -237,7 +237,7 @@ async function handleSubmit() {
     >
       <div
         v-if="isOpen"
-        class="fixed inset-0 z-[60] flex items-end sm:items-center justify-center sm:p-4"
+        class="visacheck-page fixed inset-0 z-[60] flex items-end sm:items-center justify-center sm:p-4"
         @mousedown.self="emit('close')"
       >
         <!-- Backdrop -->
@@ -254,7 +254,7 @@ async function handleSubmit() {
         >
           <div
             v-if="isOpen"
-            class="relative w-full sm:max-w-md bg-white dark:bg-[#141618] rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]"
+            class="relative w-full sm:max-w-md bg-white dark:bg-[#141618] rounded-t-xl sm:rounded-lg shadow-2xl overflow-hidden flex flex-col max-h-[92vh]"
           >
             <!-- Drag pill (mobile) -->
             <div class="flex justify-center pt-3 pb-1 sm:hidden">
@@ -274,7 +274,7 @@ async function handleSubmit() {
               <button
                 type="button"
                 @click="emit('close')"
-                class="size-8 rounded-full flex items-center justify-center bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
+                class="size-8 rounded-md flex items-center justify-center bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
               >
                 <X class="size-4" />
               </button>
@@ -295,7 +295,7 @@ async function handleSubmit() {
                     :key="vt"
                     type="button"
                     @click="setVisaType(vt as VisaType)"
-                    class="flex-1 py-2 rounded-lg text-xs font-bold transition-all border"
+                    class="flex-1 py-2 rounded-md text-xs font-bold transition-all border"
                     :class="form.visaType === vt
                       ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 border-transparent shadow-sm'
                       : 'bg-transparent text-zinc-500 dark:text-zinc-400 border-zinc-200 dark:border-zinc-700 hover:border-zinc-400 dark:hover:border-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'"
@@ -324,7 +324,7 @@ async function handleSubmit() {
                   placeholder="FA1234567"
                   required
                   autocomplete="off"
-                  class="w-full h-10 px-3.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 text-zinc-900 dark:text-white font-mono text-sm tracking-widest uppercase placeholder-zinc-400 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-500 focus:bg-white dark:focus:bg-zinc-800 transition-all"
+                  class="w-full h-10 px-3.5 rounded-md border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 text-zinc-900 dark:text-white font-mono text-sm tracking-widest uppercase placeholder-zinc-400 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-500 focus:bg-white dark:focus:bg-zinc-800 transition-all"
                 />
 
                 <!-- Autofill banner if found in main DB -->
@@ -333,7 +333,7 @@ async function handleSubmit() {
                   enter-from-class="opacity-0 -translate-y-1"
                   enter-to-class="opacity-100 translate-y-0"
                 >
-                  <div v-if="autofilledFromMain" class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 text-[11px] font-medium">
+                  <div v-if="autofilledFromMain" class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 text-[11px] font-medium">
                     <CheckCircle2 class="size-3.5 shrink-0 text-emerald-600" />
                     <span>Asosiy CRM bazasidan topildi va to'ldirildi ✓</span>
                   </div>
@@ -356,7 +356,7 @@ async function handleSubmit() {
                   placeholder="ABDUVOHIDOV KUVONCHBEK"
                   required
                   autocomplete="off"
-                  class="w-full h-10 px-3.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 text-zinc-900 dark:text-white text-sm uppercase placeholder-zinc-400 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-500 focus:bg-white dark:focus:bg-zinc-800 transition-all"
+                  class="w-full h-10 px-3.5 rounded-md border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 text-zinc-900 dark:text-white text-sm uppercase placeholder-zinc-400 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-500 focus:bg-white dark:focus:bg-zinc-800 transition-all"
                 />
                 <Transition enter-active-class="transition-all duration-200" enter-from-class="opacity-0 -translate-y-1" enter-to-class="opacity-100 translate-y-0">
                   <div v-if="spaceWarning" class="flex items-center gap-1.5 text-amber-600 dark:text-amber-400 text-[11px] font-medium">
@@ -382,7 +382,7 @@ async function handleSubmit() {
                   maxlength="10"
                   required
                   autocomplete="off"
-                  class="w-full h-10 px-3.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 text-zinc-900 dark:text-white font-mono text-sm placeholder-zinc-400 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-500 focus:bg-white dark:focus:bg-zinc-800 transition-all"
+                  class="w-full h-10 px-3.5 rounded-md border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 text-zinc-900 dark:text-white font-mono text-sm placeholder-zinc-400 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-500 focus:bg-white dark:focus:bg-zinc-800 transition-all"
                 />
               </div>
 
@@ -405,7 +405,7 @@ async function handleSubmit() {
                     v-model="form.applicationNo"
                     placeholder="AP2026123456"
                     autocomplete="off"
-                    class="w-full h-10 px-3.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 text-zinc-900 dark:text-white font-mono uppercase text-sm placeholder-zinc-400 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-500 focus:bg-white dark:focus:bg-zinc-800 transition-all"
+                    class="w-full h-10 px-3.5 rounded-md border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 text-zinc-900 dark:text-white font-mono uppercase text-sm placeholder-zinc-400 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-500 focus:bg-white dark:focus:bg-zinc-800 transition-all"
                   />
                 </div>
               </Transition>
@@ -422,13 +422,13 @@ async function handleSubmit() {
                   v-model="form.studentId"
                   placeholder="M445"
                   autocomplete="off"
-                  class="w-full h-10 px-3.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 text-zinc-900 dark:text-white font-mono uppercase text-sm placeholder-zinc-400 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-500 focus:bg-white dark:focus:bg-zinc-800 transition-all"
+                  class="w-full h-10 px-3.5 rounded-md border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 text-zinc-900 dark:text-white font-mono uppercase text-sm placeholder-zinc-400 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-500 focus:bg-white dark:focus:bg-zinc-800 transition-all"
                 />
               </div>
 
               <!-- Error -->
               <Transition enter-active-class="transition-all duration-200" enter-from-class="opacity-0 -translate-y-1" enter-to-class="opacity-100 translate-y-0">
-                <div v-if="errorMessage" class="flex items-start gap-2.5 p-3 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs">
+                <div v-if="errorMessage" class="flex items-start gap-2.5 p-3 rounded-md bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs">
                   <AlertTriangle class="size-4 shrink-0 mt-0.5 text-rose-500" />
                   <span>{{ errorMessage }}</span>
                 </div>
@@ -442,7 +442,7 @@ async function handleSubmit() {
                 type="button"
                 @click="emit('close')"
                 :disabled="submitting || checkingVisa"
-                class="h-10 px-4 rounded-xl text-sm font-semibold text-zinc-600 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all disabled:opacity-40 select-none shrink-0"
+                class="h-10 px-4 rounded-md text-sm font-semibold text-zinc-600 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all disabled:opacity-40 select-none shrink-0"
               >
                 Bekor
               </button>
@@ -452,7 +452,7 @@ async function handleSubmit() {
                 type="button"
                 @click="handleSubmit"
                 :disabled="submitting || checkingVisa"
-                class="flex-1 h-10 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 disabled:opacity-60 select-none active:scale-[0.98]"
+                class="flex-1 h-10 rounded-md text-sm font-bold transition-all flex items-center justify-center gap-2 disabled:opacity-60 select-none active:scale-[0.98]"
                 :class="checkingVisa
                   ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30'
                   : 'bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-500/30'"

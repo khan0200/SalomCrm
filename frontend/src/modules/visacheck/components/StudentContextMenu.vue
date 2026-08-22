@@ -85,7 +85,7 @@ onBeforeUnmount(() => {
       <div
         v-if="isOpen && student"
         data-context-menu
-        class="fixed z-[100] w-56 rounded-xl bg-white/95 dark:bg-[#16181b]/95 backdrop-blur-xl border border-zinc-200/80 dark:border-zinc-700/80 shadow-2xl p-1.5 text-xs text-zinc-800 dark:text-zinc-200 select-none"
+        class="visacheck-page fixed z-[100] w-56 rounded-lg bg-white/95 dark:bg-[#16181b]/95 backdrop-blur-xl border border-zinc-200/80 dark:border-zinc-700/80 shadow-2xl p-1.5 text-xs text-zinc-800 dark:text-zinc-200 select-none"
         :style="adjustedStyle"
         @contextmenu.prevent
       >
@@ -93,7 +93,7 @@ onBeforeUnmount(() => {
           <!-- 1. Batafsil ko'rish (Details) -->
           <button
             type="button"
-            class="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800/80 font-semibold transition-colors cursor-pointer"
+            class="w-full flex items-center justify-between px-3 py-2 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800/80 font-semibold transition-colors cursor-pointer"
             @click="emit('details', student); emit('close')"
           >
             <div class="flex items-center gap-2.5">
@@ -106,7 +106,7 @@ onBeforeUnmount(() => {
           <!-- 2. Tahrirlash (Edit) -->
           <button
             type="button"
-            class="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800/80 font-semibold transition-colors cursor-pointer"
+            class="w-full flex items-center justify-between px-3 py-2 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800/80 font-semibold transition-colors cursor-pointer"
             @click="emit('edit', student); emit('close')"
           >
             <div class="flex items-center gap-2.5">
@@ -119,7 +119,7 @@ onBeforeUnmount(() => {
           <!-- 3. Yuqoriga pin qilish / Pinni bekor qilish -->
           <button
             type="button"
-            class="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800/80 font-semibold transition-colors cursor-pointer"
+            class="w-full flex items-center justify-between px-3 py-2 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800/80 font-semibold transition-colors cursor-pointer"
             @click="emit('toggle-pin', student); emit('close')"
           >
             <div class="flex items-center gap-2.5">

@@ -29,12 +29,12 @@ const options: { value: VisaTypeFilter; label: string; icon: any }[] = [
 </script>
 
 <template>
-  <div class="grid grid-cols-4 sm:inline-flex sm:items-center gap-1 p-1 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs w-full sm:w-auto">
+  <div class="grid grid-cols-4 sm:inline-flex sm:items-center gap-1 p-1 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs w-full sm:w-auto">
     <button
       v-for="opt in options"
       :key="opt.value"
       type="button"
-      class="relative flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-1.5 rounded-lg px-2 sm:px-3 py-1.5 text-xs sm:text-sm font-semibold transition-all duration-150 whitespace-nowrap cursor-pointer"
+      class="relative flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-1.5 rounded-md px-2 sm:px-3 py-1.5 text-xs sm:text-sm font-semibold transition-all duration-150 whitespace-nowrap cursor-pointer"
       :class="props.modelValue === opt.value
         ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-xs font-bold border border-zinc-300 dark:border-zinc-700'
         : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-850 hover:text-zinc-900 dark:hover:text-zinc-200 border border-transparent'"
@@ -46,7 +46,7 @@ const options: { value: VisaTypeFilter; label: string; icon: any }[] = [
       />
       <span>{{ opt.label }}</span>
       <span
-        class="text-[10px] sm:text-[11px] font-bold rounded-md px-1.5 py-0.5 min-w-[1.2rem] text-center transition-colors"
+        class="text-[10px] sm:text-[11px] font-bold rounded px-1.5 py-0.5 min-w-[1.2rem] text-center transition-colors"
         :class="props.modelValue === opt.value
           ? 'bg-[#0B4133] text-white'
           : 'bg-zinc-200/80 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-400'"

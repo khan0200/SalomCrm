@@ -159,7 +159,7 @@ const universities = computed(() => {
         <!-- Copy Full Name Button -->
         <button
           @click.stop="copyName"
-          class="p-1 rounded text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+          class="p-1 rounded text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors cursor-pointer"
           title="Copy full name"
         >
           <Check v-if="isNameCopied" class="w-3.5 h-3.5 text-emerald-500" />
@@ -183,7 +183,7 @@ const universities = computed(() => {
 
         <button
           @click.stop="copyPhone"
-          class="p-1 rounded text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer shrink-0"
+          class="p-1 rounded text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors cursor-pointer shrink-0"
           title="Copy ID, name, and phones"
         >
           <Check v-if="isPhoneCopied" class="w-3.5 h-3.5 text-emerald-500" />

@@ -2,7 +2,7 @@
 import { ref, computed, watch } from 'vue'
 import {
   X, RefreshCw, FileDown, Pencil, Trash2, Globe, Map, Building2,
-  CheckCircle2, XCircle, Clock, AlertCircle, Info
+  CheckCircle2, XCircle, Clock, AlertCircle, Info, Pin
 } from 'lucide-vue-next'
 import { visaApi, type VisaStudent, type VisaOptions } from '@/api/visa'
 import { useUiStore } from '@/stores/ui'
@@ -183,7 +183,7 @@ async function clearField(fieldName: ManagementField) {
     >
       <div
         v-if="isOpen && student"
-        class="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs"
+        class="visacheck-page fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs"
         @mousedown.self="emit('close')"
       >
         <Transition
@@ -196,7 +196,7 @@ async function clearField(fieldName: ManagementField) {
         >
           <div
             v-if="isOpen && student"
-            class="relative w-full max-w-3xl bg-white dark:bg-[#141618] border border-slate-200/90 dark:border-white/10 rounded-2xl shadow-2xl overflow-hidden max-h-[92vh] flex flex-col"
+            class="relative w-full max-w-3xl bg-white dark:bg-[#141618] border border-slate-200/90 dark:border-white/10 rounded-lg shadow-2xl overflow-hidden max-h-[92vh] flex flex-col"
           >
             <!-- Modal Header (matches screenshot: "Student Details" on left, X on right) -->
             <div class="px-6 py-4 border-b border-slate-200 dark:border-zinc-800 flex items-center justify-between">
@@ -206,7 +206,7 @@ async function clearField(fieldName: ManagementField) {
               <button
                 type="button"
                 @click="emit('close')"
-                class="size-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors"
+                class="size-8 rounded-md flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors"
               >
                 <X class="size-4.5" />
               </button>
@@ -224,6 +224,7 @@ async function clearField(fieldName: ManagementField) {
                       <CopyField :value="student.full_name" label="Copy name">
                         <span class="truncate block max-w-[280px]">{{ student.full_name }}</span>
                       </CopyField>
+                      <Pin v-if="student.pinned" class="size-4 text-amber-500 fill-amber-500 shrink-0" title="Pinned" />
                       <span v-if="student.flag" title="Flagged" class="text-sm select-none shrink-0">🚩</span>
                       <span v-if="student.refund_application" title="Refund Application" class="text-sm select-none shrink-0">💸</span>
                     </div>
@@ -237,7 +238,7 @@ async function clearField(fieldName: ManagementField) {
 
                   <!-- Passport Number Box (Mint green matching screenshot) -->
                   <CopyField :value="student.passport" label="Copy passport" class="w-full block">
-                    <div class="w-full rounded-xl bg-[#E8F5E9] dark:bg-emerald-950/20 border border-[#C8E6C9] dark:border-emerald-900/40 px-4 py-3 text-left hover:bg-[#DCEDC8] dark:hover:bg-emerald-950/40 transition-colors cursor-pointer flex items-center justify-between">
+                    <div class="w-full rounded-md bg-[#E8F5E9] dark:bg-emerald-950/20 border border-[#C8E6C9] dark:border-emerald-900/40 px-4 py-3 text-left hover:bg-[#DCEDC8] dark:hover:bg-emerald-950/40 transition-colors cursor-pointer flex items-center justify-between">
                       <div class="min-w-0">
                         <p class="text-[10.5px] font-bold uppercase tracking-wider text-[#2E7D32] dark:text-emerald-400">
                           PASSPORT NUMBER
@@ -252,7 +253,7 @@ async function clearField(fieldName: ManagementField) {
                   <!-- 2-Column Info Grid -->
                   <div class="grid grid-cols-2 gap-3 text-xs">
                     <!-- Student ID -->
-                    <div class="rounded-xl border border-slate-200 dark:border-zinc-800 p-3 bg-white dark:bg-zinc-900/50">
+                    <div class="rounded-md border border-slate-200 dark:border-zinc-800 p-3 bg-white dark:bg-zinc-900/50">
                       <p class="text-[11px] text-slate-400 dark:text-zinc-500 font-medium mb-0.5">Student ID</p>
                       <CopyField :value="student.student_id || student.id" label="Copy ID" class="text-sm font-semibold text-slate-800 dark:text-zinc-200">
                         {{ student.student_id || student.id || '--' }}
@@ -260,7 +261,7 @@ async function clearField(fieldName: ManagementField) {
                     </div>
 
                     <!-- Birthdate -->
-                    <div class="rounded-xl border border-slate-200 dark:border-zinc-800 p-3 bg-white dark:bg-zinc-900/50">
+                    <div class="rounded-md border border-slate-200 dark:border-zinc-800 p-3 bg-white dark:bg-zinc-900/50">
                       <p class="text-[11px] text-slate-400 dark:text-zinc-500 font-medium mb-0.5">Birthdate</p>
                       <CopyField :value="student.birthday" label="Copy birthday" class="text-sm font-bold font-mono text-slate-900 dark:text-white">
                         {{ student.birthday || '--' }}
@@ -268,7 +269,7 @@ async function clearField(fieldName: ManagementField) {
                     </div>
 
                     <!-- Application Date -->
-                    <div class="rounded-xl border border-slate-200 dark:border-zinc-800 p-3 bg-white dark:bg-zinc-900/50">
+                    <div class="rounded-md border border-slate-200 dark:border-zinc-800 p-3 bg-white dark:bg-zinc-900/50">
                       <p class="text-[11px] text-slate-400 dark:text-zinc-500 font-medium mb-0.5">Application Date</p>
                       <CopyField :value="student.application_date" label="Copy application date" class="text-xs font-semibold text-slate-800 dark:text-zinc-200 font-mono">
                         {{ student.application_date || '--' }}
@@ -276,7 +277,7 @@ async function clearField(fieldName: ManagementField) {
                     </div>
 
                     <!-- Application Number -->
-                    <div class="rounded-xl border border-slate-200 dark:border-zinc-800 p-3 bg-white dark:bg-zinc-900/50">
+                    <div class="rounded-md border border-slate-200 dark:border-zinc-800 p-3 bg-white dark:bg-zinc-900/50">
                       <p class="text-[11px] text-slate-400 dark:text-zinc-500 font-medium mb-0.5">Application Number</p>
                       <CopyField :value="student.application_no" label="Copy app no" class="text-xs font-bold font-mono text-slate-800 dark:text-zinc-200">
                         {{ student.application_no || '--' }}
@@ -284,7 +285,7 @@ async function clearField(fieldName: ManagementField) {
                     </div>
 
                     <!-- Status Date (if available) -->
-                    <div v-if="student.status_date" class="rounded-xl border border-slate-200 dark:border-zinc-800 p-3 bg-white dark:bg-zinc-900/50">
+                    <div v-if="student.status_date" class="rounded-md border border-slate-200 dark:border-zinc-800 p-3 bg-white dark:bg-zinc-900/50">
                       <p class="text-[11px] text-slate-400 dark:text-zinc-500 font-medium mb-0.5">Status Date</p>
                       <CopyField :value="student.status_date" label="Copy status date" class="text-xs font-semibold text-slate-800 dark:text-zinc-200 font-mono">
                         {{ student.status_date }}
@@ -293,7 +294,7 @@ async function clearField(fieldName: ManagementField) {
 
                     <!-- Last Checked -->
                     <div
-                      class="rounded-xl border border-slate-200 dark:border-zinc-800 p-3 bg-white dark:bg-zinc-900/50"
+                      class="rounded-md border border-slate-200 dark:border-zinc-800 p-3 bg-white dark:bg-zinc-900/50"
                       :class="{ 'col-span-2': !student.status_date }"
                     >
                       <p class="text-[11px] text-slate-400 dark:text-zinc-500 font-medium mb-0.5">Last Checked</p>
@@ -306,7 +307,7 @@ async function clearField(fieldName: ManagementField) {
                   <!-- Rejection Reason Card (Pink card with red numbered badges matching screenshot) -->
                   <div
                     v-if="parsedRejectionReasons.length > 0"
-                    class="rounded-xl p-3 bg-[#FFF1F0] dark:bg-rose-950/30 border border-[#FFA39E] dark:border-rose-900/50 space-y-2 text-xs"
+                    class="rounded-md p-3 bg-[#FFF1F0] dark:bg-rose-950/30 border border-[#FFA39E] dark:border-rose-900/50 space-y-2 text-xs"
                   >
                     <div
                       v-for="(item, idx) in parsedRejectionReasons"
@@ -339,7 +340,7 @@ async function clearField(fieldName: ManagementField) {
                       <label class="block text-xs font-medium text-slate-500 dark:text-zinc-400 mb-1">
                         Tariff
                       </label>
-                      <div class="rounded-xl border border-slate-200 dark:border-zinc-800 p-3 flex items-center justify-between bg-white dark:bg-zinc-900/50">
+                      <div class="rounded-md border border-slate-200 dark:border-zinc-800 p-3 flex items-center justify-between bg-white dark:bg-zinc-900/50">
                         <span class="text-sm font-semibold text-slate-900 dark:text-white truncate pr-2">
                           {{ student.tariff || 'None' }}
                         </span>
@@ -370,7 +371,7 @@ async function clearField(fieldName: ManagementField) {
                       <label class="block text-xs font-medium text-slate-500 dark:text-zinc-400 mb-1">
                         University
                       </label>
-                      <div class="rounded-xl border border-slate-200 dark:border-zinc-800 p-3 flex items-center justify-between bg-white dark:bg-zinc-900/50">
+                      <div class="rounded-md border border-slate-200 dark:border-zinc-800 p-3 flex items-center justify-between bg-white dark:bg-zinc-900/50">
                         <span class="text-sm font-semibold text-slate-900 dark:text-white truncate pr-2">
                           {{ student.university || 'None' }}
                         </span>
@@ -401,7 +402,7 @@ async function clearField(fieldName: ManagementField) {
                       <label class="block text-xs font-medium text-slate-500 dark:text-zinc-400 mb-1">
                         Coordinator
                       </label>
-                      <div class="rounded-xl border border-slate-200 dark:border-zinc-800 p-3 flex items-center justify-between bg-white dark:bg-zinc-900/50">
+                      <div class="rounded-md border border-slate-200 dark:border-zinc-800 p-3 flex items-center justify-between bg-white dark:bg-zinc-900/50">
                         <span class="text-sm font-semibold text-slate-900 dark:text-white truncate pr-2">
                           {{ student.coordinator || 'None' }}
                         </span>
@@ -432,7 +433,7 @@ async function clearField(fieldName: ManagementField) {
                       <label class="block text-xs font-medium text-slate-500 dark:text-zinc-400 mb-1">
                         B2B Partner
                       </label>
-                      <div class="rounded-xl border border-slate-200 dark:border-zinc-800 p-3 flex items-center justify-between bg-white dark:bg-zinc-900/50">
+                      <div class="rounded-md border border-slate-200 dark:border-zinc-800 p-3 flex items-center justify-between bg-white dark:bg-zinc-900/50">
                         <span class="text-sm font-semibold text-slate-900 dark:text-white truncate pr-2">
                           {{ student.b2b || 'None' }}
                         </span>
@@ -463,7 +464,7 @@ async function clearField(fieldName: ManagementField) {
                       <label class="block text-xs font-medium text-slate-500 dark:text-zinc-400 mb-1">
                         Flag
                       </label>
-                      <div class="rounded-xl border border-slate-200 dark:border-zinc-800 p-3 flex items-center justify-between bg-white dark:bg-zinc-900/50">
+                      <div class="rounded-md border border-slate-200 dark:border-zinc-800 p-3 flex items-center justify-between bg-white dark:bg-zinc-900/50">
                         <span class="text-sm font-semibold text-slate-900 dark:text-white flex items-center gap-1.5">
                           <span>{{ student.flag ? 'True' : 'False' }}</span>
                           <span v-if="student.flag">🚩</span>
@@ -495,7 +496,7 @@ async function clearField(fieldName: ManagementField) {
                       <label class="block text-xs font-medium text-slate-500 dark:text-zinc-400 mb-1">
                         Refund Application
                       </label>
-                      <div class="rounded-xl border border-slate-200 dark:border-zinc-800 p-3 flex items-center justify-between bg-white dark:bg-zinc-900/50">
+                      <div class="rounded-md border border-slate-200 dark:border-zinc-800 p-3 flex items-center justify-between bg-white dark:bg-zinc-900/50">
                         <span class="text-sm font-semibold text-slate-900 dark:text-white flex items-center gap-1.5">
                           <span>{{ student.refund_application ? 'True' : 'False' }}</span>
                           <span v-if="student.refund_application">💸</span>
@@ -533,7 +534,7 @@ async function clearField(fieldName: ManagementField) {
               <button
                 type="button"
                 @click="emit('delete', student)"
-                class="flex items-center gap-1.5 text-sm font-semibold text-rose-600 hover:text-rose-700 px-3 py-2 rounded-xl hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors"
+                class="flex items-center gap-1.5 text-sm font-semibold text-rose-600 hover:text-rose-700 px-3 py-2 rounded-md hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors"
               >
                 <Trash2 class="size-4" />
                 <span>Delete</span>
@@ -544,7 +545,7 @@ async function clearField(fieldName: ManagementField) {
                 <button
                   type="button"
                   @click="emit('edit', student)"
-                  class="flex items-center gap-1.5 h-10 px-6 rounded-xl border border-slate-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 font-semibold text-sm hover:bg-slate-50 dark:hover:bg-zinc-700 transition-colors"
+                  class="flex items-center gap-1.5 h-10 px-6 rounded-md border border-slate-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 font-semibold text-sm hover:bg-slate-50 dark:hover:bg-zinc-700 transition-colors"
                 >
                   <Pencil class="size-4" />
                   <span>Edit</span>
@@ -555,7 +556,7 @@ async function clearField(fieldName: ManagementField) {
                   v-if="isApproved"
                   type="button"
                   @click="emit('downloadPdf', student)"
-                  class="flex items-center gap-2 h-10 px-6 rounded-xl bg-[#0B4133] hover:bg-[#082e24] text-white font-bold text-sm shadow-sm transition-all"
+                  class="flex items-center gap-2 h-10 px-6 rounded-md bg-[#0B4133] hover:bg-[#082e24] text-white font-bold text-sm shadow-sm transition-all"
                 >
                   <Info class="size-4" />
                   <span>PDF</span>
@@ -566,7 +567,7 @@ async function clearField(fieldName: ManagementField) {
                   type="button"
                   :disabled="isChecking"
                   @click="emit('refresh', student)"
-                  class="flex items-center gap-2 h-10 px-6 rounded-xl bg-[#0B4133] hover:bg-[#082e24] text-white font-bold text-sm shadow-sm transition-all disabled:opacity-60"
+                  class="flex items-center gap-2 h-10 px-6 rounded-md bg-[#0B4133] hover:bg-[#082e24] text-white font-bold text-sm shadow-sm transition-all disabled:opacity-60"
                 >
                   <RefreshCw class="size-4" :class="{ 'animate-spin': isChecking }" />
                   <span>{{ isChecking ? 'Checking...' : 'Check' }}</span>
@@ -589,10 +590,10 @@ async function clearField(fieldName: ManagementField) {
     >
       <div
         v-if="showEditFieldModal && editingFieldName"
-        class="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs"
+        class="visacheck-page fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs"
         @mousedown.self="showEditFieldModal = false"
       >
-        <div class="w-full max-w-sm bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl shadow-2xl p-5 space-y-4">
+        <div class="w-full max-w-sm bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-lg shadow-2xl p-5 space-y-4">
           <div class="flex items-center justify-between">
             <h3 class="font-bold text-sm text-slate-900 dark:text-white">
               Edit {{ getFieldDisplayTitle(editingFieldName) }}
@@ -609,7 +610,7 @@ async function clearField(fieldName: ManagementField) {
               </label>
               <select
                 v-model="editingFieldValue"
-                class="w-full h-10 px-3 rounded-xl border border-slate-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 text-slate-900 dark:text-white text-sm focus:outline-none focus:border-blue-500"
+                class="w-full h-10 px-3 rounded-md border border-slate-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 text-slate-900 dark:text-white text-sm focus:outline-none focus:border-blue-500"
               >
                 <option
                   v-for="opt in currentFieldChoices"
@@ -625,14 +626,14 @@ async function clearField(fieldName: ManagementField) {
               <button
                 type="button"
                 @click="showEditFieldModal = false"
-                class="h-9 px-4 rounded-xl text-xs font-semibold text-slate-600 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors"
+                class="h-9 px-4 rounded-md text-xs font-semibold text-slate-600 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 :disabled="savingField"
-                class="h-9 px-5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-colors disabled:opacity-50"
+                class="h-9 px-5 rounded-md bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-colors disabled:opacity-50"
               >
                 {{ savingField ? 'Saving...' : 'Save' }}
               </button>

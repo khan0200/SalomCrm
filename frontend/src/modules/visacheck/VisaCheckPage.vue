@@ -17,6 +17,7 @@ import VisaTypeFilterTabs, { type VisaTypeFilter } from './components/VisaTypeFi
 import StatusBadge from './components/StatusBadge.vue'
 import VisaTypeBadge from './components/VisaTypeBadge.vue'
 import CopyField from './components/CopyField.vue'
+import { formatTimestampCompact } from './useTimeAgo'
 
 const uiStore = useUiStore()
 const dashboardStore = useStudentDashboardStore()
@@ -631,24 +632,6 @@ async function confirmDelete() {
   }
 }
 
-// ─── formatTimestampCompact ────────────────────────────────────────────────────
-function formatTimestampCompact(ts: string | undefined | null): string {
-  if (!ts) return '—'
-  try {
-    const d = new Date(ts)
-    const now = new Date()
-    const diff = now.getTime() - d.getTime()
-    const mins = Math.floor(diff / 60000)
-    if (mins < 1) return 'Hozirgina'
-    if (mins < 60) return `${mins} daqiqa oldin`
-    const hours = Math.floor(mins / 60)
-    if (hours < 24) return `${hours} soat oldin`
-    const days = Math.floor(hours / 24)
-    if (days < 7) return `${days} kun oldin`
-    return d.toLocaleDateString('uz-UZ', { day: '2-digit', month: '2-digit', year: '2-digit' })
-  } catch { return ts }
-}
-
 // ─── Virtual Scroll ───────────────────────────────────────────────────────────
 const containerRef = ref<HTMLElement | null>(null)
 const containerTop = ref(300)
@@ -718,7 +701,7 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
 </script>
 
 <template>
-  <div class="space-y-4 p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto min-w-0">
+  <div class="visacheck-page space-y-3 max-w-7xl mx-auto min-w-0">
 
     <!-- ── Top Filter & Action Bar (Matching /cabinet layout) ── -->
     <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 min-w-0">
@@ -731,7 +714,7 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
           <button
             type="button"
             @click.stop="isSortMenuOpen = !isSortMenuOpen"
-            class="h-11 px-4 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200 font-bold text-sm flex items-center gap-2 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors shadow-xs cursor-pointer"
+            class="h-11 px-4 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200 font-bold text-sm flex items-center gap-2 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors shadow-xs cursor-pointer"
           >
             <ArrowUpDown class="size-4 text-zinc-400" />
             <span>Sort: <span class="text-blue-600 dark:text-blue-400 capitalize">{{ sortBy }}</span></span>
@@ -747,7 +730,7 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
           >
             <div
               v-if="isSortMenuOpen"
-              class="absolute left-0 mt-1 w-52 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-2xl py-2 z-40 text-xs"
+              class="absolute left-0 mt-1 w-52 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-2xl py-2 z-40 text-xs"
             >
               <button
                 v-for="opt in [
@@ -775,7 +758,7 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
           v-if="selectedInCurrentTab.length > 0"
           type="button"
           @click="handleDeselectAll"
-          class="h-11 px-4 rounded-xl bg-[#FBBF24] hover:bg-[#F59E0B] text-[#0B4133] font-bold text-sm shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
+          class="h-11 px-4 rounded-lg bg-[#FBBF24] hover:bg-[#F59E0B] text-[#0B4133] font-bold text-sm shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
         >
           Undo ({{ selectedInCurrentTab.length }})
         </button>
@@ -786,7 +769,7 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
           type="button"
           :disabled="batchProgress.active"
           @click="handleBatchCheck"
-          class="h-11 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm shadow-xs transition-all flex items-center gap-2 disabled:opacity-50 cursor-pointer"
+          class="h-11 px-4 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm shadow-xs transition-all flex items-center gap-2 disabled:opacity-50 cursor-pointer"
         >
           <RefreshCw v-if="batchProgress.active" class="size-4 animate-spin" />
           Check ({{ selectedInCurrentTab.length }})
@@ -795,7 +778,7 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
 
       <!-- Status Tabs (4 mutually exclusive tabs in dark green pill) -->
       <div class="w-full lg:w-auto shrink-0">
-        <div class="grid grid-cols-4 sm:inline-flex sm:items-center gap-1 p-1 rounded-xl bg-[#0B4133] w-full sm:w-auto shadow-sm">
+        <div class="grid grid-cols-4 sm:inline-flex sm:items-center gap-1 p-1 rounded-lg bg-[#0B4133] w-full sm:w-auto shadow-sm">
           <button
             v-for="tab in [
               { value: 'pending',     label: 'Pending',     count: counts.pending },
@@ -806,12 +789,12 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
             :key="tab.value"
             type="button"
             @click="currentFilter = tab.value as StatusFilter"
-            class="relative flex flex-col sm:flex-row items-center justify-center gap-1 rounded-lg px-2.5 sm:px-3.5 py-1.5 text-xs sm:text-sm font-semibold transition-all cursor-pointer"
+            class="relative flex flex-col sm:flex-row items-center justify-center gap-1 rounded-md px-2.5 sm:px-3.5 py-1.5 text-xs sm:text-sm font-semibold transition-all cursor-pointer"
             :class="currentFilter === tab.value ? 'bg-white text-[#0B4133] shadow-sm font-bold' : 'text-white/85 hover:text-white hover:bg-white/10'"
           >
             <span>{{ tab.label }}</span>
             <span
-              class="text-[10px] sm:text-[11px] font-bold rounded-md px-1.5 py-0.5 min-w-[1.25rem] text-center"
+              class="text-[10px] sm:text-[11px] font-bold rounded px-1.5 py-0.5 min-w-[1.25rem] text-center"
               :class="currentFilter === tab.value ? 'bg-[#FBBF24] text-[#0B4133]' : 'bg-white/15 text-white'"
             >
               {{ tab.count }}
@@ -824,7 +807,7 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
     <!-- Search Alert Bar -->
     <div
       v-if="searchQuery"
-      class="flex items-center justify-between px-4 py-2.5 rounded-xl bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 text-xs text-blue-700 dark:text-blue-300"
+      class="flex items-center justify-between px-4 py-2.5 rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 text-xs text-blue-700 dark:text-blue-300"
     >
       <div class="flex items-center gap-2">
         <Search class="size-4 text-blue-500" />
@@ -835,13 +818,13 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
 
     <!-- Loading -->
     <div v-if="isLoading" class="p-8 space-y-4 animate-pulse">
-      <div v-for="i in 6" :key="i" class="h-16 bg-zinc-100 dark:bg-zinc-800/60 rounded-2xl" />
+      <div v-for="i in 6" :key="i" class="h-16 bg-zinc-100 dark:bg-zinc-800/60 rounded-lg" />
     </div>
 
     <!-- Empty State -->
     <div
       v-else-if="filteredStudents.length === 0"
-      class="rounded-2xl border border-neutral-300 dark:border-white/20 bg-white dark:bg-zinc-900 py-16 px-6 text-center space-y-3 shadow-sm"
+      class="rounded-lg border border-neutral-300 dark:border-white/20 bg-white dark:bg-zinc-900 py-16 px-6 text-center space-y-3 shadow-sm"
     >
       <div class="w-14 h-14 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center mx-auto text-zinc-400">
         <ArchiveRestore class="size-7" />
@@ -883,7 +866,7 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
     <!-- ── Flat Table Card (when hasAnyGroup is false / selected mode) ── -->
     <div
       v-else
-      class="rounded-2xl border border-neutral-300 dark:border-white/20 bg-white dark:bg-zinc-900 shadow-[0_8px_30px_rgba(15,23,42,0.1),0_2px_8px_rgba(15,23,42,0.06)] dark:shadow-[0_12px_40px_rgba(0,0,0,0.7)] overflow-hidden"
+      class="rounded-lg border border-neutral-300 dark:border-white/20 bg-white dark:bg-zinc-900 shadow-[0_8px_30px_rgba(15,23,42,0.1),0_2px_8px_rgba(15,23,42,0.06)] dark:shadow-[0_12px_40px_rgba(0,0,0,0.7)] overflow-hidden"
     >
       <!-- Mobile Cards -->
       <div
@@ -895,7 +878,7 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
         <div
           v-for="st in visibleMobileStudents"
           :key="st.passport"
-          class="p-4 space-y-2.5 rounded-xl border border-neutral-300/90 dark:border-white/20 bg-white dark:bg-zinc-900 shadow-sm cursor-pointer active:bg-blue-50/60 dark:active:bg-white/[0.03]"
+          class="p-4 space-y-2.5 rounded-md border border-neutral-300/90 dark:border-white/20 bg-white dark:bg-zinc-900 shadow-sm cursor-pointer active:bg-blue-50/60 dark:active:bg-white/[0.03]"
           @click="onRowClick(st, $event)"
           @contextmenu.prevent="onContextMenu(st, $event)"
         >
@@ -903,7 +886,15 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
             <div class="min-w-0">
               <div class="font-bold text-zinc-900 dark:text-white flex items-center gap-1.5 flex-wrap">
                 <CopyField :value="st.full_name" label="Copy name" class="text-sm">{{ st.full_name }}</CopyField>
-                <Pin v-if="st.pinned" class="size-3.5 text-amber-500 fill-amber-500 shrink-0" />
+                <button
+                  v-if="st.pinned"
+                  type="button"
+                  class="focus:outline-none cursor-pointer inline-flex items-center"
+                  title="Pinned (Click to unpin)"
+                  @click.stop="togglePin(st)"
+                >
+                  <Pin class="size-3.5 text-amber-500 fill-amber-500 shrink-0" />
+                </button>
               </div>
               <div class="flex flex-wrap items-center gap-1.5 mt-1">
                 <VisaTypeBadge :visa-type="st.visa_type" />
@@ -913,7 +904,7 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
             <div v-if="showSelectColumn" class="flex items-center justify-center shrink-0 pt-0.5">
               <input
                 type="checkbox"
-                class="size-6 rounded-md border-2 border-neutral-300 dark:border-neutral-600 text-blue-600 focus:ring-2 focus:ring-blue-500 cursor-pointer transition-all"
+                class="size-6 rounded border-2 border-neutral-300 dark:border-neutral-600 text-blue-600 focus:ring-2 focus:ring-blue-500 cursor-pointer transition-all"
                 :checked="selectedPassports.has(st.passport)"
                 @click.stop
                 @change="toggleSelect(st, ($event.target as HTMLInputElement).checked)"
@@ -946,7 +937,7 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
               type="button"
               :disabled="checkingPassports.has(st.passport)"
               @click.stop="checkStudentVisa(st)"
-              class="h-9 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 disabled:opacity-50 transition-colors"
+              class="h-9 rounded-md bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 disabled:opacity-50 transition-colors"
             >
               <RefreshCw class="size-3.5" :class="{ 'animate-spin': checkingPassports.has(st.passport) }" />
               Check
@@ -954,7 +945,7 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
             <button
               type="button"
               @click.stop="openDetails(st)"
-              class="h-9 rounded-lg bg-amber-400 hover:bg-amber-500 text-amber-950 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors"
+              class="h-9 rounded-md bg-amber-400 hover:bg-amber-500 text-amber-950 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors"
             >
               <Eye class="size-3.5" />
               View
@@ -987,7 +978,7 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
                   <button
                     v-if="hasAnySelected"
                     type="button"
-                    class="p-0.5 rounded text-zinc-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-zinc-200 dark:hover:bg-white/10 transition-colors"
+                    class="p-0.5 rounded-sm text-zinc-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-zinc-200 dark:hover:bg-white/10 transition-colors"
                     title="Deselect all"
                     @click.stop="handleDeselectAll"
                   >
@@ -1016,7 +1007,15 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
               <td class="px-4 py-3 align-top">
                 <div class="font-bold text-zinc-900 dark:text-white flex items-center gap-1.5 flex-wrap">
                   <CopyField :value="st.full_name" label="Copy name">{{ st.full_name }}</CopyField>
-                  <Pin v-if="st.pinned" class="size-3.5 text-amber-500 fill-amber-500 shrink-0" />
+                  <button
+                    v-if="st.pinned"
+                    type="button"
+                    class="focus:outline-none cursor-pointer inline-flex items-center"
+                    title="Pinned (Click to unpin)"
+                    @click.stop="togglePin(st)"
+                  >
+                    <Pin class="size-3.5 text-amber-500 fill-amber-500 shrink-0" />
+                  </button>
                 </div>
                 <div class="flex flex-wrap items-center gap-1.5 mt-1">
                   <VisaTypeBadge :visa-type="st.visa_type" />
@@ -1074,7 +1073,7 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
                 <div class="flex items-center justify-center h-full">
                   <input
                     type="checkbox"
-                    class="size-6 rounded-md border-2 border-neutral-300 dark:border-neutral-600 text-blue-600 focus:ring-2 focus:ring-blue-500 focus:ring-offset-0 cursor-pointer transition-all hover:border-blue-500"
+                    class="size-6 rounded border-2 border-neutral-300 dark:border-neutral-600 text-blue-600 focus:ring-2 focus:ring-blue-500 focus:ring-offset-0 cursor-pointer transition-all hover:border-blue-500"
                     :checked="selectedPassports.has(st.passport)"
                     @click.stop
                     @change="toggleSelect(st, ($event.target as HTMLInputElement).checked)"
@@ -1163,10 +1162,10 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
       >
         <div
           v-if="showDeleteConfirm"
-          class="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+          class="visacheck-page fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
           @mousedown.self="showDeleteConfirm = false"
         >
-          <div class="w-full max-w-sm bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl p-6 space-y-4">
+          <div class="w-full max-w-sm bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg shadow-2xl p-6 space-y-4">
             <div class="flex items-start gap-3">
               <div class="size-10 rounded-full bg-rose-100 dark:bg-rose-950/40 flex items-center justify-center shrink-0">
                 <AlertTriangle class="size-5 text-rose-600 dark:text-rose-400" />
@@ -1182,14 +1181,14 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
               <button
                 type="button"
                 @click="showDeleteConfirm = false"
-                class="px-4 py-2 rounded-xl text-sm font-semibold text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                class="px-4 py-2 rounded-md text-sm font-semibold text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
               >
                 Bekor
               </button>
               <button
                 type="button"
                 @click="confirmDelete"
-                class="px-4 py-2 rounded-xl text-sm font-bold text-white bg-rose-600 hover:bg-rose-500 transition-colors shadow-sm shadow-rose-500/30"
+                class="px-4 py-2 rounded-md text-sm font-bold text-white bg-rose-600 hover:bg-rose-500 transition-colors shadow-sm shadow-rose-500/30"
               >
                 O'chirish
               </button>

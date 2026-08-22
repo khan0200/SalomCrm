@@ -8,6 +8,7 @@ import type { VisaStudent } from '@/api/visa'
 import StatusBadge from './StatusBadge.vue'
 import VisaTypeBadge from './VisaTypeBadge.vue'
 import CopyField from './CopyField.vue'
+import { formatTimestampCompact } from '../useTimeAgo'
 
 const props = defineProps<{
   groupName: string
@@ -73,27 +74,10 @@ const showStatusDateColumn = computed(() => props.currentFilter === 'approved')
 const groupHasSelected = computed(() =>
   props.students.some(s => props.selectedPassports.has(s.passport))
 )
-
-function formatTimestampCompact(ts: string | undefined | null): string {
-  if (!ts) return '—'
-  try {
-    const d = new Date(ts)
-    const now = new Date()
-    const diff = now.getTime() - d.getTime()
-    const mins = Math.floor(diff / 60000)
-    if (mins < 1) return 'Hozirgina'
-    if (mins < 60) return `${mins} daqiqa oldin`
-    const hours = Math.floor(mins / 60)
-    if (hours < 24) return `${hours} soat oldin`
-    const days = Math.floor(hours / 24)
-    if (days < 7) return `${days} kun oldin`
-    return d.toLocaleDateString('uz-UZ', { day: '2-digit', month: '2-digit', year: '2-digit' })
-  } catch { return ts }
-}
 </script>
 
 <template>
-  <div class="rounded-2xl border border-neutral-300 dark:border-white/20 shadow-[0_8px_30px_rgba(15,23,42,0.1),0_2px_8px_rgba(15,23,42,0.06)] dark:shadow-[0_12px_40px_rgba(0,0,0,0.7)] overflow-hidden bg-white dark:bg-zinc-900 transition-all">
+  <div class="rounded-lg border border-neutral-300 dark:border-white/20 shadow-[0_8px_30px_rgba(15,23,42,0.1),0_2px_8px_rgba(15,23,42,0.06)] dark:shadow-[0_12px_40px_rgba(0,0,0,0.7)] overflow-hidden bg-white dark:bg-zinc-900 transition-all">
     <!-- Accordion header with #0B4133 dark green -->
     <div class="w-full flex items-center justify-between bg-[#0B4133] hover:bg-[#0d4e3d] transition-colors select-none">
       <!-- Clickable area to toggle accordion -->
@@ -110,7 +94,7 @@ function formatTimestampCompact(ts: string | undefined | null): string {
         <span class="font-bold text-white text-xs sm:text-sm truncate tracking-wide">
           {{ displayName }}
         </span>
-        <span class="flex-shrink-0 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-2 rounded-full text-[10px] font-bold bg-[#FBBF24] text-[#0B4133]">
+        <span class="flex-shrink-0 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-2 rounded-md text-[10px] font-bold bg-[#FBBF24] text-[#0B4133]">
           {{ students.length }}
         </span>
       </button>
@@ -120,7 +104,7 @@ function formatTimestampCompact(ts: string | undefined | null): string {
         <!-- Refresh all in group -->
         <button
           type="button"
-          class="flex items-center justify-center text-white hover:text-white bg-white/10 hover:bg-white/20 transition-colors px-2.5 py-1 rounded-lg text-xs font-bold gap-1.5 focus:outline-none cursor-pointer disabled:opacity-50 shadow-2xs"
+          class="flex items-center justify-center text-white hover:text-white bg-white/10 hover:bg-white/20 transition-colors px-2.5 py-1 rounded-md text-xs font-bold gap-1.5 focus:outline-none cursor-pointer disabled:opacity-50 shadow-2xs"
           title="Check all in group"
           :disabled="groupIsChecking"
           @click.stop="emit('refresh-group', students)"
@@ -135,7 +119,7 @@ function formatTimestampCompact(ts: string | undefined | null): string {
         <!-- Toggle Chevron -->
         <button
           type="button"
-          class="flex items-center justify-center text-white/90 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-transform cursor-pointer"
+          class="flex items-center justify-center text-white/90 hover:text-white p-1 rounded-md hover:bg-white/10 transition-transform cursor-pointer"
           @click.stop="isOpen = !isOpen"
         >
           <ChevronDown
@@ -156,7 +140,7 @@ function formatTimestampCompact(ts: string | undefined | null): string {
         <div
           v-for="st in students"
           :key="st.passport"
-          class="p-4 space-y-2.5 rounded-xl border border-neutral-300/90 dark:border-white/20 bg-white dark:bg-zinc-900 shadow-sm cursor-pointer active:bg-blue-50/60 dark:active:bg-white/[0.03]"
+          class="p-4 space-y-2.5 rounded-md border border-neutral-300/90 dark:border-white/20 bg-white dark:bg-zinc-900 shadow-sm cursor-pointer active:bg-blue-50/60 dark:active:bg-white/[0.03]"
           @click="emit('details', st)"
           @contextmenu.prevent="emit('contextmenu', st, $event)"
         >
@@ -164,7 +148,15 @@ function formatTimestampCompact(ts: string | undefined | null): string {
             <div class="min-w-0">
               <div class="font-bold text-zinc-900 dark:text-white flex items-center gap-1.5 flex-wrap">
                 <CopyField :value="st.full_name" label="Copy name" class="text-sm">{{ st.full_name }}</CopyField>
-                <Pin v-if="st.pinned" class="size-3.5 text-amber-500 fill-amber-500 shrink-0" />
+                <button
+                  v-if="st.pinned"
+                  type="button"
+                  class="focus:outline-none cursor-pointer inline-flex items-center"
+                  title="Pinned (Click to unpin)"
+                  @click.stop="emit('toggle-pin', st)"
+                >
+                  <Pin class="size-3.5 text-amber-500 fill-amber-500 shrink-0" />
+                </button>
               </div>
               <div class="flex flex-wrap items-center gap-1.5 mt-1">
                 <VisaTypeBadge :visa-type="st.visa_type" />
@@ -174,7 +166,7 @@ function formatTimestampCompact(ts: string | undefined | null): string {
             <div v-if="showSelectColumn" class="flex items-center justify-center shrink-0 pt-0.5">
               <input
                 type="checkbox"
-                class="size-6 rounded-md border-2 border-neutral-300 dark:border-neutral-600 text-blue-600 focus:ring-2 focus:ring-blue-500 cursor-pointer transition-all"
+                class="size-6 rounded border-2 border-neutral-300 dark:border-neutral-600 text-blue-600 focus:ring-2 focus:ring-blue-500 cursor-pointer transition-all"
                 :checked="selectedPassports.has(st.passport)"
                 @click.stop
                 @change="emit('toggle-select', st, ($event.target as HTMLInputElement).checked)"
@@ -207,7 +199,7 @@ function formatTimestampCompact(ts: string | undefined | null): string {
               type="button"
               :disabled="checkingPassports.has(st.passport)"
               @click.stop="emit('refresh', st)"
-              class="h-9 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 disabled:opacity-50 transition-colors"
+              class="h-9 rounded-md bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 disabled:opacity-50 transition-colors"
             >
               <RefreshCw class="size-3.5" :class="{ 'animate-spin': checkingPassports.has(st.passport) }" />
               Check
@@ -215,7 +207,7 @@ function formatTimestampCompact(ts: string | undefined | null): string {
             <button
               type="button"
               @click.stop="emit('details', st)"
-              class="h-9 rounded-lg bg-amber-400 hover:bg-amber-500 text-amber-950 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors"
+              class="h-9 rounded-md bg-amber-400 hover:bg-amber-500 text-amber-950 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors"
             >
               <Eye class="size-3.5" />
               View
@@ -241,7 +233,7 @@ function formatTimestampCompact(ts: string | undefined | null): string {
                   <button
                     v-if="groupHasSelected"
                     type="button"
-                    class="p-0.5 rounded text-zinc-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-zinc-200 dark:hover:bg-white/10 transition-colors"
+                    class="p-0.5 rounded-sm text-zinc-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-zinc-200 dark:hover:bg-white/10 transition-colors"
                     title="Deselect group"
                     @click.stop="emit('deselect-group', students)"
                   >
@@ -267,15 +259,13 @@ function formatTimestampCompact(ts: string | undefined | null): string {
                 <div class="font-bold text-zinc-900 dark:text-white flex items-center gap-1.5 flex-wrap">
                   <CopyField :value="st.full_name" label="Copy name">{{ st.full_name }}</CopyField>
                   <button
+                    v-if="st.pinned"
                     type="button"
-                    class="focus:outline-none cursor-pointer"
-                    title="Toggle pin"
+                    class="focus:outline-none cursor-pointer inline-flex items-center"
+                    title="Pinned (Click to unpin)"
                     @click.stop="emit('toggle-pin', st)"
                   >
-                    <Pin
-                      class="size-3.5 transition-colors"
-                      :class="st.pinned ? 'text-amber-500 fill-amber-500' : 'text-zinc-300 dark:text-zinc-600 hover:text-amber-400'"
-                    />
+                    <Pin class="size-3.5 text-amber-500 fill-amber-500 shrink-0" />
                   </button>
                 </div>
                 <div class="flex flex-wrap items-center gap-1.5 mt-1">
@@ -334,7 +324,7 @@ function formatTimestampCompact(ts: string | undefined | null): string {
                 <div class="flex items-center justify-center h-full">
                   <input
                     type="checkbox"
-                    class="size-6 rounded-md border-2 border-neutral-300 dark:border-neutral-600 text-blue-600 focus:ring-2 focus:ring-blue-500 focus:ring-offset-0 cursor-pointer transition-all hover:border-blue-500"
+                    class="size-6 rounded border-2 border-neutral-300 dark:border-neutral-600 text-blue-600 focus:ring-2 focus:ring-blue-500 focus:ring-offset-0 cursor-pointer transition-all hover:border-blue-500"
                     :checked="selectedPassports.has(st.passport)"
                     @click.stop
                     @change="emit('toggle-select', st, ($event.target as HTMLInputElement).checked)"

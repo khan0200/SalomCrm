@@ -29,11 +29,11 @@ const percentage = computed(() => {
   >
     <div
       v-if="active && total > 0"
-      class="fixed bottom-6 sm:bottom-8 left-1/2 -translate-x-1/2 z-[100] pointer-events-auto select-none"
+      class="visacheck-page fixed bottom-6 sm:bottom-8 left-1/2 -translate-x-1/2 z-[100] pointer-events-auto select-none"
     >
       <!-- Apple Dynamic Island / Live Activity Glass Capsule -->
       <div
-        class="relative flex flex-col gap-2 px-4 py-2.5 sm:px-5 sm:py-3 rounded-[22px] min-w-[280px] sm:min-w-[320px] max-w-[92vw] text-white shadow-2xl overflow-hidden bg-black/90 backdrop-blur-xl border border-white/15"
+        class="relative flex flex-col gap-2 px-4 py-2.5 sm:px-5 sm:py-3 rounded-xl min-w-[280px] sm:min-w-[320px] max-w-[92vw] text-white shadow-2xl overflow-hidden bg-black/90 backdrop-blur-xl border border-white/15"
       >
         <!-- Top Status Row -->
         <div class="flex items-center justify-between gap-3 sm:gap-4">

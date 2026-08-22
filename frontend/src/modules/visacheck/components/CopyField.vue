@@ -31,6 +31,6 @@ async function copy() {
   >
     <slot>{{ value }}</slot>
     <Check v-if="copied" class="size-3 text-emerald-500 shrink-0 transition-all" />
-    <Copy v-else class="size-3 opacity-0 group-hover/copy:opacity-60 shrink-0 transition-opacity" />
+    <Copy v-else class="size-3 text-zinc-400 group-hover/copy:text-blue-500 dark:text-zinc-500 dark:group-hover/copy:text-blue-400 shrink-0 transition-colors" />
   </button>
 </template>
