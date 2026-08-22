@@ -672,24 +672,65 @@ class ExtractDocumentView(APIView):
         try:
             extracted_data = process_document_ephemeral(file_bytes, filename, debug=is_debug)
 
-            # Check student ID for parent passport intelligence
+            # Check student ID for parent passport intelligence (15+ years older than student)
             student_id = request.data.get('student_id') or request.query_params.get('student_id')
             if student_id:
                 try:
-                    student = Student.objects.filter(id=student_id).first()
+                    student_qs = Student.objects.filter(id=student_id)
+                    if request.user and hasattr(request.user, 'tenant') and request.user.tenant:
+                        student_qs = student_qs.filter(tenant=request.user.tenant)
+                    student = student_qs.first()
+
                     if student and student.birthday and extracted_data.get('document_type') in ('PASSPORT', 'ID_CARD'):
                         extracted_dob = extracted_data.get('fields', {}).get('DATE_OF_BIRTH')
-                        if extracted_dob and str(extracted_dob) < str(student.birthday):
-                            # Parent passport detected!
-                            extracted_data['is_parent_passport'] = True
-                            sex = extracted_data.get('fields', {}).get('SEX', '')
-                            full_name = extracted_data.get('fields', {}).get('FULL_NAME', '')
-                            if sex == 'MALE' and full_name:
-                                extracted_data['fields']['FATHER_FULLNAME'] = full_name
-                            elif sex == 'FEMALE' and full_name:
-                                extracted_data['fields']['MOTHER_FULLNAME'] = full_name
-                except Exception:
-                    pass
+                        if extracted_dob:
+                            doc_year = None
+                            student_year = None
+
+                            # Parse 4-digit years from ISO YYYY-MM-DD or date strings
+                            m_doc = re.search(r'\b(19\d\d|20\d\d)\b', str(extracted_dob))
+                            m_stu = re.search(r'\b(19\d\d|20\d\d)\b', str(student.birthday))
+
+                            if m_doc and m_stu:
+                                doc_year = int(m_doc.group(1))
+                                student_year = int(m_stu.group(1))
+                                age_diff = student_year - doc_year
+                            else:
+                                age_diff = 20 if str(extracted_dob) < str(student.birthday) else 0
+
+                            # If the passport holder is 15+ years older than the student -> Parent Passport!
+                            if age_diff >= 15:
+                                sex = str(extracted_data.get('fields', {}).get('SEX', '')).upper()
+                                full_name = extracted_data.get('fields', {}).get('FULL_NAME', '')
+
+                                # Infer gender if sex field wasn't clearly detected by OCR
+                                is_female = (sex in ('F', 'FEMALE', 'AYOL', 'ЖЕН', 'ЖЕНСКИЙ'))
+                                if not is_female and not (sex in ('M', 'MALE', 'ERKAK', 'МУЖ', 'МУЖСКОЙ')):
+                                    if any(q in full_name.upper() for q in ['QIZI', 'KIZI', 'OVNA', 'EVNA', 'KYZY']):
+                                        is_female = True
+
+                                parent_field = 'MOTHER_FULLNAME' if is_female else 'FATHER_FULLNAME'
+                                parent_doc_type = 'MOTHER_PASSPORT' if is_female else 'FATHER_PASSPORT'
+
+                                extracted_data['is_parent_passport'] = True
+                                extracted_data['parent_type'] = 'MOTHER' if is_female else 'FATHER'
+                                extracted_data['document_type'] = parent_doc_type
+
+                                # ISOLATE FIELDS: Only keep parent name, delete student's personal identity fields
+                                # so parent's passport number, DOB, and sex are NOT written to the student's profile!
+                                extracted_data['fields'] = {
+                                    parent_field: full_name
+                                }
+                                extracted_data['field_details'] = {
+                                    parent_field: {
+                                        'value': full_name,
+                                        'confidence': 0.98,
+                                        'validated': True,
+                                        'source': 'PARENT_PASSPORT'
+                                    }
+                                }
+                except Exception as e:
+                    logger.warning(f"Error evaluating parent passport intelligence: {e}")
 
             return Response(extracted_data, status=status.HTTP_200_OK)
         except PreprocessError as pe:

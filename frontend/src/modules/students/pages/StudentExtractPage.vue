@@ -107,8 +107,24 @@ const FIELD_MAPPING: Record<string, keyof Student> = {
   'DATE_OF_GRADUATION': 'date_of_graduation',
   'FATHER FULLNAME': 'father_name',
   'FATHER_FULLNAME': 'father_name',
+  'FATHER NAME': 'father_name',
+  'FATHER_NAME': 'father_name',
+  'FATHER PHONE': 'father_phone',
+  'FATHER_PHONE': 'father_phone',
+  'FATHER PHONE 2': 'father_phone',
+  'FATHER_PHONE_2': 'father_phone',
+  'FATHER PHONE NUMBER': 'father_phone',
+  'FATHER_PHONE_NUMBER': 'father_phone',
   'MOTHER FULLNAME': 'mother_name',
-  'MOTHER_FULLNAME': 'mother_name'
+  'MOTHER_FULLNAME': 'mother_name',
+  'MOTHER NAME': 'mother_name',
+  'MOTHER_NAME': 'mother_name',
+  'MOTHER PHONE': 'mother_phone',
+  'MOTHER_PHONE': 'mother_phone',
+  'MOTHER PHONE 2': 'mother_phone',
+  'MOTHER_PHONE_2': 'mother_phone',
+  'MOTHER PHONE NUMBER': 'mother_phone',
+  'MOTHER_PHONE_NUMBER': 'mother_phone'
 }
 
 // File drop & selection handlers
@@ -212,18 +228,41 @@ const triggerExtraction = async () => {
 
     const response = await studentsApi.extractDocument(formData)
 
-    extractedDocType.value = response.document_type || 'GENERAL DOCUMENT'
+    let docType = response.document_type || 'GENERAL DOCUMENT'
+    let fieldsObj = response.fields || {}
+    let detailsObj = response.field_details || {}
+
+    // Client-side Parent Passport Safeguard (if not already isolated by backend)
+    const isParentDoc = response.is_parent_passport || docType.includes('PARENT') || docType.includes('MOTHER') || docType.includes('FATHER')
+    if (!isParentDoc && student.value?.birthday && fieldsObj.DATE_OF_BIRTH && ['PASSPORT', 'ID_CARD'].includes(docType)) {
+      const matchDoc = String(fieldsObj.DATE_OF_BIRTH).match(/\b(19\d\d|20\d\d)\b/)
+      const matchStu = String(student.value.birthday).match(/\b(19\d\d|20\d\d)\b/)
+      if (matchDoc && matchStu) {
+        const docYear = parseInt(matchDoc[1], 10)
+        const stuYear = parseInt(matchStu[1], 10)
+        if (stuYear - docYear >= 15) {
+          const sex = String(fieldsObj.SEX || '').toUpperCase()
+          const fullName = fieldsObj.FULL_NAME || ''
+          const isFemale = sex.startsWith('F') || ['QIZI', 'OVNA', 'EVNA', 'KYZY'].some(q => fullName.toUpperCase().includes(q))
+          const parentKey = isFemale ? 'MOTHER_FULLNAME' : 'FATHER_FULLNAME'
+          docType = isFemale ? 'MOTHER_PASSPORT' : 'FATHER_PASSPORT'
+          fieldsObj = { [parentKey]: fullName }
+          detailsObj = { [parentKey]: { value: fullName, confidence: 0.98, validated: true, source: 'PARENT_PASSPORT' } }
+        }
+      }
+    }
+
+    extractedDocType.value = docType
     rawOcrText.value = response.ocr_text || ''
     extractionLatency.value = response.metadata?.latency_ms || null
     ocrEngineUsed.value = response.metadata?.ocr_engine || null
 
     const fieldsArr: ExtractedField[] = []
-    const details = response.field_details || {}
 
-    if (response.fields && typeof response.fields === 'object') {
-      for (const [k, v] of Object.entries(response.fields)) {
+    if (fieldsObj && typeof fieldsObj === 'object') {
+      for (const [k, v] of Object.entries(fieldsObj)) {
         if (v && String(v).trim()) {
-          const detail = details[k]
+          const detail = detailsObj[k]
           fieldsArr.push({
             key: k,
             value: String(v).trim(),
@@ -639,6 +678,22 @@ const getInitials = (name?: string) => {
             v-if="extractedFieldsList.length > 0 && !isExtracting"
             class="space-y-2.5 flex-1"
           >
+            <!-- Parent Passport Alert Banner -->
+            <div
+              v-if="extractedDocType && (extractedDocType.includes('MOTHER') || extractedDocType.includes('FATHER') || extractedDocType.includes('PARENT'))"
+              class="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-900 dark:text-amber-200 text-xs flex items-start gap-2.5"
+            >
+              <span class="text-base leading-none">👨‍👩‍👧</span>
+              <div class="space-y-0.5">
+                <p class="font-extrabold text-[11px] uppercase tracking-wide text-amber-700 dark:text-amber-300">
+                  {{ extractedDocType.includes('MOTHER') ? "Mother's Passport Detected" : "Father's Passport Detected" }} (15+ Years Older)
+                </p>
+                <p class="text-[11px] text-amber-800/80 dark:text-amber-300/80">
+                  The document owner is 15+ years older than the student. Personal identity fields (Passport No, DOB, Sex) have been isolated so they will not overwrite the student's personal identity records.
+                </p>
+              </div>
+            </div>
+
             <div
               v-for="(field, idx) in extractedFieldsList"
               :key="idx"

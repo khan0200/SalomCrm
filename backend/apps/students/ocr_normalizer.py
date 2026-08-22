@@ -135,40 +135,22 @@ def normalize_patronymic(raw_father_name: str) -> str:
     Normalizes Uzbek and Central Asian patronymics:
     - 'ABDULKHOSHIMAUGN' or 'ABDULKHOSHIMAUGL' -> 'ABDULKHOSHIM UGLI'
     - 'RUSTAMQIZI' or 'RUSTAM QIZ' -> 'RUSTAM QIZI'
+    - 'BOTIR UGLT' or 'BOTIR UGL1' -> 'BOTIR UGLI'
     """
-    clean = re.sub(r'[^A-ZА-Я\s\'-]', '', raw_father_name.upper())
-    clean = re.sub(r'\s+', ' ', clean).strip()
-
-    # Handle male suffixes: AUGN, AUGL, AUGLI, UGLI, OGLI, UGIL, OGIL, UGL, O'G'LI, UG'LI
-    male_suffix_pattern = r'[\s_-]*(?:AUGN|AUGL|AUGLI|UGLI|OGLI|UGIL|OGIL|UGL|O[\'\`\"]?G[\'\`\"]?LI|U[\'\`\"]?G[\'\`\"]?LI)$'
-    if re.search(male_suffix_pattern, clean, re.IGNORECASE):
-        base_name = re.sub(male_suffix_pattern, '', clean, flags=re.IGNORECASE).strip()
-        if base_name:
-            return f"{base_name} UGLI"
-
-    # Handle female suffixes: QIZI, KIZI, KYZY, QIZ, KIZ
-    female_suffix_pattern = r'[\s_-]*(?:QIZI|KIZI|KYZY|QIZ|KIZ)$'
-    if re.search(female_suffix_pattern, clean, re.IGNORECASE):
-        base_name = re.sub(female_suffix_pattern, '', clean, flags=re.IGNORECASE).strip()
-        if base_name:
-            return f"{base_name} QIZI"
-
-    return clean
+    if not raw_father_name:
+        return ""
+    from .ocr_suffix_normalizer import normalize_full_name
+    return normalize_full_name(raw_father_name)
 
 
 def normalize_name(raw_name: str) -> str:
     """
-    Normalizes full names by fixing joined patronymics and stripping artifacts.
+    Normalizes full names by fixing joined patronymics, OCR suffix errors, and stripping artifacts.
     """
-    clean = re.sub(r'[^A-ZА-Яa-zа-я\s\'-]', '', raw_name)
-    clean = re.sub(r'\s+', ' ', clean).strip().upper()
-
-    parts = clean.split()
-    if parts:
-        last_part = parts[-1]
-        norm_last = normalize_patronymic(last_part)
-        parts[-1] = norm_last
-    return ' '.join(parts)
+    if not raw_name:
+        return ""
+    from .ocr_suffix_normalizer import normalize_full_name
+    return normalize_full_name(raw_name)
 
 
 def normalize_address(raw_addr: str) -> str:

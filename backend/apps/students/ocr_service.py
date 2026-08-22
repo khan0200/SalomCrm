@@ -157,6 +157,14 @@ def process_document_ephemeral(
         if not field_details_map:
             field_details_map = ContactScreenshotExtractor.extract(all_raw_lines, full_ocr_text)
 
+    # Step 5: Apply Post-OCR Name/Surname Suffix Normalization Layer
+    from .ocr_suffix_normalizer import normalize_extracted_fields
+
+    for field_key, field_obj in field_details_map.items():
+        norm_map = normalize_extracted_fields({field_key: field_obj.value})
+        if field_key in norm_map and norm_map[field_key] != field_obj.value:
+            field_obj.value = norm_map[field_key]
+
     # Flatten fields for backward compatibility
     simple_fields: Dict[str, str] = {k: f.value for k, f in field_details_map.items()}
     serialized_details: Dict[str, Dict[str, Any]] = {k: f.to_dict() for k, f in field_details_map.items()}

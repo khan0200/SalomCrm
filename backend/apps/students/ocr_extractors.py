@@ -554,12 +554,25 @@ class ContactScreenshotExtractor:
         if email_match:
             fields['EMAIL'] = ExtractedField(email_match.group(0), 0.97, True, 'OCR_REGEX')
 
-        # 2. Phone numbers
+        # 2. Check for Father / Mother Contact names
+        is_father_contact = any(re.search(r'\b(?:DADA|DADAM|OTA|OTAM|FATHER)\b', l, re.IGNORECASE) for l in all_raw_lines)
+        is_mother_contact = any(re.search(r'\b(?:ONA|ONAM|OYI|OYIM|MOTHER)\b', l, re.IGNORECASE) for l in all_raw_lines)
+
+        # 3. Phone numbers
         phones = re.findall(r'(?:\+?998[\s-]*)?(?:9[0-9]|88|33|77|99|95|94|93|91|90)[\s-]*\d{3}[\s-]*\d{2}[\s-]*\d{2}', full_text)
-        if len(phones) >= 1:
-            fields['PHONE_NUMBER_1'] = ExtractedField(normalize_phone_number(phones[0]), 0.95, True, 'OCR_REGEX')
-        if len(phones) >= 2:
-            fields['PHONE_NUMBER_2'] = ExtractedField(normalize_phone_number(phones[1]), 0.95, True, 'OCR_REGEX')
+        if phones:
+            if is_father_contact and not is_mother_contact:
+                fields['FATHER_PHONE'] = ExtractedField(normalize_phone_number(phones[0]), 0.96, True, 'OCR_REGEX')
+                if len(phones) >= 2:
+                    fields['FATHER_PHONE_2'] = ExtractedField(normalize_phone_number(phones[1]), 0.95, True, 'OCR_REGEX')
+            elif is_mother_contact and not is_father_contact:
+                fields['MOTHER_PHONE'] = ExtractedField(normalize_phone_number(phones[0]), 0.96, True, 'OCR_REGEX')
+                if len(phones) >= 2:
+                    fields['MOTHER_PHONE_2'] = ExtractedField(normalize_phone_number(phones[1]), 0.95, True, 'OCR_REGEX')
+            else:
+                fields['PHONE_NUMBER_1'] = ExtractedField(normalize_phone_number(phones[0]), 0.95, True, 'OCR_REGEX')
+                if len(phones) >= 2:
+                    fields['PHONE_NUMBER_2'] = ExtractedField(normalize_phone_number(phones[1]), 0.95, True, 'OCR_REGEX')
 
         # 3. Address / Location line
         for line in all_raw_lines:
