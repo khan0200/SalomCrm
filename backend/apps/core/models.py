@@ -53,7 +53,7 @@ class SimpleTenantModel(models.Model):
     """
     Abstract model for lightweight option/lookup tables belonging to a tenant (without updated_at / created_by).
     """
-    id: Any
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)
     tenant = models.ForeignKey(
         'tenants.Tenant',
