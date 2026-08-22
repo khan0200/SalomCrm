@@ -1,3 +1,4 @@
+import uuid
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -36,9 +37,13 @@ class StatusBoardViewSet(viewsets.ModelViewSet):
         if folder == 'hidden' or show_hidden:
             qs = qs.filter(status_hidden=True)
         elif folder == 'except':
-            qs = qs.filter(status_hidden=False, folders__isnull=True)
+            qs = qs.filter(status_hidden=False).filter(Q(folder_ids=[]) | Q(folder_ids__isnull=True))
         elif folder != 'all':
-            qs = qs.filter(status_hidden=False, folders__id=folder)
+            try:
+                folder_uuid = uuid.UUID(str(folder).strip())
+                qs = qs.filter(status_hidden=False, folder_ids__contains=[folder_uuid])
+            except (ValueError, TypeError):
+                qs = qs.none()
         else:
             qs = qs.filter(status_hidden=False)
 
@@ -56,7 +61,7 @@ class StatusBoardViewSet(viewsets.ModelViewSet):
         sort_by = self.request.query_params.get('sort_by', 'id')
         sort_order = self.request.query_params.get('sort_order', 'asc')
 
-        students_list = list(qs.prefetch_related('folders'))
+        students_list = list(qs)
 
         if sort_by == 'left':
             def left_sort_key(s):

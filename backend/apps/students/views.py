@@ -1,5 +1,6 @@
 import re
 import io
+import uuid
 from typing import Any
 import openpyxl
 from openpyxl.utils import get_column_letter
@@ -77,7 +78,7 @@ class StudentViewSet(viewsets.ModelViewSet):
 
         # For detail actions (retrieve, update, set_color, set_folders, etc.), return base queryset
         if self.action != 'list':
-            return qs.prefetch_related('folders')
+            return qs
 
         # ── 1. Folder & Archive/Hidden Scopes ──────────────────────────────
         folder = params.get('folder', 'all')
@@ -88,9 +89,13 @@ class StudentViewSet(viewsets.ModelViewSet):
         elif folder == 'hidden':
             qs = qs.filter(is_deleted=False, status_hidden=True)
         elif folder == 'except':
-            qs = qs.filter(is_deleted=False, folders__isnull=True)
+            qs = qs.filter(is_deleted=False).filter(Q(folder_ids=[]) | Q(folder_ids__isnull=True))
         elif folder != 'all':
-            qs = qs.filter(is_deleted=False, folders__id=folder)
+            try:
+                folder_uuid = uuid.UUID(str(folder).strip())
+                qs = qs.filter(is_deleted=False, folder_ids__contains=[folder_uuid])
+            except (ValueError, TypeError):
+                qs = qs.none()
         else:
             if not include_archive:
                 qs = qs.filter(is_deleted=False)
@@ -184,7 +189,7 @@ class StudentViewSet(viewsets.ModelViewSet):
             order_prefix = '-' if sort_order == 'desc' else ''
             qs = qs.order_by(f"{order_prefix}{sort_by}")
 
-        return qs.prefetch_related('folders')
+        return qs
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
@@ -265,11 +270,17 @@ class StudentViewSet(viewsets.ModelViewSet):
         serializer = StudentSetFoldersSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         raw_ids = serializer.validated_data.get('folder_ids', [])
-        folders = Folder.objects.filter(id__in=raw_ids, tenant=student.tenant)
-        student.folders.set(folders)
+        clean_ids = []
+        for fid in raw_ids:
+            try:
+                clean_ids.append(uuid.UUID(str(fid)))
+            except (ValueError, TypeError):
+                pass
+        student.folder_ids = clean_ids
+        student.save(update_fields=['folder_ids', 'updated_at'])
         return Response({
             'status': 'Folders updated',
-            'folder_ids': [str(f.id) for f in student.folders.all()]
+            'folder_ids': [str(fid) for fid in student.folder_ids]
         })
 
     @action(detail=True, methods=['post'])
@@ -338,19 +349,11 @@ class StudentOptionsViewSet(viewsets.ViewSet):
         groups = list(StudentGroupOption.objects.filter(tenant=tenant).values_list('name', flat=True)) if tenant else []
         leads = list(LeadSourceOption.objects.filter(tenant=tenant).values_list('name', flat=True)) if tenant else []
         coordinators = list(CoordinatorOption.objects.filter(tenant=tenant).values_list('name', flat=True)) if tenant else []
-        universities = list(UniversityOption.objects.filter(tenant=tenant).values_list('name', flat=True)) if tenant else []
+        universities = list(UniversityOption.objects.values_list('name', flat=True).order_by('name'))
         folders_qs = Folder.objects.filter(tenant=tenant).order_by('name') if tenant else Folder.objects.all().order_by('name')
-        folders = [
-            {
-                'id': str(f.id),
-                'name': f.name,
-                'student_count': Student.objects.filter(folders=f, is_deleted=False).count()
-            }
-            for f in folders_qs
-        ]
 
         all_count = Student.objects.filter(tenant=tenant, is_deleted=False).count() if tenant else Student.objects.filter(is_deleted=False).count()
-        except_count = Student.objects.filter(tenant=tenant, is_deleted=False, folders__isnull=True).count() if tenant else Student.objects.filter(is_deleted=False, folders__isnull=True).count()
+        except_count = Student.objects.filter(tenant=tenant, is_deleted=False).filter(Q(folder_ids=[]) | Q(folder_ids__isnull=True)).count() if tenant else Student.objects.filter(is_deleted=False).filter(Q(folder_ids=[]) | Q(folder_ids__isnull=True)).count()
         deleted_count = Student.objects.filter(tenant=tenant, is_deleted=True).count() if tenant else Student.objects.filter(is_deleted=True).count()
         hidden_count = Student.objects.filter(tenant=tenant, is_deleted=False, status_hidden=True).count() if tenant else Student.objects.filter(is_deleted=False, status_hidden=True).count()
 
@@ -362,7 +365,19 @@ class StudentOptionsViewSet(viewsets.ViewSet):
             'hidden': hidden_count,
         }
         for f in folders_qs:
-            folder_counts[str(f.id)] = Student.objects.filter(folders=f, is_deleted=False).count()
+            f_qs = Student.objects.filter(is_deleted=False, folder_ids__contains=[f.id])
+            if tenant:
+                f_qs = f_qs.filter(tenant=tenant)
+            folder_counts[str(f.id)] = f_qs.count()
+
+        folders = [
+            {
+                'id': str(f.id),
+                'name': f.name,
+                'student_count': folder_counts.get(str(f.id), 0)
+            }
+            for f in folders_qs
+        ]
 
         return Response({
             'tariffs': tariffs,
@@ -409,9 +424,13 @@ class StudentExportView(APIView):
         elif folder == 'hidden':
             qs = qs.filter(is_deleted=False, status_hidden=True)
         elif folder == 'except':
-            qs = qs.filter(is_deleted=False, folders__isnull=True)
+            qs = qs.filter(is_deleted=False).filter(Q(folder_ids=[]) | Q(folder_ids__isnull=True))
         elif folder != 'all':
-            qs = qs.filter(is_deleted=False, folders__id=folder)
+            try:
+                folder_uuid = uuid.UUID(str(folder).strip())
+                qs = qs.filter(is_deleted=False, folder_ids__contains=[folder_uuid])
+            except (ValueError, TypeError):
+                qs = qs.none()
         else:
             if not include_archive:
                 qs = qs.filter(is_deleted=False)
@@ -563,9 +582,11 @@ class CoordinatorOptionViewSet(BaseOptionViewSet):
     serializer_class = CoordinatorOptionSerializer
 
 
-class UniversityOptionViewSet(BaseOptionViewSet):
-    model_class = UniversityOption
+class UniversityOptionViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsTenantUser]
+    pagination_class = None
     serializer_class = UniversityOptionSerializer
+    queryset = UniversityOption.objects.all().order_by('name')
 
 
 class UniversityStatusOptionViewSet(BaseOptionViewSet):
@@ -573,16 +594,14 @@ class UniversityStatusOptionViewSet(BaseOptionViewSet):
     serializer_class = UniversityStatusOptionSerializer
 
 
-class SchoolDirectoryViewSet(BaseOptionViewSet):
-    model_class = SchoolDirectory
+class SchoolDirectoryViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsTenantUser]
+    pagination_class = None
     serializer_class = SchoolDirectorySerializer
+    queryset = SchoolDirectory.objects.all().order_by('name')
 
     @action(detail=False, methods=['post'], url_path='upsert')
     def upsert(self, request: Request):
-        tenant = getattr(request, 'tenant', None) or getattr(request.user, 'tenant', None)
-        if not tenant:
-            return Response({'error': 'Tenant required'}, status=status.HTTP_400_BAD_REQUEST)
-        
         name = str(request.data.get('name', '')).strip()
         if not name:
             return Response({'error': 'School name is required'}, status=status.HTTP_400_BAD_REQUEST)
@@ -593,14 +612,12 @@ class SchoolDirectoryViewSet(BaseOptionViewSet):
         email = request.data.get('email', None)
 
         school, created = SchoolDirectory.objects.update_or_create(
-            tenant=tenant,
             name=name,
             defaults={
                 'address': address if address is not None else '',
                 'website': website if website is not None else '',
                 'phone': phone if phone is not None else '',
                 'email': email if email is not None else '',
-                'created_by': request.user if request.user.is_authenticated else None
             }
         )
         return Response(SchoolDirectorySerializer(school).data, status=status.HTTP_200_OK)
@@ -1151,7 +1168,7 @@ class VisaOptionsView(APIView):
 
         def get_names(model_cls, defaults=None):
             qs = model_cls.objects.all()
-            if tenant:
+            if tenant and hasattr(model_cls, 'tenant'):
                 qs = qs.filter(tenant=tenant)
             names = list(qs.values_list('name', flat=True))
             if not names and defaults:

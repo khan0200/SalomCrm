@@ -1,6 +1,6 @@
 import uuid
 from django.db import models
-from apps.core.models import TimeStampedModel
+from apps.core.models import TimeStampedModel, SimpleTenantModel
 
 class Tenant(TimeStampedModel):
     """
@@ -26,25 +26,20 @@ class Tenant(TimeStampedModel):
         return f"{self.name} ({self.slug})"
 
 
-class Branch(TimeStampedModel):
+class Branch(SimpleTenantModel):
     """
     Branch or Office location belonging to a specific tenant.
+    Mapped directly to 'offices' table.
     Examples: 'ANDIJON OFFIS', 'TOSHKENT OFFIS'.
     """
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name='branches', db_index=True)
+    id = models.BigAutoField(primary_key=True)
     name = models.CharField(max_length=255)
-    code = models.CharField(max_length=50, blank=True, null=True)
-    address = models.TextField(blank=True, null=True)
-    phone = models.CharField(max_length=50, blank=True, null=True)
-    is_active = models.BooleanField(default=True)
 
     class Meta:
-        db_table = 'crm_branches'
+        db_table = 'offices'
         verbose_name = 'Branch'
         verbose_name_plural = 'Branches'
-        unique_together = ('tenant', 'name')
         ordering = ['name']
 
     def __str__(self):
-        return f"{self.name} - {self.tenant.name}"
+        return f"{self.name}"

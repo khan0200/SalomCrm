@@ -14,15 +14,17 @@ class FolderSerializer(serializers.ModelSerializer):
         read_only_fields = ('id', 'created_at')
 
     def get_student_count(self, obj):
-        return obj.students.filter(is_deleted=False).count()
+        tenant = getattr(self.context.get('request'), 'tenant', None)
+        qs = Student.objects.filter(is_deleted=False, folder_ids__contains=[obj.id])
+        if tenant:
+            qs = qs.filter(tenant=tenant)
+        return qs.count()
 
 
 class StudentListSerializer(serializers.ModelSerializer):
     """
     Lightweight, high-performance serializer for main student roster table.
     """
-    folder_ids = serializers.PrimaryKeyRelatedField(many=True, read_only=True, source='folders')
-
     class Meta:
         model = Student
         fields = (
@@ -46,7 +48,6 @@ class StudentDetailSerializer(serializers.ModelSerializer):
     """
     Full comprehensive serializer for Student Detail Drawer and standalone detail view.
     """
-    folder_ids = serializers.PrimaryKeyRelatedField(many=True, read_only=True, source='folders')
     creator_name = serializers.SerializerMethodField()
 
     class Meta:
@@ -58,26 +59,19 @@ class StudentDetailSerializer(serializers.ModelSerializer):
 
 
 class StudentCreateUpdateSerializer(serializers.ModelSerializer):
-    folder_ids = serializers.ListField(child=serializers.UUIDField(), required=False, write_only=True)
-
     class Meta:
         model = Student
         fields = '__all__'
         read_only_fields = ('balance', 'discount', 'tenant', 'created_by', 'created_at', 'updated_at')
 
     def create(self, validated_data):
-        folder_ids = validated_data.pop('folder_ids', [])
         # Auto-compute initial missing documents checklist
         if 'pick_needed' not in validated_data or not validated_data['pick_needed']:
             validated_data['pick_needed'] = calculate_missing_documents(validated_data)
 
-        student = Student.objects.create(**validated_data)
-        if folder_ids:
-            student.folders.set(folder_ids)
-        return student
+        return Student.objects.create(**validated_data)
 
     def update(self, instance, validated_data):
-        folder_ids = validated_data.pop('folder_ids', None)
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
 
@@ -93,8 +87,6 @@ class StudentCreateUpdateSerializer(serializers.ModelSerializer):
         })
 
         instance.save()
-        if folder_ids is not None:
-            instance.folders.set(folder_ids)
         return instance
 
     def to_representation(self, instance):

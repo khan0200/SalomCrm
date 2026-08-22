@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
 import { studentsApi } from '@/api/students'
-import type { Student, Folder } from '@/types'
+import type { Student, Folder, PaginatedResponse } from '@/types'
 import { useUiStore } from '@/stores/ui'
 import {
   Search, Plus, Filter, ChevronLeft, ChevronRight,
@@ -26,6 +26,42 @@ const activeFolder = ref('all')
 const currentPage = ref(1)
 const sortOrder = ref<'asc' | 'desc'>('asc')
 const isExportingExcel = computed(() => dashboardStore.isExcelExporting)
+
+// Alphanumeric sorting logic matching UniApp2
+const compareStudentIds = (a: Student, b: Student, order: 'asc' | 'desc' = 'asc') => {
+  const idA = a.id || ''
+  const idB = b.id || ''
+
+  const parseId = (idStr: string) => {
+    const str = idStr.trim()
+    const match = str.match(/^([A-Za-z\s_-]*)(\d*)$/)
+    if (match) {
+      return {
+        prefix: match[1] || '',
+        num: match[2] ? parseInt(match[2], 10) : null
+      }
+    }
+    return { prefix: str, num: null }
+  }
+
+  const valA = parseId(idA)
+  const valB = parseId(idB)
+
+  const prefixComp = valA.prefix.localeCompare(valB.prefix, undefined, { sensitivity: 'base' })
+  if (prefixComp !== 0) {
+    return order === 'asc' ? prefixComp : -prefixComp
+  }
+
+  if (valA.num !== null && valB.num !== null) {
+    return order === 'asc' ? valA.num - valB.num : valB.num - valA.num
+  } else if (valA.num !== null) {
+    return order === 'asc' ? 1 : -1
+  } else if (valB.num !== null) {
+    return order === 'asc' ? -1 : 1
+  }
+
+  return order === 'asc' ? idA.localeCompare(idB) : idB.localeCompare(idA)
+}
 
 // Two-way bindings with dashboardStore
 const searchQuery = computed({
@@ -74,6 +110,22 @@ const selectedLeads = computed({
 })
 const activeFiltersCount = computed(() => dashboardStore.activeFiltersCount)
 
+// Reset pagination to page 1 on any filter or search change
+watch([
+  searchQuery,
+  searchMode,
+  activeFolder,
+  selectedTariffs,
+  selectedLevels,
+  selectedGroups,
+  selectedCerts,
+  selectedScores,
+  selectedTags,
+  selectedLeads,
+], () => {
+  currentPage.value = 1
+})
+
 // Modals / Drawers
 const isActionsModalOpen = ref(false)
 const selectedActionStudent = ref<Student | null>(null)
@@ -107,60 +159,153 @@ const { data: foldersData } = useQuery({
 
 const folders = computed(() => foldersData.value || [])
 
-// Query: Students Roster
-const { data: studentsResponse, isLoading, refetch } = useQuery({
-  queryKey: [
-    'students',
-    currentPage,
-    searchQuery,
-    searchMode,
-    activeFolder,
-    sortOrder,
-    selectedTariffs,
-    selectedLevels,
-    selectedGroups,
-    selectedCerts,
-    selectedScores,
-    selectedTags,
-    selectedLeads,
-  ],
-  queryFn: () => studentsApi.getStudents({
-    page: currentPage.value,
-    page_size: 50,
-    search: searchQuery.value,
-    search_mode: searchMode.value,
-    folder: activeFolder.value,
-    sort_by: 'id',
-    sort_order: sortOrder.value,
-    tariff: selectedTariffs.value,
-    level: selectedLevels.value,
-    group: selectedGroups.value,
-    cert: selectedCerts.value,
-    score: selectedScores.value,
-    tag: selectedTags.value,
-    lead_by: selectedLeads.value,
-    include_archive: activeFolder.value === 'deleted' || activeFolder.value === 'archive',
-  }),
-  staleTime: 1000 * 30,
-})
-
-const students = computed(() => studentsResponse.value?.results || [])
-const totalPages = computed(() => studentsResponse.value?.total_pages || 1)
-const totalCount = computed(() => studentsResponse.value?.count || 0)
-
-// Query: All Students in Folder (for instantaneous client-side filter count calculation)
-const { data: allStudentsData } = useQuery({
-  queryKey: ['all-students-roster', activeFolder],
+// ── Full Master Students Roster (Loaded ONCE into In-Memory Cache) ───────────
+const { data: allStudentsData, isLoading, refetch } = useQuery({
+  queryKey: ['all-students-master'],
   queryFn: () => studentsApi.getStudents({
     page: 1,
-    page_size: 2000,
-    folder: activeFolder.value,
-    include_archive: activeFolder.value === 'deleted' || activeFolder.value === 'archive',
+    page_size: 5000,
+    folder: 'all',
+    include_archive: true,
   }),
-  staleTime: 1000 * 60 * 2,
+  staleTime: 1000 * 60 * 5,
 })
 
-const allStudents = computed(() => allStudentsData.value?.results || students.value)
+const allStudents = computed<Student[]>(() => allStudentsData.value?.results || [])
+
+// Dynamic real-time folder counts calculated from in-memory master roster
+const dynamicFolderCounts = computed(() => {
+  const list = allStudents.value
+  const activeList = list.filter(s => !s.is_deleted)
+  const counts: Record<string, number> = {
+    all: activeList.length,
+    except: activeList.filter(s => !s.folder_ids || s.folder_ids.length === 0).length,
+    deleted: list.filter(s => s.is_deleted).length,
+    archive: list.filter(s => s.is_deleted).length,
+    hidden: activeList.filter(s => s.status_hidden).length,
+  }
+  for (const f of folders.value) {
+    const fId = String(f.id)
+    counts[fId] = activeList.filter(s => (s.folder_ids || []).map(String).includes(fId)).length
+  }
+  return counts
+})
+
+// ── Ultra-Fast Instant In-Memory Filter (0ms Latency on Folder Switch & Keystrokes) ──────────
+const filteredStudents = computed(() => {
+  let list = allStudents.value
+
+  // 1. Folder Scope (In-Memory Filter - 0 network delay)
+  if (activeFolder.value === 'deleted' || activeFolder.value === 'archive') {
+    list = list.filter(s => s.is_deleted)
+  } else if (activeFolder.value === 'hidden') {
+    list = list.filter(s => !s.is_deleted && s.status_hidden)
+  } else if (activeFolder.value === 'except') {
+    list = list.filter(s => !s.is_deleted && (!s.folder_ids || s.folder_ids.length === 0))
+  } else if (activeFolder.value !== 'all') {
+    const targetFolderId = String(activeFolder.value)
+    list = list.filter(s => !s.is_deleted && (s.folder_ids || []).map(String).includes(targetFolderId))
+  } else {
+    list = list.filter(s => !s.is_deleted)
+  }
+
+  // 2. Search Query (In-Memory Filter)
+  const q = searchQuery.value.trim().toLowerCase()
+  if (q) {
+    if (searchMode.value === 'id') {
+      list = list.filter(s => (s.id || '').toLowerCase().includes(q))
+    } else {
+      list = list.filter(s => {
+        const idMatch = (s.id || '').toLowerCase().includes(q)
+        const nameMatch = (s.full_name || '').toLowerCase().includes(q)
+        const koreanNameMatch = (s.korean_name || '').toLowerCase().includes(q)
+        const passportMatch = (s.passport || '').toLowerCase().includes(q)
+        const phone1Match = (s.phone1 || '').toLowerCase().includes(q)
+        const phone2Match = (s.phone2 || '').toLowerCase().includes(q)
+        const fatherMatch = (s.father_name || '').toLowerCase().includes(q)
+        const motherMatch = (s.mother_name || '').toLowerCase().includes(q)
+        const uniMatch = (s.university_1 || '').toLowerCase().includes(q)
+        return idMatch || nameMatch || koreanNameMatch || passportMatch || phone1Match || phone2Match || fatherMatch || motherMatch || uniMatch
+      })
+    }
+  }
+
+  // 3. Multi-Criteria Filters (Tariffs, Levels, Groups, Certs, Scores, Tags, Leads)
+  if (selectedTariffs.value.length > 0) {
+    const hasNoTariff = selectedTariffs.value.includes('NO_TARIFF') || selectedTariffs.value.includes('No Tariff')
+    const cleanTariffs = selectedTariffs.value.filter(t => t !== 'NO_TARIFF' && t !== 'No Tariff')
+    list = list.filter(s => {
+      if (hasNoTariff && (!s.tariff || cleanTariffs.includes(s.tariff))) return true
+      return s.tariff && cleanTariffs.includes(s.tariff)
+    })
+  }
+
+  if (selectedLevels.value.length > 0) {
+    const hasNoLevel = selectedLevels.value.includes('NO_LEVEL') || selectedLevels.value.includes('No Level')
+    const cleanLevels = selectedLevels.value.filter(l => l !== 'NO_LEVEL' && l !== 'No Level')
+    list = list.filter(s => {
+      if (hasNoLevel && (!s.level || cleanLevels.includes(s.level) || cleanLevels.includes(s.level2 || ''))) return true
+      return (s.level && cleanLevels.includes(s.level)) || (s.level2 && cleanLevels.includes(s.level2))
+    })
+  }
+
+  if (selectedGroups.value.length > 0) {
+    const hasNoGroup = selectedGroups.value.includes('NO_GROUP') || selectedGroups.value.includes('No Group')
+    const cleanGroups = selectedGroups.value.filter(g => g !== 'NO_GROUP' && g !== 'No Group')
+    list = list.filter(s => {
+      if (hasNoGroup && (!s.student_group || cleanGroups.includes(s.student_group))) return true
+      return s.student_group && cleanGroups.includes(s.student_group)
+    })
+  }
+
+  if (selectedCerts.value.length > 0) {
+    list = list.filter(s => {
+      return selectedCerts.value.some(c => {
+        if (c === 'NO CERTIFICATE') {
+          return !s.language_certificate || s.language_certificate === 'NO CERTIFICATE'
+        }
+        return s.language_certificate === c || s.language_certificate_2 === c || s.language_certificate_3 === c
+      })
+    })
+  }
+
+  if (selectedScores.value.length > 0) {
+    list = list.filter(s => {
+      return selectedScores.value.some(score => {
+        const sc = score.toLowerCase()
+        return (s.certificate_score || '').toLowerCase() === sc ||
+               (s.certificate_score_2 || '').toLowerCase() === sc ||
+               (s.certificate_score_3 || '').toLowerCase() === sc
+      })
+    })
+  }
+
+  if (selectedTags.value.length > 0) {
+    list = list.filter(s => {
+      const studentTags = Array.isArray(s.task_tags) ? s.task_tags : []
+      return selectedTags.value.some(t => studentTags.includes(t))
+    })
+  }
+
+  if (selectedLeads.value.length > 0) {
+    const hasNoLead = selectedLeads.value.includes('NO_LEADBY') || selectedLeads.value.includes('No Lead by')
+    const cleanLeads = selectedLeads.value.filter(l => l !== 'NO_LEADBY' && l !== 'No Lead by')
+    list = list.filter(s => {
+      if (hasNoLead && (!s.lead_by || cleanLeads.includes(s.lead_by))) return true
+      return s.lead_by && cleanLeads.includes(s.lead_by)
+    })
+  }
+
+  return [...list].sort((a, b) => compareStudentIds(a, b, sortOrder.value))
+})
+
+const PAGE_SIZE = 50
+const totalCount = computed(() => filteredStudents.value.length)
+const totalPages = computed(() => Math.max(1, Math.ceil(totalCount.value / PAGE_SIZE)))
+const students = computed(() => {
+  const start = (currentPage.value - 1) * PAGE_SIZE
+  return filteredStudents.value.slice(start, start + PAGE_SIZE)
+})
 
 // Query: Selected Student Detail with instant initialData from local memory roster
 const { data: detailStudent } = useQuery({
@@ -168,27 +313,39 @@ const { data: detailStudent } = useQuery({
   queryFn: () => selectedDetailStudentId.value ? studentsApi.getStudentDetail(selectedDetailStudentId.value) : null,
   enabled: computed(() => !!selectedDetailStudentId.value),
   staleTime: 1000 * 60 * 5,
-  initialData: () => allStudents.value.find(s => s.id === selectedDetailStudentId.value) || students.value.find(s => s.id === selectedDetailStudentId.value) || undefined,
+  initialData: () => allStudents.value.find(s => s.id === selectedDetailStudentId.value) || undefined,
 })
 
 const selectedStudent = computed<Student | null>(() => {
   if (!selectedDetailStudentId.value) return null
-  const fromRoster = allStudents.value.find(s => s.id === selectedDetailStudentId.value) || 
-                     students.value.find(s => s.id === selectedDetailStudentId.value)
+  const fromRoster = allStudents.value.find(s => s.id === selectedDetailStudentId.value)
   if (detailStudent.value && detailStudent.value.id === selectedDetailStudentId.value) {
     return { ...(fromRoster || {}), ...detailStudent.value }
   }
   return fromRoster || null
 })
 
-// Mutations
+// Optimistic update helper for 0ms latency UI response
+const updateMasterStudentOptimistically = (id: string, updater: (student: Student) => Student) => {
+  queryClient.setQueryData<PaginatedResponse<Student> | { results: Student[] } | undefined>(
+    ['all-students-master'],
+    (oldData) => {
+      if (!oldData || !oldData.results) return oldData
+      return {
+        ...oldData,
+        results: oldData.results.map((s) => (s.id === id ? updater({ ...s }) : s)),
+      }
+    }
+  )
+}
+
+// Mutations with 0ms Instant Optimistic Updates
 const createStudentMutation = useMutation({
   mutationFn: (data: Partial<Student>) => studentsApi.createStudent(data),
   onSuccess: (newStudent) => {
-    queryClient.invalidateQueries({ queryKey: ['students'] })
+    queryClient.invalidateQueries({ queryKey: ['all-students-master'] })
     queryClient.invalidateQueries({ queryKey: ['folders'] })
     queryClient.invalidateQueries({ queryKey: ['student-options'] })
-    queryClient.invalidateQueries({ queryKey: ['all-students-roster'] })
     isAddModalOpen.value = false
     uiStore.addToast({
       type: 'success',
@@ -210,11 +367,15 @@ const updateStudentMutation = useMutation({
     if (!selectedDetailStudentId.value) throw new Error('No student selected')
     return studentsApi.updateStudent(selectedDetailStudentId.value, data)
   },
+  onMutate: async (data) => {
+    if (selectedDetailStudentId.value) {
+      updateMasterStudentOptimistically(selectedDetailStudentId.value, s => ({ ...s, ...data }))
+    }
+  },
   onSuccess: () => {
-    queryClient.invalidateQueries({ queryKey: ['students'] })
+    queryClient.invalidateQueries({ queryKey: ['all-students-master'] })
     queryClient.invalidateQueries({ queryKey: ['folders'] })
     queryClient.invalidateQueries({ queryKey: ['student-options'] })
-    queryClient.invalidateQueries({ queryKey: ['all-students-roster'] })
     queryClient.invalidateQueries({ queryKey: ['student-detail', selectedDetailStudentId.value] })
     uiStore.addToast({
       type: 'success',
@@ -228,12 +389,15 @@ const setColorMutation = useMutation({
   mutationFn: ({ id, color }: { id: string; color: string | null }) => {
     return studentsApi.setColor(id, { row_color: color })
   },
-  onSuccess: (_data, variables) => {
-    queryClient.invalidateQueries({ queryKey: ['students'] })
-    queryClient.invalidateQueries({ queryKey: ['all-students-roster'] })
-    if (selectedActionStudent.value && selectedActionStudent.value.id === variables.id) {
-      selectedActionStudent.value = { ...selectedActionStudent.value, row_color: variables.color }
+  onMutate: async ({ id, color }) => {
+    // 0ms instant UI update
+    updateMasterStudentOptimistically(id, s => ({ ...s, row_color: color }))
+    if (selectedActionStudent.value && selectedActionStudent.value.id === id) {
+      selectedActionStudent.value = { ...selectedActionStudent.value, row_color: color }
     }
+  },
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: ['all-students-master'] })
   }
 })
 
@@ -241,14 +405,17 @@ const setFoldersMutation = useMutation({
   mutationFn: ({ id, folderIds }: { id: string; folderIds: string[] }) => {
     return studentsApi.setFolders(id, folderIds)
   },
-  onSuccess: (data, variables) => {
-    queryClient.invalidateQueries({ queryKey: ['students'] })
+  onMutate: async ({ id, folderIds }) => {
+    // 0ms instant UI update
+    updateMasterStudentOptimistically(id, s => ({ ...s, folder_ids: folderIds }))
+    if (selectedActionStudent.value && selectedActionStudent.value.id === id) {
+      selectedActionStudent.value = { ...selectedActionStudent.value, folder_ids: folderIds }
+    }
+  },
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: ['all-students-master'] })
     queryClient.invalidateQueries({ queryKey: ['folders'] })
     queryClient.invalidateQueries({ queryKey: ['student-options'] })
-    queryClient.invalidateQueries({ queryKey: ['all-students-roster'] })
-    if (selectedActionStudent.value && selectedActionStudent.value.id === variables.id) {
-      selectedActionStudent.value = { ...selectedActionStudent.value, folder_ids: data.folder_ids || variables.folderIds }
-    }
   }
 })
 
@@ -256,11 +423,32 @@ const toggleTagMutation = useMutation({
   mutationFn: ({ id, tagName }: { id: string; tagName: string }) => {
     return studentsApi.toggleTag(id, tagName)
   },
+  onMutate: async ({ id, tagName }) => {
+    // 0ms instant UI update
+    updateMasterStudentOptimistically(id, s => {
+      const currentTags = Array.isArray(s.task_tags) ? [...s.task_tags] : []
+      const idx = currentTags.indexOf(tagName)
+      if (idx > -1) {
+        currentTags.splice(idx, 1)
+      } else {
+        currentTags.push(tagName)
+      }
+      return { ...s, task_tags: currentTags }
+    })
+    if (selectedActionStudent.value && selectedActionStudent.value.id === id) {
+      const currentTags = Array.isArray(selectedActionStudent.value.task_tags) ? [...selectedActionStudent.value.task_tags] : []
+      const idx = currentTags.indexOf(tagName)
+      if (idx > -1) {
+        currentTags.splice(idx, 1)
+      } else {
+        currentTags.push(tagName)
+      }
+      selectedActionStudent.value = { ...selectedActionStudent.value, task_tags: currentTags }
+    }
+  },
   onSuccess: (data, variables) => {
-    queryClient.invalidateQueries({ queryKey: ['students'] })
-    queryClient.invalidateQueries({ queryKey: ['all-students-roster'] })
-    if (selectedActionStudent.value && selectedActionStudent.value.id === variables.id) {
-      selectedActionStudent.value = { ...selectedActionStudent.value, task_tags: data.task_tags }
+    if (data?.task_tags) {
+      updateMasterStudentOptimistically(variables.id, s => ({ ...s, task_tags: data.task_tags }))
     }
   }
 })
@@ -269,12 +457,15 @@ const clearAllMutation = useMutation({
   mutationFn: (id: string) => {
     return studentsApi.clearAll(id)
   },
-  onSuccess: () => {
-    queryClient.invalidateQueries({ queryKey: ['students'] })
-    queryClient.invalidateQueries({ queryKey: ['all-students-roster'] })
-    if (selectedActionStudent.value) {
+  onMutate: async (id) => {
+    // 0ms instant UI update
+    updateMasterStudentOptimistically(id, s => ({ ...s, row_color: null, task_tags: [] }))
+    if (selectedActionStudent.value && selectedActionStudent.value.id === id) {
       selectedActionStudent.value = { ...selectedActionStudent.value, row_color: null, task_tags: [] }
     }
+  },
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: ['all-students-master'] })
     isActionsModalOpen.value = false
     uiStore.addToast({
       type: 'success',
@@ -286,11 +477,13 @@ const clearAllMutation = useMutation({
 
 const archiveMutation = useMutation({
   mutationFn: (id: string) => studentsApi.archiveStudent(id),
+  onMutate: async (id) => {
+    updateMasterStudentOptimistically(id, s => ({ ...s, is_deleted: true }))
+  },
   onSuccess: () => {
-    queryClient.invalidateQueries({ queryKey: ['students'] })
+    queryClient.invalidateQueries({ queryKey: ['all-students-master'] })
     queryClient.invalidateQueries({ queryKey: ['folders'] })
     queryClient.invalidateQueries({ queryKey: ['student-options'] })
-    queryClient.invalidateQueries({ queryKey: ['all-students-roster'] })
     isActionsModalOpen.value = false
     uiStore.addToast({
       type: 'warning',
@@ -302,11 +495,13 @@ const archiveMutation = useMutation({
 
 const restoreMutation = useMutation({
   mutationFn: (id: string) => studentsApi.restoreStudent(id),
+  onMutate: async (id) => {
+    updateMasterStudentOptimistically(id, s => ({ ...s, is_deleted: false }))
+  },
   onSuccess: () => {
-    queryClient.invalidateQueries({ queryKey: ['students'] })
+    queryClient.invalidateQueries({ queryKey: ['all-students-master'] })
     queryClient.invalidateQueries({ queryKey: ['folders'] })
     queryClient.invalidateQueries({ queryKey: ['student-options'] })
-    queryClient.invalidateQueries({ queryKey: ['all-students-roster'] })
     isActionsModalOpen.value = false
     uiStore.addToast({
       type: 'success',
@@ -318,11 +513,22 @@ const restoreMutation = useMutation({
 
 const permanentDeleteMutation = useMutation({
   mutationFn: (id: string) => studentsApi.permanentDeleteStudent(id),
+  onMutate: async (id) => {
+    queryClient.setQueryData<PaginatedResponse<Student> | { results: Student[] } | undefined>(
+      ['all-students-master'],
+      (oldData) => {
+        if (!oldData || !oldData.results) return oldData
+        return {
+          ...oldData,
+          results: oldData.results.filter((s) => s.id !== id),
+        }
+      }
+    )
+  },
   onSuccess: () => {
-    queryClient.invalidateQueries({ queryKey: ['students'] })
+    queryClient.invalidateQueries({ queryKey: ['all-students-master'] })
     queryClient.invalidateQueries({ queryKey: ['folders'] })
     queryClient.invalidateQueries({ queryKey: ['student-options'] })
-    queryClient.invalidateQueries({ queryKey: ['all-students-roster'] })
     isActionsModalOpen.value = false
     uiStore.addToast({
       type: 'error',
@@ -335,9 +541,9 @@ const permanentDeleteMutation = useMutation({
 const createFolderMutation = useMutation({
   mutationFn: (name: string) => studentsApi.createFolder(name),
   onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: ['all-students-master'] })
     queryClient.invalidateQueries({ queryKey: ['folders'] })
     queryClient.invalidateQueries({ queryKey: ['student-options'] })
-    queryClient.invalidateQueries({ queryKey: ['all-students-roster'] })
   }
 })
 
@@ -518,7 +724,7 @@ dashboardStore.onExportExcel = handleExportExcel
       :folders="folders"
       :active-folder="activeFolder"
       :total-count="totalCount"
-      :folder-counts="options.folder_counts"
+      :folder-counts="dynamicFolderCounts"
       @select="f => { activeFolder = f; currentPage = 1; }"
       @create-folder="name => createFolderMutation.mutate(name)"
     />

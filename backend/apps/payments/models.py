@@ -1,7 +1,7 @@
 import uuid
 from decimal import Decimal
 from django.db import models
-from apps.core.models import TenantAwareModel
+from apps.core.models import TenantAwareModel, SimpleTenantModel
 
 class PaymentMethodOption(models.TextChoices):
     KARTA_JA = 'Karta J.A', 'Karta J.A'
@@ -16,6 +16,7 @@ class PaymentMethodOption(models.TextChoices):
 class Payment(TenantAwareModel):
     """
     Financial Payment / Ledger record.
+    Mapped directly to 'payments' table in Supabase.
     Positive amount for payments and discounts.
     Negative amount for withdrawals.
     """
@@ -26,6 +27,8 @@ class Payment(TenantAwareModel):
         null=True,
         blank=True,
         related_name='payments',
+        db_column='student_id',
+        to_field='id',
         db_index=True
     )
     # Stored student name snapshot for audit history if student is ever detached
@@ -36,9 +39,18 @@ class Payment(TenantAwareModel):
     notes = models.TextField(blank=True, null=True)
     is_discount = models.BooleanField(default=False, db_index=True)
     is_withdrawal = models.BooleanField(default=False, db_index=True)
+    created_by = models.ForeignKey(
+        'authentication.User',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='payments_created',
+        db_column='created_by',
+        db_index=True
+    )
 
     class Meta:
-        db_table = 'crm_payments'
+        db_table = 'payments'
         verbose_name = 'Payment'
         verbose_name_plural = 'Payments'
         ordering = ['-created_at']
@@ -53,31 +65,40 @@ class Payment(TenantAwareModel):
         return f"{self.method}: {sign}{self.amount} UZS ({self.student_id or 'General'})"
 
 
-class PaymentMethodTemplate(TenantAwareModel):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+class PaymentMethodTemplate(SimpleTenantModel):
+    """Mapped to 'payment_methods' table in Supabase."""
+    id = models.BigAutoField(primary_key=True)
     name = models.CharField(max_length=100)
 
     class Meta:
-        db_table = 'crm_payment_method_templates'
-        unique_together = ('tenant', 'name')
+        db_table = 'payment_methods'
         ordering = ['name']
 
+    def __str__(self):
+        return self.name
 
-class PaymentReceiverTemplate(TenantAwareModel):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+class PaymentReceiverTemplate(SimpleTenantModel):
+    """Mapped to 'payment_receivers' table in Supabase."""
+    id = models.BigAutoField(primary_key=True)
     name = models.CharField(max_length=100)
 
     class Meta:
-        db_table = 'crm_payment_receiver_templates'
-        unique_together = ('tenant', 'name')
+        db_table = 'payment_receivers'
         ordering = ['name']
 
+    def __str__(self):
+        return self.name
 
-class PaymentNotePill(TenantAwareModel):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+class PaymentNotePill(SimpleTenantModel):
+    """Mapped to 'payment_note_templates' table in Supabase."""
+    id = models.BigAutoField(primary_key=True)
     name = models.CharField(max_length=100)
 
     class Meta:
-        db_table = 'crm_payment_note_pills'
-        unique_together = ('tenant', 'name')
+        db_table = 'payment_note_templates'
         ordering = ['name']
+
+    def __str__(self):
+        return self.name

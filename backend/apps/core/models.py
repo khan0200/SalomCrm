@@ -29,6 +29,7 @@ class TenantAwareModel(TimeStampedModel):
         'tenants.Tenant',
         on_delete=models.CASCADE,
         related_name="%(app_label)s_%(class)s_set",
+        db_column='tenant_id',
         db_index=True
     )
     created_by = models.ForeignKey(
@@ -37,6 +38,28 @@ class TenantAwareModel(TimeStampedModel):
         null=True,
         blank=True,
         related_name="%(app_label)s_%(class)s_created",
+        db_column='created_by_id',
+        db_index=True
+    )
+
+    objects = TenantManager()
+    all_objects = models.Manager()
+
+    class Meta:
+        abstract = True
+
+
+class SimpleTenantModel(models.Model):
+    """
+    Abstract model for lightweight option/lookup tables belonging to a tenant (without updated_at / created_by).
+    """
+    id: Any
+    created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)
+    tenant = models.ForeignKey(
+        'tenants.Tenant',
+        on_delete=models.CASCADE,
+        related_name="%(app_label)s_%(class)s_set",
+        db_column='tenant_id',
         db_index=True
     )
 

@@ -1,7 +1,8 @@
 import uuid
 from decimal import Decimal
 from django.db import models
-from apps.core.models import TenantAwareModel, TimeStampedModel
+from django.contrib.postgres.fields import ArrayField
+from apps.core.models import TenantAwareModel, TimeStampedModel, SimpleTenantModel
 
 class StudentLevel(models.TextChoices):
     COLLEGE = 'COLLEGE', 'College'
@@ -30,25 +31,25 @@ class LanguageCertificate(models.TextChoices):
     NO_CERTIFICATE = 'NO CERTIFICATE', 'No Certificate'
 
 
-class Folder(TenantAwareModel):
-    """Student folders for categorization within a tenant."""
+class Folder(SimpleTenantModel):
+    """Student folders for categorization within a tenant. Mapped to 'folders' table."""
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=100)
 
     class Meta:
-        db_table = 'crm_folders'
+        db_table = 'folders'
         verbose_name = 'Student Folder'
         verbose_name_plural = 'Student Folders'
-        unique_together = ('tenant', 'name')
         ordering = ['name']
 
     def __str__(self):
-        return f"{self.name} ({self.tenant.name})"
+        return f"{self.name}"
 
 
 class Student(TenantAwareModel):
     """
     Core Student Model in Uniapp CRM.
+    Mapped directly to 'students' table in Supabase.
     Preserves all business fields, financial parameters, educational backgrounds,
     university choices, language certificates, and status board parameters.
     """
@@ -132,7 +133,7 @@ class Student(TenantAwareModel):
     discount = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal('0.00'))
 
     # 6. Document Checklist & Counts
-    pick_needed = models.JSONField(default=list, blank=True)
+    pick_needed = ArrayField(models.CharField(max_length=100), default=list, blank=True)
     has_mc = models.BooleanField(default=False)
     bc_hand_count = models.IntegerField(default=0)
     mc_hand_count = models.IntegerField(default=0)
@@ -144,12 +145,12 @@ class Student(TenantAwareModel):
     invoice_university = models.CharField(max_length=255, blank=True, null=True)
     coa = models.CharField(max_length=50, blank=True, null=True)      # NOT TAKEN, TAKEN, MISTAKE, CANCELLED
     embassy = models.CharField(max_length=50, blank=True, null=True)  # APPROVED, CANCELLED, PENDING
-    embassy_documents = models.JSONField(default=list, blank=True)
+    embassy_documents = ArrayField(models.CharField(max_length=255), default=list, blank=True)
     status_hidden = models.BooleanField(default=False, db_index=True)
     kdb_put_date = models.CharField(max_length=50, blank=True, null=True)
     kdb_take_date = models.CharField(max_length=50, blank=True, null=True)
-    embassy_father_docs = models.JSONField(default=list, blank=True)
-    embassy_mother_docs = models.JSONField(default=list, blank=True)
+    embassy_father_docs = ArrayField(models.CharField(max_length=255), default=list, blank=True)
+    embassy_mother_docs = ArrayField(models.CharField(max_length=255), default=list, blank=True)
     embassy_sponsor_notes = models.TextField(blank=True, null=True)
     status_row_color = models.CharField(max_length=50, blank=True, null=True)
 
@@ -161,14 +162,23 @@ class Student(TenantAwareModel):
     notes = models.TextField(blank=True, null=True)
     is_deleted = models.BooleanField(default=False, db_index=True)  # Soft delete archive
     row_color = models.CharField(max_length=50, blank=True, null=True)
-    task_tags = models.JSONField(default=list, blank=True)
-    folders = models.ManyToManyField(Folder, blank=True, related_name='students')
+    task_tags = ArrayField(models.CharField(max_length=100), default=list, blank=True)
+    folder_ids = ArrayField(models.UUIDField(), default=list, blank=True)
     google_drive_url = models.URLField(max_length=500, blank=True, null=True)
     google_drive_folder_id = models.CharField(max_length=255, blank=True, null=True)
     jarayon_updated_at = models.DateTimeField(blank=True, null=True)
+    created_by = models.ForeignKey(
+        'authentication.User',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='students_created',
+        db_column='created_by',
+        db_index=True
+    )
 
     class Meta:
-        db_table = 'crm_students'
+        db_table = 'students'
         verbose_name = 'Student'
         verbose_name_plural = 'Students'
         ordering = ['-created_at']
@@ -182,7 +192,7 @@ class Student(TenantAwareModel):
         ]
 
     def __str__(self):
-        return f"{self.id} - {self.full_name} ({self.tenant.name})"
+        return f"{self.id} - {self.full_name}"
 
     def save(self, *args, **kwargs):
         # Enforce uppercase on alphanumeric ID, name, passport, address
@@ -193,94 +203,116 @@ class Student(TenantAwareModel):
         super().save(*args, **kwargs)
 
 
-class TariffOption(TenantAwareModel):
-    """Configurable tariff options with default prices."""
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+class TariffOption(SimpleTenantModel):
+    """Configurable tariff options with default prices. Mapped to 'tariff_options' table."""
+    id = models.BigAutoField(primary_key=True)
     name = models.CharField(max_length=100)
     price = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal('0.00'))
 
     class Meta:
-        db_table = 'crm_tariff_options'
-        unique_together = ('tenant', 'name')
+        db_table = 'tariff_options'
         ordering = ['name']
 
+    def __str__(self):
+        return self.name
 
-class EducationLevelOption(TenantAwareModel):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+class EducationLevelOption(SimpleTenantModel):
+    """Mapped to 'education_levels' table."""
+    id = models.BigAutoField(primary_key=True)
     name = models.CharField(max_length=100)
 
     class Meta:
-        db_table = 'crm_education_levels'
-        unique_together = ('tenant', 'name')
+        db_table = 'education_levels'
         ordering = ['name']
 
+    def __str__(self):
+        return self.name
 
-class StudentGroupOption(TenantAwareModel):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+class StudentGroupOption(SimpleTenantModel):
+    """Mapped to 'student_groups' table."""
+    id = models.BigAutoField(primary_key=True)
     name = models.CharField(max_length=100)
 
     class Meta:
-        db_table = 'crm_student_groups'
-        unique_together = ('tenant', 'name')
+        db_table = 'student_groups'
         ordering = ['name']
 
+    def __str__(self):
+        return self.name
 
-class LeadSourceOption(TenantAwareModel):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+class LeadSourceOption(SimpleTenantModel):
+    """Mapped to 'lead_sources' table."""
+    id = models.BigAutoField(primary_key=True)
     name = models.CharField(max_length=100)
 
     class Meta:
-        db_table = 'crm_lead_sources'
-        unique_together = ('tenant', 'name')
+        db_table = 'lead_sources'
         ordering = ['name']
 
+    def __str__(self):
+        return self.name
 
-class CoordinatorOption(TenantAwareModel):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+class CoordinatorOption(SimpleTenantModel):
+    """Mapped to 'coordinators' table."""
+    id = models.BigAutoField(primary_key=True)
     name = models.CharField(max_length=100)
 
     class Meta:
-        db_table = 'crm_coordinators'
-        unique_together = ('tenant', 'name')
+        db_table = 'coordinators'
         ordering = ['name']
 
+    def __str__(self):
+        return self.name
 
-class UniversityOption(TenantAwareModel):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+class UniversityOption(models.Model):
+    """Mapped to 'universities' table."""
+    id = models.BigAutoField(primary_key=True)
     name = models.CharField(max_length=255)
+    created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)
 
     class Meta:
-        db_table = 'crm_universities'
-        unique_together = ('tenant', 'name')
+        db_table = 'universities'
         ordering = ['name']
 
+    def __str__(self):
+        return self.name
 
-class UniversityStatusOption(TenantAwareModel):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+class UniversityStatusOption(SimpleTenantModel):
+    """Mapped to 'university_statuses' table."""
+    id = models.BigAutoField(primary_key=True)
     name = models.CharField(max_length=100)
     color_class = models.CharField(max_length=100, default='text-blue-500')
 
     class Meta:
-        db_table = 'crm_university_statuses'
-        unique_together = ('tenant', 'name')
+        db_table = 'university_statuses'
         ordering = ['name']
 
+    def __str__(self):
+        return self.name
 
-class SchoolDirectory(TenantAwareModel):
+
+class SchoolDirectory(TimeStampedModel):
+    """Mapped to 'schools' table."""
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=255, db_index=True)
     address = models.TextField(blank=True, null=True)
     website = models.CharField(max_length=255, blank=True, null=True)
     phone = models.CharField(max_length=100, blank=True, null=True)
     email = models.CharField(max_length=255, blank=True, null=True)
+    source = models.CharField(max_length=100, blank=True, null=True)
 
     class Meta:
-        db_table = 'crm_schools'
-        unique_together = ('tenant', 'name')
+        db_table = 'schools'
         ordering = ['name']
 
     def __str__(self):
-        return f"{self.name} ({self.tenant.name})"
+        return self.name
 
 
 class MajorOption(TenantAwareModel):
@@ -293,7 +325,7 @@ class MajorOption(TenantAwareModel):
         ordering = ['name']
 
     def __str__(self):
-        return f"{self.name} ({self.tenant.name})"
+        return f"{self.name}"
 
 
 class B2BOption(TenantAwareModel):
@@ -306,7 +338,7 @@ class B2BOption(TenantAwareModel):
         ordering = ['name']
 
     def __str__(self):
-        return f"{self.name} ({self.tenant.name})"
+        return f"{self.name}"
 
 
 class VisaStudent(TenantAwareModel):
@@ -358,7 +390,7 @@ class VisaStudent(TenantAwareModel):
         ]
 
     def __str__(self):
-        return f"{self.passport} - {self.full_name} ({self.tenant.name})"
+        return f"{self.passport} - {self.full_name}"
 
     def save(self, *args, **kwargs):
         if self.passport:

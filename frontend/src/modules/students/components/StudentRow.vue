@@ -63,22 +63,16 @@ const getTagIcon = (tag: string) => {
 const rowBgClass = computed(() => {
   const colorKey = props.student.row_color?.toUpperCase()
   if (!colorKey) return 'hover:bg-zinc-50/90 dark:hover:bg-zinc-800/40'
-  if (colorKey === 'EMERALD') return 'bg-[#8fcc77]/80 hover:bg-[#7ec264] dark:bg-emerald-900/65 dark:hover:bg-emerald-900/80 text-zinc-900 dark:text-zinc-100'
-  if (colorKey === 'BLUE') return 'bg-[#82b9e3]/80 hover:bg-[#6aa9da] dark:bg-blue-900/65 dark:hover:bg-blue-900/80 text-zinc-900 dark:text-zinc-100'
-  if (colorKey === 'YELLOW') return 'bg-[#ffd24d]/80 hover:bg-[#ffc61a] dark:bg-amber-900/65 dark:hover:bg-amber-900/80 text-zinc-900 dark:text-zinc-100'
-  return 'hover:brightness-95 dark:hover:brightness-110'
+  return 'hover:brightness-90 dark:hover:brightness-110 text-zinc-950 dark:text-white font-medium'
 })
 
 const rowBgStyle = computed(() => {
   const colorKey = props.student.row_color?.toUpperCase()
   if (!colorKey || !ROW_COLOR_MAP[colorKey]) return {}
   const mapping = ROW_COLOR_MAP[colorKey]
-  if (['EMERALD', 'BLUE', 'YELLOW'].includes(colorKey)) {
-    return { borderLeft: `4px solid ${mapping.ball}` }
-  }
   return {
     backgroundColor: mapping.bg,
-    borderLeft: `4px solid ${mapping.ball}`,
+    borderLeft: `5px solid ${mapping.ball}`,
   }
 })
 
@@ -159,34 +153,42 @@ const universities = computed(() => {
         <!-- Copy Full Name Button -->
         <button
           @click.stop="copyName"
-          class="p-1 rounded text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors cursor-pointer"
+          class="p-1 rounded transition-colors cursor-pointer"
+          :class="student.row_color ? 'text-zinc-700 hover:text-zinc-950 dark:text-zinc-300 dark:hover:text-white' : 'text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200'"
           title="Copy full name"
         >
-          <Check v-if="isNameCopied" class="w-3.5 h-3.5 text-emerald-500" />
+          <Check v-if="isNameCopied" class="w-3.5 h-3.5 text-emerald-600" />
           <Copy v-else class="w-3.5 h-3.5" />
         </button>
       </div>
 
       <!-- Tariff subtext -->
-      <div class="text-[10px] font-semibold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider mt-0.5">
+      <div
+        class="text-[10.5px] uppercase tracking-wider mt-0.5"
+        :class="student.row_color ? 'text-zinc-800/90 dark:text-zinc-200 font-bold' : 'text-zinc-400 dark:text-zinc-500 font-semibold'"
+      >
         {{ student.tariff || 'NO TARIFF' }}
       </div>
     </td>
 
     <!-- 3. Phone Numbers Column -->
-    <td class="px-4 py-3 whitespace-nowrap font-mono text-xs text-zinc-700 dark:text-zinc-300">
+    <td
+      class="px-4 py-3 whitespace-nowrap font-mono text-xs"
+      :class="student.row_color ? 'text-zinc-950 dark:text-white font-semibold' : 'text-zinc-700 dark:text-zinc-300'"
+    >
       <div class="flex items-center justify-start gap-2">
         <div class="leading-tight space-y-0.5">
           <div>{{ student.phone1 || '—' }}</div>
-          <div v-if="student.phone2" class="text-zinc-500 dark:text-zinc-400">{{ student.phone2 }}</div>
+          <div v-if="student.phone2" :class="student.row_color ? 'text-zinc-800 dark:text-zinc-200 font-medium' : 'text-zinc-500 dark:text-zinc-400'">{{ student.phone2 }}</div>
         </div>
 
         <button
           @click.stop="copyPhone"
-          class="p-1 rounded text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors cursor-pointer shrink-0"
+          class="p-1 rounded transition-colors cursor-pointer shrink-0"
+          :class="student.row_color ? 'text-zinc-700 hover:text-zinc-950 dark:text-zinc-300 dark:hover:text-white' : 'text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200'"
           title="Copy ID, name, and phones"
         >
-          <Check v-if="isPhoneCopied" class="w-3.5 h-3.5 text-emerald-500" />
+          <Check v-if="isPhoneCopied" class="w-3.5 h-3.5 text-emerald-600" />
           <Copy v-else class="w-3.5 h-3.5" />
         </button>
       </div>
@@ -212,33 +214,37 @@ const universities = computed(() => {
           </span>
         </div>
 
-        <!-- Split Certificate Badges: [TOPIK | 2] -->
-        <div v-if="certs.length > 0" class="flex flex-wrap gap-1.5">
-          <div
-            v-for="(c, idx) in certs"
-            :key="idx"
-            class="inline-flex items-center text-[9.5px] font-bold rounded overflow-hidden shadow-2xs select-none"
+        <!-- Language Certificate Pills -->
+        <div v-if="certs.length > 0" class="flex flex-wrap gap-1">
+          <span
+            v-for="(c, cIdx) in certs"
+            :key="cIdx"
+            class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold shadow-2xs"
+            :class="c.isTopik ? 'bg-rose-500 text-white' : 'bg-blue-600 text-white'"
           >
-            <span
-              class="px-1.5 py-0.5 text-white uppercase tracking-wider"
-              :class="c.isTopik ? 'bg-[#de350b]' : 'bg-[#00b8d9]'"
-            >
-              {{ c.type }}
-            </span>
-            <span class="bg-[#0052cc] text-white px-1.5 py-0.5">
-              {{ c.score || '—' }}
-            </span>
-          </div>
+            <span>{{ c.type }}</span>
+            <span v-if="c.score" class="opacity-90 font-mono">({{ c.score }})</span>
+          </span>
         </div>
       </div>
     </td>
 
-    <!-- 5. University Choices Column -->
-    <td class="px-4 py-3 max-w-[280px]">
-      <ul v-if="universities.length > 0" class="space-y-0.5 text-[11px] leading-snug">
-        <li v-for="(uni, idx) in universities" :key="idx" class="flex items-start gap-1 min-w-0">
-          <span class="text-zinc-400 shrink-0">•</span>
-          <span class="truncate font-medium text-zinc-700 dark:text-zinc-300 uppercase" :title="String(uni)">{{ uni }}</span>
+    <!-- 5. University Priority List Column -->
+    <td class="px-4 py-3 text-xs max-w-[240px]">
+      <ul v-if="universities.length > 0" class="space-y-1">
+        <li
+          v-for="(uni, uniIdx) in universities"
+          :key="uniIdx"
+          class="flex items-center gap-1.5 text-[11.5px]"
+        >
+          <span :class="student.row_color ? 'text-zinc-700 dark:text-zinc-300 font-bold' : 'text-zinc-400'" class="shrink-0">•</span>
+          <span
+            class="truncate uppercase"
+            :class="student.row_color ? 'font-bold text-zinc-950 dark:text-white' : 'font-medium text-zinc-700 dark:text-zinc-300'"
+            :title="String(uni)"
+          >
+            {{ uni }}
+          </span>
         </li>
       </ul>
       <span v-else class="text-zinc-400">—</span>
@@ -248,14 +254,15 @@ const universities = computed(() => {
     <td class="px-4 py-3 text-right whitespace-nowrap" @click.stop>
       <div class="flex items-center justify-end gap-2">
         <!-- Task Tags Container -->
-        <div v-if="student.task_tags && student.task_tags.length > 0" class="flex items-center gap-1.5 flex-nowrap shrink-0">
+        <div v-if="student.task_tags && student.task_tags.length > 0" class="flex items-center gap-1.5 flex-wrap justify-end shrink-0">
           <span
             v-for="(tag, tagIdx) in student.task_tags"
             :key="tagIdx"
-            class="inline-flex items-center justify-center px-1.5 py-0.5 text-xs bg-white/80 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 rounded shadow-2xs cursor-pointer select-none"
+            class="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-semibold bg-zinc-900/10 dark:bg-white/15 border border-zinc-900/20 dark:border-white/25 text-zinc-950 dark:text-zinc-50 rounded-md shadow-2xs cursor-pointer select-none backdrop-blur-xs"
             :title="tag"
           >
-            {{ getTagIcon(tag) }}
+            <span class="text-xs leading-none">{{ getTagIcon(tag) }}</span>
+            <span class="max-w-[110px] truncate">{{ tag }}</span>
           </span>
         </div>
 

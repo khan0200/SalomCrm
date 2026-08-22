@@ -27,7 +27,6 @@ class StatusStudentListSerializer(serializers.ModelSerializer):
     """
     days_left = serializers.SerializerMethodField()
     urgency = serializers.SerializerMethodField()
-    folder_ids = serializers.PrimaryKeyRelatedField(many=True, read_only=True, source='folders')
 
     class Meta:
         model = Student

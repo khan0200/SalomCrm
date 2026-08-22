@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
 import { statusApi } from '@/api/status'
 import { studentsApi } from '@/api/students'
@@ -31,44 +31,111 @@ const activeFolder = ref('all')
 const showHidden = ref(false)
 const currentPage = ref(1)
 
+// Reset page on filter or search
+watch([searchQuery, activeFolder, showHidden, activeTab], () => {
+  currentPage.value = 1
+})
+
 // Selected student for modals
 const selectedKdbStudent = ref<Student | null>(null)
 const isKdbModalOpen = ref(false)
 const selectedEmbassyStudent = ref<Student | null>(null)
 const isEmbassyDrawerOpen = ref(false)
 
+// Alphanumeric sorting logic matching UniApp2
+const compareStudentIds = (a: Student, b: Student) => {
+  const idA = a.id || ''
+  const idB = b.id || ''
+
+  const parseId = (idStr: string) => {
+    const str = idStr.trim()
+    const match = str.match(/^([A-Za-z\s_-]*)(\d*)$/)
+    if (match) {
+      return {
+        prefix: match[1] || '',
+        num: match[2] ? parseInt(match[2], 10) : null
+      }
+    }
+    return { prefix: str, num: null }
+  }
+
+  const valA = parseId(idA)
+  const valB = parseId(idB)
+
+  const prefixComp = valA.prefix.localeCompare(valB.prefix, undefined, { sensitivity: 'base' })
+  if (prefixComp !== 0) return prefixComp
+
+  if (valA.num !== null && valB.num !== null) {
+    return valA.num - valB.num
+  } else if (valA.num !== null) {
+    return 1
+  } else if (valB.num !== null) {
+    return -1
+  }
+
+  return idA.localeCompare(idB)
+}
+
 // Query: Folders
 const { data: foldersData } = useQuery({
   queryKey: ['folders'],
   queryFn: () => studentsApi.getFolders(),
+  staleTime: 1000 * 60 * 5,
 })
 
 const folders = computed(() => foldersData.value || [])
 
-// Query: Status Students
+// Query: Status Students (In-memory cached)
 const { data: statusResponse, isLoading } = useQuery({
   queryKey: [
     'status-students',
-    activeTab,
-    currentPage,
-    searchQuery,
     activeFolder,
     showHidden,
   ],
   queryFn: () => statusApi.getStatusStudents({
-    page: currentPage.value,
-    page_size: 30,
-    search: searchQuery.value,
+    page: 1,
+    page_size: 3000,
     folder: activeFolder.value,
-    sort_by: activeTab.value === 'kdb' ? 'left' : 'id',
-    sort_order: 'asc',
     show_hidden: showHidden.value,
   }),
+  staleTime: 1000 * 60 * 5,
 })
 
-const students = computed(() => statusResponse.value?.results || [])
-const totalPages = computed(() => statusResponse.value?.total_pages || 1)
-const totalCount = computed(() => statusResponse.value?.count || 0)
+const allStatusStudents = computed<Student[]>(() => statusResponse.value?.results || [])
+
+// ── Ultra-Fast Instant In-Memory Filter for Status Board (0ms Latency) ──────────
+const filteredStudents = computed(() => {
+  let list = allStatusStudents.value
+
+  const q = searchQuery.value.trim().toLowerCase()
+  if (q) {
+    list = list.filter(s => {
+      const idMatch = (s.id || '').toLowerCase().includes(q)
+      const nameMatch = (s.full_name || '').toLowerCase().includes(q)
+      const passportMatch = (s.passport || '').toLowerCase().includes(q)
+      const phoneMatch = (s.phone1 || '').toLowerCase().includes(q)
+      const invUniMatch = (s.invoice_university || '').toLowerCase().includes(q)
+      return idMatch || nameMatch || passportMatch || phoneMatch || invUniMatch
+    })
+  }
+
+  return [...list].sort((a, b) => {
+    if (activeTab.value === 'kdb') {
+      const daysA = a.days_left !== null && a.days_left !== undefined ? a.days_left : 999999
+      const daysB = b.days_left !== null && b.days_left !== undefined ? b.days_left : 999999
+      if (daysA !== daysB) return daysA - daysB
+    }
+    return compareStudentIds(a, b)
+  })
+})
+
+const PAGE_SIZE = 50
+const totalCount = computed(() => filteredStudents.value.length)
+const totalPages = computed(() => Math.max(1, Math.ceil(totalCount.value / PAGE_SIZE)))
+const students = computed(() => {
+  const start = (currentPage.value - 1) * PAGE_SIZE
+  return filteredStudents.value.slice(start, start + PAGE_SIZE)
+})
 
 // Mutations
 const updateKdbMutation = useMutation({

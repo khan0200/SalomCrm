@@ -237,11 +237,11 @@ const handleRestoreStudent = () => {
                     type="button"
                     @click="handleColorSelect(String(name))"
                     class="relative w-8 h-8 rounded-full cursor-pointer transition-all duration-150 flex items-center justify-center shadow-xs"
-                    :class="localColor === name ? 'scale-105 ring-2 ring-offset-2 ring-zinc-400 dark:ring-zinc-600' : 'hover:scale-110'"
+                    :class="localColor === name ? 'scale-110 ring-3 ring-offset-2 ring-zinc-700 dark:ring-zinc-200' : 'hover:scale-110 opacity-90 hover:opacity-100'"
                     :style="{ backgroundColor: data.ball }"
                     :title="data.name"
                   >
-                    <Check v-if="localColor === name" class="w-4 h-4 text-white stroke-[3]" />
+                    <Check v-if="localColor === name" class="w-4 h-4 text-white stroke-[3.5]" />
                   </button>
 
                   <!-- Clear Color -->
@@ -271,7 +271,7 @@ const handleRestoreStudent = () => {
                     @click="handleClearFolders"
                     class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-semibold cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-xs"
                     :class="localFolderIds.length === 0
-                      ? 'border-blue-500 bg-blue-50/70 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 font-bold shadow-2xs'
+                      ? 'border-blue-600 bg-blue-100/80 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 font-bold shadow-xs ring-1 ring-blue-500/30'
                       : 'border-zinc-200 dark:border-zinc-700 bg-zinc-50/50 dark:bg-zinc-800/60 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-zinc-100'"
                   >
                     <span>📁 All (No Folder)</span>
@@ -285,7 +285,7 @@ const handleRestoreStudent = () => {
                     @click="handleToggleFolder(folder.id)"
                     class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-semibold cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-xs"
                     :class="localFolderIds.includes(String(folder.id))
-                      ? 'border-blue-500 bg-blue-50/70 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 font-bold shadow-2xs'
+                      ? 'border-blue-600 bg-blue-100/80 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 font-bold shadow-xs ring-1 ring-blue-500/30'
                       : 'border-zinc-200 dark:border-zinc-700 bg-zinc-50/50 dark:bg-zinc-800/60 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-zinc-100'"
                   >
                     <span>📁 {{ folder.name }}</span>
@@ -312,13 +312,13 @@ const handleRestoreStudent = () => {
                     @click="handleTagClick(tag.name)"
                     class="flex items-center gap-2 pl-3 pr-3 py-2 rounded-xl border text-[12.5px] font-semibold transition-all text-left w-full cursor-pointer"
                     :class="localTags.includes(tag.name)
-                      ? 'border-blue-500 bg-blue-50/70 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 shadow-2xs font-bold'
+                      ? 'border-blue-600 bg-blue-100/90 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 shadow-xs font-bold ring-1 ring-blue-500/30'
                       : 'border-zinc-200 dark:border-zinc-700 bg-zinc-50/50 dark:bg-zinc-800/60 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-zinc-100'"
                     :title="localTags.includes(tag.name) ? 'Click to remove tag' : 'Click to apply tag'"
                   >
                     <span class="leading-none text-base shrink-0">{{ tag.icon }}</span>
                     <span class="truncate flex-1">{{ tag.name }}</span>
-                    <CheckCircle2 v-if="localTags.includes(tag.name)" class="w-3.5 h-3.5 shrink-0 text-blue-600 dark:text-blue-400" />
+                    <CheckCircle2 v-if="localTags.includes(tag.name)" class="w-4 h-4 shrink-0 text-blue-600 dark:text-blue-400" />
                   </button>
                 </div>
 

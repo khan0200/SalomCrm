@@ -193,12 +193,12 @@ export interface PaginatedResponse<T> {
 }
 
 export const ROW_COLOR_MAP: Record<string, { bg: string; ball: string; name: string }> = {
-  BLUE: { bg: 'rgba(37, 99, 235, 0.35)', ball: '#2563EB', name: 'Blue' },
-  EMERALD: { bg: 'rgba(16, 185, 129, 0.35)', ball: '#10B981', name: 'Emerald' },
-  RED: { bg: 'rgba(239, 68, 68, 0.35)', ball: '#EF4444', name: 'Red' },
-  VIOLET: { bg: 'rgba(139, 92, 246, 0.35)', ball: '#8B5CF6', name: 'Violet' },
-  ORANGE: { bg: 'rgba(249, 115, 22, 0.35)', ball: '#F97316', name: 'Orange' },
-  YELLOW: { bg: 'rgba(250, 204, 21, 0.35)', ball: '#FACC15', name: 'Yellow' },
-  CYAN: { bg: 'rgba(6, 182, 212, 0.35)', ball: '#06B6D4', name: 'Cyan' },
-  SLATE: { bg: 'rgba(100, 116, 139, 0.35)', ball: '#64748B', name: 'Slate' }
+  BLUE: { bg: '#86bcf6', ball: '#2563EB', name: 'Blue' },
+  EMERALD: { bg: '#58d39f', ball: '#10B981', name: 'Emerald' },
+  RED: { bg: '#fa8c8c', ball: '#EF4444', name: 'Red' },
+  VIOLET: { bg: '#b79df8', ball: '#8B5CF6', name: 'Violet' },
+  ORANGE: { bg: '#fba557', ball: '#F97316', name: 'Orange' },
+  YELLOW: { bg: '#fad338', ball: '#EAB308', name: 'Yellow' },
+  CYAN: { bg: '#5ecef8', ball: '#06B6D4', name: 'Cyan' },
+  SLATE: { bg: '#b2c0d2', ball: '#64748B', name: 'Slate' }
 }
