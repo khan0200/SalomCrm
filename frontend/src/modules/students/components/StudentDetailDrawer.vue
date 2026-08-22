@@ -394,7 +394,7 @@ onUnmounted(() => {
 // Student Payments Query (Fetching live payments history for student)
 const studentId = computed(() => props.student?.id)
 
-const { data: studentPaymentsData } = useQuery({
+const { data: studentPaymentsData, isLoading: isPaymentsLoading } = useQuery({
   queryKey: ['student-payments', studentId],
   queryFn: () => paymentsApi.getPaymentHistory({ student_id: studentId.value, page_size: 100 }),
   enabled: computed(() => !!studentId.value && props.isOpen),
@@ -423,7 +423,15 @@ const computedPaymentsDone = computed(() => {
         return p.is_withdrawal ? sum - Math.abs(val) : sum + val
       }, 0)
   }
-  return Number((props.student as any)?.payments_sum || 0)
+  // Instant 0ms calculation from (Balance + Tariff Price - Discount) if payments query is in-flight
+  if (props.student?.balance !== undefined && props.student?.tariff) {
+    const tariffVal = computedTariffPrice.value
+    const balVal = Number(props.student.balance || 0)
+    const discVal = Number(props.student.discount || 0)
+    const estPaid = (balVal + tariffVal) - discVal
+    if (estPaid >= 0) return estPaid
+  }
+  return Number((props.student as any)?.payments_sum || (props.student as any)?.total_paid || 0)
 })
 
 const computedDiscount = computed(() => {
@@ -437,7 +445,6 @@ const computedDiscount = computed(() => {
 })
 
 const computedBalance = computed(() => {
-  // Balance formula matching UniApp2: (Payments Done + Discount) - Tariff Price
   // If Tariff is not set: fallback to student.balance
   if (!props.student?.tariff || props.student.tariff === 'Select' || props.student.tariff === '—') {
     return Number(props.student?.balance || 0)
@@ -3165,7 +3172,8 @@ const handleRestoreStudent = () => {
                         <Copy v-else class="w-3.5 h-3.5" />
                       </button>
                     </div>
-                    <div class="mt-1 text-[16px] font-extrabold tracking-wide font-mono">
+                    <div v-if="isPaymentsLoading && !student?.tariff" class="h-6 w-32 bg-white/30 rounded-md animate-pulse mt-1" />
+                    <div v-else class="mt-1 text-[16px] font-extrabold tracking-wide font-mono">
                       {{ formatCurrency(computedBalance) }}
                     </div>
                   </div>
@@ -3187,7 +3195,8 @@ const handleRestoreStudent = () => {
                         <Copy v-else class="w-3.5 h-3.5" />
                       </button>
                     </div>
-                    <div class="mt-1 text-[16px] font-extrabold tracking-wide font-mono">
+                    <div v-if="isPaymentsLoading && student?.balance === undefined" class="h-6 w-32 bg-white/30 rounded-md animate-pulse mt-1" />
+                    <div v-else class="mt-1 text-[16px] font-extrabold tracking-wide font-mono">
                       {{ formatCurrency(computedPaymentsDone) }}
                     </div>
                   </div>
@@ -3209,7 +3218,8 @@ const handleRestoreStudent = () => {
                         <Copy v-else class="w-3.5 h-3.5" />
                       </button>
                     </div>
-                    <div class="mt-1 text-[16px] font-extrabold tracking-wide font-mono">
+                    <div v-if="isPaymentsLoading && student?.discount === undefined" class="h-6 w-24 bg-white/30 rounded-md animate-pulse mt-1" />
+                    <div v-else class="mt-1 text-[16px] font-extrabold tracking-wide font-mono">
                       {{ formatCurrency(computedDiscount) }}
                     </div>
                   </div>

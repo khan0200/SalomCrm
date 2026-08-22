@@ -108,7 +108,7 @@ class Student(TenantAwareModel):
 
     # 4. University Selections & Statuses (1 to 5)
     university_1 = models.CharField(max_length=255, blank=True, null=True)
-    university_1_status = models.CharField(max_length=50, default='Chosen')
+    university_1_status = models.CharField(max_length=50, blank=True, null=True, default='Chosen')
     university_1_major = models.CharField(max_length=255, blank=True, null=True)
 
     university_2 = models.CharField(max_length=255, blank=True, null=True)

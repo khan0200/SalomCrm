@@ -632,6 +632,17 @@ async function confirmDelete() {
   }
 }
 
+// Pin / Unpin student
+async function togglePin(student: VisaStudent) {
+  const newPinned = !student.pinned
+  student.pinned = newPinned
+  try {
+    await visaApi.updateVisaStudent(student.passport, { pinned: newPinned })
+  } catch {
+    student.pinned = !newPinned
+  }
+}
+
 // ─── Virtual Scroll ───────────────────────────────────────────────────────────
 const containerRef = ref<HTMLElement | null>(null)
 const containerTop = ref(300)

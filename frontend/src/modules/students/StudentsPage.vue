@@ -84,6 +84,7 @@ const isDetailDrawerOpen = ref(false)
 const { data: optionsData } = useQuery({
   queryKey: ['student-options'],
   queryFn: () => studentsApi.getOptions(),
+  staleTime: 1000 * 60 * 10,
 })
 
 const options = computed(() => optionsData.value || {
@@ -101,6 +102,7 @@ const options = computed(() => optionsData.value || {
 const { data: foldersData } = useQuery({
   queryKey: ['folders'],
   queryFn: () => studentsApi.getFolders(),
+  staleTime: 1000 * 60 * 5,
 })
 
 const folders = computed(() => foldersData.value || [])
@@ -139,6 +141,7 @@ const { data: studentsResponse, isLoading, refetch } = useQuery({
     lead_by: selectedLeads.value,
     include_archive: activeFolder.value === 'deleted' || activeFolder.value === 'archive',
   }),
+  staleTime: 1000 * 30,
 })
 
 const students = computed(() => studentsResponse.value?.results || [])
@@ -154,15 +157,28 @@ const { data: allStudentsData } = useQuery({
     folder: activeFolder.value,
     include_archive: activeFolder.value === 'deleted' || activeFolder.value === 'archive',
   }),
+  staleTime: 1000 * 60 * 2,
 })
 
 const allStudents = computed(() => allStudentsData.value?.results || students.value)
 
-// Query: Selected Student Detail
+// Query: Selected Student Detail with instant initialData from local memory roster
 const { data: detailStudent } = useQuery({
   queryKey: ['student-detail', selectedDetailStudentId],
   queryFn: () => selectedDetailStudentId.value ? studentsApi.getStudentDetail(selectedDetailStudentId.value) : null,
   enabled: computed(() => !!selectedDetailStudentId.value),
+  staleTime: 1000 * 60 * 5,
+  initialData: () => allStudents.value.find(s => s.id === selectedDetailStudentId.value) || students.value.find(s => s.id === selectedDetailStudentId.value) || undefined,
+})
+
+const selectedStudent = computed<Student | null>(() => {
+  if (!selectedDetailStudentId.value) return null
+  const fromRoster = allStudents.value.find(s => s.id === selectedDetailStudentId.value) || 
+                     students.value.find(s => s.id === selectedDetailStudentId.value)
+  if (detailStudent.value && detailStudent.value.id === selectedDetailStudentId.value) {
+    return { ...(fromRoster || {}), ...detailStudent.value }
+  }
+  return fromRoster || null
 })
 
 // Mutations
@@ -572,13 +588,13 @@ dashboardStore.onExportExcel = handleExportExcel
 
     <StudentDetailDrawer
       :is-open="isDetailDrawerOpen"
-      :student="detailStudent || null"
+      :student="selectedStudent || null"
       :options="options"
       @close="isDetailDrawerOpen = false"
       @update-student="data => updateStudentMutation.mutate(data)"
-      @archive="() => detailStudent && archiveMutation.mutate(detailStudent.id)"
-      @restore="() => detailStudent && restoreMutation.mutate(detailStudent.id)"
-      @permanent-delete="() => detailStudent && permanentDeleteMutation.mutate(detailStudent.id)"
+      @archive="() => selectedStudent && archiveMutation.mutate(selectedStudent.id)"
+      @restore="() => selectedStudent && restoreMutation.mutate(selectedStudent.id)"
+      @permanent-delete="() => selectedStudent && permanentDeleteMutation.mutate(selectedStudent.id)"
       @open-add-payment="id => { isDetailDrawerOpen = false; $router.push({ path: '/payments', query: { student_id: id, open_add: 'true' } }); }"
     />
 

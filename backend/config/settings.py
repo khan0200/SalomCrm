@@ -93,6 +93,9 @@ if DATABASE_URL:
             'PASSWORD': urllib.parse.unquote(url.password or ''),
             'HOST': url.hostname or 'localhost',
             'PORT': url.port or 5432,
+            'OPTIONS': {
+                'sslmode': 'require',
+            },
         }
     }
 elif os.getenv('DB_ENGINE') == 'postgresql' and os.getenv('DB_NAME'):
