@@ -18,6 +18,7 @@ import StatusBadge from './components/StatusBadge.vue'
 import VisaTypeBadge from './components/VisaTypeBadge.vue'
 import CopyField from './components/CopyField.vue'
 import { formatTimestampCompact } from './useTimeAgo'
+import { parseRejectionReasons } from './utils/rejectionParser'
 
 const uiStore = useUiStore()
 const dashboardStore = useStudentDashboardStore()
@@ -544,14 +545,22 @@ async function runBatchCheck(list: VisaStudent[]) {
     noAnswer: noAnswerCount
   }
 
-  // Finish batch & open report modal
+  // Finish batch & open report modal only if there are status changes
   setTimeout(() => {
     batchProgress.value.active = false
-    showReportModal.value = true
-    uiStore.addToast({
-      type: changedCount > 0 ? 'success' : 'info',
-      message: `Viza tekshiruvi yakunlandi: ${completedCount}/${toCheck.length} ta tekshirildi (${changedCount} ta o'zgarish).`
-    })
+    if (changedCount > 0) {
+      showReportModal.value = true
+      uiStore.addToast({
+        type: 'success',
+        message: `Viza tekshiruvi yakunlandi: ${completedCount}/${toCheck.length} ta tekshirildi (${changedCount} ta o'zgarish).`
+      })
+    } else {
+      showReportModal.value = false
+      uiStore.addToast({
+        type: 'info',
+        message: `Viza statuslarida yangi o'zgarish qayd etilmadi (${completedCount} ta talaba tekshirildi).`
+      })
+    }
   }, 600)
 }
 
@@ -582,8 +591,24 @@ async function handleRetryNoAnswers() {
   }
 }
 
+function isEVisa(student: VisaStudent): boolean {
+  const t = (student.visa_type || '').toLowerCase()
+  return t === 'e_visa' || t === 'e-visa' || t === 'evisa' || t === 'gb01'
+}
+
+function handleEVisaNotice() {
+  uiStore.addToast({
+    type: 'info',
+    message: 'E-Visa turida viza sertifikati universitet tomonidan beriladi.'
+  })
+}
+
 // ─── PDF Download ─────────────────────────────────────────────────────────────
 async function handleDownloadPdf(student: VisaStudent) {
+  if (isEVisa(student)) {
+    handleEVisaNotice()
+    return
+  }
   const pass = (student.passport || '').trim().toUpperCase()
   const name = (student.full_name || '').trim().toUpperCase()
   const dob  = (student.birthday || '').trim()
@@ -906,6 +931,8 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
                 >
                   <Pin class="size-3.5 text-amber-500 fill-amber-500 shrink-0" />
                 </button>
+                <span v-if="st.flag" title="Flagged" class="text-sm select-none shrink-0">🚩</span>
+                <span v-if="st.refund_application" title="Refund Application" class="text-sm select-none shrink-0">💸</span>
               </div>
               <div class="flex flex-wrap items-center gap-1.5 mt-1">
                 <VisaTypeBadge :visa-type="st.visa_type" />
@@ -931,8 +958,23 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
             <StatusBadge :status="getStudentVisaStatus(st)" />
           </div>
 
-          <div v-if="st.rejection_reason" class="text-[11px] text-rose-500 font-medium truncate">
-            Sabab: {{ st.rejection_reason }}
+          <!-- Rejection reasons in mobile card -->
+          <div v-if="st.rejection_reason" class="space-y-1 mt-1.5">
+            <div
+              v-for="(rejItem, rIdx) in parseRejectionReasons(st.rejection_reason)"
+              :key="rIdx"
+              class="flex items-start gap-1.5 text-xs text-neutral-800 dark:text-neutral-200"
+            >
+              <span
+                v-if="rejItem.number"
+                class="size-4.5 min-w-[18px] rounded-full bg-[#E02424] text-white text-[10.5px] font-extrabold flex items-center justify-center shrink-0 mt-0.5"
+              >
+                {{ rejItem.number }}
+              </span>
+              <span class="text-[12px] font-normal leading-tight text-neutral-800 dark:text-neutral-200">
+                {{ rejItem.text }}
+              </span>
+            </div>
           </div>
 
           <div class="flex items-center justify-between text-xs text-zinc-400">
@@ -977,13 +1019,13 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
         >
           <thead class="sticky top-0 z-10 bg-neutral-100/90 dark:bg-[#111928] backdrop-blur">
             <tr class="border-b border-neutral-300 dark:border-white/20 text-left text-[10px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-neutral-300">
-              <th class="px-4 py-2 min-w-[220px]">Name</th>
+              <th class="px-4 py-2 min-w-[240px]">Name</th>
               <th class="px-4 py-2 w-36">Passport</th>
-              <th class="px-4 py-2 w-44">Status</th>
-              <th v-if="showAppliedColumn" class="px-4 py-2 w-28">Applied</th>
-              <th v-if="showStatusDateColumn" class="px-4 py-2 w-32">Status Date</th>
-              <th v-else class="px-4 py-2 w-44">Checked</th>
-              <th v-if="showSelectColumn" class="px-4 py-2 w-24 text-center align-middle">
+              <th class="px-4 py-2 w-36">Status</th>
+              <th v-if="showAppliedColumn" class="px-3 py-2 w-28 text-center">Applied</th>
+              <th v-if="showStatusDateColumn" class="px-3 py-2 w-32 text-center">Status Date</th>
+              <th v-else class="px-3 py-2 w-36 text-center">Checked</th>
+              <th v-if="showSelectColumn" class="px-3 py-2 w-20 text-center align-middle">
                 <div class="flex items-center justify-center gap-1.5">
                   <span>Select</span>
                   <button
@@ -997,8 +1039,8 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
                   </button>
                 </div>
               </th>
-              <th v-if="showPdfColumn" class="px-4 py-2 w-14 text-center">PDF</th>
-              <th class="px-4 py-2 w-32 text-right">Actions</th>
+              <th v-if="showPdfColumn" class="px-3 py-2 w-20 text-center align-middle">PDF</th>
+              <th class="px-4 py-2 w-36 text-right">Actions</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-neutral-200 dark:divide-white/10">
@@ -1027,6 +1069,8 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
                   >
                     <Pin class="size-3.5 text-amber-500 fill-amber-500 shrink-0" />
                   </button>
+                  <span v-if="st.flag" title="Flagged" class="text-sm select-none shrink-0">🚩</span>
+                  <span v-if="st.refund_application" title="Refund Application" class="text-sm select-none shrink-0">💸</span>
                 </div>
                 <div class="flex flex-wrap items-center gap-1.5 mt-1">
                   <VisaTypeBadge :visa-type="st.visa_type" />
@@ -1037,9 +1081,24 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
                     <CopyField :value="st.application_no" label="Copy app no">{{ st.application_no }}</CopyField>
                   </span>
                 </div>
-                <p v-if="st.rejection_reason" class="text-[11px] text-rose-500 font-medium mt-0.5 line-clamp-1 max-w-xs">
-                  {{ st.rejection_reason }}
-                </p>
+                <!-- Rejection reasons in desktop row matching Screenshot 1 -->
+                <div v-if="st.rejection_reason" class="space-y-1 mt-1.5 max-w-xl">
+                  <div
+                    v-for="(rejItem, rIdx) in parseRejectionReasons(st.rejection_reason)"
+                    :key="rIdx"
+                    class="flex items-start gap-1.5 text-xs text-neutral-800 dark:text-neutral-200"
+                  >
+                    <span
+                      v-if="rejItem.number"
+                      class="size-4.5 min-w-[18px] rounded-full bg-[#E02424] text-white text-[10.5px] font-extrabold flex items-center justify-center shrink-0 mt-0.5"
+                    >
+                      {{ rejItem.number }}
+                    </span>
+                    <span class="text-[12px] font-normal leading-tight text-neutral-800 dark:text-neutral-200">
+                      {{ rejItem.text }}
+                    </span>
+                  </div>
+                </div>
               </td>
 
               <!-- Passport Column -->
@@ -1053,20 +1112,20 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
               </td>
 
               <!-- Status Column -->
-              <td class="px-4 py-3 align-middle">
+              <td class="px-4 py-3 align-middle whitespace-nowrap">
                 <StatusBadge :status="getStudentVisaStatus(st)" />
               </td>
 
               <!-- Applied Column -->
-              <td v-if="showAppliedColumn" class="px-4 py-3 align-middle whitespace-nowrap text-zinc-500 dark:text-zinc-400 text-xs">
+              <td v-if="showAppliedColumn" class="px-3 py-3 align-middle text-center whitespace-nowrap text-zinc-500 dark:text-zinc-400 text-xs">
                 {{ st.application_date || st.created_at?.slice(0, 10) || '--' }}
               </td>
 
               <!-- Status Date / Checked Column -->
-              <td v-if="showStatusDateColumn" class="px-4 py-3 align-middle whitespace-nowrap text-zinc-500 dark:text-zinc-400 text-xs">
+              <td v-if="showStatusDateColumn" class="px-3 py-3 align-middle text-center whitespace-nowrap text-zinc-500 dark:text-zinc-400 text-xs">
                 {{ st.status_date || '--' }}
               </td>
-              <td v-else class="px-4 py-3 align-middle whitespace-nowrap text-xs">
+              <td v-else class="px-3 py-3 align-middle text-center whitespace-nowrap text-xs">
                 <span
                   v-if="checkingPassports.has(st.passport)"
                   class="inline-flex items-center gap-1.5"
@@ -1080,7 +1139,7 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
               </td>
 
               <!-- Select Column -->
-              <td v-if="showSelectColumn" class="px-4 py-3 align-middle text-center">
+              <td v-if="showSelectColumn" class="px-3 py-3 align-middle text-center">
                 <div class="flex items-center justify-center h-full">
                   <input
                     type="checkbox"
@@ -1092,27 +1151,38 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
                 </div>
               </td>
 
-              <!-- PDF Column -->
-              <td v-if="showPdfColumn" class="px-4 py-3 align-middle text-center">
-                <button
-                  v-if="isPdfEligible(st)"
-                  type="button"
-                  :disabled="downloadingPassports.has(st.passport)"
-                  class="text-emerald-600 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-200 transition-colors disabled:opacity-40 cursor-pointer"
-                  title="Viza PDF yuklab olish"
-                  @click.stop="handleDownloadPdf(st)"
-                >
-                  <FileDown class="size-5" />
-                </button>
+              <!-- PDF Column (Middle aligned with E-Visa alert support) -->
+              <td v-if="showPdfColumn" class="px-3 py-3 align-middle text-center">
+                <div class="flex items-center justify-center">
+                  <button
+                    v-if="isPdfEligible(st) && isEVisa(st)"
+                    type="button"
+                    class="size-8 rounded-lg flex items-center justify-center text-amber-500 hover:text-amber-600 dark:text-amber-400 bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/30 transition-colors cursor-pointer"
+                    title="E-Visa: Universitet tomonidan beriladi"
+                    @click.stop="handleEVisaNotice"
+                  >
+                    <AlertTriangle class="size-4.5" />
+                  </button>
+                  <button
+                    v-else-if="isPdfEligible(st)"
+                    type="button"
+                    :disabled="downloadingPassports.has(st.passport)"
+                    class="size-8 rounded-lg flex items-center justify-center text-emerald-600 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-200 transition-colors disabled:opacity-40 cursor-pointer hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
+                    title="Viza PDF yuklab olish"
+                    @click.stop="handleDownloadPdf(st)"
+                  >
+                    <FileDown class="size-5" />
+                  </button>
+                </div>
               </td>
 
               <!-- Actions Column -->
-              <td class="p-0 align-top w-px h-px" style="border-top-width:0">
+              <td class="p-0 align-middle w-36 h-px" style="border-top-width:0">
                 <div class="flex items-stretch justify-end h-full">
                   <button
                     type="button"
                     :disabled="checkingPassports.has(st.passport)"
-                    class="px-5 py-2 h-full font-bold text-white text-xs bg-blue-600 hover:bg-blue-500 transition-colors rounded-none disabled:opacity-50 flex items-center gap-1.5 whitespace-nowrap cursor-pointer"
+                    class="px-4 py-2 h-full font-bold text-white text-xs bg-blue-600 hover:bg-blue-500 transition-colors rounded-none disabled:opacity-50 flex items-center gap-1.5 whitespace-nowrap cursor-pointer"
                     @click.stop="checkStudentVisa(st)"
                   >
                     <RefreshCw class="size-3.5" :class="{ 'animate-spin': checkingPassports.has(st.passport) }" />
@@ -1120,11 +1190,11 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
                   </button>
                   <button
                     type="button"
-                    class="px-4 py-2 h-full bg-amber-400 hover:bg-amber-500 dark:bg-amber-500 dark:hover:bg-amber-400 text-amber-950 dark:text-slate-950 rounded-none transition-colors cursor-pointer"
+                    class="px-3.5 py-2 h-full bg-amber-400 hover:bg-amber-500 dark:bg-amber-500 dark:hover:bg-amber-400 text-amber-950 dark:text-slate-950 rounded-none transition-colors flex items-center justify-center cursor-pointer"
                     aria-label="View details"
                     @click.stop="openDetails(st)"
                   >
-                    <Eye class="size-5" />
+                    <Eye class="size-4.5" />
                   </button>
                 </div>
               </td>

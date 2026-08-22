@@ -51,29 +51,11 @@ function formatTimestamp(ts: string | undefined | null): string {
   } catch { return ts }
 }
 
+import { parseRejectionReasons, type ParsedRejectionReason } from '../utils/rejectionParser'
+
 // ─── Parse rejection reasons ──────────────────────────────────────────────────
-interface RejectionItem {
-  number?: string
-  text: string
-}
-
-const parsedRejectionReasons = computed<RejectionItem[]>(() => {
-  const raw = props.student?.rejection_reason || ''
-  if (!raw) return []
-  let str = raw.trim().replace(/^Rejected:\s*/i, '').trim()
-  const regex = /(\d+)\.\s*([\s\S]+?)(?=(?:\s*\d+\.|$))/g
-  const matches = Array.from(str.matchAll(regex))
-
-  if (matches.length > 0) {
-    const items: RejectionItem[] = []
-    for (const match of matches) {
-      const num = match[1]
-      const txt = (match[2] ?? '').trim()
-      if (txt) items.push({ number: num, text: txt })
-    }
-    return items
-  }
-  return [{ text: str }]
+const parsedRejectionReasons = computed<ParsedRejectionReason[]>(() => {
+  return parseRejectionReasons(props.student?.rejection_reason)
 })
 
 // ─── Management Dropdown options ──────────────────────────────────────────────
@@ -304,24 +286,24 @@ async function clearField(fieldName: ManagementField) {
                     </div>
                   </div>
 
-                  <!-- Rejection Reason Card (Pink card with red numbered badges matching screenshot) -->
+                  <!-- Rejection Reason Card (Pink card with red numbered badges matching Screenshot 2) -->
                   <div
                     v-if="parsedRejectionReasons.length > 0"
-                    class="rounded-md p-3 bg-[#FFF1F0] dark:bg-rose-950/30 border border-[#FFA39E] dark:border-rose-900/50 space-y-2 text-xs"
+                    class="rounded-xl p-3.5 bg-[#FFF5F5] dark:bg-rose-950/20 border border-[#FED7D7] dark:border-rose-900/40 space-y-2.5 text-xs"
                   >
                     <div
                       v-for="(item, idx) in parsedRejectionReasons"
                       :key="idx"
-                      class="flex items-start gap-2 leading-relaxed"
+                      class="flex items-start gap-2.5 leading-relaxed"
                     >
                       <span
                         v-if="item.number"
-                        class="size-4.5 rounded-full bg-rose-600 text-white text-[10.5px] font-bold flex items-center justify-center shrink-0 mt-0.5"
+                        class="size-5 min-w-[20px] rounded-full bg-[#E02424] text-white text-[11px] font-extrabold flex items-center justify-center shrink-0 mt-0.5"
                       >
                         {{ item.number }}
                       </span>
-                      <XCircle v-else class="size-4 text-rose-600 shrink-0 mt-0.5" />
-                      <span class="text-slate-900 dark:text-rose-100 font-normal">
+                      <XCircle v-else class="size-4.5 text-[#E02424] shrink-0 mt-0.5" />
+                      <span class="text-[12.5px] text-zinc-900 dark:text-zinc-100 font-normal leading-snug">
                         {{ item.text }}
                       </span>
                     </div>
