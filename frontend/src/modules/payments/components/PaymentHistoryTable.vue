@@ -3,7 +3,7 @@ import { ref } from 'vue'
 import type { Payment } from '@/types'
 import {
   Search, FileSpreadsheet, Pencil, Trash2, Printer,
-  Receipt, X, User
+  Receipt, X, User, LayoutGrid, Table as TableIcon
 } from 'lucide-vue-next'
 
 const props = defineProps<{
@@ -15,12 +15,14 @@ const props = defineProps<{
   selectedReceiver: string
   paymentMethods: string[]
   paymentReceivers: string[]
+  viewMode: 'grid' | 'table'
 }>()
 
 const emit = defineEmits<{
   (e: 'update:searchQuery', val: string): void
   (e: 'update:selectedMethod', val: string): void
   (e: 'update:selectedReceiver', val: string): void
+  (e: 'update:viewMode', val: 'grid' | 'table'): void
   (e: 'open-edit', payment: Payment): void
   (e: 'delete-payment', payment: Payment): void
   (e: 'export-excel'): void
@@ -184,12 +186,38 @@ const printReceipt = (payment: Payment) => {
       <button
         type="button"
         @click="emit('export-excel')"
-        class="flex items-center gap-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-850 hover:bg-zinc-50 dark:hover:bg-zinc-800 px-3.5 py-2 text-xs font-bold text-zinc-800 dark:text-zinc-200 transition-all cursor-pointer shadow-2xs ml-auto"
+        class="flex items-center gap-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-850 hover:bg-zinc-50 dark:hover:bg-zinc-800 px-3.5 py-2 text-xs font-bold text-zinc-800 dark:text-zinc-200 transition-all cursor-pointer shadow-2xs"
         title="Download Payment History as Excel"
       >
         <FileSpreadsheet class="h-4 w-4 text-emerald-600 dark:text-emerald-500" />
         <span>Export Excel</span>
       </button>
+
+      <!-- View Mode Switcher -->
+      <div class="flex items-center gap-1 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-850 p-1 ml-auto">
+        <button
+          type="button"
+          @click="emit('update:viewMode', 'grid')"
+          class="p-1.5 rounded-md transition-all cursor-pointer"
+          :class="viewMode === 'grid'
+            ? 'bg-blue-600 text-white shadow-xs'
+            : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100'"
+          title="Grid View (Cards)"
+        >
+          <LayoutGrid class="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          @click="emit('update:viewMode', 'table')"
+          class="p-1.5 rounded-md transition-all cursor-pointer"
+          :class="viewMode === 'table'
+            ? 'bg-blue-600 text-white shadow-xs'
+            : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100'"
+          title="Table View"
+        >
+          <TableIcon class="h-4 w-4" />
+        </button>
+      </div>
     </div>
 
     <!-- Payments Count -->
@@ -197,8 +225,8 @@ const printReceipt = (payment: Payment) => {
       {{ totalFilteredCount }} payments
     </div>
 
-    <!-- Payment history cards (UniApp2 1-to-1) -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+    <!-- ── 1. Grid View ──────────────────────────────────────────────── -->
+    <div v-if="viewMode === 'grid'" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
       <div
         v-for="payment in payments"
         :key="payment.id"
@@ -242,7 +270,7 @@ const printReceipt = (payment: Payment) => {
             </span>
           </div>
 
-          <!-- Registered By Section (Matching Screenshot) -->
+          <!-- Registered By Section -->
           <div class="pt-2 border-t border-zinc-100 dark:border-zinc-800/80 flex items-center gap-1.5 text-[11.5px]">
             <User class="w-3.5 h-3.5 text-zinc-400 shrink-0" />
             <span class="text-zinc-400 dark:text-zinc-500 font-medium">Registered by:</span>
@@ -259,7 +287,7 @@ const printReceipt = (payment: Payment) => {
           </div>
         </div>
 
-        <!-- Actions Footer (Matching Screenshot) -->
+        <!-- Actions Footer -->
         <div class="flex items-center gap-2 pt-2.5 border-t border-zinc-100 dark:border-zinc-800">
           <button
             type="button"
@@ -286,6 +314,121 @@ const printReceipt = (payment: Payment) => {
             <span>Print</span>
           </button>
         </div>
+      </div>
+    </div>
+
+    <!-- ── 2. Table View ──────────────────────────────────────────────── -->
+    <div v-else class="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#111315] overflow-hidden shadow-2xs">
+      <div class="overflow-x-auto">
+        <table class="w-full border-collapse text-left">
+          <thead>
+            <tr class="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-850/60 text-[12px] font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-300 select-none">
+              <th class="px-4 py-3.5 w-24">Payment ID</th>
+              <th class="px-4 py-3.5 w-36">Date & Time</th>
+              <th class="px-4 py-3.5">Student</th>
+              <th class="px-4 py-3.5">Amount</th>
+              <th class="px-4 py-3.5">Method</th>
+              <th class="px-4 py-3.5">Received By</th>
+              <th class="px-4 py-3.5">Registered By</th>
+              <th class="px-4 py-3.5">Notes</th>
+              <th class="px-4 py-3.5 text-center w-28">Actions</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-zinc-100 dark:divide-zinc-800 text-[13px]">
+            <tr
+              v-for="payment in payments"
+              :key="payment.id"
+              @click="viewingPayment = payment"
+              class="hover:bg-zinc-50/80 dark:hover:bg-zinc-850/60 transition-colors text-zinc-800 dark:text-zinc-200 cursor-pointer"
+            >
+              <!-- Payment ID -->
+              <td class="px-4 py-3 font-mono font-bold text-[11px] uppercase text-zinc-500 select-all">
+                {{ String(payment.id).slice(0, 8) }}
+              </td>
+
+              <!-- Date & Time -->
+              <td class="px-4 py-3 font-mono text-[11.5px] text-zinc-500 dark:text-zinc-400 whitespace-nowrap">
+                {{ formatTimestamp(payment.created_at) }}
+              </td>
+
+              <!-- Student -->
+              <td class="px-4 py-3 font-bold uppercase tracking-wide">
+                <div class="flex items-center gap-1.5 min-w-0">
+                  <span v-if="payment.student_id" class="font-mono text-blue-600 font-bold shrink-0">
+                    {{ payment.student_id }} —
+                  </span>
+                  <span class="truncate text-zinc-900 dark:text-zinc-100">
+                    {{ payment.student_full_name || payment.student_name || 'General Payment' }}
+                  </span>
+                </div>
+              </td>
+
+              <!-- Amount -->
+              <td class="px-4 py-3 font-mono font-bold whitespace-nowrap">
+                <span
+                  class="inline-flex px-2 py-0.5 rounded-[4px] text-[12px] font-extrabold"
+                  :class="Number(payment.amount) < 0
+                    ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/25'
+                    : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25'"
+                >
+                  {{ Number(payment.amount) < 0 ? '-' : '+' }}{{ formatAmount(Math.abs(Number(payment.amount))) }} UZS
+                </span>
+              </td>
+
+              <!-- Method -->
+              <td class="px-4 py-3">
+                <span class="inline-flex px-2 py-0.5 rounded-[4px] text-[10px] font-bold uppercase tracking-wider bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700">
+                  {{ payment.method }}
+                </span>
+              </td>
+
+              <!-- Received By -->
+              <td class="px-4 py-3 font-semibold uppercase text-zinc-700 dark:text-zinc-300 text-xs">
+                {{ payment.received_by }}
+              </td>
+
+              <!-- Registered By -->
+              <td class="px-4 py-3 font-bold uppercase text-zinc-800 dark:text-zinc-200 text-xs">
+                {{ payment.created_by_name || payment.received_by || 'Staff' }}
+              </td>
+
+              <!-- Notes -->
+              <td class="px-4 py-3 text-xs text-zinc-500 dark:text-zinc-400 max-w-[180px] truncate" :title="payment.notes || ''">
+                {{ payment.notes || '—' }}
+              </td>
+
+              <!-- Actions -->
+              <td class="px-4 py-3 text-center" @click.stop>
+                <div class="flex items-center justify-center gap-1">
+                  <button
+                    type="button"
+                    @click="emit('open-edit', payment)"
+                    class="p-1 rounded-md text-zinc-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors cursor-pointer"
+                    title="Edit"
+                  >
+                    <Pencil class="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    @click="emit('delete-payment', payment)"
+                    class="p-1 rounded-md text-zinc-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
+                    title="Delete"
+                  >
+                    <Trash2 class="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    @click="printReceipt(payment)"
+                    class="p-1 rounded-md text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+                    title="Print"
+                  >
+                    <Printer class="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
 
@@ -404,10 +547,18 @@ const printReceipt = (payment: Payment) => {
             </div>
           </div>
 
+          <!-- Registered By -->
+          <div class="flex flex-col gap-1">
+            <span class="text-xs font-semibold text-zinc-500">Registered By</span>
+            <div class="px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-750 bg-zinc-50 dark:bg-zinc-850 text-xs font-bold text-zinc-800 dark:text-zinc-200 uppercase">
+              {{ viewingPayment.created_by_name || viewingPayment.received_by || 'Staff' }}
+            </div>
+          </div>
+
           <!-- Timestamp -->
           <div class="flex flex-col gap-1">
             <span class="text-xs font-semibold text-zinc-500">Timestamp</span>
-            <div class="px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-750 bg-zinc-50 dark:bg-zinc-850 text-xs font-medium text-zinc-800 dark:text-zinc-200">
+            <div class="px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-750 bg-zinc-50 dark:bg-zinc-850 text-xs font-medium text-zinc-800 dark:text-zinc-200 font-mono">
               {{ viewingPayment.created_at ? new Date(viewingPayment.created_at).toLocaleString('uz-UZ') : '—' }}
             </div>
           </div>

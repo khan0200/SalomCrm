@@ -106,7 +106,7 @@ const matchesBalanceOption = (studentBalance: number, option: string) => {
 
 // ── Main Page State ───────────────────────────────────────────────────
 const activeTab = ref<'students' | 'history'>('students')
-const viewMode = ref<'grid' | 'table'>('grid')
+const viewMode = ref<'grid' | 'table'>('table')
 const sortOrder = ref<'asc' | 'desc'>('asc')
 
 // Students Tab Filter State (Multi-Select Arrays)
@@ -649,9 +649,11 @@ const exportPaymentHistoryToExcel = async () => {
         :selected-receiver="selectedReceiver"
         :payment-methods="paymentMethods"
         :payment-receivers="paymentReceivers"
+        :view-mode="viewMode"
         @update:search-query="historySearch = $event"
         @update:selected-method="selectedMethod = $event"
         @update:selected-receiver="selectedReceiver = $event"
+        @update:view-mode="viewMode = $event"
         @open-edit="openEditModal"
         @delete-payment="handleDeletePayment"
         @export-excel="exportPaymentHistoryToExcel"
