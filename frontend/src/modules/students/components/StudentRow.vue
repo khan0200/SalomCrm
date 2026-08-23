@@ -115,6 +115,14 @@ const universities = computed(() => {
           {{ student.full_name }}
         </span>
 
+        <!-- Archive Badge -->
+        <span
+          v-if="student.is_deleted"
+          class="px-1.5 py-0.5 rounded text-[9.5px] font-bold tracking-wider uppercase bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20 shrink-0"
+        >
+          Archive
+        </span>
+
         <!-- Document Status Indicator -->
         <span
           v-if="isDocumentComplete"

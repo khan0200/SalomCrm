@@ -201,6 +201,8 @@ const filteredStudents = computed(() => {
   let list = allStudents.value
 
   // 1. Folder Scope (In-Memory Filter - 0 network delay)
+  const q = searchQuery.value.trim().toLowerCase()
+
   if (activeFolder.value === 'deleted' || activeFolder.value === 'archive') {
     list = list.filter(s => s.is_deleted)
   } else if (activeFolder.value === 'hidden') {
@@ -211,11 +213,13 @@ const filteredStudents = computed(() => {
     const targetFolderId = String(activeFolder.value)
     list = list.filter(s => !s.is_deleted && (s.folder_ids || []).map(String).includes(targetFolderId))
   } else {
-    list = list.filter(s => !s.is_deleted)
+    // In 'all' folder: if searching, include archived students; otherwise show active students
+    if (!q) {
+      list = list.filter(s => !s.is_deleted)
+    }
   }
 
   // 2. Search Query (In-Memory Filter)
-  const q = searchQuery.value.trim().toLowerCase()
   if (q) {
     if (searchMode.value === 'id') {
       list = list.filter(s => (s.id || '').toLowerCase().includes(q))

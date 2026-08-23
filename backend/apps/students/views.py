@@ -110,6 +110,7 @@ class StudentViewSet(viewsets.ModelViewSet):
         # ── 1. Folder & Archive/Hidden Scopes ──────────────────────────────
         folder = params.get('folder', 'all')
         include_archive = str(params.get('include_archive', 'false')).lower() == 'true'
+        search_query = str(params.get('search', '')).strip()
 
         if folder == 'deleted' or folder == 'archive':
             qs = qs.filter(is_deleted=True)
@@ -124,11 +125,10 @@ class StudentViewSet(viewsets.ModelViewSet):
             except (ValueError, TypeError):
                 qs = qs.none()
         else:
-            if not include_archive:
+            if not include_archive and not search_query:
                 qs = qs.filter(is_deleted=False)
 
         # ── 2. Search Filter ──────────────────────────────────────────────
-        search_query = str(params.get('search', '')).strip()
         search_mode = params.get('search_mode', 'all')
 
         if search_query:

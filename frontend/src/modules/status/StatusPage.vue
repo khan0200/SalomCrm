@@ -251,29 +251,32 @@ const calculateTakeDays = (takeDateStr?: string | null) => {
 // ── In-Memory Instant 0ms Filter Engine ────────────────────────────────────────
 const filteredStudents = computed(() => {
   let list = allStudents.value
+  const q = searchQuery.value.trim().toLowerCase()
 
   // 1. Folder filter
   if (activeFolder.value === 'deleted') {
     list = list.filter(s => s.is_deleted === true)
   } else {
-    list = list.filter(s => s.is_deleted !== true)
+    // If searching in 'all' folder, do not exclude archived/hidden students
+    if (!q || activeFolder.value !== 'all') {
+      list = list.filter(s => s.is_deleted !== true)
 
-    if (activeFolder.value === 'hidden') {
-      list = list.filter(s => s.status_hidden === true)
-    } else {
-      // In all standard folders on status page, hidden students are excluded
-      list = list.filter(s => s.status_hidden !== true)
+      if (activeFolder.value === 'hidden') {
+        list = list.filter(s => s.status_hidden === true)
+      } else {
+        // In all standard folders on status page, hidden students are excluded
+        list = list.filter(s => s.status_hidden !== true)
 
-      if (activeFolder.value === 'except') {
-        list = list.filter(s => !s.folder_ids || s.folder_ids.length === 0)
-      } else if (activeFolder.value !== 'all') {
-        list = list.filter(s => (s.folder_ids || []).includes(activeFolder.value))
+        if (activeFolder.value === 'except') {
+          list = list.filter(s => !s.folder_ids || s.folder_ids.length === 0)
+        } else if (activeFolder.value !== 'all') {
+          list = list.filter(s => (s.folder_ids || []).includes(activeFolder.value))
+        }
       }
     }
   }
 
   // 2. Global Search Query
-  const q = searchQuery.value.trim().toLowerCase()
   if (q) {
     list = list.filter(s => {
       const idMatch = (s.id || '').toLowerCase().includes(q)
