@@ -62,8 +62,8 @@ watch(() => props.isOpen, (newVal) => {
     selectedStudentId.value = props.preselectedStudentId || ''
     studentSearch.value = ''
     amountInput.value = ''
-    method.value = props.paymentMethods[0] || 'Karta J.A'
-    receivedBy.value = props.paymentReceivers[0] || 'ABDULAZIZ'
+    method.value = ''
+    receivedBy.value = ''
     notes.value = ''
     error.value = null
     isSubmitting.value = false
@@ -182,6 +182,7 @@ const handleSubmit = () => {
               required
               class="w-full px-3 py-2 text-xs border border-zinc-200 dark:border-zinc-700 rounded-xl bg-zinc-50 dark:bg-zinc-850 text-zinc-900 dark:text-zinc-100 cursor-pointer font-semibold focus:outline-none focus:border-blue-500"
             >
+              <option value="" disabled selected>Select</option>
               <option v-for="m in paymentMethods" :key="m" :value="m">{{ m }}</option>
             </select>
           </div>
@@ -194,6 +195,7 @@ const handleSubmit = () => {
               required
               class="w-full px-3 py-2 text-xs border border-zinc-200 dark:border-zinc-700 rounded-xl bg-zinc-50 dark:bg-zinc-850 text-zinc-900 dark:text-zinc-100 cursor-pointer font-semibold focus:outline-none focus:border-blue-500"
             >
+              <option value="" disabled selected>Select</option>
               <option v-for="r in paymentReceivers" :key="r" :value="r">{{ r }}</option>
             </select>
           </div>
