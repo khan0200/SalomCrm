@@ -160,7 +160,7 @@ const handleContextMenu = (e: MouseEvent) => {
     </td>
 
     <!-- Full Name Column -->
-    <td class="px-2 py-2.5" :class="isKdbMode ? 'w-[22%]' : 'w-[22%]'">
+    <td class="px-2 py-2.5" :class="isKdbMode ? 'w-[22%]' : 'w-[21%]'">
       <div class="flex items-center gap-1.5 min-w-0">
         <span class="font-bold uppercase tracking-wide text-xs text-zinc-900 dark:text-zinc-100 truncate">
           {{ student.full_name }}
@@ -175,7 +175,7 @@ const handleContextMenu = (e: MouseEvent) => {
     </td>
 
     <!-- Level & Certificate Split Badge Column (matching /students) -->
-    <td class="px-3 py-2.5 whitespace-nowrap" :class="isKdbMode ? 'w-[10%]' : 'w-[9%]'">
+    <td class="px-3.5 py-2.5 whitespace-nowrap" :class="isKdbMode ? 'w-[11%]' : 'w-[13%]'">
       <div class="space-y-1">
         <!-- Level Pills -->
         <div class="flex flex-wrap gap-1">
@@ -354,7 +354,7 @@ const handleContextMenu = (e: MouseEvent) => {
     <!-- ── Standard Status Mode Columns ──────────────────────────────── -->
     <template v-else>
       <!-- Invoice Column -->
-      <td class="px-3 py-2.5 w-[11%] whitespace-nowrap" @click.stop>
+      <td class="px-3.5 py-2.5 w-[12%] whitespace-nowrap" @click.stop>
         <div class="flex flex-col items-start justify-center">
           <select
             :value="student.invoice || 'NOT TAKEN'"
@@ -395,7 +395,7 @@ const handleContextMenu = (e: MouseEvent) => {
 
       <!-- Embassy Column -->
       <td
-        class="px-3 py-2.5 w-[49%] max-w-0"
+        class="px-3 py-2.5 w-[45%] max-w-0"
         @click.stop="emit('open-embassy', student)"
       >
         <div class="flex flex-col gap-1 cursor-pointer hover:opacity-80 transition-opacity">

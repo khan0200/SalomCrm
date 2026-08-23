@@ -33,18 +33,18 @@ const emit = defineEmits<{
         <!-- Table Column Widths matching Uniapp2 -->
         <colgroup>
           <col style="width: 4.5rem;" />
-          <col :style="{ width: isKdbMode ? '22%' : '22%' }" />
-          <col :style="{ width: isKdbMode ? '10%' : '9%' }" />
+          <col :style="{ width: isKdbMode ? '22%' : '21%' }" />
+          <col :style="{ width: isKdbMode ? '11%' : '13%' }" />
           <template v-if="isKdbMode">
-            <col style="width: 13%;" />
+            <col style="width: 12%;" />
             <col style="width: 15%;" />
             <col style="width: 15%;" />
-            <col style="width: 26%;" />
+            <col style="width: 25%;" />
           </template>
           <template v-else>
-            <col style="width: 11%;" />
+            <col style="width: 12%;" />
             <col style="width: 9%;" />
-            <col style="width: 49%;" />
+            <col style="width: 45%;" />
           </template>
         </colgroup>
 
@@ -66,17 +66,17 @@ const emit = defineEmits<{
               </div>
             </th>
 
-            <th class="px-2 py-2.5" :class="isKdbMode ? 'w-[22%]' : 'w-[22%]'">Full Name</th>
-            <th class="px-3 py-2.5" :class="isKdbMode ? 'w-[10%]' : 'w-[9%]'">Level</th>
+            <th class="px-2 py-2.5" :class="isKdbMode ? 'w-[22%]' : 'w-[21%]'">Full Name</th>
+            <th class="px-3.5 py-2.5" :class="isKdbMode ? 'w-[11%]' : 'w-[13%]'">Level</th>
 
             <!-- KDB Mode Headers -->
             <template v-if="isKdbMode">
-              <th class="px-3 py-2.5 w-[13%]">CoA</th>
+              <th class="px-3 py-2.5 w-[12%]">CoA</th>
               <th class="px-3 py-2.5 w-[15%]">PUT</th>
               <th class="px-3 py-2.5 w-[15%]">TAKE</th>
               <th
                 @click="emit('toggle-sort', 'left')"
-                class="px-3 py-2.5 w-[26%] cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                class="px-3 py-2.5 w-[25%] cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
               >
                 <div class="flex items-center gap-1">
                   <span>LEFT</span>
@@ -91,9 +91,9 @@ const emit = defineEmits<{
 
             <!-- Standard Mode Headers -->
             <template v-else>
-              <th class="px-3 py-2.5 w-[11%]">Invoice</th>
+              <th class="px-3.5 py-2.5 w-[12%]">Invoice</th>
               <th class="px-3 py-2.5 w-[9%]">CoA</th>
-              <th class="px-3 py-2.5 w-[49%]">Embassy</th>
+              <th class="px-3 py-2.5 w-[45%]">Embassy</th>
             </template>
           </tr>
         </thead>
