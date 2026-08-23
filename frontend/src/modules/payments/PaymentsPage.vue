@@ -170,7 +170,7 @@ const options = computed(() => optionsData.value || {
 
 const { data: overviewData, isLoading: isOverviewLoading } = useQuery({
   queryKey: ['payment-overview-all'],
-  queryFn: () => paymentsApi.getPaymentOverview({ page_size: 1500 }),
+  queryFn: () => paymentsApi.getPaymentOverview({ page_size: 2500, status: 'all' }),
   staleTime: 1000 * 60 * 5,
 })
 

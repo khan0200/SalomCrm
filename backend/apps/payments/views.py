@@ -166,11 +166,11 @@ class PaymentOverviewViewSet(viewsets.ReadOnlyModelViewSet):
         else:
             qs = Student.objects.filter(tenant=user.tenant)
 
-        # Status filter (active vs archive)
-        status_filter = self.request.query_params.get('status', 'Active')
+        # Status filter (active vs archive vs all)
+        status_filter = self.request.query_params.get('status')
         if status_filter == 'Archive':
             qs = qs.filter(is_deleted=True)
-        else:
+        elif status_filter == 'Active':
             qs = qs.filter(is_deleted=False)
 
         # Search
