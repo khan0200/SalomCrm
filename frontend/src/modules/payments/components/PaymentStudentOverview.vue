@@ -1,320 +1,539 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import type { Student } from '@/types'
-import { useCurrency } from '@/composables/useCurrency'
 import {
-  Search, Plus, Minus, LayoutGrid, Table as TableIcon,
-  Users, ChevronDown, UserX
+  Search, Plus, LayoutGrid, Table as TableIcon,
+  ChevronDown, ChevronUp, UserX
 } from 'lucide-vue-next'
 
 const props = defineProps<{
   students: Student[]
+  totalFilteredCount: number
   isLoading: boolean
   options?: any
   searchQuery: string
-  selectedStatus: string
-  selectedTariff: string
-  selectedBalance: string
-  selectedGroup: string
+  selectedStatuses: string[]
+  selectedTariffs: string[]
+  selectedBalances: string[]
+  selectedGroups: string[]
   viewMode: 'grid' | 'table'
+  sortOrder: 'asc' | 'desc'
 }>()
 
 const emit = defineEmits<{
   (e: 'update:searchQuery', val: string): void
-  (e: 'update:selectedStatus', val: string): void
-  (e: 'update:selectedTariff', val: string): void
-  (e: 'update:selectedBalance', val: string): void
-  (e: 'update:selectedGroup', val: string): void
+  (e: 'toggle-status', val: string): void
+  (e: 'toggle-all-statuses'): void
+  (e: 'toggle-tariff', val: string): void
+  (e: 'toggle-all-tariffs'): void
+  (e: 'toggle-balance', val: string): void
+  (e: 'toggle-all-balances'): void
+  (e: 'toggle-group', val: string): void
+  (e: 'toggle-all-groups'): void
   (e: 'update:viewMode', val: 'grid' | 'table'): void
-  (e: 'open-add-payment', studentId: string): void
-  (e: 'open-withdraw', studentId: string): void
+  (e: 'toggle-sort'): void
+  (e: 'open-add-payment', studentId?: string): void
 }>()
 
-const { formatCurrency } = useCurrency()
+const isStatusOpen = ref(false)
+const isTariffOpen = ref(false)
+const isBalanceOpen = ref(false)
+const isGroupOpen = ref(false)
 
-const STATUS_OPTIONS = [
-  { label: 'All Statuses', value: 'all' },
-  { label: 'Active', value: 'Active' },
-  { label: 'Archive / Deleted', value: 'Archive' },
+const statusRef = ref<HTMLElement | null>(null)
+const tariffRef = ref<HTMLElement | null>(null)
+const balanceRef = ref<HTMLElement | null>(null)
+const groupRef = ref<HTMLElement | null>(null)
+
+const STATUS_FILTER_OPTIONS = ['Active', 'Archive']
+
+const TARIFF_FILTER_OPTIONS = [
+  'E-VISA (TIL SERTIFIKATISIZ)',
+  'E-VISA (TIL SERTIFIKATLI)',
+  'PREMIUM',
+  'REGIONAL VISA',
+  'STANDART',
+  'VISA PLUS',
+  'ZERO RISK',
+  'No Tariff'
 ]
 
-const TARIFF_OPTIONS = [
-  'STANDART', 'PREMIUM', 'VISA PLUS', 'E-VISA', 'REGIONAL VISA', 'ZERO RISK', 'No Tariff'
-]
-
-const BALANCE_OPTIONS = [
+const BALANCE_FILTER_OPTIONS = [
   'Balance < 0 (Debt)',
   'Balance = 0 (Fully Paid)',
   'Balance > 500,000',
   'Balance > 1,000,000',
   'Balance > 2,000,000',
   'Balance > 5,000,000',
-  'Balance > 10,000,000',
+  'Balance > 10,000,000'
 ]
 
-const groupList = computed(() => {
+const ALL_GROUP_OPTIONS = computed(() => {
   const custom = (props.options?.groups || []).map((g: any) => typeof g === 'string' ? g : g.name)
-  const defaults = ['2026 KUZ', '2027 BAHOR', '2026 BAHOR', '2025 KUZ', 'NO GROUP']
-  return Array.from(new Set([...custom, ...defaults])).filter(Boolean)
+  const defaults = ['2026 BAHOR', '2026 KUZ', '2027 BAHOR']
+  const unique = Array.from(new Set([...custom, ...defaults])).filter(Boolean).sort()
+  return ['No Group', ...unique]
+})
+
+function formatAmount(val: number | string | null | undefined) {
+  if (val === null || val === undefined) return '0'
+  const num = typeof val === 'string' ? parseFloat(val) : val
+  return new Intl.NumberFormat('uz-UZ').format(Math.round(num || 0))
+}
+
+const handleClickOutside = (e: MouseEvent) => {
+  const target = e.target as Node
+  if (statusRef.value && !statusRef.value.contains(target)) isStatusOpen.value = false
+  if (tariffRef.value && !tariffRef.value.contains(target)) isTariffOpen.value = false
+  if (balanceRef.value && !balanceRef.value.contains(target)) isBalanceOpen.value = false
+  if (groupRef.value && !groupRef.value.contains(target)) isGroupOpen.value = false
+}
+
+onMounted(() => {
+  document.addEventListener('mousedown', handleClickOutside)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('mousedown', handleClickOutside)
 })
 </script>
 
 <template>
-  <div class="space-y-4 text-xs select-none">
-    <!-- 1. Search & Filter Bar Card (Matching Reference Screenshot) -->
-    <div class="p-2.5 bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200/90 dark:border-zinc-800 shadow-2xs flex flex-wrap items-center gap-2.5">
-      <!-- Search Input Box -->
-      <div class="relative flex-1 min-w-[220px]">
-        <Search class="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+  <div class="flex flex-col gap-4 select-none text-xs">
+    <!-- ── Filter Bar matching UniApp2 ────────────────────────────────── -->
+    <div class="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#111315] p-3 shadow-2xs flex flex-wrap gap-2.5 items-center">
+      <!-- Search Input -->
+      <div class="relative flex-1 min-w-[200px]">
+        <Search class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400 pointer-events-none" />
         <input
+          type="text"
           :value="searchQuery"
           @input="emit('update:searchQuery', ($event.target as HTMLInputElement).value)"
-          type="text"
           placeholder="Search by name or ID..."
-          class="w-full pl-9 pr-3 py-2 rounded-xl bg-[#f8fafc] dark:bg-zinc-800/80 border border-zinc-200/80 dark:border-zinc-700/80 focus:border-blue-500 focus:bg-white dark:focus:bg-zinc-800 focus:ring-2 focus:ring-blue-500/20 outline-none text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 text-xs font-medium transition-all"
+          class="w-full pl-9 pr-4 py-2 text-xs border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-850 rounded-lg text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:border-blue-500 transition-colors"
         />
       </div>
 
-      <!-- Filter Dropdowns Row (Pill Style with Chevron) -->
-      <div class="flex flex-wrap items-center gap-2">
-        <!-- 1. All Statuses Dropdown -->
-        <div class="relative">
-          <select
-            :value="selectedStatus"
-            @change="emit('update:selectedStatus', ($event.target as HTMLSelectElement).value)"
-            class="appearance-none bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600 rounded-xl pl-3.5 pr-8 py-2 text-xs font-semibold text-zinc-700 dark:text-zinc-200 outline-none cursor-pointer transition-colors shadow-2xs"
-          >
-            <option v-for="st in STATUS_OPTIONS" :key="st.value" :value="st.value">
-              {{ st.label }}
-            </option>
-          </select>
-          <ChevronDown class="w-3.5 h-3.5 text-zinc-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-        </div>
-
-        <!-- 2. All Tariffs Dropdown -->
-        <div class="relative">
-          <select
-            :value="selectedTariff"
-            @change="emit('update:selectedTariff', ($event.target as HTMLSelectElement).value)"
-            class="appearance-none bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600 rounded-xl pl-3.5 pr-8 py-2 text-xs font-semibold text-zinc-700 dark:text-zinc-200 outline-none cursor-pointer transition-colors shadow-2xs"
-          >
-            <option value="all">All Tariffs</option>
-            <option v-for="t in TARIFF_OPTIONS" :key="t" :value="t">{{ t }}</option>
-          </select>
-          <ChevronDown class="w-3.5 h-3.5 text-zinc-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-        </div>
-
-        <!-- 3. All Balances Dropdown -->
-        <div class="relative">
-          <select
-            :value="selectedBalance"
-            @change="emit('update:selectedBalance', ($event.target as HTMLSelectElement).value)"
-            class="appearance-none bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600 rounded-xl pl-3.5 pr-8 py-2 text-xs font-semibold text-zinc-700 dark:text-zinc-200 outline-none cursor-pointer transition-colors shadow-2xs"
-          >
-            <option value="all">All Balances</option>
-            <option v-for="b in BALANCE_OPTIONS" :key="b" :value="b">{{ b }}</option>
-          </select>
-          <ChevronDown class="w-3.5 h-3.5 text-zinc-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-        </div>
-
-        <!-- 4. All Groups Dropdown -->
-        <div class="relative">
-          <select
-            :value="selectedGroup"
-            @change="emit('update:selectedGroup', ($event.target as HTMLSelectElement).value)"
-            class="appearance-none bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600 rounded-xl pl-3.5 pr-8 py-2 text-xs font-semibold text-zinc-700 dark:text-zinc-200 outline-none cursor-pointer transition-colors shadow-2xs"
-          >
-            <option value="all">All Groups</option>
-            <option v-for="g in groupList" :key="g" :value="g">{{ g }}</option>
-          </select>
-          <ChevronDown class="w-3.5 h-3.5 text-zinc-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-        </div>
-
-        <!-- View Mode Grid / Table Switcher (Matching Screenshot) -->
-        <div class="flex items-center gap-1 border border-zinc-200 dark:border-zinc-700 rounded-xl p-0.5 bg-zinc-50 dark:bg-zinc-800 shadow-2xs ml-auto">
-          <button
-            type="button"
-            @click="emit('update:viewMode', 'grid')"
-            class="p-1.5 rounded-lg font-bold transition-all cursor-pointer"
-            :class="viewMode === 'grid'
-              ? 'bg-[#1868db] text-white shadow-xs'
-              : 'text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200'"
-            title="Grid View"
-          >
-            <LayoutGrid class="w-4 h-4" />
-          </button>
-          <button
-            type="button"
-            @click="emit('update:viewMode', 'table')"
-            class="p-1.5 rounded-lg font-bold transition-all cursor-pointer"
-            :class="viewMode === 'table'
-              ? 'bg-[#1868db] text-white shadow-xs'
-              : 'text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200'"
-            title="Table View"
-          >
-            <TableIcon class="w-4 h-4" />
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- 2. SKELETON LOADING STATE (When Loading) -->
-    <div v-if="isLoading" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3.5">
-      <div
-        v-for="i in 8"
-        :key="`skel-${i}`"
-        class="p-4 rounded-2xl border border-zinc-200/90 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-xs flex flex-col justify-between gap-3 animate-pulse"
-      >
-        <div>
-          <div class="flex items-center justify-between mb-2">
-            <div class="h-5 w-12 bg-zinc-200 dark:bg-zinc-800 rounded-md" />
-            <div class="h-4 w-20 bg-zinc-100 dark:bg-zinc-800 rounded" />
-          </div>
-          <div class="h-5 w-3/4 bg-zinc-200 dark:bg-zinc-800 rounded mb-1.5" />
-          <div class="h-3.5 w-1/3 bg-zinc-100 dark:bg-zinc-800 rounded" />
-        </div>
-        <div class="h-12 bg-zinc-100 dark:bg-zinc-800/60 rounded-xl" />
-        <div class="flex items-center gap-2 pt-1">
-          <div class="h-8 flex-1 bg-zinc-200 dark:bg-zinc-800 rounded-xl" />
-          <div class="h-8 w-10 bg-zinc-100 dark:bg-zinc-800 rounded-xl" />
-        </div>
-      </div>
-    </div>
-
-    <!-- 3. EMPTY STATE -->
-    <div
-      v-else-if="students.length === 0"
-      class="p-12 text-center rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900"
-    >
-      <UserX class="w-10 h-10 mx-auto text-zinc-300 dark:text-zinc-700 mb-3" />
-      <h3 class="font-bold text-sm text-zinc-800 dark:text-zinc-200">No students found</h3>
-      <p class="text-xs text-zinc-400 mt-1">Try adjusting your search query or filter options.</p>
-    </div>
-
-    <!-- 4. GRID VIEW (Matching Reference Screenshot 100%) -->
-    <div v-else-if="viewMode === 'grid'" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3.5">
-      <div
-        v-for="s in students"
-        :key="s.id"
-        class="p-4 rounded-2xl border border-zinc-200/90 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-xs hover:shadow-md hover:border-blue-500/40 transition-all flex flex-col justify-between gap-3 group"
-      >
-        <!-- Card Header: ID Badge & Tariff -->
-        <div>
-          <div class="flex items-center justify-between mb-1.5">
-            <!-- Student ID Badge -->
-            <span class="px-2 py-0.5 rounded-md text-[11px] font-mono font-bold bg-[#eef4ff] dark:bg-blue-950/40 text-[#1868db] dark:text-blue-400 border border-blue-200/80 dark:border-blue-800/60 shadow-2xs">
-              {{ s.id }}
-            </span>
-            <!-- Tariff Name -->
-            <span class="text-[11px] font-bold text-zinc-400 dark:text-zinc-400 uppercase tracking-wide truncate max-w-[130px]" :title="s.tariff || ''">
-              {{ s.tariff || 'No Tariff' }}
-            </span>
-          </div>
-
-          <!-- Full Name -->
-          <h3 class="font-extrabold text-sm text-zinc-900 dark:text-zinc-100 uppercase tracking-wide truncate" :title="s.full_name">
-            {{ s.full_name }}
-          </h3>
-          <!-- Group Subtitle -->
-          <p class="text-[11.5px] font-bold text-zinc-400 dark:text-zinc-400 uppercase mt-0.5 truncate">
-            {{ s.student_group || 'No Group' }}
-          </p>
-        </div>
-
-        <!-- Financial Balance Container (Matching Screenshot) -->
-        <div class="p-3 bg-[#f8fafc] dark:bg-zinc-800/60 rounded-xl border border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
-          <span class="text-[10.5px] font-bold uppercase tracking-wider text-zinc-400">
-            BALANCE
+      <!-- 1. Status Filter Dropdown -->
+      <div class="relative" ref="statusRef">
+        <button
+          type="button"
+          @click="isStatusOpen = !isStatusOpen; isTariffOpen = false; isBalanceOpen = false; isGroupOpen = false"
+          class="px-3.5 py-2 text-xs border rounded-full text-zinc-700 dark:text-zinc-200 cursor-pointer flex items-center justify-between gap-2 min-w-[125px] select-none transition-all shadow-2xs font-semibold"
+          :class="isStatusOpen
+            ? 'border-blue-600 bg-blue-50/50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 ring-1 ring-blue-600'
+            : 'border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-850 hover:border-blue-400'"
+        >
+          <span class="truncate max-w-[130px]">
+            {{ selectedStatuses.length === 0 || selectedStatuses.length === STATUS_FILTER_OPTIONS.length
+              ? 'All Statuses'
+              : selectedStatuses.join(', ') }}
           </span>
+          <ChevronDown
+            class="h-3.5 w-3.5 text-zinc-400 transition-transform duration-200"
+            :class="isStatusOpen ? 'rotate-180 text-blue-600' : ''"
+          />
+        </button>
+
+        <div
+          v-if="isStatusOpen"
+          class="absolute left-0 mt-1.5 w-44 rounded-xl border border-zinc-200 dark:border-zinc-750 bg-white dark:bg-[#181a1d] shadow-xl py-2 z-40 max-h-80 overflow-y-auto"
+        >
+          <div
+            @click="emit('toggle-all-statuses')"
+            class="px-3.5 py-1.5 flex items-center gap-2.5 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors text-xs font-bold text-zinc-800 dark:text-zinc-200"
+          >
+            <input
+              type="checkbox"
+              :checked="selectedStatuses.length === STATUS_FILTER_OPTIONS.length"
+              class="h-3.5 w-3.5 rounded border-zinc-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+            />
+            <span>Select All</span>
+          </div>
+          <div class="h-px bg-zinc-100 dark:bg-zinc-800 my-1" />
+          <div
+            v-for="opt in STATUS_FILTER_OPTIONS"
+            :key="opt"
+            @click="emit('toggle-status', opt)"
+            class="px-3.5 py-1.5 flex items-center gap-2.5 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors text-xs font-medium text-zinc-700 dark:text-zinc-300"
+          >
+            <input
+              type="checkbox"
+              :checked="selectedStatuses.includes(opt)"
+              class="h-3.5 w-3.5 rounded border-zinc-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+            />
+            <span>{{ opt }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. Tariff Filter Dropdown -->
+      <div class="relative" ref="tariffRef">
+        <button
+          type="button"
+          @click="isTariffOpen = !isTariffOpen; isStatusOpen = false; isBalanceOpen = false; isGroupOpen = false"
+          class="px-3.5 py-2 text-xs border rounded-full text-zinc-700 dark:text-zinc-200 cursor-pointer flex items-center justify-between gap-2 min-w-[130px] select-none transition-all shadow-2xs font-semibold"
+          :class="isTariffOpen
+            ? 'border-blue-600 bg-blue-50/50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 ring-1 ring-blue-600'
+            : 'border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-850 hover:border-blue-400'"
+        >
+          <span class="truncate max-w-[140px]">
+            {{ selectedTariffs.length === 0 || selectedTariffs.length === TARIFF_FILTER_OPTIONS.length
+              ? 'All Tariffs'
+              : selectedTariffs.join(', ') }}
+          </span>
+          <ChevronDown
+            class="h-3.5 w-3.5 text-zinc-400 transition-transform duration-200"
+            :class="isTariffOpen ? 'rotate-180 text-blue-600' : ''"
+          />
+        </button>
+
+        <div
+          v-if="isTariffOpen"
+          class="absolute left-0 mt-1.5 w-60 rounded-xl border border-zinc-200 dark:border-zinc-750 bg-white dark:bg-[#181a1d] shadow-xl py-2 z-40 max-h-80 overflow-y-auto"
+        >
+          <div
+            @click="emit('toggle-all-tariffs')"
+            class="px-3.5 py-1.5 flex items-center gap-2.5 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors text-xs font-bold text-zinc-800 dark:text-zinc-200"
+          >
+            <input
+              type="checkbox"
+              :checked="selectedTariffs.length === TARIFF_FILTER_OPTIONS.length"
+              class="h-3.5 w-3.5 rounded border-zinc-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+            />
+            <span>Select All</span>
+          </div>
+          <div class="h-px bg-zinc-100 dark:bg-zinc-800 my-1" />
+          <div
+            v-for="opt in TARIFF_FILTER_OPTIONS"
+            :key="opt"
+            @click="emit('toggle-tariff', opt)"
+            class="px-3.5 py-1.5 flex items-center gap-2.5 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors text-xs font-medium text-zinc-700 dark:text-zinc-300"
+          >
+            <input
+              type="checkbox"
+              :checked="selectedTariffs.includes(opt)"
+              class="h-3.5 w-3.5 rounded border-zinc-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+            />
+            <span class="truncate">{{ opt }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. Balance Filter Dropdown -->
+      <div class="relative" ref="balanceRef">
+        <button
+          type="button"
+          @click="isBalanceOpen = !isBalanceOpen; isStatusOpen = false; isTariffOpen = false; isGroupOpen = false"
+          class="px-3.5 py-2 text-xs border rounded-full text-zinc-700 dark:text-zinc-200 cursor-pointer flex items-center justify-between gap-2 min-w-[130px] select-none transition-all shadow-2xs font-semibold"
+          :class="isBalanceOpen
+            ? 'border-blue-600 bg-blue-50/50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 ring-1 ring-blue-600'
+            : 'border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-850 hover:border-blue-400'"
+        >
+          <span class="truncate max-w-[140px]">
+            {{ selectedBalances.length === 0 || selectedBalances.length === BALANCE_FILTER_OPTIONS.length
+              ? 'All Balances'
+              : selectedBalances.join(', ') }}
+          </span>
+          <ChevronDown
+            class="h-3.5 w-3.5 text-zinc-400 transition-transform duration-200"
+            :class="isBalanceOpen ? 'rotate-180 text-blue-600' : ''"
+          />
+        </button>
+
+        <div
+          v-if="isBalanceOpen"
+          class="absolute left-0 mt-1.5 w-60 rounded-xl border border-zinc-200 dark:border-zinc-750 bg-white dark:bg-[#181a1d] shadow-xl py-2 z-40 max-h-80 overflow-y-auto"
+        >
+          <div
+            @click="emit('toggle-all-balances')"
+            class="px-3.5 py-1.5 flex items-center gap-2.5 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors text-xs font-bold text-zinc-800 dark:text-zinc-200"
+          >
+            <input
+              type="checkbox"
+              :checked="selectedBalances.length === BALANCE_FILTER_OPTIONS.length"
+              class="h-3.5 w-3.5 rounded border-zinc-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+            />
+            <span>Select All</span>
+          </div>
+          <div class="h-px bg-zinc-100 dark:bg-zinc-800 my-1" />
+          <div
+            v-for="opt in BALANCE_FILTER_OPTIONS"
+            :key="opt"
+            @click="emit('toggle-balance', opt)"
+            class="px-3.5 py-1.5 flex items-center gap-2.5 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors text-xs font-medium text-zinc-700 dark:text-zinc-300"
+          >
+            <input
+              type="checkbox"
+              :checked="selectedBalances.includes(opt)"
+              class="h-3.5 w-3.5 rounded border-zinc-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+            />
+            <span class="truncate">{{ opt }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4. Group Filter Dropdown -->
+      <div class="relative" ref="groupRef">
+        <button
+          type="button"
+          @click="isGroupOpen = !isGroupOpen; isStatusOpen = false; isTariffOpen = false; isBalanceOpen = false"
+          class="px-3.5 py-2 text-xs border rounded-full text-zinc-700 dark:text-zinc-200 cursor-pointer flex items-center justify-between gap-2 min-w-[130px] select-none transition-all shadow-2xs font-semibold"
+          :class="isGroupOpen
+            ? 'border-blue-600 bg-blue-50/50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 ring-1 ring-blue-600'
+            : 'border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-850 hover:border-blue-400'"
+        >
+          <span class="truncate max-w-[140px]">
+            {{ selectedGroups.length === 0 || selectedGroups.length === ALL_GROUP_OPTIONS.length
+              ? 'All Groups'
+              : selectedGroups.join(', ') }}
+          </span>
+          <ChevronDown
+            class="h-3.5 w-3.5 text-zinc-400 transition-transform duration-200"
+            :class="isGroupOpen ? 'rotate-180 text-blue-600' : ''"
+          />
+        </button>
+
+        <div
+          v-if="isGroupOpen"
+          class="absolute left-0 mt-1.5 w-56 rounded-xl border border-zinc-200 dark:border-zinc-750 bg-white dark:bg-[#181a1d] shadow-xl py-2 z-40 max-h-80 overflow-y-auto"
+        >
+          <div
+            @click="emit('toggle-all-groups')"
+            class="px-3.5 py-1.5 flex items-center gap-2.5 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors text-xs font-bold text-zinc-800 dark:text-zinc-200"
+          >
+            <input
+              type="checkbox"
+              :checked="selectedGroups.length === ALL_GROUP_OPTIONS.length"
+              class="h-3.5 w-3.5 rounded border-zinc-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+            />
+            <span>Select All</span>
+          </div>
+          <div class="h-px bg-zinc-100 dark:bg-zinc-800 my-1" />
+          <div
+            v-for="opt in ALL_GROUP_OPTIONS"
+            :key="opt"
+            @click="emit('toggle-group', opt)"
+            class="px-3.5 py-1.5 flex items-center gap-2.5 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors text-xs font-medium text-zinc-700 dark:text-zinc-300"
+          >
+            <input
+              type="checkbox"
+              :checked="selectedGroups.includes(opt)"
+              class="h-3.5 w-3.5 rounded border-zinc-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+            />
+            <span class="truncate">{{ opt }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- View Mode Switcher -->
+      <div class="flex items-center gap-1 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-850 p-1 ml-auto">
+        <button
+          type="button"
+          @click="emit('update:viewMode', 'grid')"
+          class="p-1.5 rounded-md transition-all cursor-pointer"
+          :class="viewMode === 'grid'
+            ? 'bg-blue-600 text-white shadow-xs'
+            : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100'"
+          title="Grid View (Cards)"
+        >
+          <LayoutGrid class="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          @click="emit('update:viewMode', 'table')"
+          class="p-1.5 rounded-md transition-all cursor-pointer"
+          :class="viewMode === 'table'
+            ? 'bg-blue-600 text-white shadow-xs'
+            : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100'"
+          title="Table View"
+        >
+          <TableIcon class="h-4 w-4" />
+        </button>
+      </div>
+    </div>
+
+    <!-- Student Count -->
+    <div class="text-xs text-zinc-500 dark:text-zinc-400 italic px-1">
+      {{ totalFilteredCount }} students
+    </div>
+
+    <!-- ── 1. Grid View (UniApp2 Student Cards 1-to-1) ────────────────────── -->
+    <div v-if="viewMode === 'grid'" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+      <button
+        v-for="student in students"
+        :key="student.id"
+        type="button"
+        @click="emit('open-add-payment', student.id)"
+        class="text-left rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#15171a] p-4 shadow-sm hover:bg-zinc-50 dark:hover:bg-zinc-850/80 transition-all cursor-pointer w-full hover:-translate-y-0.5 group"
+      >
+        <!-- Card Header: Full Name + Archive Badge -->
+        <div class="flex items-center justify-between gap-2">
+          <div class="font-bold text-[17px] uppercase text-zinc-900 dark:text-zinc-100 truncate tracking-wide group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+            {{ student.full_name }}
+          </div>
           <span
-            class="font-mono font-extrabold text-sm tracking-tight"
-            :class="s.balance < 0 ? 'text-[#ff1853]' : (s.balance === 0 ? 'text-zinc-800 dark:text-zinc-200' : 'text-[#00b074]')"
+            v-if="student.is_deleted"
+            class="px-1.5 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20 shrink-0"
           >
-            {{ formatCurrency(s.balance) }}
+            Archive
           </span>
         </div>
 
-        <!-- Action Buttons Row (Matching Screenshot) -->
-        <div class="flex items-center gap-2 pt-0.5">
-          <!-- + Pay Button -->
-          <button
-            type="button"
-            @click="emit('open-add-payment', s.id)"
-            class="flex-1 py-2 px-3 rounded-xl bg-[#00b074] hover:bg-[#009663] active:scale-98 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-2xs transition-all cursor-pointer"
-          >
-            <Plus class="w-3.5 h-3.5 stroke-[2.5]" />
-            <span>Pay</span>
-          </button>
+        <!-- Badges Row -->
+        <div class="flex flex-wrap gap-1.5 mt-3">
+          <!-- Blue ID Badge -->
+          <span class="text-[13px] font-bold px-2 py-1 rounded-[6px] bg-[#0066cc] text-white font-mono shadow-2xs">
+            {{ student.id }}
+          </span>
 
-          <!-- — (Withdraw / Refund) Button -->
-          <button
-            type="button"
-            @click="emit('open-withdraw', s.id)"
-            class="py-2 px-3 rounded-xl bg-white hover:bg-zinc-50 active:scale-98 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:text-rose-600 font-bold shadow-2xs transition-all cursor-pointer"
-            title="Withdraw / Refund"
+          <!-- Green Tariff Badge with Certificate Suffix -->
+          <span
+            v-if="student.tariff"
+            class="text-[13px] font-bold px-2.5 py-1 rounded-[6px] bg-[#10b981] text-white uppercase shadow-2xs"
           >
-            <Minus class="w-3.5 h-3.5 stroke-[2.5]" />
-          </button>
+            {{ student.tariff }}
+            <template v-if="student.tariff === 'E-VISA'">
+              {{ (student.language_certificate && student.language_certificate !== 'NO CERTIFICATE')
+                ? ' (TIL SERTIFIKATLI)'
+                : ' (TIL SERTIFIKATISIZ)' }}
+            </template>
+          </span>
+
+          <!-- Balance Badge (Red if < 0 debt, Green if >= 0) -->
+          <span
+            class="text-[13px] font-bold px-2.5 py-1 rounded-[6px] text-white shadow-2xs font-mono"
+            :class="(Number(student.balance) || 0) < 0 ? 'bg-[#ef4444]' : 'bg-[#10b981]'"
+          >
+            {{ (Number(student.balance) || 0) > 0 ? '+' : '' }}{{ formatAmount(student.balance) }}
+          </span>
+
+          <!-- Discount Badge (Pink #be185d if exists) -->
+          <span
+            v-if="student.discount !== null && student.discount !== undefined && Number(student.discount) > 0"
+            class="text-[13px] font-bold px-2.5 py-1 rounded-[6px] bg-[#be185d] text-white font-mono shadow-2xs"
+          >
+            {{ formatAmount(student.discount) }}
+          </span>
         </div>
+      </button>
+    </div>
+
+    <!-- ── 2. Table View (UniApp2 Table 1-to-1) ────────────────────────────── -->
+    <div v-else class="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#111315] overflow-hidden shadow-2xs">
+      <div class="overflow-x-auto">
+        <table class="w-full border-collapse text-left">
+          <thead>
+            <tr class="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-850/60 text-[13px] font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-300 select-none">
+              <th
+                @click="emit('toggle-sort')"
+                class="px-5 py-3.5 w-28 cursor-pointer select-none hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+              >
+                <span class="flex items-center gap-1 font-bold text-[13px] uppercase tracking-wider text-zinc-700 dark:text-zinc-200">
+                  ID
+                  <ChevronDown v-if="sortOrder === 'asc'" class="h-3.5 w-3.5 text-blue-600" />
+                  <ChevronUp v-else class="h-3.5 w-3.5 text-blue-600" />
+                </span>
+              </th>
+              <th class="px-5 py-3.5">Full Name</th>
+              <th class="px-5 py-3.5">Group</th>
+              <th class="px-5 py-3.5">Tariff</th>
+              <th class="px-5 py-3.5">Balance</th>
+              <th class="px-5 py-3.5">Discount</th>
+              <th class="px-5 py-3.5 text-center w-28">Actions</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-zinc-100 dark:divide-zinc-800 text-[14px]">
+            <tr
+              v-for="student in students"
+              :key="student.id"
+              class="hover:bg-zinc-50/80 dark:hover:bg-zinc-850/60 transition-colors text-zinc-800 dark:text-zinc-200"
+            >
+              <!-- ID -->
+              <td class="px-5 py-3.5">
+                <span class="inline-flex items-center justify-center px-2 py-0.5 text-[13px] font-bold font-mono bg-[#0066cc] text-white rounded-[4px] shadow-2xs select-all">
+                  {{ student.id }}
+                </span>
+              </td>
+
+              <!-- Full Name -->
+              <td class="px-5 py-3.5 font-bold uppercase tracking-wide text-[14px]">
+                <div class="flex items-center gap-2">
+                  <span>{{ student.full_name }}</span>
+                  <span
+                    v-if="student.is_deleted"
+                    class="px-1.5 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20 shrink-0"
+                  >
+                    Archive
+                  </span>
+                </div>
+              </td>
+
+              <!-- Group -->
+              <td class="px-5 py-3.5 text-[13.5px] font-medium text-zinc-500 dark:text-zinc-400 uppercase">
+                {{ student.student_group || '—' }}
+              </td>
+
+              <!-- Tariff -->
+              <td class="px-5 py-3.5">
+                <span
+                  v-if="student.tariff"
+                  class="inline-flex px-2 py-0.5 rounded-[4px] text-[12px] font-bold bg-[#10b981] text-white uppercase shadow-2xs"
+                >
+                  {{ student.tariff }}
+                  <template v-if="student.tariff === 'E-VISA'">
+                    {{ (student.language_certificate && student.language_certificate !== 'NO CERTIFICATE')
+                      ? ' (TIL SERTIFIKATLI)'
+                      : ' (TIL SERTIFIKATISIZ)' }}
+                  </template>
+                </span>
+                <span v-else class="text-zinc-400">—</span>
+              </td>
+
+              <!-- Balance -->
+              <td class="px-5 py-3.5 font-mono font-bold">
+                <span
+                  class="inline-flex px-2 py-0.5 rounded-[4px] text-[12.5px] font-bold text-white shadow-2xs"
+                  :class="(Number(student.balance) || 0) < 0 ? 'bg-[#ef4444]' : 'bg-[#10b981]'"
+                >
+                  {{ (Number(student.balance) || 0) > 0 ? '+' : '' }}{{ formatAmount(student.balance) }} UZS
+                </span>
+              </td>
+
+              <!-- Discount -->
+              <td class="px-5 py-3.5">
+                <span
+                  v-if="student.discount !== null && student.discount !== undefined && Number(student.discount) > 0"
+                  class="inline-flex px-2 py-0.5 rounded-[4px] text-[12px] font-bold font-mono bg-[#be185d] text-white shadow-2xs"
+                >
+                  {{ formatAmount(student.discount) }} UZS
+                </span>
+                <span v-else class="text-zinc-400">—</span>
+              </td>
+
+              <!-- Actions -->
+              <td class="px-5 py-3.5 text-center">
+                <button
+                  type="button"
+                  @click="emit('open-add-payment', student.id)"
+                  class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-all cursor-pointer shadow-2xs"
+                >
+                  <Plus class="h-3.5 w-3.5 stroke-[2.5]" />
+                  <span>Pay</span>
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
 
-    <!-- 5. TABLE VIEW -->
-    <div v-else class="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 overflow-hidden shadow-xs">
-      <table class="w-full text-left border-collapse">
-        <thead>
-          <tr class="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/60 text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-            <th class="px-4 py-3 w-16">ID</th>
-            <th class="px-4 py-3">Full Name</th>
-            <th class="px-4 py-3">Group</th>
-            <th class="px-4 py-3">Tariff</th>
-            <th class="px-4 py-3 text-right">Discount</th>
-            <th class="px-4 py-3 text-right">Balance</th>
-            <th class="px-4 py-3 text-right w-24">Actions</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-zinc-100 dark:divide-zinc-850">
-          <tr
-            v-for="s in students"
-            :key="s.id"
-            class="hover:bg-zinc-50/80 dark:hover:bg-zinc-800/40 transition-colors"
-          >
-            <td class="px-4 py-3 font-mono font-bold text-[#1868db] dark:text-blue-400">{{ s.id }}</td>
-            <td class="px-4 py-3 font-bold text-zinc-900 dark:text-zinc-100 uppercase">{{ s.full_name }}</td>
-            <td class="px-4 py-3 font-semibold text-zinc-400 uppercase">{{ s.student_group || '—' }}</td>
-            <td class="px-4 py-3 font-semibold text-zinc-500 uppercase">{{ s.tariff || 'No Tariff' }}</td>
-            <td class="px-4 py-3 text-right font-mono font-bold text-amber-600 dark:text-amber-400">
-              {{ s.discount > 0 ? formatCurrency(s.discount) : '—' }}
-            </td>
-            <td
-              class="px-4 py-3 text-right font-mono font-extrabold"
-              :class="s.balance < 0 ? 'text-[#ff1853]' : (s.balance === 0 ? 'text-zinc-700 dark:text-zinc-300' : 'text-[#00b074]')"
-            >
-              {{ formatCurrency(s.balance) }}
-            </td>
-            <td class="px-4 py-3 text-right">
-              <div class="flex items-center justify-end gap-1.5">
-                <button
-                  type="button"
-                  @click="emit('open-add-payment', s.id)"
-                  class="p-1.5 rounded-lg bg-emerald-50 text-[#00b074] dark:bg-emerald-950/40 dark:text-emerald-300 hover:bg-emerald-100 font-bold transition-colors cursor-pointer"
-                  title="Add Payment"
-                >
-                  <Plus class="w-3.5 h-3.5" />
-                </button>
-                <button
-                  type="button"
-                  @click="emit('open-withdraw', s.id)"
-                  class="p-1.5 rounded-lg bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-300 hover:bg-rose-100 font-bold transition-colors cursor-pointer"
-                  title="Withdraw"
-                >
-                  <Minus class="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+    <!-- Empty State -->
+    <div
+      v-if="students.length === 0 && !isLoading"
+      class="rounded-xl border border-zinc-200 dark:border-zinc-800 border-dashed bg-white dark:bg-[#111315] p-12 text-center text-xs text-zinc-500 dark:text-zinc-400"
+    >
+      No students match your filters.
     </div>
   </div>
 </template>

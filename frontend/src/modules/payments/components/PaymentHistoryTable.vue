@@ -1,425 +1,444 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import type { Payment } from '@/types'
-import { useCurrency } from '@/composables/useCurrency'
 import {
   Search, FileSpreadsheet, Pencil, Trash2, Printer,
-  Calendar, Receipt, Loader2, User, ChevronDown, LayoutGrid, Table as TableIcon
+  Receipt, X
 } from 'lucide-vue-next'
 
 const props = defineProps<{
   payments: Payment[]
+  totalFilteredCount: number
   isLoading: boolean
   searchQuery: string
   selectedMethod: string
   selectedReceiver: string
+  paymentMethods: string[]
+  paymentReceivers: string[]
 }>()
 
 const emit = defineEmits<{
   (e: 'update:searchQuery', val: string): void
   (e: 'update:selectedMethod', val: string): void
   (e: 'update:selectedReceiver', val: string): void
-  (e: 'export-excel'): void
   (e: 'open-edit', payment: Payment): void
   (e: 'delete-payment', payment: Payment): void
+  (e: 'export-excel'): void
 }>()
 
-const { formatCurrency } = useCurrency()
-const viewMode = ref<'grid' | 'table'>('grid')
+const viewingPayment = ref<Payment | null>(null)
 
-const PAYMENT_METHODS = ['all', 'Karta J.A', 'Karta Abdulaziz', 'Naqd', 'Karta M.A', 'Bank', 'Discount', 'Withdrawal']
-const RECEIVED_BY_OPTIONS = ['all', 'ABDULAZIZ', 'MUSLIHIDDIN', 'BAXTIYOR', 'MUHAMMADALI', 'JASUR', 'ADMIN']
-
-const formatCardDateTime = (dateStr: string) => {
-  if (!dateStr) return '—'
-  const d = new Date(dateStr)
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  const h = String(d.getHours()).padStart(2, '0')
-  const min = String(d.getMinutes()).padStart(2, '0')
-  return `${y}-${m}-${day} ${h}:${min}`
+function formatAmount(val: number | string | null | undefined) {
+  if (val === null || val === undefined) return '0'
+  const num = typeof val === 'string' ? parseFloat(val) : val
+  return new Intl.NumberFormat('uz-UZ').format(Math.round(num || 0))
 }
 
-const handlePrint = (p: Payment) => {
-  const printWindow = window.open('', '_blank', 'width=600,height=700')
-  if (!printWindow) return
+const formatTimestamp = (dateStr?: string) => {
+  if (!dateStr) return ''
+  const d = new Date(dateStr)
+  if (isNaN(d.getTime())) return dateStr
+  return d.toLocaleString('uz-UZ', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+}
 
-  const studentName = p.student_full_name || p.student_name || 'General'
-  const dateFormatted = formatCardDateTime(p.created_at)
-  const sign = p.is_withdrawal ? '-' : '+'
-  const amountFormatted = `${sign}${Number(p.amount).toLocaleString('en-US')} UZS`
-  const paymentType = p.is_withdrawal ? 'WITHDRAWAL / REFUND' : (p.is_discount ? 'DISCOUNT' : 'STUDENT PAYMENT')
+const handleEditFromModal = () => {
+  if (viewingPayment.value) {
+    const p = viewingPayment.value
+    viewingPayment.value = null
+    emit('open-edit', p)
+  }
+}
 
-  printWindow.document.write(`
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <title>Payment Receipt - ${studentName}</title>
-        <style>
-          body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 30px; color: #1e293b; }
-          .receipt { border: 2px solid #e2e8f0; border-radius: 12px; padding: 24px; max-width: 480px; margin: auto; }
-          .header { text-align: center; border-bottom: 2px dashed #cbd5e1; padding-bottom: 16px; margin-bottom: 16px; }
-          .title { font-size: 20px; font-weight: 800; text-transform: uppercase; margin: 0; color: #0f172a; }
-          .subtitle { font-size: 12px; color: #64748b; margin-top: 4px; }
-          .row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f1f5f9; font-size: 13px; }
-          .label { color: #64748b; font-weight: 600; text-transform: uppercase; font-size: 11px; }
-          .value { font-weight: 700; color: #0f172a; }
-          .amount-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px; text-align: center; margin: 16px 0; }
-          .amount-label { font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; }
-          .amount-value { font-size: 22px; font-weight: 900; color: #059669; font-family: monospace; margin-top: 4px; }
-          .footer { text-align: center; font-size: 11px; color: #94a3b8; margin-top: 20px; border-top: 1px solid #f1f5f9; padding-top: 12px; }
-        </style>
-      </head>
-      <body>
-        <div class="receipt">
-          <div class="header">
-            <h1 class="title">Official Payment Receipt</h1>
-            <div class="subtitle">${paymentType}</div>
-          </div>
-          <div class="row"><span class="label">Date & Time</span><span class="value">${dateFormatted}</span></div>
-          <div class="row"><span class="label">Student Name</span><span class="value">${studentName}</span></div>
-          <div class="row"><span class="label">Student ID</span><span class="value">${p.student_id || '—'}</span></div>
-          <div class="row"><span class="label">Payment Method</span><span class="value">${p.method}</span></div>
-          <div class="row"><span class="label">Received By</span><span class="value">${p.received_by}</span></div>
-          <div class="row"><span class="label">Registered By</span><span class="value">${p.created_by_name || 'System Admin'}</span></div>
-          ${p.notes ? `<div class="row"><span class="label">Notes</span><span class="value">${p.notes}</span></div>` : ''}
-          <div class="amount-box">
-            <div class="amount-label">Total Amount</div>
-            <div class="amount-value">${amountFormatted}</div>
-          </div>
-          <div class="footer">Thank you! Generated automatically by CRM System.</div>
-        </div>
-        <script>window.onload = function() { window.print(); }<\/script>
-      </body>
-    </html>
-  `)
-  printWindow.document.close()
+// ── 80mm Thermal Receipt Generator matching UniApp2 1-to-1 ─────────────────────────
+const printReceipt = (payment: Payment) => {
+  const amount = Number(payment.amount) || 0
+  const isWithdrawal = amount < 0
+  const absAmount = Math.abs(amount)
+  const amountFormatted = formatAmount(absAmount) + ' UZS'
+  const amountSign = isWithdrawal ? '-' : '+'
+  const amountLabel = isWithdrawal ? 'WITHDRAWAL' : 'PAYMENT'
+
+  const dateObj = payment.created_at ? new Date(payment.created_at) : new Date()
+  const dateStr = dateObj.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  const timeStr = dateObj.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+
+  const receiptNo = payment.id ? String(payment.id).replace(/-/g, '').slice(-8).toUpperCase() : 'N/A'
+  const studentName = payment.student_full_name || payment.student_name || ''
+  const studentLine = payment.student_id && studentName
+    ? `${payment.student_id} — ${studentName}`
+    : (studentName || 'General Payment')
+  const notesLine = payment.notes || ''
+  const methodLine = payment.method || '—'
+  const receiverLine = payment.received_by || '—'
+
+  const receiptHTML = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Receipt #${receiptNo}</title>
+<style>
+  @page { size: 80mm auto; margin: 2mm; }
+  html, body { font-family: 'Courier New', Courier, monospace; font-size: 11px; width: 74mm; color: #000; background: #fff; margin: 0; padding: 0; }
+  .receipt { padding: 3mm 3mm 4mm 3mm; }
+  .company-name { font-size: 14px; font-weight: 900; letter-spacing: 2px; text-align: center; margin-bottom: 0.5mm; }
+  .company-sub { font-size: 9px; text-align: center; margin-bottom: 2mm; letter-spacing: 1px; }
+  .divider { border: none; border-top: 1px dashed #000; margin: 1.5mm 0; }
+  .divider-solid { border: none; border-top: 1px solid #000; margin: 1.5mm 0; }
+  .row { display: flex; justify-content: space-between; margin: 1mm 0; font-size: 10.5px; }
+  .row .label { color: #333; flex-shrink: 0; margin-right: 2mm; }
+  .row .value { text-align: right; word-break: break-word; max-width: 50mm; }
+  .row .bold { font-weight: 700; }
+  .amount-box { border: 1px solid #000; padding: 2mm 2mm; text-align: center; margin: 2mm 0; }
+  .amount-label { font-size: 9px; letter-spacing: 1px; margin-bottom: 0.5mm; }
+  .amount-value { font-size: 18px; font-weight: 900; letter-spacing: 1px; }
+  .receipt-no { font-size: 9px; color: #555; text-align: center; margin-bottom: 1mm; }
+  .footer { text-align: center; font-size: 9px; margin-top: 2mm; letter-spacing: 1px; }
+  .notes-row { border: 1px dashed #555; padding: 1mm 2mm; margin: 1mm 0; font-size: 10px; word-break: break-word; }
+</style>
+</head>
+<body>
+<div class="receipt">
+  <div class="company-name">SALOM CRM</div>
+  <div class="company-sub">UNIBRIDGE EDUCATIONAL SERVICES</div>
+  <hr class="divider-solid">
+  <div class="receipt-no">Receipt #${receiptNo}</div>
+  <div class="row"><span class="label">Date:</span><span class="value bold">${dateStr}</span></div>
+  <div class="row"><span class="label">Time:</span><span class="value">${timeStr}</span></div>
+  <hr class="divider">
+  <div class="row"><span class="label">Student:</span><span class="value bold">${studentLine}</span></div>
+  <hr class="divider">
+  <div class="amount-box">
+    <div class="amount-label">${amountLabel}</div>
+    <div class="amount-value">${amountSign}${amountFormatted}</div>
+  </div>
+  <hr class="divider">
+  <div class="row"><span class="label">Method:</span><span class="value">${methodLine}</span></div>
+  <div class="row"><span class="label">Received by:</span><span class="value">${receiverLine}</span></div>
+  ${notesLine ? `<div class="notes-row"><span style="font-size:9px; letter-spacing:1px; color:#444;">NOTE: </span>${notesLine}</div>` : ''}
+  <hr class="divider-solid">
+  <div class="footer">★ RAHMAT! THANK YOU! ★<br><span style="font-size:8px; color:#555;">unibridge.uz</span></div>
+</div>
+</body>
+</html>`
+
+  const printWin = window.open('', '_blank', 'width=400,height=600,toolbar=0,location=0,menubar=0')
+  if (!printWin) {
+    alert('Please allow pop-ups to print the receipt!')
+    return
+  }
+  printWin.document.write(receiptHTML)
+  printWin.document.close()
+  printWin.onload = () => {
+    setTimeout(() => {
+      printWin.focus()
+      printWin.print()
+      printWin.onafterprint = () => printWin.close()
+    }, 300)
+  }
 }
 </script>
 
 <template>
-  <div class="space-y-4 text-xs select-none">
-    <!-- 1. Search & Filter Bar Card -->
-    <div class="p-2.5 bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200/90 dark:border-zinc-800 shadow-2xs flex flex-wrap items-center gap-2.5">
-      <!-- Search Input -->
+  <div class="flex flex-col gap-4 select-none text-xs">
+    <!-- Filter bar -->
+    <div class="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#111315] p-3 shadow-2xs flex flex-wrap gap-2.5 items-center">
       <div class="relative flex-1 min-w-[220px]">
-        <Search class="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+        <Search class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400 pointer-events-none" />
         <input
+          type="text"
           :value="searchQuery"
           @input="emit('update:searchQuery', ($event.target as HTMLInputElement).value)"
-          type="text"
-          placeholder="Search payments by student name, ID, or notes..."
-          class="w-full pl-9 pr-3 py-2 rounded-xl bg-[#f8fafc] dark:bg-zinc-800/80 border border-zinc-200/80 dark:border-zinc-700/80 focus:border-blue-500 focus:bg-white dark:focus:bg-zinc-800 focus:ring-2 focus:ring-blue-500/20 outline-none text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 text-xs font-medium transition-all"
+          placeholder="Search by name, ID, or notes..."
+          class="w-full pl-9 pr-4 py-2 text-xs border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-850 rounded-lg text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:border-blue-500 transition-colors"
         />
       </div>
 
-      <!-- Filter Dropdowns Row -->
-      <div class="flex flex-wrap items-center gap-2">
-        <!-- Method Dropdown -->
-        <div class="relative">
-          <select
-            :value="selectedMethod"
-            @change="emit('update:selectedMethod', ($event.target as HTMLSelectElement).value)"
-            class="appearance-none bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600 rounded-xl pl-3.5 pr-8 py-2 text-xs font-semibold text-zinc-700 dark:text-zinc-200 outline-none cursor-pointer transition-colors shadow-2xs"
-          >
-            <option value="all">All Methods</option>
-            <option v-for="m in PAYMENT_METHODS.filter(m => m !== 'all')" :key="m" :value="m">{{ m }}</option>
-          </select>
-          <ChevronDown class="w-3.5 h-3.5 text-zinc-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-        </div>
-
-        <!-- Receiver Dropdown -->
-        <div class="relative">
-          <select
-            :value="selectedReceiver"
-            @change="emit('update:selectedReceiver', ($event.target as HTMLSelectElement).value)"
-            class="appearance-none bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600 rounded-xl pl-3.5 pr-8 py-2 text-xs font-semibold text-zinc-700 dark:text-zinc-200 outline-none cursor-pointer transition-colors shadow-2xs"
-          >
-            <option value="all">All Receivers</option>
-            <option v-for="r in RECEIVED_BY_OPTIONS.filter(r => r !== 'all')" :key="r" :value="r">{{ r }}</option>
-          </select>
-          <ChevronDown class="w-3.5 h-3.5 text-zinc-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-        </div>
-
-        <!-- Export to Excel Button -->
-        <button
-          type="button"
-          @click="emit('export-excel')"
-          class="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer active:scale-98"
-          title="Export Payment History to Excel (.xlsx)"
-        >
-          <FileSpreadsheet class="w-4 h-4" />
-          <span>Export Excel</span>
-        </button>
-
-        <!-- View Mode Grid / Table Switcher -->
-        <div class="flex items-center gap-1 border border-zinc-200 dark:border-zinc-700 rounded-xl p-0.5 bg-zinc-50 dark:bg-zinc-800 shadow-2xs">
-          <button
-            type="button"
-            @click="viewMode = 'grid'"
-            class="p-1.5 rounded-lg font-bold transition-all cursor-pointer"
-            :class="viewMode === 'grid'
-              ? 'bg-[#1868db] text-white shadow-xs'
-              : 'text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200'"
-            title="Grid View"
-          >
-            <LayoutGrid class="w-4 h-4" />
-          </button>
-          <button
-            type="button"
-            @click="viewMode = 'table'"
-            class="p-1.5 rounded-lg font-bold transition-all cursor-pointer"
-            :class="viewMode === 'table'
-              ? 'bg-[#1868db] text-white shadow-xs'
-              : 'text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200'"
-            title="Table View"
-          >
-            <TableIcon class="w-4 h-4" />
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- 2. SKELETON LOADING STATE -->
-    <div v-if="isLoading" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-      <div
-        v-for="i in 6"
-        :key="`skel-pay-${i}`"
-        class="p-4 rounded-2xl border border-zinc-200/90 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-xs flex flex-col justify-between gap-3.5 animate-pulse"
+      <!-- Method Filter -->
+      <select
+        :value="selectedMethod"
+        @change="emit('update:selectedMethod', ($event.target as HTMLSelectElement).value)"
+        class="px-3 py-2 text-xs border border-zinc-200 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-850 text-zinc-700 dark:text-zinc-200 cursor-pointer shadow-2xs font-semibold focus:outline-none"
       >
-        <div class="flex items-center justify-between">
-          <div class="h-5 w-40 bg-zinc-200 dark:bg-zinc-800 rounded" />
-          <div class="h-4 w-24 bg-zinc-100 dark:bg-zinc-800 rounded" />
-        </div>
-        <div class="flex items-center gap-2">
-          <div class="h-6 w-20 bg-zinc-200 dark:bg-zinc-800 rounded-md" />
-          <div class="h-6 w-24 bg-zinc-100 dark:bg-zinc-800 rounded-md" />
-          <div class="h-6 w-20 bg-zinc-100 dark:bg-zinc-800 rounded-md" />
-        </div>
-        <div class="h-4 w-32 bg-zinc-100 dark:bg-zinc-800 rounded" />
-        <div class="h-4 w-48 bg-zinc-100 dark:bg-zinc-800 rounded" />
-        <div class="flex items-center gap-2 pt-2 border-t border-zinc-100 dark:border-zinc-800">
-          <div class="h-8 flex-1 bg-zinc-100 dark:bg-zinc-800 rounded-xl" />
-          <div class="h-8 flex-1 bg-zinc-100 dark:bg-zinc-800 rounded-xl" />
-          <div class="h-8 flex-1 bg-zinc-100 dark:bg-zinc-800 rounded-xl" />
-        </div>
-      </div>
-    </div>
+        <option value="all">All Methods</option>
+        <option v-for="m in paymentMethods" :key="m" :value="m">{{ m }}</option>
+        <option value="Withdrawal">Withdrawal</option>
+      </select>
 
-    <!-- 3. EMPTY STATE -->
-    <div
-      v-else-if="payments.length === 0"
-      class="p-12 text-center rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900"
-    >
-      <Receipt class="w-10 h-10 mx-auto text-zinc-300 dark:text-zinc-700 mb-3" />
-      <h3 class="font-bold text-sm text-zinc-800 dark:text-zinc-200">No payment records found</h3>
-      <p class="text-xs text-zinc-400 mt-1">Try adjusting your search query or filter options.</p>
-    </div>
-
-    <!-- 4. GRID / CARD VIEW (Matching Screenshot 100%) -->
-    <div v-else-if="viewMode === 'grid'" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-      <div
-        v-for="p in payments"
-        :key="p.id"
-        class="p-4 rounded-2xl border border-zinc-200/90 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-2xs hover:shadow-md hover:border-blue-500/30 transition-all flex flex-col justify-between gap-3 group"
+      <!-- Receiver Filter -->
+      <select
+        :value="selectedReceiver"
+        @change="emit('update:selectedReceiver', ($event.target as HTMLSelectElement).value)"
+        class="px-3 py-2 text-xs border border-zinc-200 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-850 text-zinc-700 dark:text-zinc-200 cursor-pointer shadow-2xs font-semibold focus:outline-none"
       >
-        <!-- Top Row: Student Name & DateTime -->
-        <div>
-          <div class="flex items-start justify-between gap-2 mb-2">
-            <h3 class="font-bold text-[13.5px] text-zinc-900 dark:text-zinc-100 uppercase tracking-wide truncate" :title="p.student_full_name || p.student_name || 'General Payment'">
-              {{ p.student_full_name || p.student_name || 'General Payment' }}
-            </h3>
-            <span class="text-[11.5px] text-zinc-400 dark:text-zinc-400 font-mono whitespace-nowrap">
-              {{ formatCardDateTime(p.created_at) }}
+        <option value="all">All Receivers</option>
+        <option v-for="r in paymentReceivers" :key="r" :value="r">{{ r }}</option>
+      </select>
+
+      <!-- Export Excel Button -->
+      <button
+        type="button"
+        @click="emit('export-excel')"
+        class="flex items-center gap-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-850 hover:bg-zinc-50 dark:hover:bg-zinc-800 px-3.5 py-2 text-xs font-bold text-zinc-800 dark:text-zinc-200 transition-all cursor-pointer shadow-2xs ml-auto"
+        title="Download Payment History as Excel"
+      >
+        <FileSpreadsheet class="h-4 w-4 text-emerald-600 dark:text-emerald-500" />
+        <span>Export Excel</span>
+      </button>
+    </div>
+
+    <!-- Payments Count -->
+    <div class="text-xs text-zinc-500 dark:text-zinc-400 italic px-1">
+      {{ totalFilteredCount }} payments
+    </div>
+
+    <!-- Payment history cards (UniApp2 1-to-1) -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+      <div
+        v-for="payment in payments"
+        :key="payment.id"
+        @click="viewingPayment = payment"
+        class="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#15171a] p-3.5 shadow-2xs hover:-translate-y-0.5 hover:shadow-md hover:border-blue-500/40 transition-all duration-200 cursor-pointer flex flex-col justify-between h-full gap-3 group"
+      >
+        <div class="flex flex-col gap-2.5">
+          <!-- Header Row: Student Name + Timestamp -->
+          <div class="flex items-start justify-between gap-2 overflow-hidden">
+            <span
+              class="font-bold text-[13px] uppercase tracking-wide text-zinc-900 dark:text-zinc-100 truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors flex-1"
+              :title="payment.student_full_name || payment.student_name || 'General Payment'"
+            >
+              {{ payment.student_full_name || payment.student_name || 'General Payment' }}
+            </span>
+            <span class="text-[9.5px] font-medium text-zinc-400 whitespace-nowrap pt-0.5">
+              {{ formatTimestamp(payment.created_at) }}
             </span>
           </div>
 
-          <!-- Badges Row: Amount, Method, Receiver (Matching Screenshot) -->
-          <div class="flex flex-wrap items-center gap-1.5 mt-2">
+          <!-- Amount & Badges Row -->
+          <div class="flex items-center gap-1.5 flex-wrap">
             <!-- Amount Badge -->
             <span
-              class="px-2.5 py-1 rounded-lg text-xs font-bold font-mono shadow-2xs"
-              :class="p.is_withdrawal
-                ? 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-800/60'
-                : (p.is_discount
-                  ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800/60'
-                  : 'bg-[#e6f8ef] dark:bg-emerald-950/40 text-[#00875a] dark:text-emerald-400 border border-[#a3e635]/70 dark:border-emerald-800/60')"
+              class="inline-flex items-center px-2 py-0.5 rounded-[4px] text-[12px] font-extrabold font-mono"
+              :class="Number(payment.amount) < 0
+                ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/25'
+                : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25'"
             >
-              {{ p.is_withdrawal ? '-' : '+' }}{{ formatCurrency(Math.abs(p.amount)) }}
+              {{ Number(payment.amount) < 0 ? '-' : '+' }}{{ formatAmount(Math.abs(Number(payment.amount))) }}
             </span>
 
             <!-- Method Badge -->
-            <span class="px-2.5 py-1 rounded-lg text-[11px] font-bold uppercase bg-blue-50/70 dark:bg-blue-950/30 text-zinc-700 dark:text-zinc-300 border border-blue-200/80 dark:border-blue-800/60 shadow-2xs">
-              {{ p.method }}
+            <span class="inline-flex items-center px-1.5 py-0.5 rounded-[3px] text-[9.5px] font-bold uppercase tracking-wider bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700">
+              {{ payment.method }}
             </span>
 
             <!-- Receiver Badge -->
-            <span class="px-2.5 py-1 rounded-lg text-[11px] font-bold uppercase bg-blue-50/70 dark:bg-blue-950/30 text-zinc-700 dark:text-zinc-300 border border-blue-200/80 dark:border-blue-800/60 shadow-2xs">
-              {{ p.received_by }}
-            </span>
-          </div>
-        </div>
-
-        <!-- Middle Section: Registered By & Notes -->
-        <div class="space-y-1.5 py-2 border-t border-zinc-100 dark:border-zinc-800/80">
-          <!-- Registered By Row -->
-          <div class="flex items-center gap-1.5 text-xs">
-            <User class="w-3.5 h-3.5 text-zinc-400" />
-            <span class="text-zinc-400 font-medium">Registered by:</span>
-            <span class="font-bold text-zinc-800 dark:text-zinc-200 uppercase">
-              {{ p.created_by_name || 'BAXTIYOR' }}
+            <span class="inline-flex items-center px-1.5 py-0.5 rounded-[3px] text-[9.5px] font-bold uppercase tracking-wider bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700">
+              {{ payment.received_by }}
             </span>
           </div>
 
-          <!-- Notes Row (Italic) -->
-          <div class="pt-0.5">
-            <p v-if="p.notes" class="italic text-xs text-zinc-500 dark:text-zinc-400 truncate" :title="p.notes">
-              {{ p.notes }}
-            </p>
-            <p v-else class="italic text-xs text-zinc-300 dark:text-zinc-600">
-              No notes
-            </p>
+          <!-- Notes Section -->
+          <div v-if="payment.notes" class="pt-2 border-t border-zinc-100 dark:border-zinc-800">
+            <div class="text-[11px] text-zinc-500 dark:text-zinc-400 leading-normal italic truncate" :title="payment.notes">
+              {{ payment.notes }}
+            </div>
           </div>
         </div>
 
-        <!-- Bottom Action Buttons: Edit, Delete, Print (Matching Screenshot) -->
-        <div class="flex items-center gap-2 pt-1 border-t border-zinc-100 dark:border-zinc-800/80">
-          <!-- Edit Button -->
+        <!-- Actions Footer -->
+        <div class="flex items-center gap-1.5 pt-2.5 border-t border-zinc-100 dark:border-zinc-800">
           <button
             type="button"
-            @click="emit('open-edit', p)"
-            class="flex-1 py-1.5 px-3 rounded-xl bg-white hover:bg-zinc-50 active:scale-98 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 font-bold text-xs flex items-center justify-center gap-1.5 shadow-2xs transition-all cursor-pointer"
+            @click.stop="emit('open-edit', payment)"
+            class="flex-1 flex items-center justify-center gap-1 py-1 text-[10px] font-semibold rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-750 transition-all cursor-pointer"
           >
-            <Pencil class="w-3.5 h-3.5" />
+            <Pencil class="h-3 w-3" />
             <span>Edit</span>
           </button>
-
-          <!-- Delete Button -->
           <button
             type="button"
-            @click="emit('delete-payment', p)"
-            class="flex-1 py-1.5 px-3 rounded-xl bg-white hover:bg-rose-50 active:scale-98 dark:bg-zinc-800 border border-rose-200 dark:border-rose-800/60 text-rose-600 dark:text-rose-400 font-bold text-xs flex items-center justify-center gap-1.5 shadow-2xs transition-all cursor-pointer"
+            @click.stop="emit('delete-payment', payment)"
+            class="flex-1 flex items-center justify-center gap-1 py-1 text-[10px] font-semibold rounded-md border border-rose-200 bg-rose-50/50 text-rose-600 hover:bg-rose-600 hover:text-white transition-all cursor-pointer dark:bg-rose-950/20 dark:border-rose-900/40 dark:text-rose-400 dark:hover:bg-rose-600 dark:hover:text-white"
           >
-            <Trash2 class="w-3.5 h-3.5" />
+            <Trash2 class="h-3 w-3" />
             <span>Delete</span>
           </button>
-
-          <!-- Print Button -->
           <button
             type="button"
-            @click="handlePrint(p)"
-            class="flex-1 py-1.5 px-3 rounded-xl bg-white hover:bg-zinc-50 active:scale-98 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 font-bold text-xs flex items-center justify-center gap-1.5 shadow-2xs transition-all cursor-pointer"
+            @click.stop="printReceipt(payment)"
+            class="flex-1 flex items-center justify-center gap-1 py-1 text-[10px] font-semibold rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-750 transition-all cursor-pointer"
           >
-            <Printer class="w-3.5 h-3.5" />
+            <Printer class="h-3 w-3" />
             <span>Print</span>
           </button>
         </div>
       </div>
     </div>
 
-    <!-- 5. TABLE VIEW (Alternative) -->
-    <div v-else class="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 overflow-hidden shadow-xs">
-      <table class="w-full text-left border-collapse">
-        <thead>
-          <tr class="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/60 text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-            <th class="px-4 py-3">Date & Time</th>
-            <th class="px-4 py-3">Student</th>
-            <th class="px-4 py-3">Method</th>
-            <th class="px-4 py-3">Received By</th>
-            <th class="px-4 py-3">Registered By</th>
-            <th class="px-4 py-3">Notes</th>
-            <th class="px-4 py-3 text-right">Amount</th>
-            <th class="px-4 py-3 text-right w-24">Actions</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-zinc-100 dark:divide-zinc-850">
-          <tr
-            v-for="p in payments"
-            :key="p.id"
-            class="hover:bg-zinc-50/80 dark:hover:bg-zinc-800/40 transition-colors"
+    <!-- Empty State -->
+    <div
+      v-if="payments.length === 0 && !isLoading"
+      class="rounded-xl border border-zinc-200 dark:border-zinc-800 border-dashed bg-white dark:bg-[#111315] p-12 text-center text-xs text-zinc-500 dark:text-zinc-400"
+    >
+      No payments match your filters.
+    </div>
+
+    <!-- ── Payment Details Modal matching UniApp2 1-to-1 ───────────────────────── -->
+    <div
+      v-if="viewingPayment"
+      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs select-none"
+    >
+      <div
+        class="bg-white dark:bg-[#181a1d] border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-page-in p-6 flex flex-col gap-4 max-h-[90vh] overflow-y-auto"
+        @click.stop
+      >
+        <!-- Modal Header -->
+        <div class="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-3">
+          <h3 class="text-base font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+            <Receipt class="h-4 w-4 text-blue-600" />
+            <span>Payment Details</span>
+          </h3>
+          <button
+            type="button"
+            @click="viewingPayment = null"
+            class="cursor-pointer text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
           >
-            <td class="px-4 py-3 whitespace-nowrap text-zinc-500 font-mono text-[11.5px]">
-              {{ formatCardDateTime(p.created_at) }}
-            </td>
-            <td class="px-4 py-3">
-              <div class="flex items-center gap-2">
+            <X class="h-5 w-5" />
+          </button>
+        </div>
+
+        <div class="flex flex-col gap-3.5 text-xs">
+          <!-- Payment ID -->
+          <div class="flex items-center justify-between text-xs border-b border-zinc-100 dark:border-zinc-800 pb-2">
+            <span class="text-zinc-500 font-semibold">Payment ID</span>
+            <span class="font-mono text-zinc-900 dark:text-zinc-100 bg-zinc-50 dark:bg-zinc-850 px-2 py-0.5 rounded border border-zinc-200 dark:border-zinc-700 select-all uppercase font-bold text-[11px]">
+              {{ viewingPayment.id }}
+            </span>
+          </div>
+
+          <!-- Student Details -->
+          <div class="flex flex-col gap-1">
+            <span class="text-xs font-semibold text-zinc-500">Student</span>
+            <div class="px-3 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-750 bg-zinc-50 dark:bg-zinc-850 flex flex-col gap-0.5">
+              <div v-if="viewingPayment.student_id" class="flex items-center gap-2">
+                <span class="text-sm font-bold text-zinc-900 dark:text-zinc-100 uppercase">
+                  {{ viewingPayment.student_full_name || viewingPayment.student_name }}
+                </span>
+              </div>
+              <span v-if="viewingPayment.student_id" class="text-xs font-semibold text-zinc-500">
+                ID: <span class="text-blue-600 font-mono font-bold">{{ viewingPayment.student_id }}</span>
+              </span>
+              <span v-else class="text-xs text-zinc-500 italic">
+                General Payment (No Student Linked)
+              </span>
+            </div>
+          </div>
+
+          <!-- Amount and Type -->
+          <div class="grid grid-cols-2 gap-3">
+            <div class="flex flex-col gap-1">
+              <span class="text-xs font-semibold text-zinc-500">Amount</span>
+              <div class="px-3 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-750 bg-zinc-50 dark:bg-zinc-850 font-mono">
                 <span
-                  v-if="p.student_id"
-                  class="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-[#1868db]/10 text-[#1868db] dark:text-blue-400 border border-[#1868db]/20"
+                  class="text-base font-extrabold"
+                  :class="Number(viewingPayment.amount) < 0 ? 'text-rose-500' : 'text-emerald-500'"
                 >
-                  {{ p.student_id }}
-                </span>
-                <span class="font-bold text-zinc-900 dark:text-zinc-100 uppercase">
-                  {{ p.student_full_name || p.student_name || 'General' }}
+                  {{ Number(viewingPayment.amount) < 0 ? '-' : '+' }}{{ formatAmount(Math.abs(Number(viewingPayment.amount))) }} UZS
                 </span>
               </div>
-            </td>
-            <td class="px-4 py-3 whitespace-nowrap">
-              <span class="px-2 py-0.5 rounded-md text-[11px] font-bold bg-blue-50 dark:bg-blue-950/30 text-zinc-700 dark:text-zinc-300 border border-blue-200/80 dark:border-blue-800/60">
-                {{ p.method }}
-              </span>
-            </td>
-            <td class="px-4 py-3 whitespace-nowrap font-bold text-zinc-700 dark:text-zinc-300 uppercase">
-              {{ p.received_by }}
-            </td>
-            <td class="px-4 py-3 whitespace-nowrap text-zinc-500 font-medium uppercase">
-              {{ p.created_by_name || 'BAXTIYOR' }}
-            </td>
-            <td class="px-4 py-3 text-zinc-500 italic truncate max-w-[180px]" :title="p.notes || ''">
-              {{ p.notes || '—' }}
-            </td>
-            <td class="px-4 py-3 text-right font-mono font-black whitespace-nowrap">
-              <span
-                v-if="p.is_withdrawal"
-                class="text-rose-600 dark:text-rose-400"
-              >
-                -{{ formatCurrency(Math.abs(p.amount)) }}
-              </span>
-              <span
-                v-else-if="p.is_discount"
-                class="text-amber-600 dark:text-amber-400"
-              >
-                +{{ formatCurrency(p.amount) }} (Discount)
-              </span>
-              <span
-                v-else
-                class="text-[#00875a] dark:text-emerald-400"
-              >
-                +{{ formatCurrency(p.amount) }}
-              </span>
-            </td>
-            <td class="px-4 py-3 text-right">
-              <div class="flex items-center justify-end gap-1">
-                <button
-                  type="button"
-                  @click="emit('open-edit', p)"
-                  class="p-1.5 rounded-lg text-zinc-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/30 transition-colors cursor-pointer"
-                  title="Edit Payment"
+            </div>
+
+            <div class="flex flex-col gap-1">
+              <span class="text-xs font-semibold text-zinc-500">Transaction Type</span>
+              <div class="px-3 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-750 bg-zinc-50 dark:bg-zinc-850 flex items-center">
+                <span
+                  v-if="viewingPayment.is_withdrawal"
+                  class="inline-flex px-2.5 py-1 rounded-md text-xs font-bold bg-rose-500/15 text-rose-600 dark:text-rose-400 uppercase"
                 >
-                  <Pencil class="w-3.5 h-3.5" />
-                </button>
-                <button
-                  type="button"
-                  @click="emit('delete-payment', p)"
-                  class="p-1.5 rounded-lg text-zinc-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors cursor-pointer"
-                  title="Delete Payment"
+                  Withdrawal
+                </span>
+                <span
+                  v-else-if="viewingPayment.is_discount"
+                  class="inline-flex px-2.5 py-1 rounded-md text-xs font-bold bg-pink-500/15 text-pink-600 dark:text-pink-400 uppercase"
                 >
-                  <Trash2 class="w-3.5 h-3.5" />
-                </button>
-                <button
-                  type="button"
-                  @click="handlePrint(p)"
-                  class="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
-                  title="Print Receipt"
+                  Discount
+                </span>
+                <span
+                  v-else
+                  class="inline-flex px-2.5 py-1 rounded-md text-xs font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 uppercase"
                 >
-                  <Printer class="w-3.5 h-3.5" />
-                </button>
+                  Standard Payment
+                </span>
               </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+            </div>
+          </div>
+
+          <!-- Method and Receiver -->
+          <div class="grid grid-cols-2 gap-3">
+            <div class="flex flex-col gap-1">
+              <span class="text-xs font-semibold text-zinc-500">Payment Method</span>
+              <div class="px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-750 bg-zinc-50 dark:bg-zinc-850 text-xs font-bold text-zinc-800 dark:text-zinc-200">
+                {{ viewingPayment.method }}
+              </div>
+            </div>
+
+            <div class="flex flex-col gap-1">
+              <span class="text-xs font-semibold text-zinc-500">Received By</span>
+              <div class="px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-750 bg-zinc-50 dark:bg-zinc-850 text-xs font-bold text-zinc-800 dark:text-zinc-200">
+                {{ viewingPayment.received_by }}
+              </div>
+            </div>
+          </div>
+
+          <!-- Timestamp -->
+          <div class="flex flex-col gap-1">
+            <span class="text-xs font-semibold text-zinc-500">Timestamp</span>
+            <div class="px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-750 bg-zinc-50 dark:bg-zinc-850 text-xs font-medium text-zinc-800 dark:text-zinc-200">
+              {{ viewingPayment.created_at ? new Date(viewingPayment.created_at).toLocaleString('uz-UZ') : '—' }}
+            </div>
+          </div>
+
+          <!-- Notes -->
+          <div class="flex flex-col gap-1">
+            <span class="text-xs font-semibold text-zinc-500">Notes / Description</span>
+            <div class="px-3 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-750 bg-zinc-50 dark:bg-zinc-850 text-xs text-zinc-800 dark:text-zinc-200 min-h-[50px] whitespace-pre-wrap">
+              {{ viewingPayment.notes || 'No notes attached.' }}
+            </div>
+          </div>
+        </div>
+
+        <!-- Actions Footer -->
+        <div class="flex items-center gap-2 mt-2 pt-3 border-t border-zinc-100 dark:border-zinc-800">
+          <button
+            type="button"
+            @click="handleEditFromModal"
+            class="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-bold rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-750 transition-all cursor-pointer text-zinc-800 dark:text-zinc-200 shadow-2xs"
+          >
+            <Pencil class="h-3.5 w-3.5" />
+            <span>Edit</span>
+          </button>
+          <button
+            type="button"
+            @click="viewingPayment && printReceipt(viewingPayment)"
+            class="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-bold rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-750 transition-all cursor-pointer text-zinc-800 dark:text-zinc-200 shadow-2xs"
+          >
+            <Printer class="h-3.5 w-3.5" />
+            <span>Print</span>
+          </button>
+          <button
+            type="button"
+            @click="viewingPayment = null"
+            class="flex-1 py-2 text-xs font-bold rounded-xl bg-blue-600 hover:bg-blue-700 text-white transition-all cursor-pointer shadow-2xs"
+          >
+            Close
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 </template>

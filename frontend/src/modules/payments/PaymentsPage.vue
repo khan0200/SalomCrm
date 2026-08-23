@@ -1,13 +1,13 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
 import { paymentsApi } from '@/api/payments'
 import { studentsApi } from '@/api/students'
+import { settingsApi } from '@/api/settings'
 import type { Payment, Student } from '@/types'
 import { useUiStore } from '@/stores/ui'
 import {
-  CreditCard, Plus, Minus, Users, Receipt,
-  ChevronLeft, ChevronRight, FileSpreadsheet
+  Users, Receipt, Plus, Minus
 } from 'lucide-vue-next'
 
 import PaymentStudentOverview from './components/PaymentStudentOverview.vue'
@@ -19,9 +19,34 @@ import EditPaymentModal from './components/EditPaymentModal.vue'
 const queryClient = useQueryClient()
 const uiStore = useUiStore()
 
-const ITEMS_PER_PAGE = 32
+const ITEMS_PER_PAGE = 30
 
-// Alphanumeric sorting logic matching UniApp2
+const PAYMENT_METHODS_DEFAULT = ['Karta J.A', 'Karta Abdulaziz', 'Naqd', 'Karta M.A', 'Bank', 'Discount']
+const RECEIVED_BY_DEFAULT = ['ABDULAZIZ', 'MUSLIHIDDIN', 'BAXTIYOR', 'MUHAMMADALI', 'JASUR', 'ADMIN', 'Discount']
+const NOTE_PILLS_DEFAULT = ['Shartnoma uchun', 'Qarz', 'Elchixona uchun', 'Appfee', 'DISCOUNT']
+
+const STATUS_FILTER_OPTIONS = ['Active', 'Archive']
+const TARIFF_FILTER_OPTIONS = [
+  'E-VISA (TIL SERTIFIKATISIZ)',
+  'E-VISA (TIL SERTIFIKATLI)',
+  'PREMIUM',
+  'REGIONAL VISA',
+  'STANDART',
+  'VISA PLUS',
+  'ZERO RISK',
+  'No Tariff'
+]
+const BALANCE_FILTER_OPTIONS = [
+  'Balance < 0 (Debt)',
+  'Balance = 0 (Fully Paid)',
+  'Balance > 500,000',
+  'Balance > 1,000,000',
+  'Balance > 2,000,000',
+  'Balance > 5,000,000',
+  'Balance > 10,000,000'
+]
+
+// ── Alphanumeric ID Sorting Logic (Matching UniApp2 1-to-1) ─────────────
 const compareStudentIds = (a: Student, b: Student, order: 'asc' | 'desc' = 'asc') => {
   const idA = a.id || ''
   const idB = b.id || ''
@@ -57,7 +82,7 @@ const compareStudentIds = (a: Student, b: Student, order: 'asc' | 'desc' = 'asc'
   return order === 'asc' ? idA.localeCompare(idB) : idB.localeCompare(idA)
 }
 
-// Balance filtering logic matching UniApp2
+// ── Balance Filter Matching (Matching UniApp2 1-to-1) ───────────────────
 const matchesBalanceOption = (studentBalance: number, option: string) => {
   switch (option) {
     case 'Balance < 0 (Debt)':
@@ -75,36 +100,63 @@ const matchesBalanceOption = (studentBalance: number, option: string) => {
     case 'Balance > 10,000,000':
       return studentBalance > 10000000
     default:
-      return true
+      return false
   }
 }
 
-// Main Page State
-const activeTab = ref<'overview' | 'history'>('overview')
+// ── Main Page State ───────────────────────────────────────────────────
+const activeTab = ref<'students' | 'history'>('students')
 const viewMode = ref<'grid' | 'table'>('grid')
+const sortOrder = ref<'asc' | 'desc'>('asc')
 
-// Modals
+// Students Tab Filter State (Multi-Select Arrays)
+const studentSearch = ref('')
+const selectedStatuses = ref<string[]>([])
+const selectedTariffs = ref<string[]>([])
+const selectedBalances = ref<string[]>([])
+const selectedGroups = ref<string[]>([])
+const studentsPage = ref(1)
+
+// History Tab Filter State
+const historySearch = ref('')
+const selectedMethod = ref('all')
+const selectedReceiver = ref('all')
+const historyPage = ref(1)
+
+// Modals State
 const isAddModalOpen = ref(false)
 const isWithdrawModalOpen = ref(false)
 const isEditModalOpen = ref(false)
 const preselectedStudentId = ref<string | null>(null)
 const editingPayment = ref<Payment | null>(null)
 
-// Overview Tab Filters
-const overviewSearch = ref('')
-const overviewStatus = ref('all')
-const selectedTariff = ref('all')
-const selectedBalance = ref('all')
-const selectedGroup = ref('all')
-const overviewPage = ref(1)
+// ── Settings Data (Methods, Receivers, Note Pills) ─────────────────────
+const paymentMethods = ref<string[]>(PAYMENT_METHODS_DEFAULT)
+const paymentReceivers = ref<string[]>(RECEIVED_BY_DEFAULT)
+const notePills = ref<string[]>(NOTE_PILLS_DEFAULT)
 
-// History Tab Filters
-const historySearch = ref('')
-const selectedMethod = ref('all')
-const selectedReceiver = ref('all')
-const historyPage = ref(1)
+onMounted(async () => {
+  try {
+    const [methodsRes, receiversRes, notesRes] = await Promise.allSettled([
+      settingsApi.getPaymentMethods(),
+      settingsApi.getPaymentReceivers(),
+      settingsApi.getPaymentNotes()
+    ])
+    if (methodsRes.status === 'fulfilled' && methodsRes.value.length > 0) {
+      paymentMethods.value = methodsRes.value.map(m => m.name)
+    }
+    if (receiversRes.status === 'fulfilled' && receiversRes.value.length > 0) {
+      paymentReceivers.value = receiversRes.value.map(r => r.name)
+    }
+    if (notesRes.status === 'fulfilled' && notesRes.value.length > 0) {
+      notePills.value = notesRes.value.map(n => n.name)
+    }
+  } catch (err) {
+    console.error('Error loading settings options:', err)
+  }
+})
 
-// Query: Options (Tariffs, Groups)
+// ── Queries ───────────────────────────────────────────────────────────
 const { data: optionsData } = useQuery({
   queryKey: ['student-options'],
   queryFn: () => studentsApi.getOptions(),
@@ -116,119 +168,199 @@ const options = computed(() => optionsData.value || {
   groups: [],
 })
 
-// Query: Payment Student Overview (Load full set into in-memory cache)
 const { data: overviewData, isLoading: isOverviewLoading } = useQuery({
   queryKey: ['payment-overview-all'],
-  queryFn: () => paymentsApi.getPaymentOverview({ page_size: 1000 }),
+  queryFn: () => paymentsApi.getPaymentOverview({ page_size: 1500 }),
   staleTime: 1000 * 60 * 5,
 })
 
-const allOverviewStudents = computed<Student[]>(() => overviewData.value?.results || [])
+const allStudents = computed<Student[]>(() => overviewData.value?.results || [])
 
-// ── Ultra-Fast Instant In-Memory Filter for Students (0ms Response) ──────────────────────────
-const filteredOverviewStudents = computed(() => {
-  let list = allOverviewStudents.value
-
-  const q = overviewSearch.value.trim().toLowerCase()
-  if (q) {
-    list = list.filter(s => {
-      const idMatch = (s.id || '').toLowerCase().includes(q)
-      const nameMatch = (s.full_name || '').toLowerCase().includes(q)
-      const phoneMatch = (s.phone1 || '').toLowerCase().includes(q) || (s.phone2 || '').toLowerCase().includes(q)
-      const groupMatch = (s.student_group || '').toLowerCase().includes(q)
-      return idMatch || nameMatch || phoneMatch || groupMatch
-    })
-  }
-
-  if (overviewStatus.value === 'Active') {
-    list = list.filter(s => !s.is_deleted)
-  } else if (overviewStatus.value === 'Archive') {
-    list = list.filter(s => s.is_deleted)
-  }
-
-  if (selectedTariff.value !== 'all') {
-    if (selectedTariff.value === 'No Tariff') {
-      list = list.filter(s => !s.tariff)
-    } else {
-      list = list.filter(s => s.tariff === selectedTariff.value)
-    }
-  }
-
-  if (selectedGroup.value !== 'all') {
-    if (selectedGroup.value === 'NO GROUP') {
-      list = list.filter(s => !s.student_group)
-    } else {
-      list = list.filter(s => s.student_group === selectedGroup.value)
-    }
-  }
-
-  if (selectedBalance.value !== 'all') {
-    list = list.filter(s => matchesBalanceOption(Number(s.balance || 0), selectedBalance.value))
-  }
-
-  return [...list].sort((a, b) => compareStudentIds(a, b, 'asc'))
-})
-
-const overviewTotalCount = computed(() => filteredOverviewStudents.value.length)
-const overviewTotalPages = computed(() => Math.max(1, Math.ceil(overviewTotalCount.value / ITEMS_PER_PAGE)))
-const overviewStudents = computed(() => {
-  const start = (overviewPage.value - 1) * ITEMS_PER_PAGE
-  return filteredOverviewStudents.value.slice(start, start + ITEMS_PER_PAGE)
-})
-
-// Query: Payment History (Load full set into in-memory cache)
 const { data: historyData, isLoading: isHistoryLoading } = useQuery({
   queryKey: ['payment-history-all'],
-  queryFn: () => paymentsApi.getPaymentHistory({ page_size: 1000 }),
+  queryFn: () => paymentsApi.getPaymentHistory({ page_size: 2000 }),
   staleTime: 1000 * 60 * 5,
 })
 
 const allPayments = computed<Payment[]>(() => historyData.value?.results || [])
 
-// ── Ultra-Fast Instant In-Memory Filter for Payment History (0ms Response) ──────────────────────────
-const filteredPayments = computed(() => {
-  let list = allPayments.value
-
-  const q = historySearch.value.trim().toLowerCase()
-  if (q) {
-    list = list.filter(p => {
-      const nameMatch = (p.student_full_name || p.student_name || '').toLowerCase().includes(q)
-      const idMatch = (p.student_id || '').toLowerCase().includes(q)
-      const notesMatch = (p.notes || '').toLowerCase().includes(q)
-      const methodMatch = (p.method || '').toLowerCase().includes(q)
-      const recMatch = (p.received_by || '').toLowerCase().includes(q)
-      return nameMatch || idMatch || notesMatch || methodMatch || recMatch
-    })
+// ── Multi-Select Handlers ─────────────────────────────────────────────
+const toggleStatus = (val: string) => {
+  if (selectedStatuses.value.includes(val)) {
+    selectedStatuses.value = selectedStatuses.value.filter(s => s !== val)
+  } else {
+    selectedStatuses.value.push(val)
   }
-
-  if (selectedMethod.value !== 'all') {
-    list = list.filter(p => p.method === selectedMethod.value)
+}
+const toggleAllStatuses = () => {
+  if (selectedStatuses.value.length === STATUS_FILTER_OPTIONS.length) {
+    selectedStatuses.value = []
+  } else {
+    selectedStatuses.value = [...STATUS_FILTER_OPTIONS]
   }
+}
 
-  if (selectedReceiver.value !== 'all') {
-    list = list.filter(p => p.received_by === selectedReceiver.value)
+const toggleTariff = (val: string) => {
+  if (selectedTariffs.value.includes(val)) {
+    selectedTariffs.value = selectedTariffs.value.filter(t => t !== val)
+  } else {
+    selectedTariffs.value.push(val)
   }
+}
+const toggleAllTariffs = () => {
+  if (selectedTariffs.value.length === TARIFF_FILTER_OPTIONS.length) {
+    selectedTariffs.value = []
+  } else {
+    selectedTariffs.value = [...TARIFF_FILTER_OPTIONS]
+  }
+}
 
-  return list
+const toggleBalance = (val: string) => {
+  if (selectedBalances.value.includes(val)) {
+    selectedBalances.value = selectedBalances.value.filter(b => b !== val)
+  } else {
+    selectedBalances.value.push(val)
+  }
+}
+const toggleAllBalances = () => {
+  if (selectedBalances.value.length === BALANCE_FILTER_OPTIONS.length) {
+    selectedBalances.value = []
+  } else {
+    selectedBalances.value = [...BALANCE_FILTER_OPTIONS]
+  }
+}
+
+const ALL_GROUP_OPTIONS = computed(() => {
+  const set = new Set<string>()
+  allStudents.value.forEach(s => { if (s.student_group) set.add(s.student_group) })
+  const list = Array.from(set)
+  if (!list.includes('2026 BAHOR')) list.push('2026 BAHOR')
+  if (!list.includes('2026 KUZ')) list.push('2026 KUZ')
+  if (!list.includes('2027 BAHOR')) list.push('2027 BAHOR')
+  return ['No Group', ...list.sort()]
 })
 
-const historyTotalCount = computed(() => filteredPayments.value.length)
-const historyTotalPages = computed(() => Math.max(1, Math.ceil(historyTotalCount.value / ITEMS_PER_PAGE)))
-const paymentsList = computed(() => {
+const toggleGroup = (val: string) => {
+  if (selectedGroups.value.includes(val)) {
+    selectedGroups.value = selectedGroups.value.filter(g => g !== val)
+  } else {
+    selectedGroups.value.push(val)
+  }
+}
+const toggleAllGroups = () => {
+  if (selectedGroups.value.length === ALL_GROUP_OPTIONS.value.length) {
+    selectedGroups.value = []
+  } else {
+    selectedGroups.value = [...ALL_GROUP_OPTIONS.value]
+  }
+}
+
+// ── Filtered & Sorted Students ────────────────────────────────────────
+const filteredStudents = computed(() => {
+  return allStudents.value.filter(s => {
+    if (studentSearch.value) {
+      const q = studentSearch.value.toLowerCase()
+      const matches = (s.id || '').toLowerCase().includes(q) || (s.full_name || '').toLowerCase().includes(q)
+      if (!matches) return false
+    }
+
+    if (selectedStatuses.value.length > 0 && selectedStatuses.value.length < STATUS_FILTER_OPTIONS.length) {
+      if (selectedStatuses.value.includes('Active') && s.is_deleted) return false
+      if (selectedStatuses.value.includes('Archive') && !s.is_deleted) return false
+    }
+
+    if (selectedTariffs.value.length > 0) {
+      let matchesTariff = false
+      for (const selected of selectedTariffs.value) {
+        if (selected === 'No Tariff' && !s.tariff) {
+          matchesTariff = true
+          break
+        } else if (selected === 'E-VISA (TIL SERTIFIKATLI)' && s.tariff === 'E-VISA' && s.language_certificate && s.language_certificate !== 'NO CERTIFICATE') {
+          matchesTariff = true
+          break
+        } else if (selected === 'E-VISA (TIL SERTIFIKATISIZ)' && s.tariff === 'E-VISA' && (!s.language_certificate || s.language_certificate === 'NO CERTIFICATE')) {
+          matchesTariff = true
+          break
+        } else if (s.tariff === selected) {
+          matchesTariff = true
+          break
+        }
+      }
+      if (!matchesTariff) return false
+    }
+
+    if (selectedBalances.value.length > 0) {
+      let matchesBalance = false
+      const bal = Number(s.balance) || 0
+      for (const selected of selectedBalances.value) {
+        if (matchesBalanceOption(bal, selected)) {
+          matchesBalance = true
+          break
+        }
+      }
+      if (!matchesBalance) return false
+    }
+
+    if (selectedGroups.value.length > 0) {
+      let matchesGroup = false
+      for (const selected of selectedGroups.value) {
+        if (selected === 'No Group' && !s.student_group) {
+          matchesGroup = true
+          break
+        } else if (s.student_group === selected) {
+          matchesGroup = true
+          break
+        }
+      }
+      if (!matchesGroup) return false
+    }
+
+    return true
+  })
+})
+
+const sortedStudents = computed(() => {
+  return [...filteredStudents.value].sort((a, b) => compareStudentIds(a, b, sortOrder.value))
+})
+
+const studentsTotalPages = computed(() => Math.max(1, Math.ceil(sortedStudents.value.length / ITEMS_PER_PAGE)))
+const paginatedStudents = computed(() => {
+  const start = (studentsPage.value - 1) * ITEMS_PER_PAGE
+  return sortedStudents.value.slice(start, start + ITEMS_PER_PAGE)
+})
+
+// ── Filtered Payments ─────────────────────────────────────────────────
+const filteredPayments = computed(() => {
+  return allPayments.value.filter(p => {
+    if (historySearch.value) {
+      const q = historySearch.value.toLowerCase()
+      const matches =
+        (p.student_full_name || p.student_name || '').toLowerCase().includes(q) ||
+        (p.student_id || '').toLowerCase().includes(q) ||
+        (p.notes || '').toLowerCase().includes(q)
+      if (!matches) return false
+    }
+    if (selectedMethod.value !== 'all' && p.method !== selectedMethod.value) return false
+    if (selectedReceiver.value !== 'all' && p.received_by !== selectedReceiver.value) return false
+    return true
+  })
+})
+
+const historyTotalPages = computed(() => Math.max(1, Math.ceil(filteredPayments.value.length / ITEMS_PER_PAGE)))
+const paginatedPayments = computed(() => {
   const start = (historyPage.value - 1) * ITEMS_PER_PAGE
   return filteredPayments.value.slice(start, start + ITEMS_PER_PAGE)
 })
 
-// Reset page on search or filter change
-watch([overviewSearch, overviewStatus, selectedTariff, selectedBalance, selectedGroup], () => {
-  overviewPage.value = 1
+watch([studentSearch, selectedStatuses, selectedTariffs, selectedBalances, selectedGroups, sortOrder], () => {
+  studentsPage.value = 1
 })
 
 watch([historySearch, selectedMethod, selectedReceiver], () => {
   historyPage.value = 1
 })
 
-// Mutations
+// ── Mutations ─────────────────────────────────────────────────────────
 const createPaymentMutation = useMutation({
   mutationFn: (data: any) => paymentsApi.createPayment(data),
   onSuccess: (res) => {
@@ -239,14 +371,14 @@ const createPaymentMutation = useMutation({
     uiStore.addToast({
       type: 'success',
       title: 'Payment Recorded',
-      message: `Payment of ${res.amount} UZS recorded successfully.`
+      message: `Payment of ${new Intl.NumberFormat('uz-UZ').format(res.amount)} UZS recorded.`
     })
   },
   onError: (err: any) => {
     uiStore.addToast({
       type: 'error',
       title: 'Payment Failed',
-      message: err.response?.data?.detail || err.message || 'Failed to record payment'
+      message: err.response?.data?.detail || err.message || 'Failed to save payment.'
     })
   }
 })
@@ -261,7 +393,14 @@ const withdrawMutation = useMutation({
     uiStore.addToast({
       type: 'warning',
       title: 'Withdrawal Recorded',
-      message: `Withdrawal of ${Math.abs(res.amount)} UZS recorded.`
+      message: `Withdrawal of ${new Intl.NumberFormat('uz-UZ').format(Math.abs(res.amount))} UZS recorded.`
+    })
+  },
+  onError: (err: any) => {
+    uiStore.addToast({
+      type: 'error',
+      title: 'Withdrawal Failed',
+      message: err.response?.data?.detail || err.message || 'Failed to process withdrawal.'
     })
   }
 })
@@ -281,6 +420,13 @@ const editPaymentMutation = useMutation({
       title: 'Payment Updated',
       message: 'Payment updated and student balance recalculated.'
     })
+  },
+  onError: (err: any) => {
+    uiStore.addToast({
+      type: 'error',
+      title: 'Update Failed',
+      message: err.response?.data?.detail || err.message || 'Failed to update payment.'
+    })
   }
 })
 
@@ -293,190 +439,276 @@ const deletePaymentMutation = useMutation({
     uiStore.addToast({
       type: 'error',
       title: 'Payment Deleted',
-      message: 'Payment removed and student balance rolled back.'
+      message: 'Payment deleted and student balance rolled back.'
+    })
+  },
+  onError: (err: any) => {
+    uiStore.addToast({
+      type: 'error',
+      title: 'Delete Failed',
+      message: err.response?.data?.detail || err.message || 'Failed to delete payment.'
     })
   }
 })
 
-// Handlers
-const openAddPayment = (studentId?: string) => {
+// ── Modals & Actions ──────────────────────────────────────────────────
+const openAddModal = (studentId?: string) => {
   preselectedStudentId.value = studentId || null
   isAddModalOpen.value = true
 }
 
-const openWithdraw = (studentId?: string) => {
+const openWithdrawModal = (studentId?: string) => {
   preselectedStudentId.value = studentId || null
   isWithdrawModalOpen.value = true
 }
 
-const openEdit = (p: Payment) => {
-  editingPayment.value = p
+const openEditModal = (payment: Payment) => {
+  editingPayment.value = payment
   isEditModalOpen.value = true
 }
 
-const deletePayment = (p: Payment) => {
-  if (confirm(`Are you sure you want to delete payment of ${p.amount} UZS for ${p.student_full_name || p.student_name || 'General'}?`)) {
-    deletePaymentMutation.mutate(p.id)
+const handleDeletePayment = (payment: Payment) => {
+  const name = payment.student_full_name || payment.student_name || 'General'
+  const absAmount = new Intl.NumberFormat('uz-UZ').format(Math.abs(Number(payment.amount)))
+  if (confirm(`Are you sure you want to delete this payment of ${absAmount} UZS for ${name}?`)) {
+    deletePaymentMutation.mutate(payment.id)
   }
+}
+
+// ── Excel Export with xlsx-js-style matching UniApp2 ─────────────────
+const exportPaymentHistoryToExcel = async () => {
+  if (filteredPayments.value.length === 0) {
+    alert('No payments to export!')
+    return
+  }
+
+  const XLSX = await import('xlsx-js-style')
+
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const formatDate = (dateStr?: string) => {
+    if (!dateStr) return ''
+    const d = new Date(dateStr)
+    if (isNaN(d.getTime())) return dateStr
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+  }
+
+  const excelData = filteredPayments.value.map((p, index) => {
+    let txType = 'Standard Payment'
+    if (p.is_withdrawal) {
+      txType = 'Withdrawal'
+    } else if (p.is_discount) {
+      txType = 'Discount'
+    }
+
+    return {
+      No: index + 1,
+      'Payment ID': p.id ? String(p.id).toUpperCase() : '',
+      'Student ID': p.student_id || '—',
+      'Student Name': p.student_full_name || p.student_name || 'General Payment',
+      'Amount (UZS)': p.amount !== undefined ? Number(p.amount) : '',
+      'Transaction Type': txType,
+      'Payment Method': p.method || '',
+      'Received By': p.received_by || '',
+      'Date & Time': formatDate(p.created_at),
+      Notes: p.notes || ''
+    }
+  })
+
+  const colWidths = [
+    { wch: 5 },   // No
+    { wch: 20 },  // Payment ID
+    { wch: 15 },  // Student ID
+    { wch: 30 },  // Student Name
+    { wch: 18 },  // Amount (UZS)
+    { wch: 18 },  // Transaction Type
+    { wch: 18 },  // Payment Method
+    { wch: 18 },  // Received By
+    { wch: 22 },  // Date & Time
+    { wch: 35 }   // Notes
+  ]
+
+  const ws = XLSX.utils.json_to_sheet(excelData)
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, 'Payment History')
+  ws['!cols'] = colWidths
+
+  const dateStr = new Date().toISOString().split('T')[0]
+  const filename = `Payment_History_Export_${dateStr}.xlsx`
+
+  XLSX.writeFile(wb, filename)
 }
 </script>
 
 <template>
-  <div class="space-y-4">
-    <!-- Navigation Tabs & Primary Action Buttons Row -->
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 select-none">
-      <!-- Left: Tab Switcher Pills -->
-      <div class="flex items-center gap-2">
+  <div class="flex flex-col gap-4 select-none">
+    <!-- Header row: tab switcher + actions -->
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <!-- Left: Tab Switcher (UniApp2 1-to-1) -->
+      <div class="flex items-center gap-1 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#111315] p-1 shadow-2xs">
         <button
           type="button"
-          @click="activeTab = 'overview'"
-          class="px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 shadow-xs"
-          :class="activeTab === 'overview'
-            ? 'bg-[#1868db] text-white shadow-blue-500/20'
-            : 'bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-750'"
+          @click="activeTab = 'students'"
+          class="flex items-center gap-2 rounded-lg px-3.5 py-1.5 text-xs font-bold transition-all cursor-pointer select-none"
+          :class="activeTab === 'students'
+            ? 'bg-blue-600 text-white shadow-xs'
+            : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-850 hover:text-zinc-900 dark:hover:text-zinc-100'"
         >
-          <Users class="w-4 h-4" />
+          <Users class="h-4 w-4" />
           <span>Students</span>
         </button>
-
         <button
           type="button"
           @click="activeTab = 'history'"
-          class="px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 shadow-xs"
+          class="flex items-center gap-2 rounded-lg px-3.5 py-1.5 text-xs font-bold transition-all cursor-pointer select-none"
           :class="activeTab === 'history'
-            ? 'bg-[#1868db] text-white shadow-blue-500/20'
-            : 'bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-750'"
+            ? 'bg-blue-600 text-white shadow-xs'
+            : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-850 hover:text-zinc-900 dark:hover:text-zinc-100'"
         >
-          <Receipt class="w-4 h-4" />
+          <Receipt class="h-4 w-4" />
           <span>Payment History</span>
         </button>
       </div>
 
       <!-- Right: Action Buttons -->
-      <div class="flex items-center gap-2.5">
+      <div class="flex items-center gap-2">
         <button
           type="button"
-          @click="openAddPayment()"
-          class="px-4 py-2 rounded-xl bg-[#1868db] hover:bg-[#1557bf] text-white text-xs font-bold shadow-xs transition-all cursor-pointer flex items-center gap-1.5 active:scale-98"
+          @click="openAddModal()"
+          class="flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700 active:scale-[0.97] transition-all cursor-pointer shadow-2xs shadow-blue-500/20"
         >
-          <Plus class="w-4 h-4" />
+          <Plus class="h-4 w-4 stroke-[2.5]" />
           <span>Add Payment</span>
         </button>
-
         <button
           type="button"
-          @click="openWithdraw()"
-          class="px-4 py-2 rounded-xl bg-white hover:bg-zinc-50 dark:bg-zinc-800 dark:hover:bg-zinc-750 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 text-xs font-bold shadow-2xs transition-all cursor-pointer flex items-center gap-1.5 active:scale-98"
+          @click="openWithdrawModal()"
+          class="flex items-center gap-1.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-850 px-4 py-2 text-xs font-bold text-zinc-800 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800 active:scale-[0.97] transition-all cursor-pointer shadow-2xs"
         >
-          <Minus class="w-4 h-4" />
+          <Minus class="h-4 w-4 stroke-[2.5]" />
           <span>Withdraw</span>
         </button>
       </div>
     </div>
 
-    <!-- TAB 1: Student Financial Overview -->
-    <div v-if="activeTab === 'overview'">
+    <!-- ── Tab 1: Students Overview ──────────────────────────────────── -->
+    <div v-if="activeTab === 'students'">
       <PaymentStudentOverview
-        :students="overviewStudents"
+        :students="paginatedStudents"
+        :total-filtered-count="sortedStudents.length"
         :is-loading="isOverviewLoading"
         :options="options"
-        v-model:search-query="overviewSearch"
-        v-model:selected-status="overviewStatus"
-        v-model:selected-tariff="selectedTariff"
-        v-model:selected-balance="selectedBalance"
-        v-model:selected-group="selectedGroup"
-        v-model:view-mode="viewMode"
-        @open-add-payment="openAddPayment"
-        @open-withdraw="openWithdraw"
+        :search-query="studentSearch"
+        :selected-statuses="selectedStatuses"
+        :selected-tariffs="selectedTariffs"
+        :selected-balances="selectedBalances"
+        :selected-groups="selectedGroups"
+        :view-mode="viewMode"
+        :sort-order="sortOrder"
+        @update:search-query="studentSearch = $event"
+        @toggle-status="toggleStatus"
+        @toggle-all-statuses="toggleAllStatuses"
+        @toggle-tariff="toggleTariff"
+        @toggle-all-tariffs="toggleAllTariffs"
+        @toggle-balance="toggleBalance"
+        @toggle-all-balances="toggleAllBalances"
+        @toggle-group="toggleGroup"
+        @toggle-all-groups="toggleAllGroups"
+        @update:view-mode="viewMode = $event"
+        @toggle-sort="sortOrder = sortOrder === 'asc' ? 'desc' : 'asc'"
+        @open-add-payment="openAddModal"
       />
 
-      <!-- Overview Pagination -->
-      <div v-if="overviewTotalPages > 1" class="flex items-center justify-between px-4 py-3 bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-500 mt-4 select-none">
-        <div>
-          Showing <span class="font-bold text-zinc-800 dark:text-zinc-200">{{ Math.min((overviewPage - 1) * 30 + 1, overviewTotalCount) }}</span> to
-          <span class="font-bold text-zinc-800 dark:text-zinc-200">{{ Math.min(overviewPage * 30, overviewTotalCount) }}</span> of
-          <span class="font-bold text-zinc-800 dark:text-zinc-200">{{ overviewTotalCount }}</span> students
-        </div>
-        <div class="flex items-center gap-1.5">
-          <button
-            @click="overviewPage = Math.max(1, overviewPage - 1)"
-            :disabled="overviewPage === 1"
-            class="p-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed hover:bg-zinc-100 transition-colors"
-          >
-            <ChevronLeft class="w-4 h-4" />
-          </button>
-          <span class="px-3 py-1 font-bold text-zinc-800 dark:text-zinc-200">Page {{ overviewPage }} of {{ overviewTotalPages }}</span>
-          <button
-            @click="overviewPage = Math.min(overviewTotalPages, overviewPage + 1)"
-            :disabled="overviewPage === overviewTotalPages"
-            class="p-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed hover:bg-zinc-100 transition-colors"
-          >
-            <ChevronRight class="w-4 h-4" />
-          </button>
-        </div>
+      <!-- Pagination -->
+      <div v-if="studentsTotalPages > 1" class="flex items-center justify-center gap-2 mt-4">
+        <button
+          :disabled="studentsPage === 1"
+          @click="studentsPage--"
+          class="px-3 py-1.5 text-xs font-bold rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-850 disabled:opacity-40 cursor-pointer text-zinc-700 dark:text-zinc-300 shadow-2xs"
+        >
+          Prev
+        </button>
+        <span class="text-xs text-zinc-500 font-mono">{{ studentsPage }} / {{ studentsTotalPages }}</span>
+        <button
+          :disabled="studentsPage === studentsTotalPages"
+          @click="studentsPage++"
+          class="px-3 py-1.5 text-xs font-bold rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-850 disabled:opacity-40 cursor-pointer text-zinc-700 dark:text-zinc-300 shadow-2xs"
+        >
+          Next
+        </button>
       </div>
     </div>
 
-    <!-- TAB 2: Payment History -->
-    <div v-if="activeTab === 'history'">
+    <!-- ── Tab 2: Payment History ────────────────────────────────────── -->
+    <div v-else>
       <PaymentHistoryTable
-        :payments="paymentsList"
+        :payments="paginatedPayments"
+        :total-filtered-count="filteredPayments.length"
         :is-loading="isHistoryLoading"
-        v-model:search-query="historySearch"
-        v-model:selected-method="selectedMethod"
-        v-model:selected-receiver="selectedReceiver"
-        @export-excel="() => paymentsApi.exportExcel()"
-        @open-edit="openEdit"
-        @delete-payment="deletePayment"
+        :search-query="historySearch"
+        :selected-method="selectedMethod"
+        :selected-receiver="selectedReceiver"
+        :payment-methods="paymentMethods"
+        :payment-receivers="paymentReceivers"
+        @update:search-query="historySearch = $event"
+        @update:selected-method="selectedMethod = $event"
+        @update:selected-receiver="selectedReceiver = $event"
+        @open-edit="openEditModal"
+        @delete-payment="handleDeletePayment"
+        @export-excel="exportPaymentHistoryToExcel"
       />
 
-      <!-- History Pagination -->
-      <div v-if="historyTotalPages > 1" class="flex items-center justify-between px-4 py-3 bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-500 mt-4 select-none">
-        <div>
-          Showing <span class="font-bold text-zinc-800 dark:text-zinc-200">{{ Math.min((historyPage - 1) * 30 + 1, historyTotalCount) }}</span> to
-          <span class="font-bold text-zinc-800 dark:text-zinc-200">{{ Math.min(historyPage * 30, historyTotalCount) }}</span> of
-          <span class="font-bold text-zinc-800 dark:text-zinc-200">{{ historyTotalCount }}</span> payments
-        </div>
-        <div class="flex items-center gap-1.5">
-          <button
-            @click="historyPage = Math.max(1, historyPage - 1)"
-            :disabled="historyPage === 1"
-            class="p-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed hover:bg-zinc-100 transition-colors"
-          >
-            <ChevronLeft class="w-4 h-4" />
-          </button>
-          <span class="px-3 py-1 font-bold text-zinc-800 dark:text-zinc-200">Page {{ historyPage }} of {{ historyTotalPages }}</span>
-          <button
-            @click="historyPage = Math.min(historyTotalPages, historyPage + 1)"
-            :disabled="historyPage === historyTotalPages"
-            class="p-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed hover:bg-zinc-100 transition-colors"
-          >
-            <ChevronRight class="w-4 h-4" />
-          </button>
-        </div>
+      <!-- Pagination -->
+      <div v-if="historyTotalPages > 1" class="flex items-center justify-center gap-2 mt-4">
+        <button
+          :disabled="historyPage === 1"
+          @click="historyPage--"
+          class="px-3 py-1.5 text-xs font-bold rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-850 disabled:opacity-40 cursor-pointer text-zinc-700 dark:text-zinc-300 shadow-2xs"
+        >
+          Prev
+        </button>
+        <span class="text-xs text-zinc-500 font-mono">{{ historyPage }} / {{ historyTotalPages }}</span>
+        <button
+          :disabled="historyPage === historyTotalPages"
+          @click="historyPage++"
+          class="px-3 py-1.5 text-xs font-bold rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-850 disabled:opacity-40 cursor-pointer text-zinc-700 dark:text-zinc-300 shadow-2xs"
+        >
+          Next
+        </button>
       </div>
     </div>
 
-    <!-- Modals -->
+    <!-- ── Modals ────────────────────────────────────────────────────── -->
+    <!-- Add Payment Modal -->
     <AddPaymentModal
       :is-open="isAddModalOpen"
       :preselected-student-id="preselectedStudentId"
+      :students="allStudents"
+      :payments="allPayments"
+      :payment-methods="paymentMethods"
+      :payment-receivers="paymentReceivers"
+      :note-pills="notePills"
       @close="isAddModalOpen = false"
-      @submit="data => createPaymentMutation.mutate(data)"
+      @submit="createPaymentMutation.mutate($event)"
     />
 
+    <!-- Withdraw Modal -->
     <WithdrawModal
       :is-open="isWithdrawModalOpen"
       :preselected-student-id="preselectedStudentId"
+      :students="allStudents"
       @close="isWithdrawModalOpen = false"
-      @submit="data => withdrawMutation.mutate(data)"
+      @submit="withdrawMutation.mutate($event)"
     />
 
+    <!-- Edit Payment Modal -->
     <EditPaymentModal
       :is-open="isEditModalOpen"
       :payment="editingPayment"
+      :students="allStudents"
+      :payment-methods="paymentMethods"
+      :payment-receivers="paymentReceivers"
       @close="isEditModalOpen = false"
-      @submit="data => editPaymentMutation.mutate(data)"
+      @submit="editPaymentMutation.mutate($event)"
     />
   </div>
 </template>
