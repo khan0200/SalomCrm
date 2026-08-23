@@ -91,17 +91,11 @@ watch(showScoreFilter, (hasScore) => {
   }
 })
 
-// Preset tag options
-const tagOptions = ['Call', 'Apply', 'Documents', 'Payment', 'Custom']
-const certOptions = ['NO CERTIFICATE', 'EXPECTED', 'TOPIK', 'SKA', 'IELTS', 'TOEFL', 'SAT', 'CEFR']
+import { useCustomTags } from '@/composables/useCustomTags'
 
-const getTagIcon = (tag: string) => {
-  if (tag === 'Call') return '📞'
-  if (tag === 'Apply') return '🎓'
-  if (tag === 'Documents') return '📄'
-  if (tag === 'Payment') return '💰'
-  return '🏷️'
-}
+const { tagsRegistry, getTagIcon } = useCustomTags()
+
+const certOptions = ['NO CERTIFICATE', 'EXPECTED', 'TOPIK', 'SKA', 'IELTS', 'TOEFL', 'SAT', 'CEFR']
 
 // Category Definitions
 interface CategoryItem {
@@ -118,6 +112,10 @@ const categories = computed<CategoryItem[]>(() => {
   const levelOpts = ['NO_LEVEL', ...(props.options.levels || [])]
   const groupOpts = ['NO_GROUP', ...(props.options.groups || [])]
   const leadOpts = ['NO_LEADBY', ...(props.options.leads || [])]
+  const dynamicTagOpts = Array.from(new Set([
+    'Call', 'Apply', 'Documents', 'Payment',
+    ...tagsRegistry.value.map(t => t.name)
+  ]))
 
   const list: CategoryItem[] = [
     {
@@ -171,7 +169,7 @@ const categories = computed<CategoryItem[]>(() => {
       label: 'Tasks / Tags',
       icon: Bookmark,
       drafts: draftTags.value,
-      fullOpts: tagOptions,
+      fullOpts: dynamicTagOpts,
       labelMapping: (opt) => `${getTagIcon(opt)} ${opt}`
     },
     {

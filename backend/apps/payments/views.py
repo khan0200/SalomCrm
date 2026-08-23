@@ -294,6 +294,9 @@ class BasePaymentOptionViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
         tenant = getattr(self.request, 'tenant', None) or getattr(user, 'tenant', None)
+        if not tenant:
+            from apps.tenants.models import Tenant
+            tenant = Tenant.objects.first()
         if not tenant or self.model_class is None:
             return Payment.objects.none()
         return self.model_class.objects.filter(tenant=tenant)
@@ -301,6 +304,9 @@ class BasePaymentOptionViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         user = self.request.user
         tenant = getattr(self.request, 'tenant', None) or getattr(user, 'tenant', None)
+        if not tenant:
+            from apps.tenants.models import Tenant
+            tenant = Tenant.objects.first()
         serializer.save(tenant=tenant)
 
 

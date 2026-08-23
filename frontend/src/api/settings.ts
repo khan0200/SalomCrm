@@ -21,11 +21,29 @@ export interface UniversityStatusOption {
 }
 
 export interface CustomTag {
+  id?: string
   name: string
   icon: string
+  created_at?: string
 }
 
 export const settingsApi = {
+  // Custom Tags (Database synced across all CRM users)
+  getTags: async (): Promise<CustomTag[]> => {
+    const res = await apiClient.get('/tags/')
+    return Array.isArray(res.data) ? res.data : (res.data?.results || [])
+  },
+  createTag: async (data: { name: string; icon: string }): Promise<CustomTag> => {
+    const res = await apiClient.post('/tags/', data)
+    return res.data
+  },
+  updateTag: async (id: string, data: { name: string; icon: string }): Promise<CustomTag> => {
+    const res = await apiClient.patch(`/tags/${id}/`, data)
+    return res.data
+  },
+  deleteTag: async (id: string) => {
+    await apiClient.delete(`/tags/${id}/`)
+  },
   // Tariffs
   getTariffs: async (): Promise<TariffOption[]> => {
     const res = await apiClient.get('/tariffs/')

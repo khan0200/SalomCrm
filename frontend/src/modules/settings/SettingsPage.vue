@@ -19,8 +19,20 @@ import {
   Check
 } from 'lucide-vue-next'
 import { settingsApi, type TariffOption, type GeneralOption, type UniversityStatusOption, type CustomTag } from '@/api/settings'
+import { useCustomTags } from '@/composables/useCustomTags'
+import { useUniversityStatuses, STATUS_COLOR_OPTIONS } from '@/composables/useUniversityStatuses'
 import { useUiStore } from '@/stores/ui'
 import { useQueryClient } from '@tanstack/vue-query'
+
+const { tagsRegistry: customTagsRegistry, fetchTags } = useCustomTags()
+const {
+  statusesRegistry,
+  setStatuses,
+  fetchStatuses,
+  resolveColor,
+  getStatusDotClass,
+  getStatusBadgeClass
+} = useUniversityStatuses()
 
 const uiStore = useUiStore()
 const queryClient = useQueryClient()
@@ -212,12 +224,6 @@ const paymentMethods = ref<GeneralOption[]>([])
 const paymentReceivers = ref<GeneralOption[]>([])
 const paymentNoteTemplates = ref<GeneralOption[]>([])
 const universityStatuses = ref<UniversityStatusOption[]>([])
-const customTagsRegistry = ref<CustomTag[]>([
-  { name: 'Call', icon: '📞' },
-  { name: 'Apply', icon: '🎓' },
-  { name: 'Documents', icon: '📄' },
-  { name: 'Payment', icon: '💰' }
-])
 
 // Modal State
 const isModalOpen = ref(false)
@@ -242,22 +248,24 @@ const formatCurrency = (val: number) => {
   return String(Math.round(val)).replace(/\B(?=(\d{3})+(?!\d))/g, '.') + ' UZS'
 }
 
-const fetchAllOptions = async () => {
+const fetchAllOptions = async (silent = false) => {
   try {
-    loading.value = true
+    if (!silent) {
+      loading.value = true
+    }
     const [
-      tariffsData,
-      levelsData,
-      groupsData,
-      leadsData,
-      coordinatorsData,
-      universitiesData,
-      foldersData,
-      methodsData,
-      receiversData,
-      notesData,
-      statusesData
-    ] = await Promise.all([
+      tariffsRes,
+      levelsRes,
+      groupsRes,
+      leadsRes,
+      coordinatorsRes,
+      universitiesRes,
+      foldersRes,
+      methodsRes,
+      receiversRes,
+      notesRes,
+      statusesRes
+    ] = await Promise.allSettled([
       settingsApi.getTariffs(),
       settingsApi.getLevels(),
       settingsApi.getGroups(),
@@ -271,30 +279,28 @@ const fetchAllOptions = async () => {
       settingsApi.getUniversityStatuses(),
     ])
 
-    tariffs.value = tariffsData || []
-    levels.value = levelsData || []
-    groups.value = groupsData || []
-    leads.value = leadsData || []
-    coordinators.value = coordinatorsData || []
-    universities.value = universitiesData || []
-    folders.value = foldersData || []
-    paymentMethods.value = methodsData || []
-    paymentReceivers.value = receiversData || []
-    paymentNoteTemplates.value = notesData || []
-    universityStatuses.value = statusesData || []
-
-    const savedTags = localStorage.getItem('customTagsRegistry')
-    if (savedTags) {
-      try {
-        customTagsRegistry.value = JSON.parse(savedTags)
-      } catch (e) {
-        console.error(e)
-      }
+    if (tariffsRes.status === 'fulfilled') tariffs.value = tariffsRes.value || []
+    if (levelsRes.status === 'fulfilled') levels.value = levelsRes.value || []
+    if (groupsRes.status === 'fulfilled') groups.value = groupsRes.value || []
+    if (leadsRes.status === 'fulfilled') leads.value = leadsRes.value || []
+    if (coordinatorsRes.status === 'fulfilled') coordinators.value = coordinatorsRes.value || []
+    if (universitiesRes.status === 'fulfilled') universities.value = universitiesRes.value || []
+    if (foldersRes.status === 'fulfilled') folders.value = foldersRes.value || []
+    if (methodsRes.status === 'fulfilled') paymentMethods.value = methodsRes.value || []
+    if (receiversRes.status === 'fulfilled') paymentReceivers.value = receiversRes.value || []
+    if (notesRes.status === 'fulfilled') paymentNoteTemplates.value = notesRes.value || []
+    if (statusesRes.status === 'fulfilled') {
+      universityStatuses.value = statusesRes.value || []
+      setStatuses(statusesRes.value || [])
     }
+
+    await fetchTags(true)
   } catch (err: any) {
     console.error('Error loading settings:', err)
   } finally {
-    loading.value = false
+    if (!silent) {
+      loading.value = false
+    }
   }
 }
 
@@ -312,13 +318,13 @@ const filteredCoordinators = computed(() => coordinators.value.filter(c => c.nam
 const filteredUniversities = computed(() => universities.value.filter(u => u.name.toLowerCase().includes(query.value)))
 const filteredFolders = computed(() => folders.value.filter(f => f.name.toLowerCase().includes(query.value)))
 const filteredOffices = computed(() => offices.value.filter(o => o.name.toLowerCase().includes(query.value)))
-const filteredPaymentMethods = computed(() => paymentMethods.value.filter(pm => pm.name.toLowerCase().includes(query.value)))
-const filteredPaymentReceivers = computed(() => paymentReceivers.value.filter(pr => pr.name.toLowerCase().includes(query.value)))
-const filteredPaymentNoteTemplates = computed(() => paymentNoteTemplates.value.filter(pnt => pnt.name.toLowerCase().includes(query.value)))
-const filteredUniversityStatuses = computed(() => universityStatuses.value.filter(us => us.name.toLowerCase().includes(query.value)))
+const filteredPaymentMethods = computed(() => paymentMethods.value.filter(p => p.name.toLowerCase().includes(query.value)))
+const filteredPaymentReceivers = computed(() => paymentReceivers.value.filter(p => p.name.toLowerCase().includes(query.value)))
+const filteredPaymentNoteTemplates = computed(() => paymentNoteTemplates.value.filter(p => p.name.toLowerCase().includes(query.value)))
+const filteredUniversityStatuses = computed(() => universityStatuses.value.filter(u => u.name.toLowerCase().includes(query.value)))
 const filteredTags = computed(() => customTagsRegistry.value.filter(t => t.name.toLowerCase().includes(query.value)))
 
-// Modal handlers
+// Action Handlers
 const handleOpenAdd = (type: string) => {
   modalType.value = type
   modalMode.value = 'add'
@@ -333,97 +339,19 @@ const handleOpenAdd = (type: string) => {
 const handleOpenEdit = (type: string, item: any) => {
   modalType.value = type
   modalMode.value = 'edit'
-  editingId.value = String(item.id)
+  editingId.value = item.id
   formName.value = item.name
-  formPrice.value = type === 'tariff' ? String(item.price) : ''
+  formPrice.value = item.price ? String(item.price) : ''
   formColorClass.value = item.color_class || 'text-blue-500'
   modalError.value = null
   isModalOpen.value = true
 }
 
-const handleDelete = async (type: string, id: string, name: string) => {
-  if (!confirm(`Are you sure you want to delete "${name}"?`)) return
-  try {
-    if (type === 'tariff') await settingsApi.deleteTariff(id)
-    else if (type === 'level') await settingsApi.deleteLevel(id)
-    else if (type === 'group') await settingsApi.deleteGroup(id)
-    else if (type === 'lead') await settingsApi.deleteLead(id)
-    else if (type === 'coordinator') await settingsApi.deleteCoordinator(id)
-    else if (type === 'university') await settingsApi.deleteUniversity(id)
-    else if (type === 'folder') await settingsApi.deleteFolder(id)
-    else if (type === 'payment_method') await settingsApi.deletePaymentMethod(id)
-    else if (type === 'payment_receiver') await settingsApi.deletePaymentReceiver(id)
-    else if (type === 'payment_note_template') await settingsApi.deletePaymentNote(id)
-    else if (type === 'university_status') await settingsApi.deleteUniversityStatus(id)
-    await fetchAllOptions()
-    await invalidateGlobalCaches()
-    uiStore.addToast({ type: 'success', title: 'Deleted', message: `"${name}" removed successfully.` })
-  } catch (err: any) {
-    uiStore.addToast({ type: 'error', title: 'Delete Failed', message: err.message || 'Failed to delete item.' })
-  }
-}
-
-const handleSubmit = async (e: Event) => {
-  e.preventDefault()
-  if (!formName.value.trim()) {
-    modalError.value = 'Name is required.'
-    return
-  }
-  submitting.value = true
-  modalError.value = null
-
-  try {
-    const name = formName.value.trim()
-    if (modalType.value === 'tariff') {
-      const price = Number(formPrice.value.replace(/[^0-9.-]+/g, ''))
-      if (isNaN(price) || price < 0) throw new Error('Price must be a valid positive number.')
-      if (modalMode.value === 'add') await settingsApi.createTariff({ name, price })
-      else if (editingId.value) await settingsApi.updateTariff(editingId.value, { name, price })
-    } else if (modalType.value === 'level') {
-      if (modalMode.value === 'add') await settingsApi.createLevel({ name })
-      else if (editingId.value) await settingsApi.updateLevel(editingId.value, { name })
-    } else if (modalType.value === 'group') {
-      if (modalMode.value === 'add') await settingsApi.createGroup({ name })
-      else if (editingId.value) await settingsApi.updateGroup(editingId.value, { name })
-    } else if (modalType.value === 'lead') {
-      if (modalMode.value === 'add') await settingsApi.createLead({ name })
-      else if (editingId.value) await settingsApi.updateLead(editingId.value, { name })
-    } else if (modalType.value === 'coordinator') {
-      if (modalMode.value === 'add') await settingsApi.createCoordinator({ name })
-      else if (editingId.value) await settingsApi.updateCoordinator(editingId.value, { name })
-    } else if (modalType.value === 'university') {
-      if (modalMode.value === 'add') await settingsApi.createUniversity({ name })
-      else if (editingId.value) await settingsApi.updateUniversity(editingId.value, { name })
-    } else if (modalType.value === 'folder') {
-      if (modalMode.value === 'add') await settingsApi.createFolder(name)
-    } else if (modalType.value === 'payment_method') {
-      if (modalMode.value === 'add') await settingsApi.createPaymentMethod({ name })
-    } else if (modalType.value === 'payment_receiver') {
-      if (modalMode.value === 'add') await settingsApi.createPaymentReceiver({ name })
-    } else if (modalType.value === 'payment_note_template') {
-      if (modalMode.value === 'add') await settingsApi.createPaymentNote({ name })
-    } else if (modalType.value === 'university_status') {
-      if (modalMode.value === 'add') await settingsApi.createUniversityStatus({ name, color_class: formColorClass.value })
-      else if (editingId.value) await settingsApi.updateUniversityStatus(editingId.value, { name, color_class: formColorClass.value })
-    }
-
-    isModalOpen.value = false
-    await fetchAllOptions()
-    await invalidateGlobalCaches()
-    uiStore.addToast({ type: 'success', title: 'Success', message: `Saved "${name}" successfully.` })
-  } catch (err: any) {
-    modalError.value = err.response?.data?.detail || err.message || 'Failed to save option.'
-  } finally {
-    submitting.value = false
-  }
-}
-
-// Custom Tag Modals
 const handleOpenAddTag = () => {
   tagModalMode.value = 'add'
   editingTag.value = null
   tagFormName.value = ''
-  tagFormEmoji.value = CUSTOM_TAG_ICONS[0].emoji
+  tagFormEmoji.value = '🏷️'
   isTagEmojiPickerOpen.value = false
   isTagModalOpen.value = true
 }
@@ -440,25 +368,247 @@ const handleOpenEditTag = (tag: CustomTag) => {
 const handleSaveTag = async () => {
   const name = tagFormName.value.trim()
   if (!name) return
-  if (tagModalMode.value === 'add') {
-    customTagsRegistry.value.push({ name, icon: tagFormEmoji.value })
-  } else if (tagModalMode.value === 'edit' && editingTag.value) {
-    const orig = editingTag.value.name
-    const idx = customTagsRegistry.value.findIndex(t => t.name === orig)
-    if (idx !== -1) {
-      customTagsRegistry.value[idx] = { name, icon: tagFormEmoji.value }
-    }
-  }
-  localStorage.setItem('customTagsRegistry', JSON.stringify(customTagsRegistry.value))
-  await invalidateGlobalCaches()
   isTagModalOpen.value = false
+
+  const icon = tagFormEmoji.value
+  const isEdit = tagModalMode.value === 'edit' && editingTag.value
+  const origName = editingTag.value?.name
+  const prevTags = [...customTagsRegistry.value]
+
+  // Optimistic instant UI update
+  if (isEdit) {
+    const idx = customTagsRegistry.value.findIndex(t => t.name === origName)
+    if (idx !== -1) {
+      customTagsRegistry.value[idx] = { ...customTagsRegistry.value[idx], name, icon }
+    }
+    uiStore.addToast({ type: 'success', message: 'Custom tag updated' })
+  } else {
+    customTagsRegistry.value.push({ name, icon })
+    uiStore.addToast({ type: 'success', message: 'Custom tag created' })
+  }
+
+  try {
+    if (isEdit) {
+      if (editingTag.value?.id) {
+        await settingsApi.updateTag(editingTag.value.id, { name, icon })
+      } else {
+        const found = prevTags.find(t => t.name === origName)
+        if (found?.id) {
+          await settingsApi.updateTag(found.id, { name, icon })
+        } else {
+          await settingsApi.createTag({ name, icon })
+        }
+      }
+    } else {
+      await settingsApi.createTag({ name, icon })
+    }
+    await fetchTags(true)
+    invalidateGlobalCaches()
+  } catch (err: any) {
+    customTagsRegistry.value = prevTags
+    console.error('Error saving custom tag:', err)
+    uiStore.addToast({ type: 'error', message: err.response?.data?.detail || 'Failed to save tag' })
+  }
 }
 
-const handleDeleteTag = async (tagName: string) => {
-  if (!confirm(`Delete tag "${tagName}"?`)) return
+const handleDeleteTag = async (tagOrName: CustomTag | string) => {
+  const tagName = typeof tagOrName === 'string' ? tagOrName : tagOrName.name
+  const tagItem = typeof tagOrName === 'object' ? tagOrName : customTagsRegistry.value.find(t => t.name === tagName)
+  if (!confirm(`Are you sure you want to delete custom tag "${tagName}"?`)) return
+
+  // Instant optimistic removal
+  const prevTags = [...customTagsRegistry.value]
   customTagsRegistry.value = customTagsRegistry.value.filter(t => t.name !== tagName)
-  localStorage.setItem('customTagsRegistry', JSON.stringify(customTagsRegistry.value))
-  await invalidateGlobalCaches()
+  uiStore.addToast({ type: 'success', message: `Tag "${tagName}" deleted` })
+
+  try {
+    if (tagItem?.id) {
+      await settingsApi.deleteTag(tagItem.id)
+    }
+    fetchTags(true)
+    invalidateGlobalCaches()
+  } catch (err: any) {
+    customTagsRegistry.value = prevTags
+    console.error('Error deleting tag:', err)
+    uiStore.addToast({ type: 'error', message: 'Failed to delete tag' })
+  }
+}
+
+const handleDelete = async (type: string, id: string, name: string) => {
+  if (!confirm(`Are you sure you want to delete "${name}"?`)) return
+
+  // 1. Snapshot previous state for rollback if network fails
+  const prevTariffs = [...tariffs.value]
+  const prevLevels = [...levels.value]
+  const prevGroups = [...groups.value]
+  const prevLeads = [...leads.value]
+  const prevCoordinators = [...coordinators.value]
+  const prevUniversities = [...universities.value]
+  const prevFolders = [...folders.value]
+  const prevMethods = [...paymentMethods.value]
+  const prevReceivers = [...paymentReceivers.value]
+  const prevNotes = [...paymentNoteTemplates.value]
+  const prevStatuses = [...universityStatuses.value]
+
+  // 2. Instantaneous optimistic removal from local state (NO loading spinner / delay!)
+  if (type === 'tariff') tariffs.value = tariffs.value.filter(item => item.id !== id)
+  else if (type === 'level') levels.value = levels.value.filter(item => item.id !== id)
+  else if (type === 'group') groups.value = groups.value.filter(item => item.id !== id)
+  else if (type === 'lead') leads.value = leads.value.filter(item => item.id !== id)
+  else if (type === 'coordinator') coordinators.value = coordinators.value.filter(item => item.id !== id)
+  else if (type === 'university') universities.value = universities.value.filter(item => item.id !== id)
+  else if (type === 'folder') folders.value = folders.value.filter(item => item.id !== id)
+  else if (type === 'payment_method') paymentMethods.value = paymentMethods.value.filter(item => item.id !== id)
+  else if (type === 'payment_receiver') paymentReceivers.value = paymentReceivers.value.filter(item => item.id !== id)
+  else if (type === 'payment_note_template') paymentNoteTemplates.value = paymentNoteTemplates.value.filter(item => item.id !== id)
+  else if (type === 'university_status') universityStatuses.value = universityStatuses.value.filter(item => item.id !== id)
+
+  uiStore.addToast({ type: 'success', title: 'Deleted', message: `"${name}" removed.` })
+
+  // 3. Asynchronous background server delete
+  try {
+    if (type === 'tariff') await settingsApi.deleteTariff(id)
+    else if (type === 'level') await settingsApi.deleteLevel(id)
+    else if (type === 'group') await settingsApi.deleteGroup(id)
+    else if (type === 'lead') await settingsApi.deleteLead(id)
+    else if (type === 'coordinator') await settingsApi.deleteCoordinator(id)
+    else if (type === 'university') await settingsApi.deleteUniversity(id)
+    else if (type === 'folder') await settingsApi.deleteFolder(id)
+    else if (type === 'payment_method') await settingsApi.deletePaymentMethod(id)
+    else if (type === 'payment_receiver') await settingsApi.deletePaymentReceiver(id)
+    else if (type === 'payment_note_template') await settingsApi.deletePaymentNote(id)
+    else if (type === 'university_status') await settingsApi.deleteUniversityStatus(id)
+
+    invalidateGlobalCaches()
+  } catch (err: any) {
+    // Revert local state on error
+    tariffs.value = prevTariffs
+    levels.value = prevLevels
+    groups.value = prevGroups
+    leads.value = prevLeads
+    coordinators.value = prevCoordinators
+    universities.value = prevUniversities
+    folders.value = prevFolders
+    paymentMethods.value = prevMethods
+    paymentReceivers.value = prevReceivers
+    paymentNoteTemplates.value = prevNotes
+    universityStatuses.value = prevStatuses
+    uiStore.addToast({ type: 'error', title: 'Delete Failed', message: err.message || 'Failed to delete item.' })
+  }
+}
+
+const handleSubmit = async (e: Event) => {
+  e.preventDefault()
+  if (!formName.value.trim()) {
+    modalError.value = 'Name is required.'
+    return
+  }
+  const name = formName.value.trim()
+  const type = modalType.value
+  const isEdit = modalMode.value === 'edit' && editingId.value
+  const id = editingId.value
+
+  // Close modal instantly
+  isModalOpen.value = false
+  uiStore.addToast({ type: 'success', title: 'Success', message: `Saved "${name}".` })
+
+  try {
+    if (type === 'tariff') {
+      const price = Number(formPrice.value.replace(/[^0-9.-]+/g, ''))
+      if (isNaN(price) || price < 0) throw new Error('Price must be a valid positive number.')
+      if (isEdit && id) {
+        const idx = tariffs.value.findIndex(t => t.id === id)
+        if (idx !== -1) tariffs.value[idx] = { ...tariffs.value[idx], name, price }
+        await settingsApi.updateTariff(id, { name, price })
+      } else {
+        const created = await settingsApi.createTariff({ name, price })
+        tariffs.value.push(created)
+      }
+    } else if (type === 'level') {
+      if (isEdit && id) {
+        const idx = levels.value.findIndex(l => l.id === id)
+        if (idx !== -1) levels.value[idx] = { ...levels.value[idx], name }
+        await settingsApi.updateLevel(id, { name })
+      } else {
+        const created = await settingsApi.createLevel({ name })
+        levels.value.push(created)
+      }
+    } else if (type === 'group') {
+      if (isEdit && id) {
+        const idx = groups.value.findIndex(g => g.id === id)
+        if (idx !== -1) groups.value[idx] = { ...groups.value[idx], name }
+        await settingsApi.updateGroup(id, { name })
+      } else {
+        const created = await settingsApi.createGroup({ name })
+        groups.value.push(created)
+      }
+    } else if (type === 'lead') {
+      if (isEdit && id) {
+        const idx = leads.value.findIndex(l => l.id === id)
+        if (idx !== -1) leads.value[idx] = { ...leads.value[idx], name }
+        await settingsApi.updateLead(id, { name })
+      } else {
+        const created = await settingsApi.createLead({ name })
+        leads.value.push(created)
+      }
+    } else if (type === 'coordinator') {
+      if (isEdit && id) {
+        const idx = coordinators.value.findIndex(c => c.id === id)
+        if (idx !== -1) coordinators.value[idx] = { ...coordinators.value[idx], name }
+        await settingsApi.updateCoordinator(id, { name })
+      } else {
+        const created = await settingsApi.createCoordinator({ name })
+        coordinators.value.push(created)
+      }
+    } else if (type === 'university') {
+      if (isEdit && id) {
+        const idx = universities.value.findIndex(u => u.id === id)
+        if (idx !== -1) universities.value[idx] = { ...universities.value[idx], name }
+        await settingsApi.updateUniversity(id, { name })
+      } else {
+        const created = await settingsApi.createUniversity({ name })
+        universities.value.push(created)
+      }
+    } else if (type === 'folder') {
+      const created = await settingsApi.createFolder(name)
+      folders.value.push(created)
+    } else if (type === 'payment_method') {
+      const created = await settingsApi.createPaymentMethod({ name })
+      paymentMethods.value.push(created)
+    } else if (type === 'payment_receiver') {
+      const created = await settingsApi.createPaymentReceiver({ name })
+      paymentReceivers.value.push(created)
+    } else if (type === 'payment_note_template') {
+      const created = await settingsApi.createPaymentNote({ name })
+      paymentNoteTemplates.value.push(created)
+    } else if (type === 'university_status') {
+      const color_class = formColorClass.value
+      if (isEdit && id) {
+        const idx = universityStatuses.value.findIndex(s => s.id === id)
+        if (idx !== -1) universityStatuses.value[idx] = { ...universityStatuses.value[idx], name, color_class }
+        const regIdx = statusesRegistry.value.findIndex(s => s.id === id || s.name.toUpperCase() === name.toUpperCase())
+        if (regIdx !== -1) {
+          statusesRegistry.value[regIdx] = { ...statusesRegistry.value[regIdx], name, color_class }
+        } else {
+          statusesRegistry.value.push({ id: String(id), name, color_class })
+        }
+        await settingsApi.updateUniversityStatus(id, { name, color_class })
+      } else {
+        const created = await settingsApi.createUniversityStatus({ name, color_class })
+        universityStatuses.value.push(created)
+        statusesRegistry.value.push({ id: String(created.id), name: created.name, color_class: created.color_class })
+      }
+      setStatuses(universityStatuses.value)
+    }
+
+    // Silent background sync
+    fetchAllOptions(true)
+    invalidateGlobalCaches()
+  } catch (err: any) {
+    console.error('Submit error:', err)
+    uiStore.addToast({ type: 'error', title: 'Save Failed', message: err.message || 'Failed to save option.' })
+    fetchAllOptions(true)
+  }
 }
 
 const getTabCount = (tabId: string) => {
@@ -750,7 +900,7 @@ const activeConfig = computed(() => TABS_CONFIG[activeTab.value])
                 <Pencil class="w-3.5 h-3.5" />
               </button>
               <button
-                @click="handleDeleteTag(tag.name)"
+                @click="handleDeleteTag(tag)"
                 class="w-7 h-7 flex items-center justify-center border border-zinc-200 dark:border-zinc-700 hover:bg-white rounded-lg text-rose-600 transition-all cursor-pointer"
               >
                 <Trash2 class="w-3.5 h-3.5" />
@@ -924,11 +1074,14 @@ const activeConfig = computed(() => TABS_CONFIG[activeTab.value])
           <div
             v-for="item in filteredUniversityStatuses"
             :key="item.id"
-            class="group flex items-center justify-between gap-3 p-3 bg-zinc-50/70 dark:bg-zinc-850 border border-zinc-200 dark:border-zinc-700/80 hover:border-pink-400 rounded-xl shadow-2xs transition-all"
+            class="group flex items-center justify-between gap-3 p-3 bg-zinc-50/70 dark:bg-zinc-850 border border-zinc-200 dark:border-zinc-700/80 hover:border-blue-400 rounded-xl shadow-2xs transition-all"
           >
             <div class="flex items-center gap-2.5 min-w-0">
-              <div class="w-3.5 h-3.5 rounded-full bg-blue-500" />
+              <div class="w-3.5 h-3.5 rounded-full shrink-0 shadow-xs" :class="resolveColor(item.color_class).dotClass" />
               <div class="text-xs font-bold text-zinc-900 dark:text-zinc-100 truncate">{{ item.name }}</div>
+              <span class="ml-1.5 px-2.5 py-0.5 rounded-full text-[10.5px] font-extrabold uppercase shadow-2xs border" :class="resolveColor(item.color_class).badgeClass">
+                {{ item.name }}
+              </span>
             </div>
             <div class="flex items-center gap-1 shrink-0 opacity-80 sm:opacity-0 group-hover:opacity-100 transition-opacity">
               <button
@@ -989,6 +1142,35 @@ const activeConfig = computed(() => TABS_CONFIG[activeTab.value])
               placeholder="e.g. 13000000"
               class="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-850 border border-zinc-200 dark:border-zinc-700 rounded-xl text-zinc-800 dark:text-zinc-200 focus:outline-none focus:border-blue-500"
             />
+          </div>
+
+          <!-- Color Options with Live Preview for University Status -->
+          <div v-if="modalType === 'university_status'" class="space-y-2.5">
+            <!-- Live Preview -->
+            <div class="p-3 bg-zinc-100 dark:bg-zinc-850 rounded-xl border border-zinc-200 dark:border-zinc-700/80 flex items-center justify-between">
+              <span class="text-xs font-bold text-zinc-600 dark:text-zinc-400">Live Status Preview:</span>
+              <span class="inline-flex items-center px-3 py-1 rounded-full text-[11px] font-extrabold uppercase shadow-2xs border" :class="resolveColor(formColorClass).badgeClass">
+                <span>{{ formName || 'STATUS PREVIEW' }}</span>
+              </span>
+            </div>
+
+            <label class="block font-bold text-zinc-700 dark:text-zinc-300">Choose Status Color</label>
+            <div class="grid grid-cols-4 sm:grid-cols-6 gap-2 p-2 bg-zinc-50 dark:bg-zinc-850/60 rounded-xl border border-zinc-200 dark:border-zinc-700/80 max-h-40 overflow-y-auto">
+              <button
+                v-for="color in STATUS_COLOR_OPTIONS"
+                :key="color.key"
+                type="button"
+                @click="formColorClass = color.key"
+                class="flex flex-col items-center gap-1 p-1.5 rounded-lg border transition-all cursor-pointer"
+                :class="formColorClass === color.key ? 'border-blue-500 bg-white dark:bg-zinc-800 shadow-xs ring-2 ring-blue-500/20' : 'border-transparent hover:bg-zinc-200/50 dark:hover:bg-zinc-750'"
+                :title="color.label"
+              >
+                <div class="w-5 h-5 rounded-full shadow-2xs flex items-center justify-center text-white" :class="color.dotClass">
+                  <Check v-if="formColorClass === color.key" class="w-3 h-3 stroke-[3]" />
+                </div>
+                <span class="text-[9.5px] font-bold text-zinc-600 dark:text-zinc-400 truncate w-full text-center">{{ color.label }}</span>
+              </button>
+            </div>
           </div>
 
           <div class="flex items-center justify-end gap-2 pt-2">

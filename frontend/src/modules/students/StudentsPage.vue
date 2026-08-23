@@ -16,16 +16,21 @@ import StudentActionsModal from './components/StudentActionsModal.vue'
 import StudentFoldersManager from './components/StudentFoldersManager.vue'
 import StudentDetailDrawer from './components/StudentDetailDrawer.vue'
 import ExportExcelModal from './components/ExportExcelModal.vue'
+import AddStudentsToFolderModal from './components/AddStudentsToFolderModal.vue'
 import { useStudentDashboardStore } from '@/stores/studentDashboard'
+import { useCustomTags } from '@/composables/useCustomTags'
 
 const queryClient = useQueryClient()
 const uiStore = useUiStore()
 const dashboardStore = useStudentDashboardStore()
+const { fetchTags } = useCustomTags()
+fetchTags()
 
 const activeFolder = ref('all')
 const currentPage = ref(1)
 const sortOrder = ref<'asc' | 'desc'>('asc')
 const isExportingExcel = computed(() => dashboardStore.isExcelExporting)
+const isFolderAddModalOpen = ref(false)
 
 // Alphanumeric sorting logic matching UniApp2
 const compareStudentIds = (a: Student, b: Student, order: 'asc' | 'desc' = 'asc') => {
@@ -337,6 +342,10 @@ const updateMasterStudentOptimistically = (id: string, updater: (student: Studen
       }
     }
   )
+  queryClient.setQueryData<Student | undefined>(
+    ['student-detail', id],
+    (old) => (old ? updater({ ...old }) : undefined)
+  )
 }
 
 // Mutations with 0ms Instant Optimistic Updates
@@ -622,6 +631,62 @@ const resetAllFilters = () => {
   currentPage.value = 1
 }
 
+const activeFolderItem = computed(() => folders.value.find(f => String(f.id) === String(activeFolder.value)))
+const activeFolderName = computed(() => {
+  if (activeFolder.value === 'all') return 'All'
+  if (activeFolder.value === 'except') return 'Except'
+  if (activeFolder.value === 'deleted' || activeFolder.value === 'archive') return 'Archive'
+  if (activeFolder.value === 'hidden') return 'Hidden'
+  return activeFolderItem.value?.name || 'Folder'
+})
+
+const handleOpenFolderAdd = () => {
+  isFolderAddModalOpen.value = true
+}
+
+const handleSaveFolderAdd = async (selectedIds: string[]) => {
+  if (selectedIds.length === 0) return
+  const folderId = String(activeFolder.value)
+  if (!folderId || activeFolder.value === 'all' || activeFolder.value === 'except' || activeFolder.value === 'deleted') return
+
+  isFolderAddModalOpen.value = false
+  uiStore.addToast({
+    type: 'success',
+    title: 'Added to Folder',
+    message: `Added ${selectedIds.length} student${selectedIds.length !== 1 ? 's' : ''} to "${activeFolderName.value}".`
+  })
+
+  // Optimistic update: append folderId to selected students
+  queryClient.setQueryData<PaginatedResponse<Student> | { results: Student[] } | undefined>(
+    ['all-students-master'],
+    (oldData) => {
+      if (!oldData || !oldData.results) return oldData
+      return {
+        ...oldData,
+        results: oldData.results.map((s) => {
+          if (selectedIds.includes(s.id)) {
+            const curr = (s.folder_ids || []).map(String)
+            if (!curr.includes(folderId)) {
+              return { ...s, folder_ids: [...curr, folderId] }
+            }
+          }
+          return s
+        })
+      }
+    }
+  )
+
+  try {
+    await studentsApi.addStudentsToFolder(folderId, selectedIds)
+    queryClient.invalidateQueries({ queryKey: ['all-students-master'] })
+    queryClient.invalidateQueries({ queryKey: ['folders'] })
+    queryClient.invalidateQueries({ queryKey: ['student-options'] })
+  } catch (err: any) {
+    console.error('Error adding students to folder:', err)
+    queryClient.invalidateQueries({ queryKey: ['all-students-master'] })
+  }
+}
+
 dashboardStore.onExportExcel = handleExportExcel
 </script>
 
@@ -727,6 +792,7 @@ dashboardStore.onExportExcel = handleExportExcel
       :folder-counts="dynamicFolderCounts"
       @select="f => { activeFolder = f; currentPage = 1; }"
       @create-folder="name => createFolderMutation.mutate(name)"
+      @open-add-to-folder="handleOpenFolderAdd"
     />
 
     <!-- Students Table -->
@@ -771,6 +837,16 @@ dashboardStore.onExportExcel = handleExportExcel
     </div>
 
     <!-- Modals & Drawers -->
+    <AddStudentsToFolderModal
+      :is-open="isFolderAddModalOpen"
+      :folder-id="activeFolder"
+      :folder-name="activeFolderName"
+      :folders="folders"
+      :all-students="allStudents"
+      @close="isFolderAddModalOpen = false"
+      @save="handleSaveFolderAdd"
+    />
+
     <AddStudentModal
       :is-open="isAddModalOpen"
       :options="options"

@@ -17,6 +17,7 @@ class StatusBoardViewSet(viewsets.ModelViewSet):
     """
     serializer_class = StatusStudentListSerializer
     permission_classes = [IsTenantUser]
+    lookup_field = 'id'
 
     def get_queryset(self):
         user = self.request.user
@@ -57,29 +58,34 @@ class StatusBoardViewSet(viewsets.ModelViewSet):
                 Q(phone1__icontains=search)
             )
 
-        # 4. Sorting (ID vs Remaining Days 'left')
-        sort_by = self.request.query_params.get('sort_by', 'id')
-        sort_order = self.request.query_params.get('sort_order', 'asc')
+        return qs.order_by('id')
+
+    def list(self, request, *args, **kwargs):
+        qs = self.get_queryset()
+        sort_by = request.query_params.get('sort_by', 'id')
+        sort_order = request.query_params.get('sort_order', 'asc')
 
         students_list = list(qs)
 
         if sort_by == 'left':
             def left_sort_key(s):
                 days = calculate_days_left(s.kdb_take_date)
-                # Items without dates go to the bottom
                 return (days if days is not None else 999999, alphanumeric_key(s.id))
 
             students_list.sort(key=left_sort_key, reverse=(sort_order == 'desc'))
-            return students_list
-
-        if sort_by == 'id':
+        elif sort_by == 'id':
             students_list.sort(key=lambda s: alphanumeric_key(s.id), reverse=(sort_order == 'desc'))
-            return students_list
 
-        return qs.order_by('id')
+        page = self.paginate_queryset(students_list)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(students_list, many=True)
+        return Response(serializer.data)
 
     @action(detail=True, methods=['patch'])
-    def quick_update(self, request, pk=None):
+    def quick_update(self, request, id=None):
         student = self.get_object()
         serializer = StatusQuickUpdateSerializer(data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
@@ -91,7 +97,7 @@ class StatusBoardViewSet(viewsets.ModelViewSet):
         return Response(StatusStudentListSerializer(student).data)
 
     @action(detail=True, methods=['patch'])
-    def embassy_drawer(self, request, pk=None):
+    def embassy_drawer(self, request, id=None):
         student = self.get_object()
         serializer = EmbassyDrawerUpdateSerializer(data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)

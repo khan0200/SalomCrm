@@ -1,7 +1,8 @@
 import re
 import io
 import uuid
-from typing import Any
+import logging
+from typing import Any, cast
 import openpyxl
 from openpyxl.utils import get_column_letter
 from openpyxl.styles import Font, PatternFill, Alignment
@@ -16,7 +17,7 @@ from apps.core.permissions import IsTenantUser, IsTenantHeadManager
 from .models import (
     Student, Folder, TariffOption, EducationLevelOption,
     StudentGroupOption, LeadSourceOption, CoordinatorOption,
-    UniversityOption, UniversityStatusOption, SchoolDirectory, MajorOption
+    UniversityOption, UniversityStatusOption, TagOption, SchoolDirectory, MajorOption
 )
 from .serializers import (
     StudentListSerializer, StudentDetailSerializer, StudentCreateUpdateSerializer,
@@ -24,9 +25,35 @@ from .serializers import (
     TariffOptionSerializer, EducationLevelOptionSerializer, StudentGroupOptionSerializer,
     LeadSourceOptionSerializer, CoordinatorOptionSerializer,
     UniversityOptionSerializer, UniversityStatusOptionSerializer,
-    SchoolDirectorySerializer, MajorOptionSerializer
+    TagOptionSerializer, SchoolDirectorySerializer, MajorOptionSerializer
 )
 from .services import archive_student, restore_student, permanent_delete_student
+
+logger = logging.getLogger(__name__)
+
+DEFAULT_TAGS_DATA = [
+    ('HAL', '✅'),
+    ('JEONJU REG', '📋'),
+    ('KDB', '💳'),
+    ('Natija kutilmoqda', '⏳'),
+    ('Topik 2', '🏷️'),
+    ('til kursi', '🏷️'),
+    ('BUFS TIL KURSI', '🚩'),
+    ('BUFS APPFEE', '🎫'),
+    ('AeroSpace', '✈️'),
+    ('GIMCHEON OK', '🏷️'),
+    ('WOOSUK APPFEE', '💳'),
+    ('Documents Pending', '📄'),
+    ('Visa Processing', '🎫'),
+    ('Visa Approved', '🛂'),
+    ('Departure', '✈️'),
+    ('Arrived', '📍'),
+    ('Scholarship Awarded', '💎'),
+    ('Call', '📞'),
+    ('Apply', '🎓'),
+    ('Documents', '📄'),
+    ('Payment', '💰'),
+]
 
 def alphanumeric_key(student_id):
     """
@@ -324,16 +351,64 @@ class FolderViewSet(viewsets.ModelViewSet):
         req: Any = self.request
         user = req.user
         tenant = getattr(req, 'tenant', None) or getattr(user, 'tenant', None)
-        is_super = getattr(user, 'is_superuser', False) or getattr(user, 'role', '') == 'SUPER_ADMIN'
-        if is_super:
-            return Folder.objects.all().order_by('name')
-        return Folder.objects.filter(tenant=tenant).order_by('name')
+        if not tenant:
+            from apps.tenants.models import Tenant
+            tenant = Tenant.objects.first()
+        if tenant:
+            if not Folder.objects.filter(tenant=tenant, name__iexact='KDB').exists():
+                Folder.objects.create(tenant=tenant, name='KDB')
+            return Folder.objects.filter(tenant=tenant).order_by('name')
+        return Folder.objects.all().order_by('name')
 
     def perform_create(self, serializer):
         req: Any = self.request
         user = req.user
         tenant = getattr(req, 'tenant', None) or getattr(user, 'tenant', None)
         serializer.save(tenant=tenant, created_by=user)
+
+    @action(detail=True, methods=['post'], url_path='add-students')
+    def add_students(self, request, pk=None):
+        folder = self.get_object()
+        student_ids = request.data.get('student_ids', [])
+        if not student_ids:
+            return Response({'status': 'No students provided', 'added_count': 0})
+
+        folder_uuid = folder.id
+        folder_str = str(folder_uuid)
+        students = Student.objects.filter(id__in=student_ids)
+        updated = 0
+        for s in students:
+            curr = list(s.folder_ids or [])
+            curr_strs = [str(x) for x in curr]
+            if folder_str not in curr_strs:
+                curr.append(folder_uuid)
+                s.folder_ids = curr
+                s.save(update_fields=['folder_ids', 'updated_at'])
+                updated += 1
+        return Response({'status': 'Students added', 'added_count': updated})
+
+    @action(detail=True, methods=['post'], url_path='sync-students')
+    def sync_students(self, request, pk=None):
+        folder = self.get_object()
+        student_ids = set(request.data.get('student_ids', []))
+        folder_uuid = folder.id
+        req: Any = self.request
+        tenant = getattr(req, 'tenant', None) or getattr(req.user, 'tenant', None)
+        qs = Student.objects.filter(tenant=tenant) if tenant else Student.objects.all()
+
+        for s in qs:
+            curr = list(s.folder_ids or [])
+            has_folder = folder_uuid in curr
+            should_have = s.id in student_ids
+            if should_have and not has_folder:
+                curr.append(folder_uuid)
+                s.folder_ids = curr
+                s.save(update_fields=['folder_ids', 'updated_at'])
+            elif not should_have and has_folder:
+                curr = [fid for fid in curr if fid != folder_uuid]
+                s.folder_ids = curr
+                s.save(update_fields=['folder_ids', 'updated_at'])
+        return Response({'status': 'Folder students synced'})
 
 
 class StudentOptionsViewSet(viewsets.ViewSet):
@@ -343,6 +418,9 @@ class StudentOptionsViewSet(viewsets.ViewSet):
     def list(self, request):
         user = request.user
         tenant = getattr(request, 'tenant', None) or getattr(user, 'tenant', None)
+        if tenant:
+            if not Folder.objects.filter(tenant=tenant, name__iexact='KDB').exists():
+                Folder.objects.create(tenant=tenant, name='KDB')
 
         tariffs = list(TariffOption.objects.filter(tenant=tenant).values('name', 'price')) if tenant else []
         levels = list(EducationLevelOption.objects.filter(tenant=tenant).values_list('name', flat=True)) if tenant else []
@@ -379,6 +457,21 @@ class StudentOptionsViewSet(viewsets.ViewSet):
             for f in folders_qs
         ]
 
+        tags_qs = TagOption.objects.filter(tenant=tenant).order_by('name') if tenant else TagOption.objects.all().order_by('name')
+        if tenant and not tags_qs.exists():
+            for t_name, t_icon in DEFAULT_TAGS_DATA:
+                TagOption.objects.get_or_create(tenant=tenant, name=t_name, defaults={'icon': t_icon})
+            tags_qs = TagOption.objects.filter(tenant=tenant).order_by('name')
+
+        tags = [
+            {
+                'id': str(t.id),
+                'name': t.name,
+                'icon': t.icon
+            }
+            for t in tags_qs
+        ]
+
         return Response({
             'tariffs': tariffs,
             'levels': levels,
@@ -388,7 +481,8 @@ class StudentOptionsViewSet(viewsets.ViewSet):
             'universities': universities,
             'folders': folders,
             'folder_counts': folder_counts,
-            'offices': ['ANDIJON OFFIS', 'TOSHKENT OFFIS']
+            'offices': ['ANDIJON OFFIS', 'TOSHKENT OFFIS'],
+            'tags': tags
         })
 
 
@@ -546,14 +640,20 @@ class BaseOptionViewSet(viewsets.ModelViewSet):
         req: Any = self.request
         user = req.user
         tenant = getattr(req, 'tenant', None) or getattr(user, 'tenant', None)
+        if not tenant:
+            from apps.tenants.models import Tenant
+            tenant = Tenant.objects.first()
         if not tenant or self.model_class is None:
             return self.model_class.objects.none() if self.model_class else Student.objects.none()
-        return self.model_class.objects.filter(tenant=tenant)
+        return self.model_class.objects.filter(tenant=tenant).order_by('name')
 
     def perform_create(self, serializer):
         req: Any = self.request
         user = req.user
         tenant = getattr(req, 'tenant', None) or getattr(user, 'tenant', None)
+        if not tenant:
+            from apps.tenants.models import Tenant
+            tenant = Tenant.objects.first()
         serializer.save(tenant=tenant)
 
 
@@ -592,6 +692,21 @@ class UniversityOptionViewSet(viewsets.ModelViewSet):
 class UniversityStatusOptionViewSet(BaseOptionViewSet):
     model_class = UniversityStatusOption
     serializer_class = UniversityStatusOptionSerializer
+
+
+class TagOptionViewSet(BaseOptionViewSet):
+    model_class = TagOption
+    serializer_class = TagOptionSerializer
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        req: Any = self.request
+        tenant = getattr(req, 'tenant', None) or getattr(req.user, 'tenant', None)
+        if tenant and not qs.exists():
+            for t_name, t_icon in DEFAULT_TAGS_DATA:
+                TagOption.objects.get_or_create(tenant=tenant, name=t_name, defaults={'icon': t_icon})
+            qs = TagOption.objects.filter(tenant=tenant).order_by('name')
+        return qs
 
 
 class SchoolDirectoryViewSet(viewsets.ModelViewSet):
@@ -1039,7 +1154,8 @@ class VisaStudentListCreateView(APIView):
         if not full_name:
             return Response({'error': 'Full name is required.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        s_id = (request.data.get('student_id') or request.data.get('id') or '').strip().upper()
+        data = cast(dict[str, Any], request.data) if isinstance(request.data, dict) else {}
+        s_id = str(data.get('student_id') or data.get('id') or '').strip().upper()
 
         visa_student, created = VisaStudent.objects.get_or_create(
             tenant=tenant,
@@ -1047,23 +1163,23 @@ class VisaStudentListCreateView(APIView):
             defaults={
                 'student_id': s_id,
                 'full_name': full_name,
-                'birthday': request.data.get('birthday', '').strip(),
-                'visa_type': request.data.get('visa_type', 'Embassy'),
-                'application_no': request.data.get('application_no', '').strip().upper(),
-                'tariff': request.data.get('tariff', ''),
-                'university': request.data.get('university', ''),
-                'coordinator': request.data.get('coordinator', ''),
-                'b2b': request.data.get('b2b', ''),
-                'flag': bool(request.data.get('flag', False)),
-                'refund_application': bool(request.data.get('refund_application', False)),
+                'birthday': str(data.get('birthday', '')).strip(),
+                'visa_type': str(data.get('visa_type', 'Embassy')),
+                'application_no': str(data.get('application_no', '')).strip().upper(),
+                'tariff': str(data.get('tariff', '')),
+                'university': str(data.get('university', '')),
+                'coordinator': str(data.get('coordinator', '')),
+                'b2b': str(data.get('b2b', '')),
+                'flag': bool(data.get('flag', False)),
+                'refund_application': bool(data.get('refund_application', False)),
             }
         )
 
         if not created:
             # Update existing
             for field in ('full_name', 'birthday', 'visa_type', 'application_no', 'tariff', 'university', 'coordinator', 'b2b', 'flag', 'refund_application'):
-                if field in request.data:
-                    setattr(visa_student, field, request.data[field])
+                if field in data:
+                    setattr(visa_student, field, data[field])
             if s_id:
                 visa_student.student_id = s_id
             visa_student.is_deleted = False
@@ -1101,6 +1217,8 @@ class VisaStudentDetailView(APIView):
         if not student:
             return Response({'error': 'Student not found in Visa database.'}, status=status.HTTP_404_NOT_FOUND)
 
+        data = cast(dict[str, Any], request.data) if isinstance(request.data, dict) else {}
+
         # Allow partial updating of any management or status fields
         for field in (
             'student_id', 'full_name', 'birthday', 'visa_type', 'application_no',
@@ -1108,8 +1226,8 @@ class VisaStudentDetailView(APIView):
             'flag', 'refund_application', 'pinned', 'batch_selected',
             'status', 'rejection_reason', 'pdf_url', 'application_date', 'status_date'
         ):
-            if field in request.data:
-                val = request.data[field]
+            if field in data:
+                val = data[field]
                 if field in ('flag', 'refund_application', 'pinned', 'batch_selected'):
                     setattr(student, field, bool(val))
                 elif field in ('tariff', 'university', 'coordinator', 'b2b'):
@@ -1117,8 +1235,8 @@ class VisaStudentDetailView(APIView):
                 else:
                     setattr(student, field, val)
 
-        if 'id' in request.data and 'student_id' not in request.data:
-            student.student_id = request.data['id']
+        if 'id' in data and 'student_id' not in data:
+            student.student_id = str(data['id'])
 
         student.save()
         return Response(VisaStudentSerializer(student).data)

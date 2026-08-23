@@ -297,6 +297,20 @@ class UniversityStatusOption(SimpleTenantModel):
         return self.name
 
 
+class TagOption(SimpleTenantModel):
+    """Configurable custom tags with icons. Mapped to 'crm_tag_options' table."""
+    id = models.BigAutoField(primary_key=True)
+    name = models.CharField(max_length=100)
+    icon = models.CharField(max_length=50, default='🏷️')
+
+    class Meta:
+        db_table = 'crm_tag_options'
+        ordering = ['name']
+
+    def __str__(self):
+        return f"{self.icon} {self.name}"
+
+
 class SchoolDirectory(TimeStampedModel):
     """Mapped to 'schools' table."""
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

@@ -15,6 +15,7 @@ const emit = defineEmits<{
   (e: 'select', folderId: string): void
   (e: 'create-folder', name: string): void
   (e: 'delete-folder', id: string): void
+  (e: 'open-add-to-folder'): void
 }>()
 
 const isCreateModalOpen = ref(false)
@@ -26,6 +27,10 @@ const handleCreate = () => {
   newFolderName.value = ''
   isCreateModalOpen.value = false
 }
+
+const isCustomFolder = computed(() => {
+  return props.activeFolder !== 'all' && props.activeFolder !== 'except' && props.activeFolder !== 'deleted' && props.activeFolder !== 'archive' && props.activeFolder !== 'hidden'
+})
 
 const activeFolderName = computed(() => {
   if (props.activeFolder === 'all') return 'All'
@@ -136,12 +141,24 @@ const activeFolderName = computed(() => {
     </div>
 
     <!-- Subtitle Bar matching the screenshot -->
-    <div class="flex items-center justify-between text-[11px] text-zinc-400 dark:text-zinc-500 px-1 pt-0.5 select-none">
+    <div class="flex items-center justify-between text-[11px] text-zinc-400 dark:text-zinc-500 px-1 pt-0.5 select-none min-h-[28px]">
       <div class="italic">
         Showing all students in <span class="font-medium text-zinc-600 dark:text-zinc-300">{{ activeFolderName }}</span>
       </div>
-      <div class="italic">
-        Total {{ totalCount }} students
+      <div class="flex items-center gap-3">
+        <!-- Add to Folder button -->
+        <button
+          v-if="isCustomFolder"
+          type="button"
+          @click="emit('open-add-to-folder')"
+          class="not-italic inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold cursor-pointer transition-all shadow-xs"
+        >
+          <Plus class="w-3.5 h-3.5" />
+          <span>Add to Folder</span>
+        </button>
+        <div class="italic text-right">
+          Total {{ totalCount }} students
+        </div>
       </div>
     </div>
 

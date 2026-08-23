@@ -37,28 +37,9 @@ const copyPhone = () => {
   }, 2000)
 }
 
-const TAG_ICON_MAP: Record<string, string> = {
-  'JEONJU REG': '📋',
-  'KDB': '💳',
-  'Natija kutilmoqda': '⏳',
-  'Topik 2': '🏷️',
-  'til kursi': '🏷️',
-  'BUFS TIL KURSI': '🚩',
-  'BUFS APPFEE': '🎫',
-  'AeroSpace': '✈️',
-  'GIMCHEON OK': '🏷️',
-  'WOOSUK APPFEE': '💳',
-  'Documents Pending': '📄',
-  'Visa Processing': '🎫',
-  'Visa Approved': '🛂',
-  'Departure': '✈️',
-  'Arrived': '📍',
-  'Scholarship Awarded': '💎',
-}
+import { useCustomTags } from '@/composables/useCustomTags'
 
-const getTagIcon = (tag: string) => {
-  return TAG_ICON_MAP[tag] || '🏷️'
-}
+const { getTagIcon } = useCustomTags()
 
 const rowBgClass = computed(() => {
   const colorKey = props.student.row_color?.toUpperCase()
@@ -253,17 +234,31 @@ const universities = computed(() => {
     <!-- 6. Actions Column (Tags & Actions Menu Trigger) -->
     <td class="px-4 py-3 text-right whitespace-nowrap" @click.stop>
       <div class="flex items-center justify-end gap-2">
-        <!-- Task Tags Container -->
-        <div v-if="student.task_tags && student.task_tags.length > 0" class="flex items-center gap-1.5 flex-wrap justify-end shrink-0">
-          <span
+        <!-- Task Tags Container (Icon only with iOS-styled Solid Black Tooltip) -->
+        <div v-if="student.task_tags && student.task_tags.length > 0" class="flex items-center gap-1 flex-wrap justify-end shrink-0">
+          <div
             v-for="(tag, tagIdx) in student.task_tags"
             :key="tagIdx"
-            class="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-semibold bg-zinc-900/10 dark:bg-white/15 border border-zinc-900/20 dark:border-white/25 text-zinc-950 dark:text-zinc-50 rounded-md shadow-2xs cursor-pointer select-none backdrop-blur-xs"
-            :title="tag"
+            class="group/tag relative inline-flex items-center justify-center"
           >
-            <span class="text-xs leading-none">{{ getTagIcon(tag) }}</span>
-            <span class="max-w-[110px] truncate">{{ tag }}</span>
-          </span>
+            <!-- Tag Icon Badge -->
+            <div
+              class="inline-flex items-center justify-center w-6 h-6 text-sm bg-zinc-900/10 dark:bg-white/15 border border-zinc-900/20 dark:border-white/25 text-zinc-950 dark:text-zinc-50 rounded-lg shadow-2xs cursor-pointer select-none backdrop-blur-xs hover:scale-110 active:scale-95 transition-all"
+            >
+              <span class="leading-none select-none">{{ getTagIcon(tag) }}</span>
+            </div>
+
+            <!-- iOS Styled Solid Black Tooltip -->
+            <div
+              class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 opacity-0 scale-90 translate-y-1 group-hover/tag:opacity-100 group-hover/tag:scale-100 group-hover/tag:translate-y-0 transition-all duration-150 ease-out z-50 flex flex-col items-center select-none"
+            >
+              <div class="px-2.5 py-1 bg-black text-white text-[11px] font-semibold rounded-md shadow-xl shadow-black/50 whitespace-nowrap tracking-wide flex items-center gap-1">
+                <span>{{ tag }}</span>
+              </div>
+              <!-- Tooltip Arrow Tail -->
+              <div class="w-0 h-0 border-x-4 border-x-transparent border-t-4 border-t-black -mt-[0.5px]"></div>
+            </div>
+          </div>
         </div>
 
         <!-- Actions Menu Trigger -->

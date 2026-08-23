@@ -28,26 +28,9 @@ const emit = defineEmits<{
   (e: 'permanent-delete'): void
 }>()
 
-const DEFAULT_TAGS: CustomTag[] = [
-  { name: 'JEONJU REG', icon: '📋' },
-  { name: 'KDB', icon: '💳' },
-  { name: 'Natija kutilmoqda', icon: '⏳' },
-  { name: 'Topik 2', icon: '🏷️' },
-  { name: 'til kursi', icon: '🏷️' },
-  { name: 'BUFS TIL KURSI', icon: '🚩' },
-  { name: 'BUFS APPFEE', icon: '🎫' },
-  { name: 'AeroSpace', icon: '✈️' },
-  { name: 'GIMCHEON OK', icon: '🏷️' },
-  { name: 'WOOSUK APPFEE', icon: '💳' },
-  { name: 'Documents Pending', icon: '📄' },
-  { name: 'Visa Processing', icon: '🎫' },
-  { name: 'Visa Approved', icon: '🛂' },
-  { name: 'Departure', icon: '✈️' },
-  { name: 'Arrived', icon: '📍' },
-  { name: 'Scholarship Awarded', icon: '💎' },
-]
+import { useCustomTags } from '@/composables/useCustomTags'
 
-const customTagsRegistry = ref<CustomTag[]>([...DEFAULT_TAGS])
+const { tagsRegistry: customTagsRegistry, fetchTags } = useCustomTags()
 const isPermanentConfirmOpen = ref(false)
 
 // Local optimistic state for instant UI reactivity
@@ -71,30 +54,9 @@ watch(() => props.student, (newVal) => {
   syncFromStudent(newVal)
 }, { immediate: true, deep: true })
 
-const loadCustomTags = () => {
-  const saved = localStorage.getItem('customTagsRegistry')
-  if (saved) {
-    try {
-      const parsed = JSON.parse(saved)
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        const map = new Map<string, string>()
-        DEFAULT_TAGS.forEach(t => map.set(t.name, t.icon))
-        parsed.forEach((t: any) => {
-          if (t && t.name) map.set(t.name, t.icon || '🏷️')
-        })
-        customTagsRegistry.value = Array.from(map.entries()).map(([name, icon]) => ({ name, icon }))
-        return
-      }
-    } catch (e) {
-      console.error('Failed to parse customTagsRegistry from localStorage', e)
-    }
-  }
-  customTagsRegistry.value = [...DEFAULT_TAGS]
-}
-
 watch(() => props.isOpen, (newVal) => {
   if (newVal) {
-    loadCustomTags()
+    fetchTags()
     syncFromStudent(props.student)
     isPermanentConfirmOpen.value = false
   }
@@ -111,7 +73,7 @@ const handleKeyDown = (e: KeyboardEvent) => {
 }
 
 onMounted(() => {
-  loadCustomTags()
+  fetchTags()
   window.addEventListener('keydown', handleKeyDown)
 })
 

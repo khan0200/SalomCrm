@@ -110,6 +110,16 @@ export const studentsApi = {
     return response.data
   },
 
+  addStudentsToFolder: async (folderId: string, studentIds: string[]) => {
+    const response = await apiClient.post(`/folders/${folderId}/add-students/`, { student_ids: studentIds })
+    return response.data
+  },
+
+  syncFolderStudents: async (folderId: string, studentIds: string[]) => {
+    const response = await apiClient.post(`/folders/${folderId}/sync-students/`, { student_ids: studentIds })
+    return response.data
+  },
+
   getOptions: async () => {
     const response = await apiClient.get('/student-options/')
     return response.data

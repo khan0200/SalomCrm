@@ -1,7 +1,7 @@
 from django.contrib import admin
 from .models import (
     Student, Folder, TariffOption, EducationLevelOption,
-    StudentGroupOption, LeadSourceOption, CoordinatorOption
+    StudentGroupOption, LeadSourceOption, CoordinatorOption, TagOption
 )
 
 @admin.register(Student)
@@ -22,6 +22,12 @@ class FolderAdmin(admin.ModelAdmin):
 @admin.register(TariffOption)
 class TariffOptionAdmin(admin.ModelAdmin):
     list_display = ('name', 'price', 'tenant')
+    list_filter = ('tenant',)
+
+
+@admin.register(TagOption)
+class TagOptionAdmin(admin.ModelAdmin):
+    list_display = ('name', 'icon', 'tenant')
     list_filter = ('tenant',)
 
 

@@ -16,9 +16,10 @@
   --foreground-muted: #64748b;
   --foreground-subtle: #94a3b8;
   --accent: #007aff;
-  --radius-sm: 6px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 10px;
 }
 
 .dark {
@@ -242,4 +243,13 @@ button, input, select, textarea, optgroup, pre, code, kbd, samp, table, tr, th, 
     font-size: 11.7px !important;
   }
 }
+
+/* ── Crisp Corner Radii Standard (Decreased Radii for buttons, modals, tables, inputs) ── */
+.rounded-3xl { border-radius: 10px !important; }
+.rounded-2xl { border-radius: 8px !important; }
+.rounded-xl { border-radius: 6px !important; }
+.rounded-lg { border-radius: 5px !important; }
+.rounded-md { border-radius: 4px !important; }
+.rounded { border-radius: 3px !important; }
+.rounded-sm { border-radius: 2px !important; }
 

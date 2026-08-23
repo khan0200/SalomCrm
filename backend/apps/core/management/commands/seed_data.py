@@ -130,7 +130,7 @@ class Command(BaseCommand):
             'BUSAN UNIVERSITY OF FOREIGN STUDIES (GEUMJEONG, BUSAN)',
             'KYUNGPOOK NATIONAL UNIVERSITY (BUK-GU, DAEGU)',
         ]
-        from apps.students.models import UniversityOption, UniversityStatusOption
+        from apps.students.models import UniversityOption, UniversityStatusOption, TagOption
         for u in unis:
             UniversityOption.objects.get_or_create(tenant=tenant_ub, name=u)
 
@@ -145,6 +145,32 @@ class Command(BaseCommand):
         ]
         for s_name, s_color in statuses:
             UniversityStatusOption.objects.get_or_create(tenant=tenant_ub, name=s_name, defaults={'color_class': s_color})
+
+        tags_data = [
+            ('HAL', '✅'),
+            ('JEONJU REG', '📋'),
+            ('KDB', '💳'),
+            ('Natija kutilmoqda', '⏳'),
+            ('Topik 2', '🏷️'),
+            ('til kursi', '🏷️'),
+            ('BUFS TIL KURSI', '🚩'),
+            ('BUFS APPFEE', '🎫'),
+            ('AeroSpace', '✈️'),
+            ('GIMCHEON OK', '🏷️'),
+            ('WOOSUK APPFEE', '💳'),
+            ('Documents Pending', '📄'),
+            ('Visa Processing', '🎫'),
+            ('Visa Approved', '🛂'),
+            ('Departure', '✈️'),
+            ('Arrived', '📍'),
+            ('Scholarship Awarded', '💎'),
+            ('Call', '📞'),
+            ('Apply', '🎓'),
+            ('Documents', '📄'),
+            ('Payment', '💰'),
+        ]
+        for t_name, t_icon in tags_data:
+            TagOption.objects.update_or_create(tenant=tenant_ub, name=t_name, defaults={'icon': t_icon})
 
         # 5. Seed Sample Students for Unibridge
         sample_students = [

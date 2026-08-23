@@ -4,7 +4,7 @@ from .views import (
     StudentViewSet, FolderViewSet, StudentOptionsViewSet, StudentExportView,
     TariffOptionViewSet, EducationLevelOptionViewSet, StudentGroupOptionViewSet,
     LeadSourceOptionViewSet, CoordinatorOptionViewSet,
-    UniversityOptionViewSet, UniversityStatusOptionViewSet,
+    UniversityOptionViewSet, UniversityStatusOptionViewSet, TagOptionViewSet,
     SchoolDirectoryViewSet, MajorOptionViewSet, ExtractDocumentView,
     VisaCheckView, VisaDownloadPdfView, VisaStudentQuickSearchView,
     VisaStudentLookupView, VisaStudentListCreateView, VisaStudentDetailView,
@@ -21,6 +21,7 @@ router.register(r'lead-sources', LeadSourceOptionViewSet, basename='lead-source'
 router.register(r'coordinators', CoordinatorOptionViewSet, basename='coordinator')
 router.register(r'universities', UniversityOptionViewSet, basename='university')
 router.register(r'university-statuses', UniversityStatusOptionViewSet, basename='university-status')
+router.register(r'tags', TagOptionViewSet, basename='tag-option')
 router.register(r'schools', SchoolDirectoryViewSet, basename='school')
 router.register(r'majors', MajorOptionViewSet, basename='major')
 

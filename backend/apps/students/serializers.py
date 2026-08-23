@@ -40,7 +40,10 @@ class StudentListSerializer(serializers.ModelSerializer):
             'university_5', 'university_5_status', 'university_5_major',
             'office', 'student_group', 'lead_by', 'coordinator',
             'row_color', 'status_row_color', 'task_tags', 'folder_ids',
-            'is_deleted', 'status_hidden', 'created_at'
+            'is_deleted', 'status_hidden', 'invoice', 'invoice_university',
+            'coa', 'embassy', 'kdb_put_date', 'kdb_take_date',
+            'embassy_father_docs', 'embassy_mother_docs', 'embassy_sponsor_notes',
+            'created_at'
         )
 
 
@@ -150,6 +153,14 @@ class UniversityStatusOptionSerializer(serializers.ModelSerializer):
         from .models import UniversityStatusOption
         model = UniversityStatusOption
         fields = ('id', 'name', 'color_class', 'created_at')
+        read_only_fields = ('id', 'created_at')
+
+
+class TagOptionSerializer(serializers.ModelSerializer):
+    class Meta:
+        from .models import TagOption
+        model = TagOption
+        fields = ('id', 'name', 'icon', 'created_at')
         read_only_fields = ('id', 'created_at')
 
 

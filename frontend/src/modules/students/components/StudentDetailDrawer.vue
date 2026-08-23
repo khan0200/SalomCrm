@@ -7,6 +7,7 @@ import { paymentsApi } from '@/api/payments'
 import { getTariffPrice } from '@/utils/tariff'
 import type { Student, Payment } from '@/types'
 import { useCurrency } from '@/composables/useCurrency'
+import { useUniversityStatuses } from '@/composables/useUniversityStatuses'
 import { UNIVERSITY_SUGGESTIONS, BUILTIN_SCHOOL_DIRECTORY, UZ_MAJOR_SUGGESTIONS, type SchoolEntry } from '@/data/schoolsData'
 import {
   User, Mail, Calendar, GraduationCap, Layers, Landmark,
@@ -249,14 +250,13 @@ const onUniMajorInput = () => {
 
 const testDateYears = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i)
 
-// Status Options
-const universityStatusList = [
-  { name: 'Chosen', colorClass: 'bg-blue-500' },
-  { name: 'Applying', colorClass: 'bg-amber-500' },
-  { name: 'Applied', colorClass: 'bg-amber-500' },
-  { name: 'Accepted', colorClass: 'bg-emerald-500' },
-  { name: 'Failed', colorClass: 'bg-rose-500' }
-]
+// Dynamic University Statuses & Colors from Settings / DB
+const {
+  statusesRegistry: universityStatusList,
+  fetchStatuses: fetchUniversityStatuses,
+  getStatusDotClass,
+  getStatusBadgeClass: getUniStatusBadgeClass
+} = useUniversityStatuses()
 
 // Helper: Initials
 const getInitials = (name?: string | null) => {
@@ -385,6 +385,7 @@ const handleGlobalKeyDown = (e: KeyboardEvent) => {
 
 onMounted(() => {
   window.addEventListener('keydown', handleGlobalKeyDown)
+  fetchUniversityStatuses()
 })
 
 onUnmounted(() => {
@@ -553,21 +554,6 @@ const leadByOptions = computed(() => props.options?.leads || [])
 const coordinatorOptions = computed(() => props.options?.coordinators || [])
 const universityOptions = computed(() => allUniversities.value)
 const officeOptions = computed(() => props.options?.offices || ['ANDIJON OFFIS', 'TOSHKENT OFFIS'])
-
-// University Status Badge Helper
-const getUniStatusBadgeClass = (status?: string | null) => {
-  const st = (status || '').toUpperCase()
-  if (st === 'ACCEPTED' || st === 'FINISHED' || st === 'ADMITTED') {
-    return 'bg-[#36b37e] text-white border-[#36b37e]'
-  }
-  if (st === 'FAILED' || st === 'REJECTED') {
-    return 'bg-[#ff5630] text-white border-[#ff5630]'
-  }
-  if (st === 'APPLYING' || st === 'APPLIED') {
-    return 'bg-[#ffab00] text-zinc-900 border-[#ffab00]'
-  }
-  return 'bg-[#0052cc] text-white border-[#0052cc]'
-}
 
 // Major Modal Handlers
 const openMajorModal = (slot: number) => {
@@ -2711,16 +2697,15 @@ const handleRestoreStudent = () => {
                           </div>
                           
                           <div class="mt-1.5 flex items-center relative flex-wrap gap-2">
-                            <!-- Clickable Status Badge Pill -->
+                            <!-- Clickable Status Badge Pill (Clean text only, no bullet mark) -->
                             <div class="relative">
                               <button
                                 type="button"
                                 @click.stop="activeStatusDropdown = activeStatusDropdown === slot ? null : slot"
-                                class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase shadow-2xs border cursor-pointer hover:opacity-90 active:scale-95 transition-all select-none"
+                                class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10.5px] font-extrabold uppercase shadow-2xs border cursor-pointer hover:opacity-90 active:scale-95 transition-all select-none"
                                 :class="getUniStatusBadgeClass((student as any)[`university_${slot}_status`])"
                                 title="Click to change application status"
                               >
-                                <span class="h-1.5 w-1.5 rounded-full bg-white flex-shrink-0" />
                                 <span>{{ (student as any)[`university_${slot}_status`] || 'Chosen' }}</span>
                               </button>
 
@@ -2740,20 +2725,19 @@ const handleRestoreStudent = () => {
                                   @click.stop="handleStatusSelect(slot, st.name)"
                                   class="w-full text-left px-2.5 py-1 text-[12.5px] font-semibold text-zinc-800 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 flex items-center gap-2 cursor-pointer transition-all"
                                 >
-                                  <span class="h-2 w-2 rounded-full flex-shrink-0" :class="st.colorClass" />
+                                  <span class="h-2 w-2 rounded-full flex-shrink-0" :class="getStatusDotClass(st.name)" />
                                   <span>{{ st.name }}</span>
                                 </button>
                               </div>
                             </div>
 
-                            <!-- Clickable Major Pill (Opens Write Selected Major Modal) -->
+                            <!-- Clickable Major Pill (Clean text only, no icon) -->
                             <button
                               type="button"
                               @click.stop="openMajorModal(slot)"
-                              class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10.5px] font-bold border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 active:scale-95 transition-all shadow-2xs select-none cursor-pointer"
+                              class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10.5px] font-bold border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 active:scale-95 transition-all shadow-2xs select-none cursor-pointer"
                               :title="`Click to edit major for University ${slot}`"
                             >
-                              <BookOpen class="h-3 w-3 shrink-0" />
                               <span>{{ (((student as any)[`university_${slot}_major`]) || 'Add Major').toUpperCase() }}</span>
                             </button>
                           </div>
