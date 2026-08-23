@@ -677,32 +677,32 @@ const activeConfig = computed(() => TABS_CONFIG[activeTab.value])
     <!-- Master-Detail Navigation & Content Grid -->
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
       <!-- Left Category Navigation Tabs (w-[280px]) -->
-      <div class="lg:col-span-4 xl:col-span-3 bg-white dark:bg-[#111315] p-2 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-2xs space-y-1">
+      <div class="lg:col-span-4 xl:col-span-3 bg-white dark:bg-[#111315] p-1.5 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-2xs space-y-0.5">
         <button
           v-for="tab in Object.values(TABS_CONFIG)"
           :key="tab.id"
           @click="activeTab = tab.id as TabType"
-          class="w-full flex items-center justify-between p-3 rounded-xl text-left text-xs font-bold transition-all cursor-pointer select-none"
+          class="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left text-xs font-bold transition-all cursor-pointer select-none"
           :class="[
             activeTab === tab.id
               ? 'bg-blue-50/80 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200/60 dark:border-blue-800/60 shadow-2xs'
               : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-850 hover:text-zinc-900 dark:hover:text-zinc-200 border border-transparent'
           ]"
         >
-          <div class="flex items-center gap-3 min-w-0">
+          <div class="flex items-center gap-2.5 min-w-0">
             <div
-              class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 border"
+              class="w-7 h-7 rounded-md flex items-center justify-center shrink-0 border"
               :class="tab.colorClass"
             >
-              <component :is="tab.icon" class="w-4 h-4" />
+              <component :is="tab.icon" class="w-3.5 h-3.5" />
             </div>
             <div class="truncate">
-              <div class="font-bold truncate">{{ tab.label }}</div>
-              <div class="text-[10.5px] font-medium text-zinc-400 dark:text-zinc-500 truncate">{{ tab.subLabel }}</div>
+              <div class="font-bold truncate text-[12px]">{{ tab.label }}</div>
+              <div class="text-[10px] font-medium text-zinc-400 dark:text-zinc-500 truncate leading-tight">{{ tab.subLabel }}</div>
             </div>
           </div>
           <span
-            class="px-2 py-0.5 rounded-full text-[10px] font-bold font-mono ml-2 shrink-0"
+            class="px-1.5 py-0.2 rounded-full text-[9.5px] font-bold font-mono ml-2 shrink-0"
             :class="activeTab === tab.id ? 'bg-blue-600 text-white shadow-xs' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500'"
           >
             {{ getTabCount(tab.id) }}
