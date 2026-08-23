@@ -714,12 +714,16 @@ const activeConfig = computed(() => TABS_CONFIG[activeTab.value])
       <div class="lg:col-span-8 xl:col-span-9 bg-white dark:bg-[#111315] p-5 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-2xs min-h-[480px] flex flex-col">
         <!-- Tab Content Header -->
         <div class="border-b border-zinc-100 dark:border-zinc-800 pb-4 mb-4 flex items-center justify-between">
-          <div>
-            <h2 class="text-base font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-              <component :is="activeConfig.icon" class="w-5 h-5 text-blue-600" />
-              <span>{{ activeConfig.label }}</span>
-            </h2>
-            <p class="text-xs text-zinc-500 font-medium mt-0.5">{{ activeConfig.description }}</p>
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl flex items-center justify-center border shrink-0 shadow-2xs" :class="activeConfig.colorClass">
+              <component :is="activeConfig.icon" class="w-5 h-5" />
+            </div>
+            <div>
+              <h2 class="text-base font-bold text-zinc-900 dark:text-zinc-100">
+                {{ activeConfig.label }}
+              </h2>
+              <p class="text-xs text-zinc-500 font-medium mt-0.5">{{ activeConfig.description }}</p>
+            </div>
           </div>
         </div>
 
@@ -979,91 +983,154 @@ const activeConfig = computed(() => TABS_CONFIG[activeTab.value])
           </div>
         </div>
 
-        <!-- 10. Payment Settings (Sub-sections) -->
-        <div v-else-if="activeTab === 'payment_setting'" class="space-y-6">
-          <!-- 10.1 Payment Methods -->
-          <div class="space-y-3">
-            <div class="flex items-center justify-between">
-              <h3 class="text-xs font-bold text-zinc-800 dark:text-zinc-200 uppercase tracking-wider">Payment Methods</h3>
+        <!-- 10. Payment Settings (3-Column Layout matching screenshot) -->
+        <div v-else-if="activeTab === 'payment_setting'" class="grid grid-cols-1 md:grid-cols-3 gap-5 items-start">
+          <!-- Column 1: PAYMENT METHODS -->
+          <div class="bg-white dark:bg-[#15171a] rounded-2xl border border-zinc-200 dark:border-zinc-800 p-4.5 flex flex-col min-h-[380px] shadow-2xs">
+            <div class="flex items-center justify-between pb-3.5 mb-3.5 border-b border-zinc-100 dark:border-zinc-800">
+              <h3 class="text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">Payment Methods</h3>
               <button
+                type="button"
                 @click="handleOpenAdd('payment_method')"
-                class="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1 cursor-pointer"
+                class="text-xs font-bold text-orange-500 hover:text-orange-600 dark:text-orange-400 flex items-center gap-1 cursor-pointer transition-colors"
               >
-                <PlusCircle class="w-3.5 h-3.5" />
-                <span>Add Method</span>
+                <PlusCircle class="w-4 h-4" />
+                <span>Add</span>
               </button>
             </div>
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+
+            <div class="space-y-2.5 flex-1 overflow-y-auto">
+              <div
+                v-if="filteredPaymentMethods.length === 0"
+                class="py-12 text-center text-xs text-zinc-400 italic"
+              >
+                No payment methods added
+              </div>
+
               <div
                 v-for="pm in filteredPaymentMethods"
                 :key="pm.id"
-                class="group flex items-center justify-between p-2.5 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-850 border border-zinc-200 dark:border-zinc-700 text-xs font-bold"
+                class="group flex items-center justify-between px-3.5 py-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-750 text-xs font-bold text-zinc-800 dark:text-zinc-200 hover:border-orange-400 dark:hover:border-orange-500 transition-all shadow-2xs"
               >
-                <span>{{ pm.name }}</span>
-                <button
-                  @click="handleDelete('payment_method', pm.id, pm.name)"
-                  class="opacity-0 group-hover:opacity-100 text-rose-500 hover:text-rose-700 transition-opacity cursor-pointer"
-                >
-                  <Trash2 class="w-3.5 h-3.5" />
-                </button>
+                <span class="truncate">{{ pm.name }}</span>
+                <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                  <button
+                    type="button"
+                    @click="handleOpenEdit('payment_method', pm)"
+                    class="p-1 text-zinc-400 hover:text-blue-600 transition-colors cursor-pointer"
+                    title="Edit"
+                  >
+                    <Pencil class="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    @click="handleDelete('payment_method', pm.id, pm.name)"
+                    class="p-1 text-zinc-400 hover:text-rose-500 transition-colors cursor-pointer"
+                    title="Delete"
+                  >
+                    <Trash2 class="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
             </div>
           </div>
 
-          <!-- 10.2 Payment Receivers -->
-          <div class="space-y-3 border-t border-zinc-100 dark:border-zinc-800 pt-4">
-            <div class="flex items-center justify-between">
-              <h3 class="text-xs font-bold text-zinc-800 dark:text-zinc-200 uppercase tracking-wider">Payment Receivers</h3>
+          <!-- Column 2: PAYMENT RECEIVERS -->
+          <div class="bg-white dark:bg-[#15171a] rounded-2xl border border-zinc-200 dark:border-zinc-800 p-4.5 flex flex-col min-h-[380px] shadow-2xs">
+            <div class="flex items-center justify-between pb-3.5 mb-3.5 border-b border-zinc-100 dark:border-zinc-800">
+              <h3 class="text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">Payment Receivers</h3>
               <button
+                type="button"
                 @click="handleOpenAdd('payment_receiver')"
-                class="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1 cursor-pointer"
+                class="text-xs font-bold text-orange-500 hover:text-orange-600 dark:text-orange-400 flex items-center gap-1 cursor-pointer transition-colors"
               >
-                <PlusCircle class="w-3.5 h-3.5" />
-                <span>Add Receiver</span>
+                <PlusCircle class="w-4 h-4" />
+                <span>Add</span>
               </button>
             </div>
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+
+            <div class="space-y-2.5 flex-1 overflow-y-auto">
+              <div
+                v-if="filteredPaymentReceivers.length === 0"
+                class="py-12 text-center text-xs text-zinc-400 italic"
+              >
+                No payment receivers added
+              </div>
+
               <div
                 v-for="pr in filteredPaymentReceivers"
                 :key="pr.id"
-                class="group flex items-center justify-between p-2.5 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-850 border border-zinc-200 dark:border-zinc-700 text-xs font-bold"
+                class="group flex items-center justify-between px-3.5 py-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-750 text-xs font-bold text-zinc-800 dark:text-zinc-200 hover:border-orange-400 dark:hover:border-orange-500 transition-all shadow-2xs"
               >
-                <span>{{ pr.name }}</span>
-                <button
-                  @click="handleDelete('payment_receiver', pr.id, pr.name)"
-                  class="opacity-0 group-hover:opacity-100 text-rose-500 hover:text-rose-700 transition-opacity cursor-pointer"
-                >
-                  <Trash2 class="w-3.5 h-3.5" />
-                </button>
+                <span class="truncate">{{ pr.name }}</span>
+                <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                  <button
+                    type="button"
+                    @click="handleOpenEdit('payment_receiver', pr)"
+                    class="p-1 text-zinc-400 hover:text-blue-600 transition-colors cursor-pointer"
+                    title="Edit"
+                  >
+                    <Pencil class="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    @click="handleDelete('payment_receiver', pr.id, pr.name)"
+                    class="p-1 text-zinc-400 hover:text-rose-500 transition-colors cursor-pointer"
+                    title="Delete"
+                  >
+                    <Trash2 class="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
             </div>
           </div>
 
-          <!-- 10.3 Payment Note Templates -->
-          <div class="space-y-3 border-t border-zinc-100 dark:border-zinc-800 pt-4">
-            <div class="flex items-center justify-between">
-              <h3 class="text-xs font-bold text-zinc-800 dark:text-zinc-200 uppercase tracking-wider">Quick Note Templates (Pills)</h3>
+          <!-- Column 3: QUICK NOTE TEMPLATES -->
+          <div class="bg-white dark:bg-[#15171a] rounded-2xl border border-zinc-200 dark:border-zinc-800 p-4.5 flex flex-col min-h-[380px] shadow-2xs">
+            <div class="flex items-center justify-between pb-3.5 mb-3.5 border-b border-zinc-100 dark:border-zinc-800">
+              <h3 class="text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">Quick Note Templates</h3>
               <button
+                type="button"
                 @click="handleOpenAdd('payment_note_template')"
-                class="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1 cursor-pointer"
+                class="text-xs font-bold text-orange-500 hover:text-orange-600 dark:text-orange-400 flex items-center gap-1 cursor-pointer transition-colors"
               >
-                <PlusCircle class="w-3.5 h-3.5" />
-                <span>Add Note Pill</span>
+                <PlusCircle class="w-4 h-4" />
+                <span>Add</span>
               </button>
             </div>
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+
+            <div class="space-y-2.5 flex-1 overflow-y-auto">
+              <div
+                v-if="filteredPaymentNoteTemplates.length === 0"
+                class="py-12 text-center text-xs text-zinc-400 italic"
+              >
+                No quick note templates added
+              </div>
+
               <div
                 v-for="pnt in filteredPaymentNoteTemplates"
                 :key="pnt.id"
-                class="group flex items-center justify-between p-2.5 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-850 border border-zinc-200 dark:border-zinc-700 text-xs font-bold"
+                class="group flex items-center justify-between px-3.5 py-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-750 text-xs font-bold text-zinc-800 dark:text-zinc-200 hover:border-orange-400 dark:hover:border-orange-500 transition-all shadow-2xs"
               >
-                <span>{{ pnt.name }}</span>
-                <button
-                  @click="handleDelete('payment_note_template', pnt.id, pnt.name)"
-                  class="opacity-0 group-hover:opacity-100 text-rose-500 hover:text-rose-700 transition-opacity cursor-pointer"
-                >
-                  <Trash2 class="w-3.5 h-3.5" />
-                </button>
+                <span class="truncate">{{ pnt.name }}</span>
+                <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                  <button
+                    type="button"
+                    @click="handleOpenEdit('payment_note_template', pnt)"
+                    class="p-1 text-zinc-400 hover:text-blue-600 transition-colors cursor-pointer"
+                    title="Edit"
+                  >
+                    <Pencil class="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    @click="handleDelete('payment_note_template', pnt.id, pnt.name)"
+                    class="p-1 text-zinc-400 hover:text-rose-500 transition-colors cursor-pointer"
+                    title="Delete"
+                  >
+                    <Trash2 class="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
             </div>
           </div>
