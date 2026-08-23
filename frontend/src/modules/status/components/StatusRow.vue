@@ -153,14 +153,14 @@ const handleContextMenu = (e: MouseEvent) => {
     :style="visaRowStyle"
   >
     <!-- ID Column (Sortable Badge) -->
-    <td class="px-2 py-2.5 w-[5rem]">
-      <div class="flex items-center justify-center w-10 h-6.5 text-[11px] font-bold bg-[#007aff] text-white rounded-[4px] shadow-xs select-all">
+    <td class="px-2 py-2.5 w-[4.5rem]">
+      <div class="inline-flex items-center justify-center px-2.5 py-1 min-w-[36px] h-7 text-[11px] font-mono font-bold bg-[#007aff] text-white rounded-[4px] shadow-2xs select-all">
         {{ student.id }}
       </div>
     </td>
 
     <!-- Full Name Column -->
-    <td class="px-2 py-2.5" :class="isKdbMode ? 'w-[22%]' : 'w-[28%]'">
+    <td class="px-2 py-2.5" :class="isKdbMode ? 'w-[22%]' : 'w-[22%]'">
       <div class="flex items-center gap-1.5 min-w-0">
         <span class="font-bold uppercase tracking-wide text-xs text-zinc-900 dark:text-zinc-100 truncate">
           {{ student.full_name }}
@@ -175,7 +175,7 @@ const handleContextMenu = (e: MouseEvent) => {
     </td>
 
     <!-- Level & Certificate Split Badge Column (matching /students) -->
-    <td class="px-3 py-2.5 whitespace-nowrap" :class="isKdbMode ? 'w-[10%]' : 'w-[12%]'">
+    <td class="px-3 py-2.5 whitespace-nowrap" :class="isKdbMode ? 'w-[10%]' : 'w-[9%]'">
       <div class="space-y-1">
         <!-- Level Pills -->
         <div class="flex flex-wrap gap-1">
