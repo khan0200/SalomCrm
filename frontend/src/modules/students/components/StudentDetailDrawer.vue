@@ -14,7 +14,7 @@ import {
   Tag, Building2, CheckSquare, Plus, Pencil, CheckCircle2,
   Trash2, RefreshCw, X, Maximize2, Minimize2, Copy,
   Check, ChevronDown, Folder, ExternalLink, AlertTriangle, AlertCircle,
-  BookOpen, ArrowLeft, FileText, Eraser, Loader2
+  BookOpen, ArrowLeft, FileText, Eraser, Loader2, ArrowDownCircle
 } from 'lucide-vue-next'
 
 const router = useRouter()
@@ -416,15 +416,13 @@ const computedTariffPrice = computed(() => {
 })
 
 const computedPaymentsDone = computed(() => {
+  // Only standard payments (non-discount, non-withdrawal)
   if (studentPayments.value && studentPayments.value.length > 0) {
     return studentPayments.value
-      .filter(p => !p.is_discount)
-      .reduce((sum, p) => {
-        const val = Number(p.amount) || 0
-        return p.is_withdrawal ? sum - Math.abs(val) : sum + val
-      }, 0)
+      .filter(p => !p.is_discount && !p.is_withdrawal)
+      .reduce((sum, p) => sum + (Number(p.amount) || 0), 0)
   }
-  // Instant 0ms calculation from (Balance + Tariff Price - Discount) if payments query is in-flight
+  // Instant 0ms fallback while payments query is in-flight
   if (props.student?.balance !== undefined && props.student?.tariff) {
     const tariffVal = computedTariffPrice.value
     const balVal = Number(props.student.balance || 0)
@@ -445,12 +443,22 @@ const computedDiscount = computed(() => {
   return Number(props.student?.discount || 0)
 })
 
+const computedWithdrawals = computed(() => {
+  if (studentPayments.value && studentPayments.value.length > 0) {
+    return studentPayments.value
+      .filter(p => p.is_withdrawal)
+      .reduce((sum, p) => sum + Math.abs(Number(p.amount) || 0), 0)
+  }
+  return 0
+})
+
 const computedBalance = computed(() => {
   // If Tariff is not set: fallback to student.balance
   if (!props.student?.tariff || props.student.tariff === 'Select' || props.student.tariff === '—') {
     return Number(props.student?.balance || 0)
   }
-  const balance = (computedPaymentsDone.value + computedDiscount.value) - computedTariffPrice.value
+  // BALANCE = (PAYMENTS_DONE + DISCOUNT) - TARIFF_PRICE - WITHDRAWALS
+  const balance = (computedPaymentsDone.value + computedDiscount.value) - computedTariffPrice.value - computedWithdrawals.value
   return Math.abs(balance) < 0.01 ? 0 : balance
 })
 
@@ -3208,7 +3216,30 @@ const handleRestoreStudent = () => {
                     </div>
                   </div>
 
-                  <!-- 3.5 STUDENT ID -->
+                  <!-- 3.5 WITHDRAWN CARD (Solid Rose) -->
+                  <div
+                    v-if="computedWithdrawals > 0"
+                    class="bg-[#e11d48] rounded-xl px-3.5 py-2.5 text-white flex flex-col justify-between shadow-xs cursor-pointer hover:brightness-105 transition-all duration-150 group/card"
+                    :class="[copiedField === 'withdrawn' && 'animate-copy-press']"
+                    @click="handleCopy('withdrawn', String(computedWithdrawals))"
+                    title="Single-click to copy Withdrawn"
+                  >
+                    <div class="flex items-center justify-between">
+                      <span class="text-[11px] uppercase font-extrabold tracking-wider text-rose-100 flex items-center gap-1.5">
+                        <ArrowDownCircle class="w-3.5 h-3.5" />
+                        WITHDRAWN
+                      </span>
+                      <button type="button" @click.stop="handleCopy('withdrawn', String(computedWithdrawals))" class="p-0.5 text-rose-200 hover:text-white transition-colors" title="Copy Withdrawn">
+                        <Check v-if="copiedField === 'withdrawn'" class="w-3.5 h-3.5 text-white" />
+                        <Copy v-else class="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                    <div class="mt-1 text-[16px] font-extrabold tracking-wide font-mono">
+                      {{ formatCurrency(computedWithdrawals) }}
+                    </div>
+                  </div>
+
+                  <!-- 3.6 STUDENT ID -->
                   <div
                     class="relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 border-l-[3.5px] border-l-blue-600 rounded-lg px-2.5 py-1.5 shadow-2xs hover:bg-zinc-50/70 transition-all duration-150 cursor-pointer group/card"
                     :class="[copiedField === 'student_id' && 'animate-copy-press']"

@@ -360,14 +360,69 @@ watch([historySearch, selectedMethod, selectedReceiver], () => {
   historyPage.value = 1
 })
 
+// ── Optimistic Cache Helpers ──────────────────────────────────────────
+const injectPaymentToCache = (payment: Payment) => {
+  // Immediately add the new payment to the history cache
+  queryClient.setQueryData(['payment-history-all'], (old: any) => {
+    if (!old) return old
+    return { ...old, results: [payment, ...(old.results || [])] }
+  })
+  // Also inject into student-specific payment cache if open
+  if (payment.student_id) {
+    queryClient.setQueryData(['student-payments', payment.student_id], (old: any) => {
+      if (!old) return old
+      return { ...old, results: [payment, ...(old.results || [])] }
+    })
+  }
+}
+
+const removePaymentFromCache = (paymentId: string) => {
+  queryClient.setQueryData(['payment-history-all'], (old: any) => {
+    if (!old) return old
+    return { ...old, results: (old.results || []).filter((p: Payment) => p.id !== paymentId) }
+  })
+  // Remove from all student-specific caches
+  queryClient.getQueriesData({ queryKey: ['student-payments'] }).forEach(([key, data]: any) => {
+    if (data?.results) {
+      queryClient.setQueryData(key, { ...data, results: data.results.filter((p: Payment) => p.id !== paymentId) })
+    }
+  })
+}
+
+const backgroundRefreshAll = () => {
+  queryClient.invalidateQueries({ queryKey: ['payment-overview-all'] })
+  queryClient.invalidateQueries({ queryKey: ['payment-history-all'] })
+  queryClient.invalidateQueries({ queryKey: ['students'] })
+  queryClient.invalidateQueries({ queryKey: ['all-students-master'] })
+  queryClient.invalidateQueries({ queryKey: ['student-payments'] })
+}
+
 // ── Mutations ─────────────────────────────────────────────────────────
 const createPaymentMutation = useMutation({
   mutationFn: (data: any) => paymentsApi.createPayment(data),
-  onSuccess: (res) => {
-    queryClient.invalidateQueries({ queryKey: ['payment-overview-all'] })
-    queryClient.invalidateQueries({ queryKey: ['payment-history-all'] })
-    queryClient.invalidateQueries({ queryKey: ['students'] })
+  onMutate: (data: any) => {
+    // Optimistically inject a temporary payment record
+    const tempPayment: Payment = {
+      id: `temp-${Date.now()}`,
+      student_id: data.student_id,
+      student_full_name: allStudents.value.find(s => s.id === data.student_id)?.full_name || null,
+      student_name: null,
+      amount: data.amount,
+      method: data.method,
+      received_by: data.received_by,
+      notes: data.notes,
+      is_discount: data.is_discount || false,
+      is_withdrawal: false,
+      created_by_name: null,
+      created_at: new Date().toISOString(),
+    }
+    injectPaymentToCache(tempPayment)
     isAddModalOpen.value = false
+  },
+  onSuccess: (res) => {
+    // Replace temp record with real server response
+    removePaymentFromCache(`temp-${Math.floor(Date.now() / 1000) * 1000}`)
+    backgroundRefreshAll()
     uiStore.addToast({
       type: 'success',
       title: 'Payment Recorded',
@@ -375,6 +430,7 @@ const createPaymentMutation = useMutation({
     })
   },
   onError: (err: any) => {
+    backgroundRefreshAll()
     uiStore.addToast({
       type: 'error',
       title: 'Payment Failed',
@@ -385,11 +441,26 @@ const createPaymentMutation = useMutation({
 
 const withdrawMutation = useMutation({
   mutationFn: (data: any) => paymentsApi.createWithdrawal(data),
-  onSuccess: (res) => {
-    queryClient.invalidateQueries({ queryKey: ['payment-overview-all'] })
-    queryClient.invalidateQueries({ queryKey: ['payment-history-all'] })
-    queryClient.invalidateQueries({ queryKey: ['students'] })
+  onMutate: (data: any) => {
+    const tempPayment: Payment = {
+      id: `temp-${Date.now()}`,
+      student_id: data.student_id,
+      student_full_name: allStudents.value.find(s => s.id === data.student_id)?.full_name || null,
+      student_name: null,
+      amount: -Math.abs(data.amount),
+      method: data.method,
+      received_by: data.received_by,
+      notes: data.notes || data.reason,
+      is_discount: false,
+      is_withdrawal: true,
+      created_by_name: null,
+      created_at: new Date().toISOString(),
+    }
+    injectPaymentToCache(tempPayment)
     isWithdrawModalOpen.value = false
+  },
+  onSuccess: (res) => {
+    backgroundRefreshAll()
     uiStore.addToast({
       type: 'warning',
       title: 'Withdrawal Recorded',
@@ -397,6 +468,7 @@ const withdrawMutation = useMutation({
     })
   },
   onError: (err: any) => {
+    backgroundRefreshAll()
     uiStore.addToast({
       type: 'error',
       title: 'Withdrawal Failed',
@@ -410,11 +482,41 @@ const editPaymentMutation = useMutation({
     if (!editingPayment.value) throw new Error('No payment selected')
     return paymentsApi.updatePayment(editingPayment.value.id, data)
   },
-  onSuccess: () => {
-    queryClient.invalidateQueries({ queryKey: ['payment-overview-all'] })
-    queryClient.invalidateQueries({ queryKey: ['payment-history-all'] })
-    queryClient.invalidateQueries({ queryKey: ['students'] })
+  onMutate: (data: any) => {
+    if (!editingPayment.value) return
+    const paymentId = editingPayment.value.id
+    const isWithdrawal = editingPayment.value.is_withdrawal
+    const updatedAmount = isWithdrawal ? -Math.abs(data.amount) : Math.abs(data.amount)
+
+    // Optimistically update the payment in history cache
+    queryClient.setQueryData(['payment-history-all'], (old: any) => {
+      if (!old) return old
+      return {
+        ...old,
+        results: (old.results || []).map((p: Payment) =>
+          p.id === paymentId
+            ? { ...p, amount: updatedAmount, method: data.method, received_by: data.received_by, notes: data.notes ?? p.notes }
+            : p
+        )
+      }
+    })
+    // Update student-specific caches
+    queryClient.getQueriesData({ queryKey: ['student-payments'] }).forEach(([key, cacheData]: any) => {
+      if (cacheData?.results?.some((p: Payment) => p.id === paymentId)) {
+        queryClient.setQueryData(key, {
+          ...cacheData,
+          results: cacheData.results.map((p: Payment) =>
+            p.id === paymentId
+              ? { ...p, amount: updatedAmount, method: data.method, received_by: data.received_by, notes: data.notes ?? p.notes }
+              : p
+          )
+        })
+      }
+    })
     isEditModalOpen.value = false
+  },
+  onSuccess: () => {
+    backgroundRefreshAll()
     uiStore.addToast({
       type: 'success',
       title: 'Payment Updated',
@@ -422,6 +524,7 @@ const editPaymentMutation = useMutation({
     })
   },
   onError: (err: any) => {
+    backgroundRefreshAll()
     uiStore.addToast({
       type: 'error',
       title: 'Update Failed',
@@ -432,10 +535,12 @@ const editPaymentMutation = useMutation({
 
 const deletePaymentMutation = useMutation({
   mutationFn: (id: string) => paymentsApi.deletePayment(id),
+  onMutate: (id: string) => {
+    // Optimistically remove the payment from cache immediately
+    removePaymentFromCache(id)
+  },
   onSuccess: () => {
-    queryClient.invalidateQueries({ queryKey: ['payment-overview-all'] })
-    queryClient.invalidateQueries({ queryKey: ['payment-history-all'] })
-    queryClient.invalidateQueries({ queryKey: ['students'] })
+    backgroundRefreshAll()
     uiStore.addToast({
       type: 'error',
       title: 'Payment Deleted',
@@ -443,6 +548,7 @@ const deletePaymentMutation = useMutation({
     })
   },
   onError: (err: any) => {
+    backgroundRefreshAll()
     uiStore.addToast({
       type: 'error',
       title: 'Delete Failed',

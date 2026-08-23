@@ -46,7 +46,7 @@ def get_tariff_price(tariff_name, certificate=None, tenant=None):
 def recalculate_student_financials(student):
     """
     Recalculates a student's balance and discount strictly from payment history and assigned tariff.
-    Formula: Balance = (Total Payments + Total Discount) - Tariff Price
+    Formula: Balance = (Total Payments + Total Discount) - Tariff Price - abs(Total Withdrawals)
     - Negative balance indicates remaining debt.
     - Zero balance indicates fully paid.
     - Positive balance indicates overpayment.
@@ -56,8 +56,10 @@ def recalculate_student_financials(student):
         # Lock row to prevent race conditions
         student_obj = Student.objects.select_for_update().get(id=student.id)
 
-        # 1. Calculate sum of non-discount payments (normal payments are positive, withdrawals are negative)
-        payments_sum = student_obj.payments.filter(is_discount=False).aggregate(
+        # 1. Calculate sum of standard payments (non-discount, non-withdrawal)
+        payments_sum = student_obj.payments.filter(
+            is_discount=False, is_withdrawal=False
+        ).aggregate(
             total=Sum('amount')
         )['total'] or Decimal('0.00')
 
@@ -66,14 +68,20 @@ def recalculate_student_financials(student):
             total=Sum('amount')
         )['total'] or Decimal('0.00')
 
-        # 3. Get tariff price
+        # 3. Calculate sum of withdrawals (stored as negative amounts, take absolute value)
+        withdrawals_sum = student_obj.payments.filter(is_withdrawal=True).aggregate(
+            total=Sum('amount')
+        )['total'] or Decimal('0.00')
+        withdrawals_abs = abs(withdrawals_sum)
+
+        # 4. Get tariff price
         tariff_price = get_tariff_price(student_obj.tariff, student_obj.language_certificate, student_obj.tenant)
 
-        # 4. Compute balance
+        # 5. Compute balance: (Payments + Discount) - Tariff - Withdrawals
         if tariff_price > 0:
-            computed_balance = (payments_sum + discounts_sum) - tariff_price
+            computed_balance = (payments_sum + discounts_sum) - tariff_price - withdrawals_abs
         else:
-            computed_balance = payments_sum + discounts_sum
+            computed_balance = (payments_sum + discounts_sum) - withdrawals_abs
 
         student_obj.balance = computed_balance
         student_obj.discount = discounts_sum
