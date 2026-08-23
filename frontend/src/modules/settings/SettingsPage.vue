@@ -16,7 +16,12 @@ import {
   Folder as FolderIcon,
   Building2,
   CreditCard,
-  Check
+  Check,
+  Wallet,
+  UserCheck,
+  StickyNote,
+  Banknote,
+  Plus
 } from 'lucide-vue-next'
 import { settingsApi, type TariffOption, type GeneralOption, type UniversityStatusOption, type CustomTag } from '@/api/settings'
 import { useCustomTags } from '@/composables/useCustomTags'
@@ -983,41 +988,56 @@ const activeConfig = computed(() => TABS_CONFIG[activeTab.value])
           </div>
         </div>
 
-        <!-- 10. Payment Settings (3-Column Layout matching screenshot) -->
-        <div v-else-if="activeTab === 'payment_setting'" class="grid grid-cols-1 md:grid-cols-3 gap-5 items-start">
+        <!-- 10. Payment Settings (High-End 3-Column Layout) -->
+        <div v-else-if="activeTab === 'payment_setting'" class="grid grid-cols-1 lg:grid-cols-3 gap-5 items-start">
           <!-- Column 1: PAYMENT METHODS -->
-          <div class="bg-white dark:bg-[#15171a] rounded-2xl border border-zinc-200 dark:border-zinc-800 p-4.5 flex flex-col min-h-[380px] shadow-2xs">
-            <div class="flex items-center justify-between pb-3.5 mb-3.5 border-b border-zinc-100 dark:border-zinc-800">
-              <h3 class="text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">Payment Methods</h3>
+          <div class="bg-zinc-50/60 dark:bg-[#15171a] rounded-2xl border border-zinc-200/80 dark:border-zinc-800 p-4 flex flex-col min-h-[420px] shadow-2xs">
+            <div class="flex items-center justify-between pb-3 mb-3 border-b border-zinc-200/70 dark:border-zinc-800">
+              <div class="flex items-center gap-2">
+                <div class="w-7 h-7 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200/60 dark:border-blue-900/40 flex items-center justify-center">
+                  <CreditCard class="w-3.5 h-3.5" />
+                </div>
+                <div>
+                  <h3 class="text-xs font-extrabold text-zinc-800 dark:text-zinc-200 uppercase tracking-wider">Payment Methods</h3>
+                  <p class="text-[10.5px] text-zinc-400 font-medium">{{ filteredPaymentMethods.length }} method{{ filteredPaymentMethods.length !== 1 ? 's' : '' }} configured</p>
+                </div>
+              </div>
               <button
                 type="button"
                 @click="handleOpenAdd('payment_method')"
-                class="text-xs font-bold text-orange-500 hover:text-orange-600 dark:text-orange-400 flex items-center gap-1 cursor-pointer transition-colors"
+                class="px-2.5 py-1 rounded-lg text-xs font-bold text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-950/40 border border-orange-200/60 dark:border-orange-900/40 flex items-center gap-1 cursor-pointer transition-all shadow-2xs"
               >
-                <PlusCircle class="w-4 h-4" />
+                <Plus class="w-3.5 h-3.5 stroke-[2.5]" />
                 <span>Add</span>
               </button>
             </div>
 
-            <div class="space-y-2.5 flex-1 overflow-y-auto">
+            <div class="space-y-2 flex-1 overflow-y-auto pr-0.5 scrollbar-thin">
               <div
                 v-if="filteredPaymentMethods.length === 0"
-                class="py-12 text-center text-xs text-zinc-400 italic"
+                class="py-16 text-center text-xs text-zinc-400 italic flex flex-col items-center justify-center gap-2"
               >
-                No payment methods added
+                <CreditCard class="w-7 h-7 text-zinc-300 dark:text-zinc-700" />
+                <span>No payment methods configured</span>
               </div>
 
               <div
                 v-for="pm in filteredPaymentMethods"
                 :key="pm.id"
-                class="group flex items-center justify-between px-3.5 py-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-750 text-xs font-bold text-zinc-800 dark:text-zinc-200 hover:border-orange-400 dark:hover:border-orange-500 transition-all shadow-2xs"
+                class="group flex items-center justify-between px-3 py-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 text-xs font-bold text-zinc-800 dark:text-zinc-200 hover:border-blue-400 dark:hover:border-blue-500 transition-all shadow-2xs hover:shadow-xs"
               >
-                <span class="truncate">{{ pm.name }}</span>
+                <div class="flex items-center gap-2.5 min-w-0">
+                  <div class="w-6 h-6 rounded-md bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 flex items-center justify-center shrink-0 border border-zinc-200/60 dark:border-zinc-700">
+                    <Banknote class="w-3.5 h-3.5" />
+                  </div>
+                  <span class="truncate font-bold tracking-tight">{{ pm.name }}</span>
+                </div>
+
                 <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
                   <button
                     type="button"
                     @click="handleOpenEdit('payment_method', pm)"
-                    class="p-1 text-zinc-400 hover:text-blue-600 transition-colors cursor-pointer"
+                    class="p-1 rounded-md text-zinc-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors cursor-pointer"
                     title="Edit"
                   >
                     <Pencil class="w-3.5 h-3.5" />
@@ -1025,7 +1045,7 @@ const activeConfig = computed(() => TABS_CONFIG[activeTab.value])
                   <button
                     type="button"
                     @click="handleDelete('payment_method', pm.id, pm.name)"
-                    class="p-1 text-zinc-400 hover:text-rose-500 transition-colors cursor-pointer"
+                    class="p-1 rounded-md text-zinc-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
                     title="Delete"
                   >
                     <Trash2 class="w-3.5 h-3.5" />
@@ -1036,38 +1056,53 @@ const activeConfig = computed(() => TABS_CONFIG[activeTab.value])
           </div>
 
           <!-- Column 2: PAYMENT RECEIVERS -->
-          <div class="bg-white dark:bg-[#15171a] rounded-2xl border border-zinc-200 dark:border-zinc-800 p-4.5 flex flex-col min-h-[380px] shadow-2xs">
-            <div class="flex items-center justify-between pb-3.5 mb-3.5 border-b border-zinc-100 dark:border-zinc-800">
-              <h3 class="text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">Payment Receivers</h3>
+          <div class="bg-zinc-50/60 dark:bg-[#15171a] rounded-2xl border border-zinc-200/80 dark:border-zinc-800 p-4 flex flex-col min-h-[420px] shadow-2xs">
+            <div class="flex items-center justify-between pb-3 mb-3 border-b border-zinc-200/70 dark:border-zinc-800">
+              <div class="flex items-center gap-2">
+                <div class="w-7 h-7 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-900/40 flex items-center justify-center">
+                  <UserCheck class="w-3.5 h-3.5" />
+                </div>
+                <div>
+                  <h3 class="text-xs font-extrabold text-zinc-800 dark:text-zinc-200 uppercase tracking-wider">Payment Receivers</h3>
+                  <p class="text-[10.5px] text-zinc-400 font-medium">{{ filteredPaymentReceivers.length }} receiver{{ filteredPaymentReceivers.length !== 1 ? 's' : '' }} configured</p>
+                </div>
+              </div>
               <button
                 type="button"
                 @click="handleOpenAdd('payment_receiver')"
-                class="text-xs font-bold text-orange-500 hover:text-orange-600 dark:text-orange-400 flex items-center gap-1 cursor-pointer transition-colors"
+                class="px-2.5 py-1 rounded-lg text-xs font-bold text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-950/40 border border-orange-200/60 dark:border-orange-900/40 flex items-center gap-1 cursor-pointer transition-all shadow-2xs"
               >
-                <PlusCircle class="w-4 h-4" />
+                <Plus class="w-3.5 h-3.5 stroke-[2.5]" />
                 <span>Add</span>
               </button>
             </div>
 
-            <div class="space-y-2.5 flex-1 overflow-y-auto">
+            <div class="space-y-2 flex-1 overflow-y-auto pr-0.5 scrollbar-thin">
               <div
                 v-if="filteredPaymentReceivers.length === 0"
-                class="py-12 text-center text-xs text-zinc-400 italic"
+                class="py-16 text-center text-xs text-zinc-400 italic flex flex-col items-center justify-center gap-2"
               >
-                No payment receivers added
+                <UserCheck class="w-7 h-7 text-zinc-300 dark:text-zinc-700" />
+                <span>No payment receivers configured</span>
               </div>
 
               <div
                 v-for="pr in filteredPaymentReceivers"
                 :key="pr.id"
-                class="group flex items-center justify-between px-3.5 py-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-750 text-xs font-bold text-zinc-800 dark:text-zinc-200 hover:border-orange-400 dark:hover:border-orange-500 transition-all shadow-2xs"
+                class="group flex items-center justify-between px-3 py-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 text-xs font-bold text-zinc-800 dark:text-zinc-200 hover:border-emerald-400 dark:hover:border-emerald-500 transition-all shadow-2xs hover:shadow-xs"
               >
-                <span class="truncate">{{ pr.name }}</span>
+                <div class="flex items-center gap-2.5 min-w-0">
+                  <div class="w-6 h-6 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 font-extrabold text-[10.5px] flex items-center justify-center shrink-0 border border-emerald-200 dark:border-emerald-900/50">
+                    {{ (pr.name || 'R').charAt(0).toUpperCase() }}
+                  </div>
+                  <span class="truncate font-bold uppercase tracking-tight">{{ pr.name }}</span>
+                </div>
+
                 <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
                   <button
                     type="button"
                     @click="handleOpenEdit('payment_receiver', pr)"
-                    class="p-1 text-zinc-400 hover:text-blue-600 transition-colors cursor-pointer"
+                    class="p-1 rounded-md text-zinc-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors cursor-pointer"
                     title="Edit"
                   >
                     <Pencil class="w-3.5 h-3.5" />
@@ -1075,7 +1110,7 @@ const activeConfig = computed(() => TABS_CONFIG[activeTab.value])
                   <button
                     type="button"
                     @click="handleDelete('payment_receiver', pr.id, pr.name)"
-                    class="p-1 text-zinc-400 hover:text-rose-500 transition-colors cursor-pointer"
+                    class="p-1 rounded-md text-zinc-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
                     title="Delete"
                   >
                     <Trash2 class="w-3.5 h-3.5" />
@@ -1086,38 +1121,53 @@ const activeConfig = computed(() => TABS_CONFIG[activeTab.value])
           </div>
 
           <!-- Column 3: QUICK NOTE TEMPLATES -->
-          <div class="bg-white dark:bg-[#15171a] rounded-2xl border border-zinc-200 dark:border-zinc-800 p-4.5 flex flex-col min-h-[380px] shadow-2xs">
-            <div class="flex items-center justify-between pb-3.5 mb-3.5 border-b border-zinc-100 dark:border-zinc-800">
-              <h3 class="text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">Quick Note Templates</h3>
+          <div class="bg-zinc-50/60 dark:bg-[#15171a] rounded-2xl border border-zinc-200/80 dark:border-zinc-800 p-4 flex flex-col min-h-[420px] shadow-2xs">
+            <div class="flex items-center justify-between pb-3 mb-3 border-b border-zinc-200/70 dark:border-zinc-800">
+              <div class="flex items-center gap-2">
+                <div class="w-7 h-7 rounded-lg bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border border-amber-200/60 dark:border-amber-900/40 flex items-center justify-center">
+                  <StickyNote class="w-3.5 h-3.5" />
+                </div>
+                <div>
+                  <h3 class="text-xs font-extrabold text-zinc-800 dark:text-zinc-200 uppercase tracking-wider">Quick Note Templates</h3>
+                  <p class="text-[10.5px] text-zinc-400 font-medium">{{ filteredPaymentNoteTemplates.length }} template{{ filteredPaymentNoteTemplates.length !== 1 ? 's' : '' }} configured</p>
+                </div>
+              </div>
               <button
                 type="button"
                 @click="handleOpenAdd('payment_note_template')"
-                class="text-xs font-bold text-orange-500 hover:text-orange-600 dark:text-orange-400 flex items-center gap-1 cursor-pointer transition-colors"
+                class="px-2.5 py-1 rounded-lg text-xs font-bold text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-950/40 border border-orange-200/60 dark:border-orange-900/40 flex items-center gap-1 cursor-pointer transition-all shadow-2xs"
               >
-                <PlusCircle class="w-4 h-4" />
+                <Plus class="w-3.5 h-3.5 stroke-[2.5]" />
                 <span>Add</span>
               </button>
             </div>
 
-            <div class="space-y-2.5 flex-1 overflow-y-auto">
+            <div class="space-y-2 flex-1 overflow-y-auto pr-0.5 scrollbar-thin">
               <div
                 v-if="filteredPaymentNoteTemplates.length === 0"
-                class="py-12 text-center text-xs text-zinc-400 italic"
+                class="py-16 text-center text-xs text-zinc-400 italic flex flex-col items-center justify-center gap-2"
               >
-                No quick note templates added
+                <StickyNote class="w-7 h-7 text-zinc-300 dark:text-zinc-700" />
+                <span>No quick note templates configured</span>
               </div>
 
               <div
                 v-for="pnt in filteredPaymentNoteTemplates"
                 :key="pnt.id"
-                class="group flex items-center justify-between px-3.5 py-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-750 text-xs font-bold text-zinc-800 dark:text-zinc-200 hover:border-orange-400 dark:hover:border-orange-500 transition-all shadow-2xs"
+                class="group flex items-center justify-between px-3 py-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 text-xs font-bold text-zinc-800 dark:text-zinc-200 hover:border-amber-400 dark:hover:border-amber-500 transition-all shadow-2xs hover:shadow-xs"
               >
-                <span class="truncate">{{ pnt.name }}</span>
+                <div class="flex items-center gap-2.5 min-w-0">
+                  <div class="w-6 h-6 rounded-md bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 border border-amber-200/60 dark:border-amber-900/50">
+                    <StickyNote class="w-3 h-3" />
+                  </div>
+                  <span class="truncate font-bold tracking-tight">{{ pnt.name }}</span>
+                </div>
+
                 <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
                   <button
                     type="button"
                     @click="handleOpenEdit('payment_note_template', pnt)"
-                    class="p-1 text-zinc-400 hover:text-blue-600 transition-colors cursor-pointer"
+                    class="p-1 rounded-md text-zinc-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors cursor-pointer"
                     title="Edit"
                   >
                     <Pencil class="w-3.5 h-3.5" />
@@ -1125,7 +1175,7 @@ const activeConfig = computed(() => TABS_CONFIG[activeTab.value])
                   <button
                     type="button"
                     @click="handleDelete('payment_note_template', pnt.id, pnt.name)"
-                    class="p-1 text-zinc-400 hover:text-rose-500 transition-colors cursor-pointer"
+                    class="p-1 rounded-md text-zinc-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
                     title="Delete"
                   >
                     <Trash2 class="w-3.5 h-3.5" />
