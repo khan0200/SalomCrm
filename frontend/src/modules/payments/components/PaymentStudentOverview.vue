@@ -424,48 +424,50 @@ onUnmounted(() => {
       <div class="overflow-x-auto">
         <table class="w-full border-collapse text-left">
           <thead>
-            <tr class="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-850/60 text-[13px] font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-300 select-none">
+            <tr class="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-850/60 text-[12px] font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-300 select-none">
+              <!-- Student / Full Name (Sortable) -->
               <th
                 @click="emit('toggle-sort')"
-                class="px-5 py-3.5 w-28 cursor-pointer select-none hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                class="px-5 py-3.5 cursor-pointer select-none hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors w-[30%]"
               >
-                <span class="flex items-center gap-1 font-bold text-[13px] uppercase tracking-wider text-zinc-700 dark:text-zinc-200">
-                  ID
+                <span class="flex items-center gap-1.5 font-bold text-[12.5px] uppercase tracking-wider text-zinc-700 dark:text-zinc-200">
+                  Student / Full Name
                   <ChevronDown v-if="sortOrder === 'asc'" class="h-3.5 w-3.5 text-blue-600" />
                   <ChevronUp v-else class="h-3.5 w-3.5 text-blue-600" />
                 </span>
               </th>
-              <th class="px-5 py-3.5">Full Name</th>
-              <th class="px-5 py-3.5">Group</th>
-              <th class="px-5 py-3.5">Tariff</th>
-              <th class="px-5 py-3.5">Balance</th>
-              <th class="px-5 py-3.5">Discount</th>
-              <th class="px-5 py-3.5 text-center w-28">Actions</th>
+              <th class="px-5 py-3.5 w-[14%]">Group</th>
+              <th class="px-5 py-3.5 w-[22%]">Tariff</th>
+              <th class="px-5 py-3.5 w-[18%]">Balance</th>
+              <th class="px-5 py-3.5 w-[12%]">Discount</th>
+              <th class="px-5 py-3.5 text-center w-24">Actions</th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-zinc-100 dark:divide-zinc-800 text-[14px]">
+          <tbody class="divide-y divide-zinc-100 dark:divide-zinc-800 text-[13.5px]">
             <tr
               v-for="student in students"
               :key="student.id"
               class="hover:bg-zinc-50/80 dark:hover:bg-zinc-850/60 transition-colors text-zinc-800 dark:text-zinc-200"
             >
-              <!-- ID -->
-              <td class="px-5 py-3.5">
-                <span class="inline-flex items-center justify-center px-2 py-0.5 text-[13px] font-bold font-mono bg-[#0066cc] text-white rounded-[4px] shadow-2xs select-all">
-                  {{ student.id }}
-                </span>
-              </td>
-
-              <!-- Full Name -->
-              <td class="px-5 py-3.5 font-bold uppercase tracking-wide text-[14px]">
-                <div class="flex items-center gap-2">
-                  <span>{{ student.full_name }}</span>
-                  <span
-                    v-if="student.is_deleted"
-                    class="px-1.5 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20 shrink-0"
-                  >
-                    Archive
-                  </span>
+              <!-- Student: Full Name on top, ID below -->
+              <td class="px-5 py-3">
+                <div class="flex flex-col gap-0.5">
+                  <div class="flex items-center gap-2">
+                    <span class="font-bold uppercase tracking-wide text-zinc-900 dark:text-zinc-100 truncate">
+                      {{ student.full_name }}
+                    </span>
+                    <span
+                      v-if="student.is_deleted"
+                      class="px-1.5 py-0.5 rounded text-[9.5px] font-bold tracking-wider uppercase bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20 shrink-0"
+                    >
+                      Archive
+                    </span>
+                  </div>
+                  <div class="flex items-center gap-1">
+                    <span class="font-mono text-[11px] font-bold text-[#0066cc] dark:text-blue-400 tracking-wider">
+                      {{ student.id }}
+                    </span>
+                  </div>
                 </div>
               </td>
 

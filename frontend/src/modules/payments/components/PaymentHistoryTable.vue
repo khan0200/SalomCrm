@@ -323,15 +323,14 @@ const printReceipt = (payment: Payment) => {
         <table class="w-full border-collapse text-left">
           <thead>
             <tr class="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-850/60 text-[12px] font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-300 select-none">
-              <th class="px-4 py-3.5 w-24">Payment ID</th>
-              <th class="px-4 py-3.5 w-36">Date & Time</th>
-              <th class="px-4 py-3.5">Student</th>
-              <th class="px-4 py-3.5">Amount</th>
-              <th class="px-4 py-3.5">Method</th>
-              <th class="px-4 py-3.5">Received By</th>
-              <th class="px-4 py-3.5">Registered By</th>
-              <th class="px-4 py-3.5">Notes</th>
-              <th class="px-4 py-3.5 text-center w-28">Actions</th>
+              <th class="px-4 py-3.5 w-[16%]">Date & Time / ID</th>
+              <th class="px-4 py-3.5 w-[24%]">Student</th>
+              <th class="px-4 py-3.5 w-[15%]">Amount</th>
+              <th class="px-4 py-3.5 w-[11%]">Method</th>
+              <th class="px-4 py-3.5 w-[11%]">Received By</th>
+              <th class="px-4 py-3.5 w-[11%]">Registered By</th>
+              <th class="px-4 py-3.5 w-[12%]">Notes</th>
+              <th class="px-4 py-3.5 text-center w-24">Actions</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-zinc-100 dark:divide-zinc-800 text-[13px]">
@@ -341,25 +340,35 @@ const printReceipt = (payment: Payment) => {
               @click="viewingPayment = payment"
               class="hover:bg-zinc-50/80 dark:hover:bg-zinc-850/60 transition-colors text-zinc-800 dark:text-zinc-200 cursor-pointer"
             >
-              <!-- Payment ID -->
-              <td class="px-4 py-3 font-mono font-bold text-[11px] uppercase text-zinc-500 select-all">
-                {{ String(payment.id).slice(0, 8) }}
-              </td>
-
-              <!-- Date & Time -->
-              <td class="px-4 py-3 font-mono text-[11.5px] text-zinc-500 dark:text-zinc-400 whitespace-nowrap">
-                {{ formatTimestamp(payment.created_at) }}
-              </td>
-
-              <!-- Student -->
-              <td class="px-4 py-3 font-bold uppercase tracking-wide">
-                <div class="flex items-center gap-1.5 min-w-0">
-                  <span v-if="payment.student_id" class="font-mono text-blue-600 font-bold shrink-0">
-                    {{ payment.student_id }} —
+              <!-- Date & Time on top, Payment ID below -->
+              <td class="px-4 py-3">
+                <div class="flex flex-col gap-0.5">
+                  <span class="font-mono text-[12px] font-semibold text-zinc-900 dark:text-zinc-100 whitespace-nowrap">
+                    {{ formatTimestamp(payment.created_at) }}
                   </span>
-                  <span class="truncate text-zinc-900 dark:text-zinc-100">
+                  <span class="font-mono font-bold text-[10.5px] uppercase text-zinc-400 dark:text-zinc-500 select-all tracking-wider">
+                    #{{ String(payment.id).slice(0, 8) }}
+                  </span>
+                </div>
+              </td>
+
+              <!-- Student: Full Name on top, Student ID below -->
+              <td class="px-4 py-3">
+                <div class="flex flex-col gap-0.5">
+                  <span
+                    class="font-bold uppercase tracking-wide text-zinc-900 dark:text-zinc-100 text-[13px] truncate"
+                    :title="payment.student_full_name || payment.student_name || 'General Payment'"
+                  >
                     {{ payment.student_full_name || payment.student_name || 'General Payment' }}
                   </span>
+                  <div class="flex items-center gap-1">
+                    <span v-if="payment.student_id" class="font-mono text-blue-600 dark:text-blue-400 font-bold text-[11px] tracking-wider">
+                      {{ payment.student_id }}
+                    </span>
+                    <span v-else class="text-[10.5px] text-zinc-400 italic">
+                      General Payment
+                    </span>
+                  </div>
                 </div>
               </td>
 
