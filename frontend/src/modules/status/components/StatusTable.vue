@@ -32,19 +32,19 @@ const emit = defineEmits<{
       <table class="w-full table-fixed border-collapse text-left min-w-[700px]">
         <!-- Table Column Widths matching Uniapp2 -->
         <colgroup>
-          <col style="width: 5rem;" />
-          <col :style="{ width: isKdbMode ? '22%' : '28%' }" />
-          <col :style="{ width: isKdbMode ? '10%' : '12%' }" />
+          <col style="width: 4.5rem;" />
+          <col :style="{ width: isKdbMode ? '22%' : '22%' }" />
+          <col :style="{ width: isKdbMode ? '10%' : '9%' }" />
           <template v-if="isKdbMode">
             <col style="width: 13%;" />
             <col style="width: 15%;" />
             <col style="width: 15%;" />
-            <col style="width: 25%;" />
+            <col style="width: 26%;" />
           </template>
           <template v-else>
-            <col style="width: 16%;" />
-            <col style="width: 14%;" />
-            <col style="width: 30%;" />
+            <col style="width: 11%;" />
+            <col style="width: 9%;" />
+            <col style="width: 49%;" />
           </template>
         </colgroup>
 
@@ -54,7 +54,7 @@ const emit = defineEmits<{
             <!-- ID (Sortable) -->
             <th
               @click="emit('toggle-sort', 'id')"
-              class="px-2 py-2.5 cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors w-[5rem]"
+              class="px-2 py-2.5 cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors w-[4.5rem]"
             >
               <div class="flex items-center gap-1">
                 <span>ID</span>
@@ -66,8 +66,8 @@ const emit = defineEmits<{
               </div>
             </th>
 
-            <th class="px-2 py-2.5" :class="isKdbMode ? 'w-[22%]' : 'w-[28%]'">Full Name</th>
-            <th class="px-3 py-2.5" :class="isKdbMode ? 'w-[10%]' : 'w-[12%]'">Level</th>
+            <th class="px-2 py-2.5" :class="isKdbMode ? 'w-[22%]' : 'w-[22%]'">Full Name</th>
+            <th class="px-3 py-2.5" :class="isKdbMode ? 'w-[10%]' : 'w-[9%]'">Level</th>
 
             <!-- KDB Mode Headers -->
             <template v-if="isKdbMode">
@@ -76,7 +76,7 @@ const emit = defineEmits<{
               <th class="px-3 py-2.5 w-[15%]">TAKE</th>
               <th
                 @click="emit('toggle-sort', 'left')"
-                class="px-3 py-2.5 w-[25%] cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                class="px-3 py-2.5 w-[26%] cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
               >
                 <div class="flex items-center gap-1">
                   <span>LEFT</span>
@@ -91,9 +91,9 @@ const emit = defineEmits<{
 
             <!-- Standard Mode Headers -->
             <template v-else>
-              <th class="px-3 py-2.5 w-[16%]">Invoice</th>
-              <th class="px-3 py-2.5 w-[14%]">CoA</th>
-              <th class="px-3 py-2.5 w-[30%]">Embassy</th>
+              <th class="px-3 py-2.5 w-[11%]">Invoice</th>
+              <th class="px-3 py-2.5 w-[9%]">CoA</th>
+              <th class="px-3 py-2.5 w-[49%]">Embassy</th>
             </template>
           </tr>
         </thead>
