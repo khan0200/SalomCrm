@@ -3,7 +3,7 @@ import { ref } from 'vue'
 import type { Payment } from '@/types'
 import {
   Search, FileSpreadsheet, Pencil, Trash2, Printer,
-  Receipt, X
+  Receipt, X, User
 } from 'lucide-vue-next'
 
 const props = defineProps<{
@@ -209,12 +209,12 @@ const printReceipt = (payment: Payment) => {
           <!-- Header Row: Student Name + Timestamp -->
           <div class="flex items-start justify-between gap-2 overflow-hidden">
             <span
-              class="font-bold text-[13px] uppercase tracking-wide text-zinc-900 dark:text-zinc-100 truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors flex-1"
+              class="font-bold text-[13px] uppercase tracking-wide text-[#1868db] dark:text-blue-400 truncate flex-1"
               :title="payment.student_full_name || payment.student_name || 'General Payment'"
             >
               {{ payment.student_full_name || payment.student_name || 'General Payment' }}
             </span>
-            <span class="text-[9.5px] font-medium text-zinc-400 whitespace-nowrap pt-0.5">
+            <span class="text-[10px] font-medium text-zinc-400 whitespace-nowrap pt-0.5 font-mono">
               {{ formatTimestamp(payment.created_at) }}
             </span>
           </div>
@@ -232,48 +232,57 @@ const printReceipt = (payment: Payment) => {
             </span>
 
             <!-- Method Badge -->
-            <span class="inline-flex items-center px-1.5 py-0.5 rounded-[3px] text-[9.5px] font-bold uppercase tracking-wider bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700">
+            <span class="inline-flex items-center px-2 py-0.5 rounded-[4px] text-[10px] font-bold uppercase tracking-wider bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700">
               {{ payment.method }}
             </span>
 
             <!-- Receiver Badge -->
-            <span class="inline-flex items-center px-1.5 py-0.5 rounded-[3px] text-[9.5px] font-bold uppercase tracking-wider bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700">
+            <span class="inline-flex items-center px-2 py-0.5 rounded-[4px] text-[10px] font-bold uppercase tracking-wider bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700">
               {{ payment.received_by }}
             </span>
           </div>
 
+          <!-- Registered By Section (Matching Screenshot) -->
+          <div class="pt-2 border-t border-zinc-100 dark:border-zinc-800/80 flex items-center gap-1.5 text-[11.5px]">
+            <User class="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+            <span class="text-zinc-400 dark:text-zinc-500 font-medium">Registered by:</span>
+            <span class="font-bold text-zinc-800 dark:text-zinc-200 uppercase tracking-tight">
+              {{ payment.created_by_name || payment.received_by || 'Staff' }}
+            </span>
+          </div>
+
           <!-- Notes Section -->
-          <div v-if="payment.notes" class="pt-2 border-t border-zinc-100 dark:border-zinc-800">
+          <div v-if="payment.notes" class="pt-1.5 border-t border-zinc-100 dark:border-zinc-800">
             <div class="text-[11px] text-zinc-500 dark:text-zinc-400 leading-normal italic truncate" :title="payment.notes">
               {{ payment.notes }}
             </div>
           </div>
         </div>
 
-        <!-- Actions Footer -->
-        <div class="flex items-center gap-1.5 pt-2.5 border-t border-zinc-100 dark:border-zinc-800">
+        <!-- Actions Footer (Matching Screenshot) -->
+        <div class="flex items-center gap-2 pt-2.5 border-t border-zinc-100 dark:border-zinc-800">
           <button
             type="button"
             @click.stop="emit('open-edit', payment)"
-            class="flex-1 flex items-center justify-center gap-1 py-1 text-[10px] font-semibold rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-750 transition-all cursor-pointer"
+            class="flex-1 flex items-center justify-center gap-1 py-1.5 text-xs font-semibold rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-750 transition-all cursor-pointer shadow-2xs"
           >
-            <Pencil class="h-3 w-3" />
+            <Pencil class="h-3.5 w-3.5" />
             <span>Edit</span>
           </button>
           <button
             type="button"
             @click.stop="emit('delete-payment', payment)"
-            class="flex-1 flex items-center justify-center gap-1 py-1 text-[10px] font-semibold rounded-md border border-rose-200 bg-rose-50/50 text-rose-600 hover:bg-rose-600 hover:text-white transition-all cursor-pointer dark:bg-rose-950/20 dark:border-rose-900/40 dark:text-rose-400 dark:hover:bg-rose-600 dark:hover:text-white"
+            class="flex-1 flex items-center justify-center gap-1 py-1.5 text-xs font-bold rounded-xl border border-rose-200 dark:border-rose-900/40 bg-rose-50/60 dark:bg-rose-950/20 text-rose-600 dark:text-rose-400 hover:bg-rose-600 hover:text-white transition-all cursor-pointer shadow-2xs"
           >
-            <Trash2 class="h-3 w-3" />
+            <Trash2 class="h-3.5 w-3.5" />
             <span>Delete</span>
           </button>
           <button
             type="button"
             @click.stop="printReceipt(payment)"
-            class="flex-1 flex items-center justify-center gap-1 py-1 text-[10px] font-semibold rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-750 transition-all cursor-pointer"
+            class="flex-1 flex items-center justify-center gap-1 py-1.5 text-xs font-semibold rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-750 transition-all cursor-pointer shadow-2xs"
           >
-            <Printer class="h-3 w-3" />
+            <Printer class="h-3.5 w-3.5" />
             <span>Print</span>
           </button>
         </div>

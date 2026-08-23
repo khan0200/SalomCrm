@@ -5,7 +5,7 @@ from apps.students.models import Student
 class PaymentSerializer(serializers.ModelSerializer):
     student_id = serializers.CharField(source='student.id', read_only=True)
     student_full_name = serializers.CharField(source='student.full_name', read_only=True)
-    created_by_name = serializers.CharField(source='created_by.full_name', read_only=True)
+    created_by_name = serializers.SerializerMethodField()
 
     class Meta:
         model = Payment
@@ -16,6 +16,11 @@ class PaymentSerializer(serializers.ModelSerializer):
             'created_at', 'updated_at'
         )
         read_only_fields = ('id', 'created_at', 'updated_at')
+
+    def get_created_by_name(self, obj):
+        if obj.created_by:
+            return obj.created_by.full_name or obj.created_by.email or 'Staff'
+        return obj.received_by or 'Staff'
 
 
 class PaymentCreateSerializer(serializers.Serializer):
