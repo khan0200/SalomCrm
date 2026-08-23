@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import { Search, X, Check, Filter, Layers, GraduationCap, Archive, Users } from 'lucide-vue-next'
+import { Search, X, Check, GraduationCap, Users } from 'lucide-vue-next'
 import type { Student, Folder } from '@/types'
 
 const props = defineProps<{
@@ -18,13 +18,13 @@ const emit = defineEmits<{
 
 const searchQuery = ref('')
 const selectedIds = ref<string[]>([])
-const statusFilter = ref<'all' | 'active' | 'archived'>('all')
 const selectedLevel = ref<string>('all')
 
-// Filter out students who already belong to this target folder
+// Only Active students (!s.is_deleted) who do not already belong to this target folder
 const pickableStudents = computed(() => {
   const targetFolderId = String(props.folderId)
   return props.allStudents.filter(s => {
+    if (s.is_deleted) return false
     const currentFolderIds = (s.folder_ids || []).map(String)
     return !currentFolderIds.includes(targetFolderId)
   })
@@ -36,7 +36,6 @@ watch(
   (open) => {
     if (open) {
       searchQuery.value = ''
-      statusFilter.value = 'all'
       selectedLevel.value = 'all'
       selectedIds.value = []
     }
@@ -44,15 +43,7 @@ watch(
   { immediate: true }
 )
 
-// Dynamic Counts for Status Segments based on pickable students
-const statusCounts = computed(() => {
-  const all = pickableStudents.value.length
-  const active = pickableStudents.value.filter(s => !s.is_deleted).length
-  const archived = pickableStudents.value.filter(s => s.is_deleted).length
-  return { all, active, archived }
-})
-
-// Distinct Study Levels present in pickable student roster
+// Distinct Study Levels present in pickable active student roster
 const availableLevels = computed(() => {
   const levelsSet = new Set<string>()
   for (const s of pickableStudents.value) {
@@ -63,23 +54,16 @@ const availableLevels = computed(() => {
   return Array.from(levelsSet).sort()
 })
 
-// Filtered list applying Search, Status (All/Active/Archived), and Level filter
+// Filtered list applying Search and Study Level filter
 const filteredStudents = computed(() => {
   let list = pickableStudents.value
 
-  // 1. Status Filter
-  if (statusFilter.value === 'active') {
-    list = list.filter(s => !s.is_deleted)
-  } else if (statusFilter.value === 'archived') {
-    list = list.filter(s => s.is_deleted)
-  }
-
-  // 2. Level Filter
+  // 1. Level Filter
   if (selectedLevel.value !== 'all') {
     list = list.filter(s => (s.level || '').trim().toUpperCase() === selectedLevel.value.trim().toUpperCase())
   }
 
-  // 3. Search Query
+  // 2. Search Query
   const q = searchQuery.value.trim().toLowerCase()
   if (q) {
     list = list.filter(s =>
@@ -185,81 +169,38 @@ const getLevelBadgeClass = (lvl?: string | null) => {
         </button>
       </div>
 
-      <!-- ── Filter & Search Toolbar ────────────────────────────── -->
+      <!-- ── Search & Filter Toolbar ────────────────────────────── -->
       <div class="px-6 pt-3.5 pb-2.5 space-y-3 bg-zinc-50/70 dark:bg-zinc-850/40 border-b border-zinc-100 dark:border-zinc-800/80 shrink-0">
-        <!-- 1. Search Bar -->
-        <div class="relative">
-          <Search class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 pointer-events-none" />
-          <input
-            v-model="searchQuery"
-            type="text"
-            placeholder="Search students by name or ID (e.g. CF2, D1, Abdullokh)..."
-            class="w-full pl-10 pr-9 py-2 text-xs font-medium border border-zinc-200 dark:border-zinc-700 rounded-xl bg-white dark:bg-zinc-900 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 shadow-2xs transition-all"
-            autofocus
-          />
-          <button
-            v-if="searchQuery"
-            type="button"
-            @click="searchQuery = ''"
-            class="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 p-0.5"
-          >
-            <X class="w-3.5 h-3.5" />
-          </button>
-        </div>
-
-        <!-- 2. Status Segment Tabs (All, Active, Archived) + Study Level Selector -->
-        <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
-          <!-- Status Tabs -->
-          <div class="inline-flex p-1 bg-zinc-200/70 dark:bg-zinc-800 rounded-xl select-none gap-0.5 shrink-0">
+        <!-- 1. Search Bar & Level Selector Row -->
+        <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+          <!-- Search Bar -->
+          <div class="relative flex-1">
+            <Search class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 pointer-events-none" />
+            <input
+              v-model="searchQuery"
+              type="text"
+              placeholder="Search active students by name or ID..."
+              class="w-full pl-10 pr-9 py-2 text-xs font-medium border border-zinc-200 dark:border-zinc-700 rounded-xl bg-white dark:bg-zinc-900 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 shadow-2xs transition-all"
+              autofocus
+            />
             <button
+              v-if="searchQuery"
               type="button"
-              @click="statusFilter = 'all'"
-              class="px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer"
-              :class="[
-                statusFilter === 'all'
-                  ? 'bg-white dark:bg-zinc-900 text-blue-600 dark:text-blue-400 shadow-xs'
-                  : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'
-              ]"
+              @click="searchQuery = ''"
+              class="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 p-0.5"
             >
-              All ({{ statusCounts.all }})
-            </button>
-            <button
-              type="button"
-              @click="statusFilter = 'active'"
-              class="px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer"
-              :class="[
-                statusFilter === 'active'
-                  ? 'bg-white dark:bg-zinc-900 text-blue-600 dark:text-blue-400 shadow-xs'
-                  : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'
-              ]"
-            >
-              Active ({{ statusCounts.active }})
-            </button>
-            <button
-              type="button"
-              @click="statusFilter = 'archived'"
-              class="px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1"
-              :class="[
-                statusFilter === 'archived'
-                  ? 'bg-white dark:bg-zinc-900 text-rose-600 dark:text-rose-400 shadow-xs'
-                  : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'
-              ]"
-            >
-              <span>Archived</span>
-              <span class="text-[10.5px] px-1 py-0.2 rounded-full" :class="statusFilter === 'archived' ? 'bg-rose-100 dark:bg-rose-950/60 text-rose-600' : ''">
-                ({{ statusCounts.archived }})
-              </span>
+              <X class="w-3.5 h-3.5" />
             </button>
           </div>
 
           <!-- Level to Study Filter -->
-          <div class="flex items-center gap-1.5 min-w-0">
+          <div class="flex items-center gap-1.5 shrink-0">
             <GraduationCap class="w-4 h-4 text-zinc-400 shrink-0 hidden sm:block" />
             <select
               v-model="selectedLevel"
-              class="w-full sm:w-44 px-2.5 py-1.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-xs font-bold text-zinc-700 dark:text-zinc-300 focus:outline-none focus:border-blue-500 shadow-2xs cursor-pointer truncate"
+              class="w-full sm:w-44 px-2.5 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-xs font-bold text-zinc-700 dark:text-zinc-300 focus:outline-none focus:border-blue-500 shadow-2xs cursor-pointer truncate"
             >
-              <option value="all">All Levels ({{ props.allStudents.length }})</option>
+              <option value="all">All Levels ({{ pickableStudents.length }})</option>
               <option
                 v-for="lvl in availableLevels"
                 :key="lvl"
@@ -271,7 +212,7 @@ const getLevelBadgeClass = (lvl?: string | null) => {
           </div>
         </div>
 
-        <!-- 3. Quick Action & Summary Header -->
+        <!-- 2. Quick Action & Summary Header -->
         <div class="flex items-center justify-between pt-0.5">
           <button
             v-if="filteredStudents.length > 0"
@@ -284,7 +225,7 @@ const getLevelBadgeClass = (lvl?: string | null) => {
           <span v-else class="text-xs text-zinc-400 italic">No matching students</span>
 
           <span class="text-[11px] font-medium text-zinc-400">
-            Showing <strong class="text-zinc-700 dark:text-zinc-300">{{ filteredStudents.length }}</strong> of {{ allStudents.length }}
+            Showing <strong class="text-zinc-700 dark:text-zinc-300">{{ filteredStudents.length }}</strong> active students
           </span>
         </div>
       </div>
@@ -296,8 +237,8 @@ const getLevelBadgeClass = (lvl?: string | null) => {
           class="py-14 text-center text-xs text-zinc-400 italic"
         >
           <Users class="w-8 h-8 text-zinc-300 dark:text-zinc-700 mx-auto mb-2" />
-          <p class="font-bold text-zinc-600 dark:text-zinc-400">No students match your filter.</p>
-          <p class="mt-0.5 text-zinc-400">Try changing status, study level, or search keyword.</p>
+          <p class="font-bold text-zinc-600 dark:text-zinc-400">No active students match your filter.</p>
+          <p class="mt-0.5 text-zinc-400">Try adjusting the study level or search keyword.</p>
         </div>
 
         <!-- Student Item Card -->
@@ -349,17 +290,8 @@ const getLevelBadgeClass = (lvl?: string | null) => {
             </div>
           </div>
 
-          <!-- Right Status Badges (Archive, Folders) -->
+          <!-- Right Other Folder Badges -->
           <div class="flex items-center flex-wrap gap-1 shrink-0">
-            <!-- Archived Pill -->
-            <span
-              v-if="s.is_deleted"
-              class="text-[10px] font-bold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 rounded-md px-2 py-0.5 uppercase tracking-wide"
-            >
-              ARCHIVE
-            </span>
-
-            <!-- Other Folder Badges -->
             <span
               v-for="name in getOtherFolderNames(s)"
               :key="name"
@@ -391,7 +323,8 @@ const getLevelBadgeClass = (lvl?: string | null) => {
           <button
             type="button"
             @click="handleSave"
-            class="px-5 py-2 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-xs transition-all cursor-pointer"
+            :disabled="selectedIds.length === 0"
+            class="px-5 py-2 text-xs font-bold bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl shadow-xs transition-all cursor-pointer"
           >
             Save ({{ selectedIds.length }})
           </button>
