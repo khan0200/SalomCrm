@@ -98,16 +98,20 @@ const handleSubmit = () => {
     error.value = 'Please select who received the payment!'
     return
   }
-
-  const isDiscount = notes.value.toUpperCase().includes('DISCOUNT')
-  if (isDiscount && !selectedStudentId.value) {
-    error.value = 'Please select a student for the discount!'
+  if (!selectedStudentId.value) {
+    error.value = 'Please select a student!'
+    return
+  }
+  if (!notes.value.trim()) {
+    error.value = 'Please enter notes / description!'
     return
   }
 
+  const isDiscount = notes.value.toUpperCase().includes('DISCOUNT')
+
   isSubmitting.value = true
   emit('submit', {
-    student_id: selectedStudentId.value || null,
+    student_id: selectedStudentId.value,
     amount: numericAmount,
     method: method.value,
     received_by: receivedBy.value,
@@ -154,7 +158,9 @@ const handleSubmit = () => {
       <form @submit.prevent="handleSubmit" class="flex flex-col gap-3.5 text-xs">
         <!-- Amount -->
         <div>
-          <label class="text-xs font-semibold text-zinc-500 mb-1 block">Amount (UZS) *</label>
+          <label class="text-xs font-semibold text-zinc-500 mb-1 block">
+            Amount (UZS) <span class="text-rose-500">*</span>
+          </label>
           <input
             type="text"
             :value="amountInput"
@@ -168,18 +174,24 @@ const handleSubmit = () => {
         <!-- Method & Received By -->
         <div class="grid grid-cols-2 gap-3">
           <div>
-            <label class="text-xs font-semibold text-zinc-500 mb-1 block">Method</label>
+            <label class="text-xs font-semibold text-zinc-500 mb-1 block">
+              Method <span class="text-rose-500">*</span>
+            </label>
             <select
               v-model="method"
+              required
               class="w-full px-3 py-2 text-xs border border-zinc-200 dark:border-zinc-700 rounded-xl bg-zinc-50 dark:bg-zinc-850 text-zinc-900 dark:text-zinc-100 cursor-pointer font-semibold focus:outline-none focus:border-blue-500"
             >
               <option v-for="m in paymentMethods" :key="m" :value="m">{{ m }}</option>
             </select>
           </div>
           <div>
-            <label class="text-xs font-semibold text-zinc-500 mb-1 block">Received By</label>
+            <label class="text-xs font-semibold text-zinc-500 mb-1 block">
+              Received By <span class="text-rose-500">*</span>
+            </label>
             <select
               v-model="receivedBy"
+              required
               class="w-full px-3 py-2 text-xs border border-zinc-200 dark:border-zinc-700 rounded-xl bg-zinc-50 dark:bg-zinc-850 text-zinc-900 dark:text-zinc-100 cursor-pointer font-semibold focus:outline-none focus:border-blue-500"
             >
               <option v-for="r in paymentReceivers" :key="r" :value="r">{{ r }}</option>
@@ -189,7 +201,9 @@ const handleSubmit = () => {
 
         <!-- Student Selection (Searchable) -->
         <div>
-          <label class="text-xs font-semibold text-zinc-500 mb-1 block">Student (optional)</label>
+          <label class="text-xs font-semibold text-zinc-500 mb-1 block">
+            Student <span class="text-rose-500">*</span>
+          </label>
           <div
             v-if="selectedStudent"
             class="flex items-center justify-between px-3 py-2 text-xs border border-zinc-200 dark:border-zinc-700 rounded-xl bg-zinc-50 dark:bg-zinc-850"
@@ -249,11 +263,14 @@ const handleSubmit = () => {
 
         <!-- Notes & Note Pills -->
         <div>
-          <label class="text-xs font-semibold text-zinc-500 mb-1 block">Notes</label>
+          <label class="text-xs font-semibold text-zinc-500 mb-1 block">
+            Notes <span class="text-rose-500">*</span>
+          </label>
           <textarea
             v-model="notes"
             rows="2"
-            placeholder="Add note..."
+            required
+            placeholder="Add note / description (required)..."
             class="w-full px-3 py-2 text-xs border border-zinc-200 dark:border-zinc-700 rounded-xl bg-zinc-50 dark:bg-zinc-850 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-blue-500 resize-none"
           />
           <div class="flex flex-wrap gap-1.5 mt-1.5">
