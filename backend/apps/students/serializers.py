@@ -23,34 +23,25 @@ class FolderSerializer(serializers.ModelSerializer):
 
 class StudentListSerializer(serializers.ModelSerializer):
     """
-    Lightweight, high-performance serializer for main student roster table.
+    Complete serializer for main student roster table and memory cache.
     """
+    creator_name = serializers.SerializerMethodField()
+    created_by = serializers.SerializerMethodField()
+
     class Meta:
         model = Student
-        fields = (
-            'id', 'full_name', 'korean_name', 'phone1', 'phone2',
-            'level', 'level2', 'tariff', 'balance', 'discount',
-            'language_certificate', 'certificate_score',
-            'language_certificate_2', 'certificate_score_2',
-            'language_certificate_3', 'certificate_score_3',
-            'university_1', 'university_1_status', 'university_1_major',
-            'university_2', 'university_2_status', 'university_2_major',
-            'university_3', 'university_3_status', 'university_3_major',
-            'university_4', 'university_4_status', 'university_4_major',
-            'university_5', 'university_5_status', 'university_5_major',
-            'office', 'student_group', 'lead_by', 'coordinator',
-            'row_color', 'status_row_color', 'task_tags', 'folder_ids',
-            'is_deleted', 'status_hidden', 'invoice', 'invoice_university',
-            'coa', 'embassy', 'kdb_put_date', 'kdb_take_date',
-            'embassy_father_docs', 'embassy_mother_docs', 'embassy_sponsor_notes',
-            # Documents page: missing-docs checklist + physical copy counters,
-            # plus the profile fields syncMissingDocuments/search rely on.
-            'passport', 'email', 'address', 'father_phone', 'mother_phone',
-            'final_school_name', 'pick_needed', 'has_mc',
-            'bc_hand_count', 'mc_hand_count', 'apos_hand_count', 'pic_hand_count',
-            'google_drive_url', 'google_drive_folder_id',
-            'created_at'
-        )
+        fields = '__all__'
+
+    def get_creator_name(self, obj):
+        try:
+            if obj.created_by:
+                return getattr(obj.created_by, 'full_name', None) or getattr(obj.created_by, 'email', None)
+        except Exception:
+            return None
+        return None
+
+    def get_created_by(self, obj):
+        return str(obj.created_by_id) if obj.created_by_id else None
 
 
 class StudentDetailSerializer(serializers.ModelSerializer):

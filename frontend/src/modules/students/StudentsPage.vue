@@ -330,13 +330,12 @@ const students = computed(() => {
   return filteredStudents.value.slice(start, start + PAGE_SIZE)
 })
 
-// Query: Selected Student Detail with instant initialData from local memory roster
+// Query: Selected Student Detail with reactive query key & immediate background refetch
 const { data: detailStudent } = useQuery({
-  queryKey: ['student-detail', selectedDetailStudentId],
+  queryKey: computed(() => ['student-detail', selectedDetailStudentId.value]),
   queryFn: () => selectedDetailStudentId.value ? studentsApi.getStudentDetail(selectedDetailStudentId.value) : null,
   enabled: computed(() => !!selectedDetailStudentId.value),
-  staleTime: 1000 * 60 * 5,
-  initialData: () => allStudents.value.find(s => s.id === selectedDetailStudentId.value) || undefined,
+  staleTime: 0,
 })
 
 const selectedStudent = computed<Student | null>(() => {
