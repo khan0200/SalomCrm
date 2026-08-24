@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
+import logoUrl from '@/assets/logo.png'
 import {
   Users,
   CreditCard,
@@ -91,12 +92,12 @@ const handleLogout = () => {
   >
     <!-- Logo & Brand Header -->
     <div class="flex items-center justify-center h-14 shrink-0 border-b border-zinc-100 dark:border-zinc-800/80">
-      <router-link to="/students" class="flex items-center justify-center group" title="Salom CRM">
-        <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-blue-500/25 group-hover:scale-105 transition-transform">
-          <svg class="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
-          </svg>
-        </div>
+      <router-link to="/students" class="flex items-center justify-center group p-1" title="Salom CRM">
+        <img
+          :src="logoUrl"
+          alt="Salom CRM"
+          class="w-8 h-8 rounded-xl object-contain shadow-xs group-hover:scale-105 transition-transform"
+        />
       </router-link>
     </div>
 

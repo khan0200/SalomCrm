@@ -250,10 +250,15 @@ class StudentViewSet(viewsets.ModelViewSet):
         req: Any = self.request
         user = req.user
         tenant = getattr(req, 'tenant', None) or getattr(user, 'tenant', None)
-        serializer.save(
+        student = serializer.save(
             tenant=tenant,
             created_by=user
         )
+        try:
+            from apps.core.telegram_service import notify_new_registration
+            notify_new_registration(student)
+        except Exception as e:
+            logger.error(f"Telegram registration notification failed: {e}")
 
     # ── Actions: Archive / Restore / Permanent Delete ──────────────────────
     @action(detail=True, methods=['post'])
@@ -769,7 +774,7 @@ class ExtractDocumentView(APIView):
 
     def post(self, request: Request):
         try:
-            from .ocr_service import process_document_ephemeral
+            from .ai_ocr_service import process_document_ephemeral
             from .ocr_preprocessor import PreprocessError
         except ImportError as ie:
             logger.exception(f"OCR dependencies failed to load: {ie}")
@@ -808,8 +813,19 @@ class ExtractDocumentView(APIView):
         # Debug mode enabled for staff/superusers with ?debug=true
         is_debug = request.user.is_staff and (request.query_params.get('debug') in ('1', 'true'))
 
+        provider = request.data.get('provider') or request.query_params.get('provider') or 'openai'
+        model = request.data.get('model') or request.query_params.get('model') or 'gpt-4o'
+        api_key = request.data.get('api_key') or request.query_params.get('api_key') or None
+
         try:
-            extracted_data = process_document_ephemeral(file_bytes, filename, debug=is_debug)
+            extracted_data = process_document_ephemeral(
+                file_bytes,
+                filename,
+                debug=is_debug,
+                provider=provider,
+                model=model,
+                api_key=api_key
+            )
 
             # Check student ID for parent passport intelligence (15+ years older than student)
             student_id = request.data.get('student_id') or request.query_params.get('student_id')

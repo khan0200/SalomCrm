@@ -99,6 +99,15 @@ class PaymentViewSet(viewsets.ModelViewSet):
             user=user
         )
 
+        try:
+            from apps.core.telegram_service import notify_payment_received, notify_discount_added
+            if payment.is_discount:
+                notify_discount_added(payment, student)
+            else:
+                notify_payment_received(payment, student)
+        except Exception as e:
+            pass
+
         return Response(PaymentSerializer(payment).data, status=status.HTTP_201_CREATED)
 
     @action(detail=False, methods=['post'])
@@ -126,6 +135,12 @@ class PaymentViewSet(viewsets.ModelViewSet):
             user=user
         )
 
+        try:
+            from apps.core.telegram_service import notify_withdrawal
+            notify_withdrawal(payment, student)
+        except Exception as e:
+            pass
+
         return Response(PaymentSerializer(payment).data, status=status.HTTP_201_CREATED)
 
     def update(self, request, *args, **kwargs):
@@ -145,6 +160,14 @@ class PaymentViewSet(viewsets.ModelViewSet):
 
     def destroy(self, request, *args, **kwargs):
         payment = self.get_object()
+        student = getattr(payment, 'student', None)
+
+        try:
+            from apps.core.telegram_service import notify_payment_deleted
+            notify_payment_deleted(payment, student)
+        except Exception as e:
+            pass
+
         delete_payment(payment, user=request.user)
         return Response(status=status.HTTP_204_NO_CONTENT)
 

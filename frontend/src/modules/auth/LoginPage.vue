@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
+import logoUrl from '@/assets/logo.png'
 import {
   Lock, Mail, ArrowRight, AlertCircle, Sun, Moon,
   Eye, EyeOff, ShieldCheck, Sparkles
@@ -76,8 +77,8 @@ const handleLogin = async () => {
       <div class="text-center space-y-3">
         <!-- Modern App Icon Badge -->
         <div class="inline-flex relative items-center justify-center">
-          <div class="w-14 h-14 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-500 text-white flex items-center justify-center shadow-lg shadow-blue-500/25 ring-4 ring-blue-500/10">
-            <Sparkles class="w-7 h-7 stroke-[2.2]" />
+          <div class="w-16 h-16 rounded-2xl bg-white dark:bg-zinc-800 border border-slate-200/80 dark:border-zinc-700/80 p-2 text-white flex items-center justify-center shadow-lg shadow-blue-500/10 ring-4 ring-blue-500/10">
+            <img :src="logoUrl" alt="Salom CRM" class="w-full h-full object-contain" />
           </div>
         </div>
 

@@ -15,7 +15,11 @@ import {
   Loader2,
   Check,
   AlertCircle,
-  X
+  X,
+  Sparkles,
+  Sliders,
+  Eye,
+  EyeOff
 } from 'lucide-vue-next'
 import { studentsApi } from '@/api/students'
 import { settingsApi } from '@/api/settings'
@@ -42,6 +46,79 @@ const { data: dbSchools } = useQuery({
   queryKey: ['schools-directory'],
   queryFn: () => settingsApi.getSchools(),
 })
+
+// AI Settings State (stored in localStorage)
+const isSettingsOpen = ref(false)
+const showApiKey = ref(false)
+const geminiModelSelect = ref('gemini-3.7-flash')
+const customModelId = ref('')
+
+const KNOWN_GEMINI_MODELS = [
+  'gemini-3.7-flash',
+  'gemini-3.5-flash',
+  'gemini-3.1-pro',
+  'gemini-3.1-flash-lite',
+  'gemini-2.5-flash',
+  'gemini-2.5-pro',
+  'gemini-2.0-flash',
+  'gemini-1.5-pro',
+  'gemini-1.5-flash',
+  'gemini-2.5-flash-lite'
+]
+
+const aiSettings = ref({
+  provider: 'openai', // 'openai' | 'gemini'
+  apiKey: '',
+  openaiApiKey: '',
+  model: 'gemini-3.7-flash',
+  openaiModel: 'gpt-4o',
+  normalizeDates: true,
+  mergeNames: true,
+  extractStructured: true
+})
+
+const tempSettings = ref({ ...aiSettings.value })
+
+const toggleSettings = () => {
+  if (!isSettingsOpen.value) {
+    tempSettings.value = { ...aiSettings.value }
+    if (aiSettings.value.model) {
+      if (KNOWN_GEMINI_MODELS.includes(aiSettings.value.model)) {
+        geminiModelSelect.value = aiSettings.value.model
+      } else {
+        geminiModelSelect.value = 'custom'
+        customModelId.value = aiSettings.value.model
+      }
+    }
+  }
+  isSettingsOpen.value = !isSettingsOpen.value
+}
+
+const handleSaveSettings = () => {
+  if (tempSettings.value.provider === 'gemini' && geminiModelSelect.value === 'custom') {
+    tempSettings.value.model = customModelId.value || 'gemini-2.5-flash'
+  } else if (tempSettings.value.provider === 'gemini') {
+    tempSettings.value.model = geminiModelSelect.value
+  }
+
+  aiSettings.value = { ...tempSettings.value }
+  try {
+    localStorage.setItem('ai_settings', JSON.stringify(aiSettings.value))
+    uiStore.addToast({
+      type: 'success',
+      title: 'AI Settings Saved',
+      message: 'AI provider and model configuration updated.'
+    })
+    isSettingsOpen.value = false
+  } catch (e) {
+    console.error('Failed to save AI settings to localStorage', e)
+    uiStore.addToast({
+      type: 'error',
+      title: 'Save Failed',
+      message: 'Could not save AI settings locally.'
+    })
+  }
+}
 
 // Upload & Extraction states
 const isDragging = ref(false)
@@ -74,14 +151,20 @@ const editValue = ref('')
 const FIELD_MAPPING: Record<string, keyof Student> = {
   'FULL NAME': 'full_name',
   'FULL_NAME': 'full_name',
+  'STUDENT NAME': 'full_name',
   'PASSPORT NUMBER': 'passport',
   'PASSPORT_NUMBER': 'passport',
+  'PASSPORT': 'passport',
   'DATE OF BIRTH': 'birthday',
   'DATE_OF_BIRTH': 'birthday',
+  'BIRTHDAY': 'birthday',
+  'DOB': 'birthday',
   'DATE OF ISSUE': 'passport_issue_date',
   'DATE_OF_ISSUE': 'passport_issue_date',
+  'ISSUE DATE': 'passport_issue_date',
   'DATE OF EXPIRATION': 'passport_expire_date',
   'DATE_OF_EXPIRATION': 'passport_expire_date',
+  'EXPIRATION DATE': 'passport_expire_date',
   'SEX': 'gender',
   'GENDER': 'gender',
   'EMAIL': 'email',
@@ -91,43 +174,89 @@ const FIELD_MAPPING: Record<string, keyof Student> = {
   'PHONE_NUMBER_2': 'phone2',
   'PHONE 1': 'phone1',
   'PHONE 2': 'phone2',
+  'PHONE': 'phone1',
+  'CONTACT': 'phone1',
+  'TELEFON': 'phone1',
   'ADDRESS': 'address',
+  'HOME ADDRESS': 'address',
+  'MANZIL': 'address',
+  'MANZILI': 'address',
+  'YASHASH MANZILI': 'address',
   'PLACE OF BIRTH': 'address',
   'PLACE_OF_BIRTH': 'address',
+  // Educational Background mappings
   'FINAL SCHOOL NAME': 'final_school_name',
   'FINAL_SCHOOL_NAME': 'final_school_name',
   'NAME OF SCHOOL': 'final_school_name',
+  'NAME OF SCHOOL / EDUCATIONAL INSTITUTION': 'final_school_name',
   'EDUCATIONAL INSTITUTION': 'final_school_name',
+  'SCHOOL NAME': 'final_school_name',
+  'EDUCATIONAL BACKGROUND': 'final_school_name',
+  'UNIVERSITY': 'final_school_name',
+  'COLLEGE': 'final_school_name',
+  'MAKTAB': 'final_school_name',
+  'LITSEY': 'final_school_name',
   'MAJOR': 'major',
+  'MAJOR OR SPECIALTY': 'major',
   'SPECIALTY': 'major',
+  'SPECIALITY': 'major',
+  'MUTAXASSISLIK': 'major',
+  'YONALISH': 'major',
   'GPA': 'gpa',
+  'GRADE POINT AVERAGE': 'gpa',
+  'AVERAGE GRADE': 'gpa',
   'DEGREE NO': 'degree_no',
   'DEGREE_NO': 'degree_no',
+  'DEGREE NUMBER': 'degree_no',
+  'DIPLOMA NO': 'degree_no',
+  'DIPLOMA_NO': 'degree_no',
   'DIPLOMA NUMBER': 'degree_no',
+  'CERTIFICATE NO': 'degree_no',
+  'CERTIFICATE_NO': 'degree_no',
+  'CERTIFICATE NUMBER': 'degree_no',
+  'SHAHODATNOMA NO': 'degree_no',
   'DATE OF ENTRY': 'date_of_entry',
   'DATE_OF_ENTRY': 'date_of_entry',
+  'ENTRY DATE': 'date_of_entry',
+  'YEAR OF ENTRY': 'date_of_entry',
+  'KIRGAN YILI': 'date_of_entry',
   'DATE OF GRADUATION': 'date_of_graduation',
   'DATE_OF_GRADUATION': 'date_of_graduation',
+  'GRADUATION DATE': 'date_of_graduation',
+  'YEAR OF GRADUATION': 'date_of_graduation',
+  'BITIRGAN YILI': 'date_of_graduation',
+  'TAMOMLAGAN YILI': 'date_of_graduation',
+  // Parent mappings
   'FATHER FULLNAME': 'father_name',
   'FATHER_FULLNAME': 'father_name',
   'FATHER NAME': 'father_name',
   'FATHER_NAME': 'father_name',
+  'DADAM': 'father_name',
+  'OTASI': 'father_name',
+  'OTASINING ISMI': 'father_name',
   'FATHER PHONE': 'father_phone',
   'FATHER_PHONE': 'father_phone',
+  'FATHER PHONE 1': 'father_phone',
   'FATHER PHONE 2': 'father_phone',
-  'FATHER_PHONE_2': 'father_phone',
   'FATHER PHONE NUMBER': 'father_phone',
   'FATHER_PHONE_NUMBER': 'father_phone',
+  'DADAM RAQAMI': 'father_phone',
+  'OTAM RAQAMI': 'father_phone',
   'MOTHER FULLNAME': 'mother_name',
   'MOTHER_FULLNAME': 'mother_name',
   'MOTHER NAME': 'mother_name',
   'MOTHER_NAME': 'mother_name',
+  'ONASI': 'mother_name',
+  'ONASINING ISMI': 'mother_name',
+  'OYIM': 'mother_name',
   'MOTHER PHONE': 'mother_phone',
   'MOTHER_PHONE': 'mother_phone',
+  'MOTHER PHONE 1': 'mother_phone',
   'MOTHER PHONE 2': 'mother_phone',
-  'MOTHER_PHONE_2': 'mother_phone',
   'MOTHER PHONE NUMBER': 'mother_phone',
-  'MOTHER_PHONE_NUMBER': 'mother_phone'
+  'MOTHER_PHONE_NUMBER': 'mother_phone',
+  'OYIM RAQAMI': 'mother_phone',
+  'ONAM RAQAMI': 'mother_phone'
 }
 
 // File drop & selection handlers
@@ -146,10 +275,85 @@ const handleFileInput = (e: Event) => {
   }
 }
 
-const isPdf = ref(false)
+// High-performance Client-Side Canvas Image Compressor
+const compressImageClient = async (file: File, maxDim = 1920, quality = 0.86): Promise<File> => {
+  return new Promise((resolve) => {
+    // If already small JPEG (< 300KB), return as is
+    if (file.size < 300 * 1024 && file.type === 'image/jpeg') {
+      return resolve(file)
+    }
 
-const processFile = (file: File) => {
-  selectedFile.value = file
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      const img = new Image()
+      img.onload = () => {
+        let { width, height } = img
+
+        // Scale proportionally if larger than maxDim
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height * maxDim) / width)
+            width = maxDim
+          } else {
+            width = Math.round((width * maxDim) / height)
+            height = maxDim
+          }
+        }
+
+        const canvas = document.createElement('canvas')
+        canvas.width = width
+        canvas.height = height
+        const ctx = canvas.getContext('2d')
+
+        if (!ctx) {
+          return resolve(file)
+        }
+
+        // Enable smooth image scaling
+        ctx.imageSmoothingEnabled = true
+        ctx.imageSmoothingQuality = 'high'
+        ctx.drawImage(img, 0, 0, width, height)
+
+        canvas.toBlob(
+          (blob) => {
+            if (blob && blob.size < file.size) {
+              const fileName = (file.name || 'screenshot').replace(/\.[^/.]+$/, '') + '.jpg'
+              const compressedFile = new File([blob], fileName, {
+                type: 'image/jpeg',
+                lastModified: Date.now()
+              })
+              resolve(compressedFile)
+            } else {
+              resolve(file)
+            }
+          },
+          'image/jpeg',
+          quality
+        )
+      }
+      img.onerror = () => resolve(file)
+      img.src = e.target?.result as string
+    }
+    reader.onerror = () => resolve(file)
+    reader.readAsDataURL(file)
+  })
+}
+
+const processFile = async (file: File) => {
+  // Only accept images (JPG, PNG, WEBP)
+  if (!file.type.startsWith('image/')) {
+    uiStore.addToast({
+      type: 'error',
+      title: 'Invalid File',
+      message: 'Please upload an image file (JPG, PNG, or WebP) or paste a screenshot.'
+    })
+    return
+  }
+
+  // Compress image instantly in browser before upload
+  const processed = await compressImageClient(file)
+
+  selectedFile.value = processed
   extractError.value = null
   extractedDocType.value = null
   extractedFieldsList.value = []
@@ -158,13 +362,14 @@ const processFile = (file: File) => {
   ocrEngineUsed.value = null
   savedFields.value = {}
 
-  isPdf.value = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
-  previewUrl.value = URL.createObjectURL(file)
+  if (previewUrl.value && previewUrl.value.startsWith('blob:')) {
+    URL.revokeObjectURL(previewUrl.value)
+  }
+  previewUrl.value = URL.createObjectURL(processed)
 }
 
 // Global Ctrl+V Screenshot Paste Handler
 const handlePaste = (e: ClipboardEvent) => {
-  // If user is typing in a modal or input, let the browser handle it
   if (isEditModalOpen.value) return
   const target = e.target as HTMLElement
   if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) return
@@ -186,6 +391,24 @@ const handlePaste = (e: ClipboardEvent) => {
 
 onMounted(() => {
   window.addEventListener('paste', handlePaste)
+  try {
+    const stored = localStorage.getItem('ai_settings')
+    if (stored) {
+      const parsed = JSON.parse(stored)
+      aiSettings.value = { ...aiSettings.value, ...parsed }
+      tempSettings.value = { ...aiSettings.value }
+      if (parsed.model) {
+        if (KNOWN_GEMINI_MODELS.includes(parsed.model)) {
+          geminiModelSelect.value = parsed.model
+        } else {
+          geminiModelSelect.value = 'custom'
+          customModelId.value = parsed.model
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('Failed to parse ai_settings from local storage', e)
+  }
 })
 
 onUnmounted(() => {
@@ -201,7 +424,6 @@ const removeFile = () => {
   }
   selectedFile.value = null
   previewUrl.value = null
-  isPdf.value = false
   extractedDocType.value = null
   extractedFieldsList.value = []
   rawOcrText.value = ''
@@ -211,7 +433,54 @@ const removeFile = () => {
   savedFields.value = {}
 }
 
-// Trigger in-memory OCR extraction
+const normalizeDate = (val: string): string => {
+  if (!val) return val
+  const s = String(val).trim()
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s
+
+  // DD MM YYYY, DD.MM.YYYY, DD/MM/YYYY, DD-MM-YYYY
+  const m1 = s.match(/^(\d{1,2})[\s\.\/\-](\d{1,2})[\s\.\/\-](\d{4})$/)
+  if (m1) {
+    let d = parseInt(m1[1], 10)
+    let m = parseInt(m1[2], 10)
+    const y = parseInt(m1[3], 10)
+    if (m > 12 && d <= 12) {
+      const temp = d
+      d = m
+      m = temp
+    }
+    return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+  }
+
+  // YYYY MM DD, YYYY.MM.DD, YYYY/MM/DD
+  const m2 = s.match(/^(\d{4})[\s\.\/\-](\d{1,2})[\s\.\/\-](\d{1,2})$/)
+  if (m2) {
+    const y = parseInt(m2[1], 10)
+    const m = parseInt(m2[2], 10)
+    const d = parseInt(m2[3], 10)
+    return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+  }
+
+  // DD Mon YYYY e.g. 15 OCT 2007 or 15 OKT 2007
+  const monthsMap: Record<string, number> = {
+    JAN: 1, FEB: 2, MAR: 3, APR: 4, MAY: 5, JUN: 6,
+    JUL: 7, AUG: 8, SEP: 9, OCT: 10, NOV: 11, DEC: 12,
+    YAN: 1, FEV: 2, MART: 3, IYUN: 6, IYUL: 7, AVG: 8, SEN: 9, OKT: 10, NOY: 11, DEK: 12
+  }
+  const m3 = s.match(/^(\d{1,2})[\s\.\/\-]([A-Za-z]{3,5})[\s\.\/\-](\d{4})$/)
+  if (m3) {
+    const d = parseInt(m3[1], 10)
+    const mon = m3[2].toUpperCase().slice(0, 3)
+    const y = parseInt(m3[3], 10)
+    if (monthsMap[mon]) {
+      return `${y}-${String(monthsMap[mon]).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+    }
+  }
+
+  return s
+}
+
+// Trigger AI extraction
 const triggerExtraction = async () => {
   if (!selectedFile.value) return
 
@@ -223,6 +492,20 @@ const triggerExtraction = async () => {
     const formData = new FormData()
     formData.append('file', selectedFile.value)
     formData.append('student_id', studentId.value)
+
+    // Pass configured AI Settings
+    formData.append('provider', aiSettings.value.provider)
+    const activeModel = aiSettings.value.provider === 'openai'
+      ? (aiSettings.value.openaiModel || 'gpt-4o')
+      : (geminiModelSelect.value === 'custom' ? customModelId.value : (aiSettings.value.model || 'gemini-3.7-flash'))
+    formData.append('model', activeModel)
+
+    const activeApiKey = aiSettings.value.provider === 'openai'
+      ? aiSettings.value.openaiApiKey
+      : aiSettings.value.apiKey
+    if (activeApiKey && activeApiKey.trim()) {
+      formData.append('api_key', activeApiKey.trim())
+    }
 
     const response = await studentsApi.extractDocument(formData)
 
@@ -260,10 +543,14 @@ const triggerExtraction = async () => {
     if (fieldsObj && typeof fieldsObj === 'object') {
       for (const [k, v] of Object.entries(fieldsObj)) {
         if (v && String(v).trim()) {
+          let fieldVal = String(v).trim()
+          if (k.toUpperCase().includes('DATE') || k.toUpperCase().includes('BIRTH') || k.toUpperCase().includes('ENTRY') || k.toUpperCase().includes('GRADUATION')) {
+            fieldVal = normalizeDate(fieldVal)
+          }
           const detail = detailsObj[k]
           fieldsArr.push({
             key: k,
-            value: String(v).trim(),
+            value: fieldVal,
             confidence: detail?.confidence,
             validated: detail?.validated,
             source: detail?.source
@@ -311,6 +598,8 @@ const handleSaveAllFields = async () => {
       if (cleanDigits.length === 9) {
         finalValue = `${cleanDigits.slice(0, 2)}-${cleanDigits.slice(2, 5)}-${cleanDigits.slice(5, 7)}-${cleanDigits.slice(7, 9)}`
       }
+    } else if (['birthday', 'passport_issue_date', 'passport_expire_date', 'date_of_entry', 'date_of_graduation'].includes(dbField as string)) {
+      finalValue = normalizeDate(finalValue)
     } else if (['full_name', 'address', 'final_school_name', 'major', 'father_name', 'mother_name'].includes(dbField as string)) {
       finalValue = finalValue.toUpperCase()
     }
@@ -418,6 +707,8 @@ const handleSaveFieldToProfile = async (fieldKey: string, value: string) => {
     if (cleanDigits.length === 9) {
       finalValue = `${cleanDigits.slice(0, 2)}-${cleanDigits.slice(2, 5)}-${cleanDigits.slice(5, 7)}-${cleanDigits.slice(7, 9)}`
     }
+  } else if (['birthday', 'passport_issue_date', 'passport_expire_date', 'date_of_entry', 'date_of_graduation'].includes(dbField as string)) {
+    finalValue = normalizeDate(finalValue)
   } else if (['full_name', 'address', 'final_school_name', 'major', 'father_name', 'mother_name'].includes(dbField as string)) {
     finalValue = finalValue.toUpperCase()
   }
@@ -496,17 +787,17 @@ const getInitials = (name?: string) => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-zinc-50 dark:bg-zinc-950 p-4 md:p-6 space-y-4">
-    <!-- Student Header Banner with Back Button -->
+  <div class="space-y-4">
+    <!-- Student Header Banner with Back Button & AI Settings Toggle -->
     <div
       v-if="student"
-      class="p-3.5 sm:p-4 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs flex items-center justify-between gap-4"
+      class="p-3.5 sm:p-4 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs flex items-center justify-between gap-4 flex-wrap"
     >
-      <div class="flex items-center gap-3">
-        <!-- Back Button next to Square Avatar -->
+      <div class="flex items-center gap-3 min-w-0">
+        <!-- Back Button -->
         <button
           @click="router.push('/students')"
-          class="p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-850 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 transition-all cursor-pointer shadow-2xs hover:scale-[1.02] active:scale-[0.98]"
+          class="p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-850 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 transition-all cursor-pointer shadow-2xs hover:scale-[1.02] active:scale-[0.98] shrink-0"
           title="Back to Students Dashboard"
         >
           <ArrowLeft class="w-4 h-4" />
@@ -528,7 +819,206 @@ const getInitials = (name?: string) => {
           </div>
         </div>
       </div>
+
+      <!-- Right Header Actions: Active Model Badge + AI Settings Button -->
+      <div class="flex items-center gap-2.5 shrink-0">
+        <span class="hidden md:inline-flex px-3 py-1.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-[11px] font-bold text-zinc-600 dark:text-zinc-300 shadow-2xs font-mono">
+          Model: <span class="text-brand-500 font-extrabold ml-1">{{ aiSettings.provider === 'openai' ? `OpenAI (${aiSettings.openaiModel})` : `Gemini (${geminiModelSelect === 'custom' ? customModelId : aiSettings.model})` }}</span>
+        </span>
+
+        <button
+          @click="toggleSettings"
+          :class="[
+            'inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer active:scale-[0.98]',
+            isSettingsOpen
+              ? 'bg-brand-500 text-white shadow-brand-500/25'
+              : 'bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-750 text-zinc-800 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-700'
+          ]"
+        >
+          <Sliders class="w-3.5 h-3.5" />
+          <span>AI Settings</span>
+        </button>
+      </div>
     </div>
+
+    <!-- Collapsible AI Settings Panel -->
+    <Transition
+      enter-active-class="transition duration-200 ease-out"
+      enter-from-class="opacity-0 -translate-y-2 scale-[0.99]"
+      enter-to-class="opacity-100 translate-y-0 scale-100"
+      leave-active-class="transition duration-150 ease-in"
+      leave-from-class="opacity-100 translate-y-0 scale-100"
+      leave-to-class="opacity-0 -translate-y-2 scale-[0.99]"
+    >
+      <div
+        v-if="isSettingsOpen"
+        class="p-5 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xl space-y-5"
+      >
+        <div class="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-3">
+          <h3 class="text-xs font-extrabold text-brand-500 uppercase tracking-wider flex items-center gap-2">
+            <Cpu class="w-4 h-4" />
+            AI Extraction Configuration
+          </h3>
+          <span class="text-[10px] text-zinc-400 font-mono font-semibold">Changes sync locally</span>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <!-- Active Provider Selector -->
+          <div class="space-y-1.5">
+            <label class="text-[11px] uppercase font-bold tracking-wider text-zinc-500 dark:text-zinc-400">
+              Active Provider
+            </label>
+            <div class="bg-zinc-100 dark:bg-zinc-850 p-1 rounded-xl border border-zinc-200 dark:border-zinc-700 flex h-10 shadow-inner">
+              <button
+                type="button"
+                @click="tempSettings.provider = 'gemini'"
+                :class="[
+                  'flex-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5',
+                  tempSettings.provider === 'gemini'
+                    ? 'bg-white dark:bg-zinc-900 text-purple-600 dark:text-purple-400 shadow-sm border border-zinc-200 dark:border-zinc-800'
+                    : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100'
+                ]"
+              >
+                <span>Google Gemini</span>
+              </button>
+              <button
+                type="button"
+                @click="tempSettings.provider = 'openai'"
+                :class="[
+                  'flex-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5',
+                  tempSettings.provider === 'openai'
+                    ? 'bg-white dark:bg-zinc-900 text-emerald-600 dark:text-emerald-400 shadow-sm border border-zinc-200 dark:border-zinc-800'
+                    : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100'
+                ]"
+              >
+                <span>OpenAI GPT</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- AI Model Selector -->
+          <div class="space-y-1.5">
+            <label class="text-[11px] uppercase font-bold tracking-wider text-zinc-500 dark:text-zinc-400">
+              AI Model
+            </label>
+            <div v-if="tempSettings.provider === 'openai'">
+              <select
+                v-model="tempSettings.openaiModel"
+                class="bg-zinc-50 dark:bg-zinc-850 border border-zinc-200 dark:border-zinc-700 text-xs text-zinc-900 dark:text-zinc-100 p-2.5 rounded-xl focus:outline-none focus:border-brand-500 font-semibold cursor-pointer w-full h-10 shadow-2xs"
+              >
+                <option value="gpt-4o">GPT-4o (Recommended) — High Accuracy</option>
+                <option value="gpt-4o-mini">GPT-4o Mini — Fastest & Cheapest</option>
+              </select>
+            </div>
+            <div v-else class="space-y-2">
+              <select
+                v-model="geminiModelSelect"
+                @change="tempSettings.model = geminiModelSelect === 'custom' ? (customModelId || 'gemini-3.7-flash') : geminiModelSelect"
+                class="bg-zinc-50 dark:bg-zinc-850 border border-zinc-200 dark:border-zinc-700 text-xs text-zinc-900 dark:text-zinc-100 p-2.5 rounded-xl focus:outline-none focus:border-brand-500 font-semibold cursor-pointer w-full h-10 shadow-2xs"
+              >
+                <optgroup label="🌟 Gemini 3.x Series (Newest)">
+                  <option value="gemini-3.7-flash">Gemini 3.7 Flash (Recommended — State-of-the-Art)</option>
+                  <option value="gemini-3.5-flash">Gemini 3.5 Flash</option>
+                  <option value="gemini-3.1-pro">Gemini 3.1 Pro</option>
+                  <option value="gemini-3.1-flash-lite">Gemini 3.1 Flash Lite</option>
+                </optgroup>
+                <optgroup label="⚡ Gemini 2.x Series">
+                  <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+                  <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
+                  <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+                  <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash Lite</option>
+                </optgroup>
+                <optgroup label="Legacy & Custom">
+                  <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+                  <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
+                  <option value="custom">Custom Model ID...</option>
+                </optgroup>
+              </select>
+              <input
+                v-if="geminiModelSelect === 'custom'"
+                v-model="customModelId"
+                @input="tempSettings.model = customModelId"
+                type="text"
+                placeholder="Enter custom Gemini model ID (e.g. gemini-2.5-flash)..."
+                class="w-full px-3 py-2 text-xs bg-zinc-50 dark:bg-zinc-850 rounded-xl border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-brand-500"
+              />
+            </div>
+          </div>
+        </div>
+
+        <!-- Custom API Key Input -->
+        <div class="space-y-1.5">
+          <label class="text-[11px] uppercase font-bold tracking-wider text-zinc-500 dark:text-zinc-400 flex items-center justify-between">
+            <span>{{ tempSettings.provider === 'openai' ? 'OpenAI API Key (Optional)' : 'Gemini API Key (Required for Gemini)' }}</span>
+            <span class="text-[10px] text-zinc-400 font-normal">Leave blank to use default server key</span>
+          </label>
+          <div class="relative">
+            <input
+              v-if="tempSettings.provider === 'openai'"
+              v-model="tempSettings.openaiApiKey"
+              :type="showApiKey ? 'text' : 'password'"
+              placeholder="Enter custom OpenAI API key (sk-proj-...)..."
+              class="w-full pl-3.5 pr-10 py-2.5 text-xs bg-zinc-50 dark:bg-zinc-850 rounded-xl border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:border-brand-500 font-mono"
+            />
+            <input
+              v-else
+              v-model="tempSettings.apiKey"
+              :type="showApiKey ? 'text' : 'password'"
+              placeholder="Enter your Gemini API key (AIzaSy...)..."
+              class="w-full pl-3.5 pr-10 py-2.5 text-xs bg-zinc-50 dark:bg-zinc-850 rounded-xl border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:border-brand-500 font-mono"
+            />
+            <button
+              type="button"
+              @click="showApiKey = !showApiKey"
+              class="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 cursor-pointer p-1"
+            >
+              <Eye v-if="showApiKey" class="w-4 h-4" />
+              <EyeOff v-else class="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        <!-- Extraction Options Toggles -->
+        <div class="pt-2 border-t border-zinc-100 dark:border-zinc-800 flex flex-wrap items-center justify-between gap-4">
+          <div class="flex items-center gap-6">
+            <label class="flex items-center gap-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                v-model="tempSettings.normalizeDates"
+                class="rounded border-zinc-300 text-brand-500 focus:ring-brand-500 h-4 w-4"
+              />
+              <span class="text-xs font-semibold text-zinc-700 dark:text-zinc-300">Normalize Dates (YYYY-MM-DD)</span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                v-model="tempSettings.mergeNames"
+                class="rounded border-zinc-300 text-brand-500 focus:ring-brand-500 h-4 w-4"
+              />
+              <span class="text-xs font-semibold text-zinc-700 dark:text-zinc-300">Auto-Format Uppercase</span>
+            </label>
+          </div>
+
+          <!-- Save / Cancel Buttons -->
+          <div class="flex items-center gap-2">
+            <button
+              type="button"
+              @click="isSettingsOpen = false"
+              class="px-4 py-2 rounded-xl border border-zinc-200 dark:border-zinc-800 text-xs font-bold text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              @click="handleSaveSettings"
+              class="px-5 py-2 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-xs font-bold shadow-md shadow-brand-500/20 cursor-pointer transition-all active:scale-[0.98]"
+            >
+              Save Settings
+            </button>
+          </div>
+        </div>
+      </div>
+    </Transition>
 
     <!-- Main Two-Column Grid -->
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
@@ -557,7 +1047,7 @@ const getInitials = (name?: string) => {
             <input
               ref="fileInput"
               type="file"
-              accept=".pdf,.jpg,.jpeg,.png,.webp"
+              accept=".jpg,.jpeg,.png,.webp"
               class="hidden"
               @change="handleFileInput"
             />
@@ -568,7 +1058,7 @@ const getInitials = (name?: string) => {
               Click to browse or drop document scan
             </h4>
             <p class="text-[11px] text-zinc-400 max-w-[240px] mb-3">
-              Supports Passport photo, Diploma, Shahodatnoma, or PDF files.
+              Supports Passport photo, Diploma, Shahodatnoma, or any screenshot.
             </p>
             <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-[10px] font-bold text-zinc-500 dark:text-zinc-400">
               <span>Paste screenshot:</span>
@@ -592,20 +1082,11 @@ const getInitials = (name?: string) => {
 
               <!-- Image Visual Preview -->
               <img
-                v-if="!isPdf && previewUrl"
+                v-if="previewUrl"
                 :src="previewUrl"
                 alt="Document Preview"
                 class="max-h-[380px] w-auto object-contain rounded-xl shadow-sm"
               />
-
-              <!-- PDF Visual Preview -->
-              <div v-else-if="isPdf && previewUrl" class="w-full h-[380px] flex flex-col rounded-xl overflow-hidden bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-inner">
-                <iframe
-                  :src="previewUrl + '#toolbar=0&navpanes=0&scrollbar=1&view=FitH'"
-                  class="w-full flex-1 border-0 rounded-xl bg-white"
-                  title="PDF Preview"
-                />
-              </div>
 
               <!-- Fallback -->
               <div v-else class="text-center space-y-2 p-6">
@@ -627,26 +1108,38 @@ const getInitials = (name?: string) => {
             >
               <Loader2 v-if="isExtracting" class="w-4 h-4 animate-spin" />
               <Cpu v-else class="w-4 h-4" />
-              <span>{{ isExtracting ? 'Extracting with Python OCR...' : 'Extract Information from Document' }}</span>
+              <span>{{ isExtracting ? 'Extracting with AI...' : 'Extract Information from Document' }}</span>
             </button>
           </div>
 
-          <!-- Loading Shimmer Overlay -->
+          <!-- Enhanced Loading Shimmer Overlay -->
           <div
             v-if="isExtracting"
-            class="absolute inset-0 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-xs flex flex-col items-center justify-center p-6 z-20 space-y-3"
+            class="absolute inset-0 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-md flex flex-col items-center justify-center p-6 z-20 space-y-6 transition-all duration-300"
           >
-            <div class="p-3.5 rounded-2xl bg-brand-500/10 text-brand-500 border border-brand-500/20">
-              <Loader2 class="w-7 h-7 animate-spin" />
+            <!-- AI Pulse Icon with Scanning Line -->
+            <div class="relative w-20 h-20 flex items-center justify-center">
+              <div class="absolute inset-0 bg-brand-500/20 rounded-full animate-ping opacity-75"></div>
+              <div class="absolute inset-2 bg-brand-500/40 rounded-full animate-pulse"></div>
+              <div class="relative w-14 h-14 bg-white dark:bg-zinc-900 border-2 border-brand-500 rounded-2xl shadow-[0_0_25px_rgba(59,130,246,0.5)] flex items-center justify-center overflow-hidden">
+                 <Sparkles class="w-6 h-6 text-brand-500 animate-pulse relative z-10" />
+                 <!-- Scanning line effect -->
+                 <div class="absolute inset-0 bg-gradient-to-b from-transparent via-brand-500/40 to-transparent h-[200%] animate-scanline"></div>
+              </div>
             </div>
-            <h4 class="text-xs font-extrabold text-zinc-900 dark:text-zinc-100">
-              Analyzing Document Structure
-            </h4>
-            <p class="text-[11px] text-zinc-500 dark:text-zinc-400 text-center max-w-xs">
-              Reading text blocks, recognizing MRZ checksums, and detecting profile fields in RAM...
-            </p>
-            <div class="w-48 h-1.5 bg-zinc-200 dark:bg-zinc-800 rounded-full overflow-hidden relative mt-2">
-              <div class="absolute inset-0 w-1/2 bg-brand-500 rounded-full animate-pulse" />
+
+            <div class="text-center space-y-2">
+              <h4 class="text-sm font-extrabold text-zinc-900 dark:text-zinc-100 flex items-center justify-center gap-2">
+                Analyzing Document with AI
+              </h4>
+              <p class="text-xs text-zinc-500 dark:text-zinc-400 max-w-[280px] mx-auto leading-relaxed">
+                Applying optical character recognition and natural language processing to extract structured profile fields...
+              </p>
+            </div>
+
+            <!-- Indeterminate Progress Bar -->
+            <div class="w-64 h-1.5 bg-zinc-200 dark:bg-zinc-800 rounded-full overflow-hidden relative shadow-inner">
+              <div class="absolute top-0 bottom-0 left-0 w-1/2 bg-brand-500 rounded-full animate-indeterminate"></div>
             </div>
           </div>
         </div>
@@ -751,26 +1244,6 @@ const getInitials = (name?: string) => {
                   <span class="text-[10px] font-extrabold uppercase tracking-wider text-brand-500">
                     {{ field.key.replace(/_/g, ' ') }}
                   </span>
-                  <span
-                    v-if="field.source"
-                    class="px-1.5 py-0.2 rounded text-[9px] font-extrabold uppercase bg-zinc-200/80 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-300/40 dark:border-zinc-700"
-                  >
-                    {{ field.source }}
-                  </span>
-                  <span
-                    v-if="field.confidence"
-                    class="px-1.5 py-0.2 rounded text-[9px] font-extrabold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20"
-                    :title="`Confidence: ${(field.confidence * 100).toFixed(0)}%`"
-                  >
-                    {{ (field.confidence * 100).toFixed(0) }}%
-                  </span>
-                  <span
-                    v-if="field.validated"
-                    class="text-[10px] text-emerald-500 font-black"
-                    title="Format Validated"
-                  >
-                    ✓
-                  </span>
                 </div>
                 <span
                   class="text-xs font-bold text-zinc-900 dark:text-zinc-100 block break-words"
@@ -874,3 +1347,21 @@ const getInitials = (name?: string) => {
     </div>
   </div>
 </template>
+
+<style scoped>
+@keyframes indeterminate {
+  0% { transform: translateX(-100%); }
+  50% { transform: translateX(50%); }
+  100% { transform: translateX(200%); }
+}
+.animate-indeterminate {
+  animation: indeterminate 1.5s infinite ease-in-out;
+}
+@keyframes scanline {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100%); }
+}
+.animate-scanline {
+  animation: scanline 2s infinite linear;
+}
+</style>
