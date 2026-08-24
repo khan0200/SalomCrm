@@ -51,13 +51,16 @@ const copiedField = ref<string | null>(null)
 // Name Language Mode
 const nameLanguage = ref<'EN' | 'KR'>('EN')
 
-// Accordion Collapsible States - matching UniApp2
-const expandedSection = ref<'contact' | 'education' | null>(null)
-const contactExpanded = computed(() => expandedSection.value === 'contact')
-const eduExpanded = computed(() => expandedSection.value === 'education')
+// Accordion Collapsible States (Contact open by default)
+const contactExpanded = ref(true)
+const eduExpanded = ref(false)
 
 const toggleSection = (sec: 'contact' | 'education') => {
-  expandedSection.value = expandedSection.value === sec ? null : sec
+  if (sec === 'contact') {
+    contactExpanded.value = !contactExpanded.value
+  } else {
+    eduExpanded.value = !eduExpanded.value
+  }
 }
 
 // Slot Visibility States
