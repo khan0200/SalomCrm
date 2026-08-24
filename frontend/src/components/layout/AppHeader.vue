@@ -13,9 +13,11 @@ import {
   Globe,
   Map,
   ChevronDown,
-  Check
+  Check,
+  FileText
 } from 'lucide-vue-next'
 import { useStudentDashboardStore } from '@/stores/studentDashboard'
+import { PICK_NEEDED_LIST } from '@/composables/useDocumentHelpers'
 
 const route = useRoute()
 const dashboardStore = useStudentDashboardStore()
@@ -33,6 +35,27 @@ const isMac = computed(() => {
 })
 
 const isVisaTypeDropdownOpen = ref(false)
+const isMissingDocsDropdownOpen = ref(false)
+const missingDocsSearchQuery = ref('')
+
+const filteredMissingDocOptions = computed(() => {
+  const q = missingDocsSearchQuery.value.trim().toLowerCase()
+  if (!q) return PICK_NEEDED_LIST
+  return PICK_NEEDED_LIST.filter(doc => doc.toLowerCase().includes(q))
+})
+
+const toggleMissingDoc = (doc: string) => {
+  const current = [...dashboardStore.selectedMissingDocs]
+  if (current.includes(doc)) {
+    dashboardStore.selectedMissingDocs = current.filter(d => d !== doc)
+  } else {
+    dashboardStore.selectedMissingDocs = [...current, doc]
+  }
+}
+
+const clearMissingDocs = () => {
+  dashboardStore.selectedMissingDocs = []
+}
 
 const visaTypeOptions = [
   { value: 'all', label: 'All', icon: Layers },
@@ -48,6 +71,7 @@ const activeVisaTypeOpt = computed(() => {
 const PAGE_TITLES: Record<string, string> = {
   '/students': 'Students',
   '/status': 'Status Board',
+  '/documents': 'Documents',
   '/visacheck': 'Visa Check',
   '/payments': 'Payments',
   '/settings': 'Settings',
@@ -90,6 +114,10 @@ const handleGlobalKeyDown = (e: KeyboardEvent) => {
     }
 
     // Close top bar modals / panels if open
+    if (isMissingDocsDropdownOpen.value) {
+      isMissingDocsDropdownOpen.value = false
+      return
+    }
     if (dashboardStore.isFilterPanelOpen) {
       dashboardStore.isFilterPanelOpen = false
       return
@@ -110,11 +138,12 @@ const handleGlobalKeyDown = (e: KeyboardEvent) => {
 }
 
 function onDocClick(e: MouseEvent) {
-  if (isVisaTypeDropdownOpen.value) {
-    const target = e.target as HTMLElement
-    if (!target.closest('[data-visa-type-menu]')) {
-      isVisaTypeDropdownOpen.value = false
-    }
+  const target = e.target as HTMLElement
+  if (isVisaTypeDropdownOpen.value && !target.closest('[data-visa-type-menu]')) {
+    isVisaTypeDropdownOpen.value = false
+  }
+  if (isMissingDocsDropdownOpen.value && !target.closest('[data-missing-docs-menu]')) {
+    isMissingDocsDropdownOpen.value = false
   }
 }
 
@@ -135,79 +164,82 @@ onUnmounted(() => {
     v-if="isStudentOrStatusPage"
     class="flex flex-col md:flex-row flex-shrink-0 items-stretch md:items-center justify-between gap-3 md:gap-4 px-4 md:px-6 h-auto py-2.5 md:h-14 md:py-0 border-b border-zinc-200/80 dark:border-zinc-800 bg-white/95 dark:bg-[#111315]/95 backdrop-blur-md sticky top-0 z-30 shadow-2xs"
   >
-    <!-- Left Side: Visa Type Dropdown on /visacheck OR Filter Button on other pages -->
-    <div v-if="pathname === '/visacheck'" class="flex-shrink-0 relative" data-visa-type-menu>
-      <button
-        type="button"
-        @click.stop="isVisaTypeDropdownOpen = !isVisaTypeDropdownOpen"
-        class="flex items-center justify-center gap-2 px-3.5 lg:px-4 h-[34px] md:h-[36px] rounded-full border text-xs md:text-sm font-bold select-none cursor-pointer transition-all duration-200 shadow-xs hover:shadow-md outline-none whitespace-nowrap shrink-0 border-zinc-300 dark:border-zinc-700 bg-zinc-100/90 dark:bg-zinc-900 text-zinc-800 dark:text-zinc-100 hover:bg-zinc-200/80 dark:hover:bg-zinc-800"
-      >
-        <component :is="activeVisaTypeOpt.icon" class="size-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-        <span>{{ activeVisaTypeOpt.label }}</span>
-        <span class="text-[11px] font-bold rounded-md px-1.5 py-0.5 min-w-[1.25rem] text-center bg-[#0B4133] text-white">
-          {{ dashboardStore.visaTypeCounts?.[dashboardStore.visaTypeFilter] ?? 0 }}
-        </span>
-        <ChevronDown class="size-3.5 text-zinc-400" />
-      </button>
-
-      <Transition
-        enter-active-class="transition duration-100 ease-out"
-        enter-from-class="opacity-0 scale-95"
-        enter-to-class="opacity-100 scale-100"
-        leave-active-class="transition duration-75 ease-in"
-        leave-from-class="opacity-100 scale-100"
-        leave-to-class="opacity-0 scale-95"
-      >
-        <div
-          v-if="isVisaTypeDropdownOpen"
-          class="absolute left-0 mt-1 w-52 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-2xl py-2 z-50 text-xs"
+    <!-- Left Column: Filter Button or Visa Type (Balanced width for true center alignment) -->
+    <div class="flex-shrink-0 flex items-center gap-2 md:w-[220px] justify-start">
+      <!-- Visa Type Dropdown on /visacheck -->
+      <div v-if="pathname === '/visacheck'" class="relative" data-visa-type-menu>
+        <button
+          type="button"
+          @click.stop="isVisaTypeDropdownOpen = !isVisaTypeDropdownOpen"
+          class="flex items-center justify-center gap-2 px-3.5 lg:px-4 h-[34px] md:h-[36px] rounded-full border text-xs md:text-sm font-bold select-none cursor-pointer transition-all duration-200 shadow-xs hover:shadow-md outline-none whitespace-nowrap shrink-0 border-zinc-300 dark:border-zinc-700 bg-zinc-100/90 dark:bg-zinc-900 text-zinc-800 dark:text-zinc-100 hover:bg-zinc-200/80 dark:hover:bg-zinc-800"
         >
-          <button
-            v-for="opt in visaTypeOptions"
-            :key="opt.value"
-            type="button"
-            @click="dashboardStore.visaTypeFilter = opt.value as any; isVisaTypeDropdownOpen = false"
-            class="w-full text-left px-3.5 py-2.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 flex items-center justify-between text-zinc-800 dark:text-zinc-200 font-semibold cursor-pointer transition-colors"
+          <component :is="activeVisaTypeOpt.icon" class="size-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+          <span>{{ activeVisaTypeOpt.label }}</span>
+          <span class="text-[11px] font-bold rounded-md px-1.5 py-0.5 min-w-[1.25rem] text-center bg-[#0B4133] text-white">
+            {{ dashboardStore.visaTypeCounts?.[dashboardStore.visaTypeFilter] ?? 0 }}
+          </span>
+          <ChevronDown class="size-3.5 text-zinc-400" />
+        </button>
+
+        <Transition
+          enter-active-class="transition duration-100 ease-out"
+          enter-from-class="opacity-0 scale-95"
+          enter-to-class="opacity-100 scale-100"
+          leave-active-class="transition duration-75 ease-in"
+          leave-from-class="opacity-100 scale-100"
+          leave-to-class="opacity-0 scale-95"
+        >
+          <div
+            v-if="isVisaTypeDropdownOpen"
+            class="absolute left-0 mt-1 w-52 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-2xl py-2 z-50 text-xs"
           >
-            <div class="flex items-center gap-2">
-              <component :is="opt.icon" class="size-4 text-zinc-400" />
-              <span>{{ opt.label }}</span>
-            </div>
-            <div class="flex items-center gap-1.5">
-              <span
-                class="text-[10px] font-bold rounded px-1.5 py-0.5 text-center"
-                :class="dashboardStore.visaTypeFilter === opt.value
-                  ? 'bg-[#0B4133] text-white'
-                  : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400'"
-              >
-                {{ dashboardStore.visaTypeCounts?.[opt.value] ?? 0 }}
-              </span>
-              <Check v-if="dashboardStore.visaTypeFilter === opt.value" class="size-3.5 text-emerald-500" />
-            </div>
-          </button>
-        </div>
-      </Transition>
+            <button
+              v-for="opt in visaTypeOptions"
+              :key="opt.value"
+              type="button"
+              @click="dashboardStore.visaTypeFilter = opt.value as any; isVisaTypeDropdownOpen = false"
+              class="w-full text-left px-3.5 py-2.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 flex items-center justify-between text-zinc-800 dark:text-zinc-200 font-semibold cursor-pointer transition-colors"
+            >
+              <div class="flex items-center gap-2">
+                <component :is="opt.icon" class="size-4 text-zinc-400" />
+                <span>{{ opt.label }}</span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <span
+                  class="text-[10px] font-bold rounded px-1.5 py-0.5 text-center"
+                  :class="dashboardStore.visaTypeFilter === opt.value
+                    ? 'bg-[#0B4133] text-white'
+                    : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400'"
+                >
+                  {{ dashboardStore.visaTypeCounts?.[opt.value] ?? 0 }}
+                </span>
+                <Check v-if="dashboardStore.visaTypeFilter === opt.value" class="size-3.5 text-emerald-500" />
+              </div>
+            </button>
+          </div>
+        </Transition>
+      </div>
+
+      <!-- Filter Button on other pages -->
+      <div v-else class="flex items-center gap-2 flex-wrap">
+        <button
+          type="button"
+          @click="dashboardStore.isFilterPanelOpen = !dashboardStore.isFilterPanelOpen"
+          class="flex items-center justify-center gap-1.5 px-3 lg:px-4 h-[34px] md:h-[36px] rounded-full border text-xs md:text-sm font-semibold select-none cursor-pointer transition-all duration-200 shadow-xs hover:shadow-md outline-none whitespace-nowrap shrink-0"
+          :class="[
+            dashboardStore.isFilterPanelOpen || dashboardStore.activeFiltersCount > 0
+              ? 'border-blue-500 bg-blue-50/80 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 font-bold ring-2 ring-blue-500/20'
+              : 'border-zinc-200 dark:border-zinc-700/80 bg-zinc-100/80 dark:bg-zinc-900 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-200/70 dark:hover:bg-zinc-800'
+          ]"
+        >
+          <Filter class="h-4 w-4" />
+          <span>Filter{{ dashboardStore.activeFiltersCount > 0 ? ` (${dashboardStore.activeFiltersCount})` : '' }}</span>
+        </button>
+      </div>
     </div>
 
-    <!-- Filter Button on other pages -->
-    <div v-else class="flex-shrink-0 flex items-center gap-2 flex-wrap">
-      <button
-        type="button"
-        @click="dashboardStore.isFilterPanelOpen = !dashboardStore.isFilterPanelOpen"
-        class="flex items-center justify-center gap-1.5 px-3 lg:px-4 h-[34px] md:h-[36px] rounded-full border text-xs md:text-sm font-semibold select-none cursor-pointer transition-all duration-200 shadow-xs hover:shadow-md outline-none whitespace-nowrap shrink-0"
-        :class="[
-          dashboardStore.isFilterPanelOpen || dashboardStore.activeFiltersCount > 0
-            ? 'border-blue-500 bg-blue-50/80 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 font-bold ring-2 ring-blue-500/20'
-            : 'border-zinc-200 dark:border-zinc-700/80 bg-zinc-100/80 dark:bg-zinc-900 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-200/70 dark:hover:bg-zinc-800'
-        ]"
-      >
-        <Filter class="h-4 w-4" />
-        <span>Filter{{ dashboardStore.activeFiltersCount > 0 ? ` (${dashboardStore.activeFiltersCount})` : '' }}</span>
-      </button>
-    </div>
-
-    <!-- Center: Sleek Search Bar -->
-    <div class="flex items-center gap-2.5 z-30 w-full h-auto md:flex-1 md:min-w-0 md:mx-3 max-w-full md:max-w-[480px]">
+    <!-- Center Column: Search Bar + (on /documents) Missing Docs Filter -->
+    <div class="flex items-center justify-center gap-2 z-30 w-full md:flex-1 md:min-w-0 max-w-full md:max-w-[580px] mx-auto">
       <div
         class="relative flex-1 flex items-center rounded-full border border-zinc-200 dark:border-zinc-700/80 bg-zinc-100/90 dark:bg-zinc-900 backdrop-blur-md shadow-xs hover:border-zinc-300 dark:hover:border-zinc-600 dark:hover:bg-zinc-850 transition-all duration-200 ease-out h-[38px] md:h-[40px] focus-within:border-blue-500 dark:focus-within:border-blue-500 focus-within:bg-white dark:focus-within:bg-zinc-900 focus-within:ring-2 focus-within:ring-blue-500/20"
       >
@@ -250,13 +282,98 @@ onUnmounted(() => {
           </div>
         </div>
       </div>
+
+      <!-- Dedicated Missing Documents Dropdown Trigger (on right of searchbar on /documents) -->
+      <div v-if="pathname === '/documents'" class="relative shrink-0" data-missing-docs-menu>
+        <button
+          type="button"
+          @click.stop="isMissingDocsDropdownOpen = !isMissingDocsDropdownOpen"
+          class="flex items-center justify-center gap-1.5 px-3 lg:px-3.5 h-[38px] md:h-[40px] rounded-full border text-xs font-semibold select-none cursor-pointer transition-all duration-200 shadow-xs hover:shadow-md outline-none whitespace-nowrap"
+          :class="[
+            dashboardStore.selectedMissingDocs.length > 0 || isMissingDocsDropdownOpen
+              ? 'border-orange-500 bg-orange-50/90 dark:bg-orange-950/40 text-orange-700 dark:text-orange-300 font-bold ring-2 ring-orange-500/20'
+              : 'border-zinc-200 dark:border-zinc-700/80 bg-zinc-100/90 dark:bg-zinc-900 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-200/70 dark:hover:bg-zinc-800'
+          ]"
+        >
+          <FileText class="h-4 w-4 text-orange-500 dark:text-orange-400 shrink-0" />
+          <span>Missing Docs</span>
+          <span
+            v-if="dashboardStore.selectedMissingDocs.length > 0"
+            class="text-[10px] font-bold rounded-full px-1.5 py-0.2 min-w-[1.2rem] text-center bg-orange-500 text-white"
+          >
+            {{ dashboardStore.selectedMissingDocs.length }}
+          </span>
+          <ChevronDown class="size-3.5 text-zinc-400 transition-transform" :class="isMissingDocsDropdownOpen ? 'rotate-180' : ''" />
+        </button>
+
+        <Transition
+          enter-active-class="transition duration-100 ease-out"
+          enter-from-class="opacity-0 scale-95"
+          enter-to-class="opacity-100 scale-100"
+          leave-active-class="transition duration-75 ease-in"
+          leave-from-class="opacity-100 scale-100"
+          leave-to-class="opacity-0 scale-95"
+        >
+          <div
+            v-if="isMissingDocsDropdownOpen"
+            class="absolute right-0 mt-1.5 w-64 max-h-[380px] rounded-2xl bg-white dark:bg-[#15171a] border border-zinc-200 dark:border-zinc-800 shadow-2xl z-50 text-xs flex flex-col overflow-hidden animate-page-in"
+          >
+            <!-- Search inside missing docs -->
+            <div class="p-2 border-b border-zinc-100 dark:border-zinc-800">
+              <div class="relative">
+                <Search class="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-400" />
+                <input
+                  v-model="missingDocsSearchQuery"
+                  type="text"
+                  placeholder="Search missing docs..."
+                  class="w-full pl-8 pr-2.5 py-1.5 text-xs bg-zinc-50 dark:bg-zinc-850 rounded-lg border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:border-orange-500"
+                  @click.stop
+                />
+              </div>
+            </div>
+
+            <!-- List of Missing Doc Checkboxes -->
+            <div class="overflow-y-auto max-h-[240px] p-1.5 space-y-0.5 scrollbar-thin">
+              <label
+                v-for="doc in filteredMissingDocOptions"
+                :key="doc"
+                class="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800/80 cursor-pointer transition-colors select-none"
+                @click.stop
+              >
+                <span class="text-xs font-semibold text-zinc-800 dark:text-zinc-200">{{ doc }}</span>
+                <input
+                  type="checkbox"
+                  :checked="dashboardStore.selectedMissingDocs.includes(doc)"
+                  @change="toggleMissingDoc(doc)"
+                  class="h-4 w-4 rounded border-zinc-300 text-orange-600 focus:ring-orange-500 cursor-pointer"
+                />
+              </label>
+            </div>
+
+            <!-- Footer with Clear button -->
+            <div class="p-2 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between bg-zinc-50/60 dark:bg-zinc-850/40">
+              <span class="text-[11px] text-zinc-400 font-medium">
+                {{ dashboardStore.selectedMissingDocs.length }} selected
+              </span>
+              <button
+                v-if="dashboardStore.selectedMissingDocs.length > 0"
+                type="button"
+                @click="clearMissingDocs"
+                class="text-[11px] font-bold text-rose-600 dark:text-rose-400 hover:underline cursor-pointer"
+              >
+                Clear all
+              </button>
+            </div>
+          </div>
+        </Transition>
+      </div>
     </div>
 
-    <!-- Right Side Actions -->
-    <div class="flex items-center gap-2 md:gap-2.5 justify-end z-10 w-full md:w-auto md:shrink-0 mt-1 md:mt-0">
-      <!-- Admissions Link Button (Hidden on /visacheck) -->
+    <!-- Right Column: Action Buttons on other pages (or Empty Balanced Spacer on /documents) -->
+    <div class="flex items-center gap-2 md:gap-2.5 justify-end md:w-[220px] shrink-0 mt-1 md:mt-0">
+      <!-- Admissions Link Button (Hidden on /visacheck and /documents) -->
       <a
-        v-if="pathname !== '/visacheck'"
+        v-if="pathname !== '/visacheck' && pathname !== '/documents'"
         href="https://www.salomkorea.uz/#admission"
         target="_blank"
         rel="noopener noreferrer"
@@ -267,9 +384,9 @@ onUnmounted(() => {
         <span class="hidden sm:inline md:hidden lg:inline">Admissions</span>
       </a>
 
-      <!-- Excel Download Button (Hidden on /visacheck) -->
+      <!-- Excel Download Button (Hidden on /visacheck and /documents) -->
       <button
-        v-if="pathname !== '/visacheck'"
+        v-if="pathname !== '/visacheck' && pathname !== '/documents'"
         type="button"
         @click="dashboardStore.isExcelModalOpen = true"
         class="flex items-center justify-center gap-1.5 px-3 lg:px-4 h-[34px] rounded-full border border-emerald-600/30 bg-emerald-50 hover:bg-emerald-100/70 text-emerald-700 dark:bg-emerald-950/20 dark:border-emerald-800/40 dark:text-emerald-400 text-xs md:text-sm font-semibold select-none cursor-pointer transition-all duration-300 shadow-[0_8px_30px_rgba(0,0,0,0.06)] hover:shadow-md outline-none shrink-0 whitespace-nowrap"
@@ -279,8 +396,9 @@ onUnmounted(() => {
         <span class="hidden sm:inline md:hidden lg:inline">Export Excel</span>
       </button>
 
-      <!-- Add Student Button -->
+      <!-- Add Student Button (Hidden on /documents) -->
       <button
+        v-if="pathname !== '/documents'"
         type="button"
         @click="dashboardStore.isAddStudentModalOpen = true"
         class="flex-1 md:flex-initial flex items-center justify-center gap-1.5 lg:gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 px-3.5 lg:px-4 py-1.5 text-xs md:text-sm font-bold text-white shadow-md shadow-blue-500/25 transition-all cursor-pointer select-none h-8 md:h-[34px] shrink-0 whitespace-nowrap"

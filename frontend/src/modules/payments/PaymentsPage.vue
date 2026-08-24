@@ -320,13 +320,26 @@ const filteredStudents = computed(() => {
 })
 
 const sortedStudents = computed(() => {
-  return [...filteredStudents.value].sort((a, b) => compareStudentIds(a, b, sortOrder.value))
+  return [...filteredStudents.value].sort((a, b) => {
+    // Archived students always sort after active ones, regardless of ID order
+    const aArchived = a.is_deleted ? 1 : 0
+    const bArchived = b.is_deleted ? 1 : 0
+    if (aArchived !== bArchived) return aArchived - bArchived
+    return compareStudentIds(a, b, sortOrder.value)
+  })
 })
 
 const studentsTotalPages = computed(() => Math.max(1, Math.ceil(sortedStudents.value.length / ITEMS_PER_PAGE)))
 const paginatedStudents = computed(() => {
   const start = (studentsPage.value - 1) * ITEMS_PER_PAGE
   return sortedStudents.value.slice(start, start + ITEMS_PER_PAGE)
+})
+
+// Lookup of archived student IDs, used to push their payments to the bottom
+const archivedStudentIds = computed(() => {
+  const set = new Set<string>()
+  allStudents.value.forEach(s => { if (s.is_deleted) set.add(String(s.id)) })
+  return set
 })
 
 // ── Filtered Payments ─────────────────────────────────────────────────
@@ -346,10 +359,20 @@ const filteredPayments = computed(() => {
   })
 })
 
-const historyTotalPages = computed(() => Math.max(1, Math.ceil(filteredPayments.value.length / ITEMS_PER_PAGE)))
+// Payments belonging to archived students sort after all active ones,
+// preserving the existing (newest-first) order within each group.
+const sortedPayments = computed(() => {
+  return [...filteredPayments.value].sort((a, b) => {
+    const aArchived = a.student_id && archivedStudentIds.value.has(String(a.student_id)) ? 1 : 0
+    const bArchived = b.student_id && archivedStudentIds.value.has(String(b.student_id)) ? 1 : 0
+    return aArchived - bArchived
+  })
+})
+
+const historyTotalPages = computed(() => Math.max(1, Math.ceil(sortedPayments.value.length / ITEMS_PER_PAGE)))
 const paginatedPayments = computed(() => {
   const start = (historyPage.value - 1) * ITEMS_PER_PAGE
-  return filteredPayments.value.slice(start, start + ITEMS_PER_PAGE)
+  return sortedPayments.value.slice(start, start + ITEMS_PER_PAGE)
 })
 
 watch([studentSearch, selectedStatuses, selectedTariffs, selectedBalances, selectedGroups, sortOrder], () => {
@@ -583,7 +606,7 @@ const handleDeletePayment = (payment: Payment) => {
 
 // ── Excel Export with xlsx-js-style matching UniApp2 ─────────────────
 const exportPaymentHistoryToExcel = async () => {
-  if (filteredPayments.value.length === 0) {
+  if (sortedPayments.value.length === 0) {
     alert('No payments to export!')
     return
   }
@@ -598,7 +621,7 @@ const exportPaymentHistoryToExcel = async () => {
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
   }
 
-  const excelData = filteredPayments.value.map((p, index) => {
+  const excelData = sortedPayments.value.map((p, index) => {
     let txType = 'Standard Payment'
     if (p.is_withdrawal) {
       txType = 'Withdrawal'
@@ -748,7 +771,7 @@ const exportPaymentHistoryToExcel = async () => {
     <div v-else>
       <PaymentHistoryTable
         :payments="paginatedPayments"
-        :total-filtered-count="filteredPayments.length"
+        :total-filtered-count="sortedPayments.length"
         :is-loading="isHistoryLoading"
         :search-query="historySearch"
         :selected-method="selectedMethod"

@@ -17,6 +17,7 @@ export const useStudentDashboardStore = defineStore('studentDashboard', () => {
   const selectedScores = ref<string[]>([])
   const selectedTags = ref<string[]>([])
   const selectedLeads = ref<string[]>([])
+  const selectedMissingDocs = ref<string[]>([])
 
   const activeFiltersCount = computed(() => {
     return (
@@ -26,7 +27,8 @@ export const useStudentDashboardStore = defineStore('studentDashboard', () => {
       selectedCerts.value.length +
       selectedScores.value.length +
       selectedTags.value.length +
-      selectedLeads.value.length
+      selectedLeads.value.length +
+      selectedMissingDocs.value.length
     )
   })
 
@@ -39,6 +41,7 @@ export const useStudentDashboardStore = defineStore('studentDashboard', () => {
     selectedScores.value = []
     selectedTags.value = []
     selectedLeads.value = []
+    selectedMissingDocs.value = []
   }
 
   // Export event trigger callback
@@ -75,6 +78,7 @@ export const useStudentDashboardStore = defineStore('studentDashboard', () => {
     selectedScores,
     selectedTags,
     selectedLeads,
+    selectedMissingDocs,
     activeFiltersCount,
     resetAllFilters,
     onExportExcel,

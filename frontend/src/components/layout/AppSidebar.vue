@@ -32,7 +32,7 @@ const navItems = computed<NavItem[]>(() => {
   const items: NavItem[] = [
     { name: 'STUDENTS', path: '/students', icon: Users },
     { name: 'STATUS', path: '/status', icon: ClipboardList },
-    { name: 'DOCUMENTS', path: '/students?tab=documents', icon: FileText },
+    { name: 'DOCUMENTS', path: '/documents', icon: FileText },
     { name: 'PAYMENTS', path: '/payments', icon: CreditCard },
     { name: 'VISACHECK', path: '/visacheck', icon: ShieldCheck },
     { name: 'SETTINGS', path: '/settings', icon: Settings }

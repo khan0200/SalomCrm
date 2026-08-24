@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import type { Payment } from '@/types'
 import {
   Search, FileSpreadsheet, Pencil, Trash2, Printer,
-  Receipt, X, User, LayoutGrid, Table as TableIcon
+  Receipt, X, User, LayoutGrid, Table as TableIcon,
+  Copy, Check, Calendar, Clock, ArrowDownLeft, ArrowUpRight, Tag
 } from 'lucide-vue-next'
 
 const props = defineProps<{
@@ -29,6 +30,86 @@ const emit = defineEmits<{
 }>()
 
 const viewingPayment = ref<Payment | null>(null)
+const copiedField = ref<string | null>(null)
+
+const handleCopy = (field: string, text?: string | number | null) => {
+  if (!text) return
+  navigator.clipboard.writeText(String(text))
+  copiedField.value = field
+  setTimeout(() => {
+    if (copiedField.value === field) copiedField.value = null
+  }, 1600)
+}
+
+// ── Responsive Zoom Scaling for Laptop Screens ─────────────────────────
+const modalPanelRef = ref<HTMLElement | null>(null)
+const modalZoom = ref(1)
+const MIN_ZOOM = 0.65
+const VIEWPORT_MARGIN = 32
+
+const recalcZoom = () => {
+  const el = modalPanelRef.value
+  if (!el) return
+
+  const prev = modalZoom.value
+  modalZoom.value = 1
+
+  nextTick(() => {
+    if (!modalPanelRef.value) {
+      modalZoom.value = prev
+      return
+    }
+    const naturalH = modalPanelRef.value.offsetHeight
+    const naturalW = modalPanelRef.value.offsetWidth
+    if (!naturalH || !naturalW) {
+      modalZoom.value = prev
+      return
+    }
+
+    const availH = window.innerHeight - VIEWPORT_MARGIN
+    const availW = window.innerWidth - VIEWPORT_MARGIN
+    const fit = Math.min(availH / naturalH, availW / naturalW)
+
+    modalZoom.value = fit >= 1 ? 1 : Math.max(MIN_ZOOM, Math.round(fit * 1000) / 1000)
+  })
+}
+
+let resizeObserver: ResizeObserver | null = null
+
+watch(() => viewingPayment.value, (val) => {
+  if (val) {
+    nextTick(() => {
+      recalcZoom()
+      if (modalPanelRef.value && typeof ResizeObserver !== 'undefined') {
+        resizeObserver?.disconnect()
+        resizeObserver = new ResizeObserver(() => {
+          if (modalZoom.value === 1) recalcZoom()
+        })
+        resizeObserver.observe(modalPanelRef.value)
+      }
+    })
+  } else {
+    resizeObserver?.disconnect()
+    resizeObserver = null
+  }
+})
+
+const handleKeydown = (e: KeyboardEvent) => {
+  if (e.key === 'Escape' && viewingPayment.value) {
+    viewingPayment.value = null
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('resize', recalcZoom)
+  window.addEventListener('keydown', handleKeydown)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', recalcZoom)
+  window.removeEventListener('keydown', handleKeydown)
+  resizeObserver?.disconnect()
+})
 
 function formatAmount(val: number | string | null | undefined) {
   if (val === null || val === undefined) return '0'
@@ -54,6 +135,14 @@ const handleEditFromModal = () => {
     const p = viewingPayment.value
     viewingPayment.value = null
     emit('open-edit', p)
+  }
+}
+
+const handleDeleteFromModal = () => {
+  if (viewingPayment.value) {
+    const p = viewingPayment.value
+    viewingPayment.value = null
+    emit('delete-payment', p)
   }
 }
 
@@ -222,11 +311,67 @@ const printReceipt = (payment: Payment) => {
 
     <!-- Payments Count -->
     <div class="text-xs text-zinc-500 dark:text-zinc-400 italic px-1">
-      {{ totalFilteredCount }} payments
+      <span v-if="isLoading" class="inline-block h-3 w-24 rounded bg-zinc-200 dark:bg-zinc-800 animate-pulse align-middle" />
+      <template v-else>{{ totalFilteredCount }} payments</template>
+    </div>
+
+    <!-- ── Loading Skeleton: Grid View ────────────────────────────────── -->
+    <div v-if="isLoading && viewMode === 'grid'" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+      <div
+        v-for="i in 12"
+        :key="i"
+        class="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#15171a] p-3.5 shadow-2xs flex flex-col gap-3 animate-pulse"
+      >
+        <div class="flex items-start justify-between gap-2">
+          <div class="h-3.5 w-2/3 rounded bg-zinc-200 dark:bg-zinc-800" />
+          <div class="h-2.5 w-12 rounded bg-zinc-100 dark:bg-zinc-800/70" />
+        </div>
+        <div class="flex items-center gap-1.5 flex-wrap">
+          <div class="h-5 w-24 rounded bg-zinc-100 dark:bg-zinc-800/70" />
+          <div class="h-5 w-14 rounded bg-zinc-100 dark:bg-zinc-800/70" />
+          <div class="h-5 w-16 rounded bg-zinc-100 dark:bg-zinc-800/70" />
+        </div>
+        <div class="pt-2 border-t border-zinc-100 dark:border-zinc-800/80">
+          <div class="h-3 w-1/2 rounded bg-zinc-100 dark:bg-zinc-800/70" />
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Loading Skeleton: Table View ───────────────────────────────── -->
+    <div v-else-if="isLoading" class="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#111315] overflow-hidden shadow-2xs">
+      <div class="overflow-x-auto">
+        <table class="w-full border-collapse text-left">
+          <thead>
+            <tr class="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-850/60 text-[12px] font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-300 select-none">
+              <th class="px-4 py-3.5 w-[145px] whitespace-nowrap">Date &amp; Time / ID</th>
+              <th class="px-4 py-3.5 w-[22%] min-w-[180px]">Student</th>
+              <th class="px-4 py-3.5 w-[130px] whitespace-nowrap">Amount</th>
+              <th class="px-4 py-3.5 w-[95px] whitespace-nowrap">Method</th>
+              <th class="px-4 py-3.5 w-[110px] whitespace-nowrap">Received By</th>
+              <th class="px-4 py-3.5 w-[110px] whitespace-nowrap">Registered By</th>
+              <th class="px-4 py-3.5 w-auto min-w-[200px]">Notes</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-zinc-100 dark:divide-zinc-800">
+            <tr v-for="i in 12" :key="i" class="animate-pulse">
+              <td class="px-4 py-3 whitespace-nowrap">
+                <div class="h-3 w-20 rounded bg-zinc-200 dark:bg-zinc-800 mb-1.5" />
+                <div class="h-2.5 w-14 rounded bg-zinc-100 dark:bg-zinc-800/70" />
+              </td>
+              <td class="px-4 py-3"><div class="h-3 w-4/5 rounded bg-zinc-200 dark:bg-zinc-800" /></td>
+              <td class="px-4 py-3 whitespace-nowrap"><div class="h-5 w-24 rounded bg-zinc-100 dark:bg-zinc-800/70" /></td>
+              <td class="px-4 py-3 whitespace-nowrap"><div class="h-3 w-14 rounded bg-zinc-100 dark:bg-zinc-800/70" /></td>
+              <td class="px-4 py-3 whitespace-nowrap"><div class="h-3 w-16 rounded bg-zinc-100 dark:bg-zinc-800/70" /></td>
+              <td class="px-4 py-3 whitespace-nowrap"><div class="h-3 w-16 rounded bg-zinc-100 dark:bg-zinc-800/70" /></td>
+              <td class="px-4 py-3"><div class="h-3 w-3/4 rounded bg-zinc-100 dark:bg-zinc-800/70" /></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
 
     <!-- ── 1. Grid View ──────────────────────────────────────────────── -->
-    <div v-if="viewMode === 'grid'" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+    <div v-else-if="viewMode === 'grid'" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
       <div
         v-for="payment in payments"
         :key="payment.id"
@@ -323,14 +468,13 @@ const printReceipt = (payment: Payment) => {
         <table class="w-full border-collapse text-left">
           <thead>
             <tr class="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-850/60 text-[12px] font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-300 select-none">
-              <th class="px-4 py-3.5 w-[16%]">Date & Time / ID</th>
-              <th class="px-4 py-3.5 w-[24%]">Student</th>
-              <th class="px-4 py-3.5 w-[15%]">Amount</th>
-              <th class="px-4 py-3.5 w-[11%]">Method</th>
-              <th class="px-4 py-3.5 w-[11%]">Received By</th>
-              <th class="px-4 py-3.5 w-[11%]">Registered By</th>
-              <th class="px-4 py-3.5 w-[12%]">Notes</th>
-              <th class="px-4 py-3.5 text-center w-24">Actions</th>
+              <th class="px-4 py-3.5 w-[145px] whitespace-nowrap">Date &amp; Time / ID</th>
+              <th class="px-4 py-3.5 w-[22%] min-w-[180px]">Student</th>
+              <th class="px-4 py-3.5 w-[130px] whitespace-nowrap">Amount</th>
+              <th class="px-4 py-3.5 w-[95px] whitespace-nowrap">Method</th>
+              <th class="px-4 py-3.5 w-[110px] whitespace-nowrap">Received By</th>
+              <th class="px-4 py-3.5 w-[110px] whitespace-nowrap">Registered By</th>
+              <th class="px-4 py-3.5 w-auto min-w-[200px]">Notes</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-zinc-100 dark:divide-zinc-800 text-[13px]">
@@ -341,7 +485,7 @@ const printReceipt = (payment: Payment) => {
               class="hover:bg-zinc-50/80 dark:hover:bg-zinc-850/60 transition-colors text-zinc-800 dark:text-zinc-200 cursor-pointer"
             >
               <!-- Date & Time on top, Payment ID below -->
-              <td class="px-4 py-3">
+              <td class="px-4 py-3 whitespace-nowrap">
                 <div class="flex flex-col gap-0.5">
                   <span class="font-mono text-[12px] font-semibold text-zinc-900 dark:text-zinc-100 whitespace-nowrap">
                     {{ formatTimestamp(payment.created_at) }}
@@ -385,55 +529,26 @@ const printReceipt = (payment: Payment) => {
               </td>
 
               <!-- Method -->
-              <td class="px-4 py-3">
+              <td class="px-4 py-3 whitespace-nowrap">
                 <span class="inline-flex px-2 py-0.5 rounded-[4px] text-[10px] font-bold uppercase tracking-wider bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700">
                   {{ payment.method }}
                 </span>
               </td>
 
               <!-- Received By -->
-              <td class="px-4 py-3 font-semibold uppercase text-zinc-700 dark:text-zinc-300 text-xs">
+              <td class="px-4 py-3 font-semibold uppercase text-zinc-700 dark:text-zinc-300 text-xs whitespace-nowrap">
                 {{ payment.received_by }}
               </td>
 
               <!-- Registered By -->
-              <td class="px-4 py-3 font-bold uppercase text-zinc-800 dark:text-zinc-200 text-xs">
+              <td class="px-4 py-3 font-bold uppercase text-zinc-800 dark:text-zinc-200 text-xs whitespace-nowrap">
                 {{ payment.created_by_name || payment.received_by || 'Staff' }}
               </td>
 
-              <!-- Notes -->
-              <td class="px-4 py-3 text-xs text-zinc-500 dark:text-zinc-400 max-w-[180px] truncate" :title="payment.notes || ''">
-                {{ payment.notes || '—' }}
-              </td>
-
-              <!-- Actions -->
-              <td class="px-4 py-3 text-center" @click.stop>
-                <div class="flex items-center justify-center gap-1">
-                  <button
-                    type="button"
-                    @click="emit('open-edit', payment)"
-                    class="p-1 rounded-md text-zinc-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors cursor-pointer"
-                    title="Edit"
-                  >
-                    <Pencil class="h-3.5 w-3.5" />
-                  </button>
-                  <button
-                    type="button"
-                    @click="emit('delete-payment', payment)"
-                    class="p-1 rounded-md text-zinc-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
-                    title="Delete"
-                  >
-                    <Trash2 class="h-3.5 w-3.5" />
-                  </button>
-                  <button
-                    type="button"
-                    @click="printReceipt(payment)"
-                    class="p-1 rounded-md text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
-                    title="Print"
-                  >
-                    <Printer class="h-3.5 w-3.5" />
-                  </button>
-                </div>
+              <!-- Notes (Takes all remaining table width) -->
+              <td class="px-4 py-3 text-xs text-zinc-600 dark:text-zinc-300 leading-relaxed" :title="payment.notes || ''">
+                <span v-if="payment.notes" class="line-clamp-2">{{ payment.notes }}</span>
+                <span v-else class="text-zinc-400 dark:text-zinc-600 italic">—</span>
               </td>
             </tr>
           </tbody>
@@ -444,168 +559,252 @@ const printReceipt = (payment: Payment) => {
     <!-- Empty State -->
     <div
       v-if="payments.length === 0 && !isLoading"
-      class="rounded-xl border border-zinc-200 dark:border-zinc-800 border-dashed bg-white dark:bg-[#111315] p-12 text-center text-xs text-zinc-500 dark:text-zinc-400"
+      class="rounded-xl border border-zinc-200 dark:border-zinc-800 border-dashed bg-white dark:bg-[#111315] py-16 px-6 text-center space-y-3"
     >
-      No payments match your filters.
+      <div class="w-14 h-14 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center mx-auto text-zinc-400">
+        <Receipt class="h-7 w-7" />
+      </div>
+      <p class="font-bold text-sm text-zinc-800 dark:text-zinc-200">No payments found</p>
+      <p class="text-xs text-zinc-500 dark:text-zinc-400">
+        {{ searchQuery || selectedMethod !== 'all' || selectedReceiver !== 'all'
+          ? 'No payments match your filters. Try adjusting your search or filters.'
+          : 'No payments have been recorded yet.' }}
+      </p>
     </div>
 
-    <!-- ── Payment Details Modal matching UniApp2 1-to-1 ───────────────────────── -->
+    <!-- ── Payment Details Modal (+10% width, Auto-Fit Zoom Scaling) ───────────────────────── -->
     <div
       v-if="viewingPayment"
-      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs select-none"
+      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs select-none overflow-hidden"
     >
-      <div
-        class="bg-white dark:bg-[#181a1d] border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-page-in p-6 flex flex-col gap-4 max-h-[90vh] overflow-y-auto"
-        @click.stop
-      >
-        <!-- Modal Header -->
-        <div class="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-3">
-          <h3 class="text-base font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-            <Receipt class="h-4 w-4 text-blue-600" />
-            <span>Payment Details</span>
-          </h3>
-          <button
-            type="button"
-            @click="viewingPayment = null"
-            class="cursor-pointer text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
-          >
-            <X class="h-5 w-5" />
-          </button>
-        </div>
+      <div class="fixed inset-0" @click="viewingPayment = null" />
 
-        <div class="flex flex-col gap-3.5 text-xs">
-          <!-- Payment ID -->
-          <div class="flex items-center justify-between text-xs border-b border-zinc-100 dark:border-zinc-800 pb-2">
-            <span class="text-zinc-500 font-semibold">Payment ID</span>
-            <span class="font-mono text-zinc-900 dark:text-zinc-100 bg-zinc-50 dark:bg-zinc-850 px-2 py-0.5 rounded border border-zinc-200 dark:border-zinc-700 select-all uppercase font-bold text-[11px]">
-              {{ viewingPayment.id }}
-            </span>
+      <!-- Scale wrapper for smaller laptop displays -->
+      <div class="relative z-10 flex items-center justify-center pointer-events-auto" :style="{ zoom: modalZoom }">
+        <div
+          ref="modalPanelRef"
+          class="relative w-[565px] max-w-[calc(100vw-2rem)] rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#15171a] shadow-2xl overflow-hidden flex flex-col p-4 sm:p-5 gap-3.5 text-xs text-zinc-900 dark:text-zinc-100 animate-page-in"
+          @click.stop
+        >
+          <!-- 1. Header Bar -->
+          <div class="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800/80 pb-2.5">
+            <div class="flex items-center gap-2.5">
+              <div class="w-8 h-8 rounded-xl bg-blue-600/10 dark:bg-blue-500/15 text-blue-600 dark:text-blue-400 flex items-center justify-center border border-blue-500/20">
+                <Receipt class="h-4 w-4" />
+              </div>
+              <div class="flex flex-col">
+                <div class="flex items-center gap-2">
+                  <h3 class="text-sm font-extrabold text-zinc-900 dark:text-zinc-100 tracking-tight">Payment Details</h3>
+                  <!-- Short Receipt / Payment ID Badge with Copy -->
+                  <button
+                    type="button"
+                    @click="handleCopy('id', viewingPayment.id)"
+                    class="group inline-flex items-center gap-1 font-mono text-[10.5px] font-bold px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-850 hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-750 transition-colors cursor-pointer"
+                    :title="'Click to copy full ID: ' + viewingPayment.id"
+                  >
+                    <span>#{{ String(viewingPayment.id).replace(/-/g, '').slice(-8).toUpperCase() }}</span>
+                    <Check v-if="copiedField === 'id'" class="w-3 h-3 text-emerald-500" />
+                    <Copy v-else class="w-3 h-3 text-zinc-400 group-hover:text-zinc-600 dark:group-hover:text-zinc-300" />
+                  </button>
+                </div>
+                <span class="text-[10px] text-zinc-400 font-medium">Recorded transaction record</span>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              @click="viewingPayment = null"
+              class="w-7 h-7 rounded-lg flex items-center justify-center text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+              title="Close (Esc)"
+            >
+              <X class="h-4 w-4" />
+            </button>
           </div>
 
-          <!-- Student Details -->
-          <div class="flex flex-col gap-1">
-            <span class="text-xs font-semibold text-zinc-500">Student</span>
-            <div class="px-3 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-750 bg-zinc-50 dark:bg-zinc-850 flex flex-col gap-0.5">
-              <div v-if="viewingPayment.student_id" class="flex items-center gap-2">
-                <span class="text-sm font-bold text-zinc-900 dark:text-zinc-100 uppercase">
-                  {{ viewingPayment.student_full_name || viewingPayment.student_name }}
+          <!-- 2. Hero Amount & Key Badges (High-density compact card) -->
+          <div
+            class="rounded-xl border p-3.5 flex flex-col gap-2.5 transition-all"
+            :class="Number(viewingPayment.amount) < 0
+              ? 'border-rose-500/25 bg-rose-500/5 dark:bg-rose-500/10'
+              : viewingPayment.is_discount
+                ? 'border-pink-500/25 bg-pink-500/5 dark:bg-pink-500/10'
+                : 'border-emerald-500/25 bg-emerald-500/5 dark:bg-emerald-500/10'"
+          >
+            <!-- Amount Row with 1-click Copy -->
+            <div class="flex items-center justify-between">
+              <div class="flex flex-col">
+                <span class="text-[10px] uppercase font-bold tracking-wider text-zinc-400 dark:text-zinc-500">
+                  Total Transaction Amount
                 </span>
+                <button
+                  type="button"
+                  @click="handleCopy('amount', formatAmount(Math.abs(Number(viewingPayment.amount))))"
+                  class="group inline-flex items-baseline gap-1.5 text-left cursor-pointer transition-transform active:scale-[0.99]"
+                  title="Click to copy amount"
+                >
+                  <span
+                    class="font-mono text-xl sm:text-2xl font-black tracking-tight"
+                    :class="Number(viewingPayment.amount) < 0
+                      ? 'text-rose-600 dark:text-rose-400'
+                      : viewingPayment.is_discount
+                        ? 'text-pink-600 dark:text-pink-400'
+                        : 'text-emerald-600 dark:text-emerald-400'"
+                  >
+                    {{ Number(viewingPayment.amount) < 0 ? '-' : '+' }}{{ formatAmount(Math.abs(Number(viewingPayment.amount))) }}
+                  </span>
+                  <span class="font-mono text-xs font-bold text-zinc-500 dark:text-zinc-400">UZS</span>
+                  <Check v-if="copiedField === 'amount'" class="w-3.5 h-3.5 text-emerald-500 inline ml-1 self-center" />
+                  <Copy v-else class="w-3.5 h-3.5 text-zinc-400 opacity-0 group-hover:opacity-100 transition-opacity self-center" />
+                </button>
               </div>
-              <span v-if="viewingPayment.student_id" class="text-xs font-semibold text-zinc-500">
-                ID: <span class="text-blue-600 font-mono font-bold">{{ viewingPayment.student_id }}</span>
+
+              <!-- Transaction Type Tag -->
+              <span
+                class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-extrabold uppercase tracking-wide border shadow-2xs"
+                :class="Number(viewingPayment.amount) < 0
+                  ? 'bg-rose-500/15 border-rose-500/30 text-rose-700 dark:text-rose-300'
+                  : viewingPayment.is_discount
+                    ? 'bg-pink-500/15 border-pink-500/30 text-pink-700 dark:text-pink-300'
+                    : 'bg-emerald-500/15 border-emerald-500/30 text-emerald-700 dark:text-emerald-300'"
+              >
+                <ArrowDownLeft v-if="Number(viewingPayment.amount) < 0" class="w-3.5 h-3.5" />
+                <ArrowUpRight v-else class="w-3.5 h-3.5" />
+                <span>{{ Number(viewingPayment.amount) < 0 ? 'Withdrawal' : (viewingPayment.is_discount ? 'Discount' : 'Payment') }}</span>
               </span>
-              <span v-else class="text-xs text-zinc-500 italic">
-                General Payment (No Student Linked)
-              </span>
             </div>
-          </div>
 
-          <!-- Amount and Type -->
-          <div class="grid grid-cols-2 gap-3">
-            <div class="flex flex-col gap-1">
-              <span class="text-xs font-semibold text-zinc-500">Amount</span>
-              <div class="px-3 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-750 bg-zinc-50 dark:bg-zinc-850 font-mono">
-                <span
-                  class="text-base font-extrabold"
-                  :class="Number(viewingPayment.amount) < 0 ? 'text-rose-500' : 'text-emerald-500'"
-                >
-                  {{ Number(viewingPayment.amount) < 0 ? '-' : '+' }}{{ formatAmount(Math.abs(Number(viewingPayment.amount))) }} UZS
+            <!-- Inline Method & Receiver Pills -->
+            <div class="flex items-center gap-2 pt-2 border-t border-zinc-200/50 dark:border-zinc-800/60 flex-wrap">
+              <div class="flex items-center gap-1.5">
+                <span class="text-[10.5px] font-semibold text-zinc-500 dark:text-zinc-400">Method:</span>
+                <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[10.5px] font-bold uppercase tracking-wider bg-white/80 dark:bg-zinc-800/90 text-zinc-800 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-700 shadow-2xs">
+                  {{ viewingPayment.method || '—' }}
                 </span>
               </div>
-            </div>
-
-            <div class="flex flex-col gap-1">
-              <span class="text-xs font-semibold text-zinc-500">Transaction Type</span>
-              <div class="px-3 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-750 bg-zinc-50 dark:bg-zinc-850 flex items-center">
-                <span
-                  v-if="viewingPayment.is_withdrawal"
-                  class="inline-flex px-2.5 py-1 rounded-md text-xs font-bold bg-rose-500/15 text-rose-600 dark:text-rose-400 uppercase"
-                >
-                  Withdrawal
-                </span>
-                <span
-                  v-else-if="viewingPayment.is_discount"
-                  class="inline-flex px-2.5 py-1 rounded-md text-xs font-bold bg-pink-500/15 text-pink-600 dark:text-pink-400 uppercase"
-                >
-                  Discount
-                </span>
-                <span
-                  v-else
-                  class="inline-flex px-2.5 py-1 rounded-md text-xs font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 uppercase"
-                >
-                  Standard Payment
+              <span class="text-zinc-300 dark:text-zinc-700">•</span>
+              <div class="flex items-center gap-1.5">
+                <span class="text-[10.5px] font-semibold text-zinc-500 dark:text-zinc-400">Received by:</span>
+                <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[10.5px] font-bold uppercase tracking-wider bg-white/80 dark:bg-zinc-800/90 text-zinc-800 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-700 shadow-2xs">
+                  {{ viewingPayment.received_by || '—' }}
                 </span>
               </div>
             </div>
           </div>
 
-          <!-- Method and Receiver -->
-          <div class="grid grid-cols-2 gap-3">
-            <div class="flex flex-col gap-1">
-              <span class="text-xs font-semibold text-zinc-500">Payment Method</span>
-              <div class="px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-750 bg-zinc-50 dark:bg-zinc-850 text-xs font-bold text-zinc-800 dark:text-zinc-200">
-                {{ viewingPayment.method }}
+          <!-- 3. Compact 2-Column Info Grid -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <!-- Student Card -->
+            <div class="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/80 dark:bg-zinc-850/60 p-2.5 flex flex-col justify-between gap-1.5">
+              <div class="flex items-center justify-between">
+                <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Student</span>
+                <button
+                  v-if="viewingPayment.student_id"
+                  type="button"
+                  @click="handleCopy('student', viewingPayment.student_id)"
+                  class="text-[10px] font-mono font-bold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 cursor-pointer"
+                  title="Click to copy Student ID"
+                >
+                  <span>{{ viewingPayment.student_id }}</span>
+                  <Check v-if="copiedField === 'student'" class="w-3 h-3 text-emerald-500" />
+                  <Copy v-else class="w-2.5 h-2.5 text-blue-400" />
+                </button>
+              </div>
+
+              <div class="flex flex-col">
+                <span
+                  class="font-bold text-zinc-900 dark:text-zinc-100 uppercase tracking-tight text-[12.5px] truncate"
+                  :title="viewingPayment.student_full_name || viewingPayment.student_name || 'General Payment'"
+                >
+                  {{ viewingPayment.student_full_name || viewingPayment.student_name || 'General Payment' }}
+                </span>
+                <span v-if="!viewingPayment.student_id" class="text-[10.5px] text-zinc-400 italic">
+                  No Student Profile Linked
+                </span>
               </div>
             </div>
 
-            <div class="flex flex-col gap-1">
-              <span class="text-xs font-semibold text-zinc-500">Received By</span>
-              <div class="px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-750 bg-zinc-50 dark:bg-zinc-850 text-xs font-bold text-zinc-800 dark:text-zinc-200">
-                {{ viewingPayment.received_by }}
+            <!-- Metadata & Timing Card -->
+            <div class="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/80 dark:bg-zinc-850/60 p-2.5 flex flex-col justify-between gap-1.5">
+              <div class="flex items-center justify-between">
+                <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Registered By</span>
+                <div class="flex items-center gap-1 text-[11px] font-bold uppercase text-zinc-800 dark:text-zinc-200">
+                  <User class="w-3 h-3 text-zinc-400" />
+                  <span>{{ viewingPayment.created_by_name || viewingPayment.received_by || 'Staff' }}</span>
+                </div>
+              </div>
+
+              <div class="flex items-center justify-between pt-1 border-t border-zinc-200/50 dark:border-zinc-800/60 text-[10.5px]">
+                <span class="text-zinc-400 font-medium flex items-center gap-1">
+                  <Calendar class="w-3 h-3 text-zinc-400" />
+                  <span>Date &amp; Time</span>
+                </span>
+                <span class="font-mono font-semibold text-zinc-800 dark:text-zinc-200">
+                  {{ formatTimestamp(viewingPayment.created_at) || '—' }}
+                </span>
               </div>
             </div>
           </div>
 
-          <!-- Registered By -->
-          <div class="flex flex-col gap-1">
-            <span class="text-xs font-semibold text-zinc-500">Registered By</span>
-            <div class="px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-750 bg-zinc-50 dark:bg-zinc-850 text-xs font-bold text-zinc-800 dark:text-zinc-200 uppercase">
-              {{ viewingPayment.created_by_name || viewingPayment.received_by || 'Staff' }}
+          <!-- 4. Notes / Description Section (Compact Quote) -->
+          <div class="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/60 dark:bg-zinc-850/40 p-2.5 flex flex-col gap-1 border-l-3 border-l-blue-500">
+            <div class="flex items-center justify-between">
+              <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Notes / Details</span>
+              <button
+                v-if="viewingPayment.notes"
+                type="button"
+                @click="handleCopy('notes', viewingPayment.notes)"
+                class="text-[10px] text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 flex items-center gap-1 cursor-pointer"
+                title="Copy notes"
+              >
+                <Check v-if="copiedField === 'notes'" class="w-3 h-3 text-emerald-500" />
+                <Copy v-else class="w-2.5 h-2.5" />
+              </button>
             </div>
+            <p class="text-[11.5px] text-zinc-700 dark:text-zinc-300 leading-snug whitespace-pre-wrap">
+              {{ viewingPayment.notes || 'No notes or description attached to this transaction.' }}
+            </p>
           </div>
 
-          <!-- Timestamp -->
-          <div class="flex flex-col gap-1">
-            <span class="text-xs font-semibold text-zinc-500">Timestamp</span>
-            <div class="px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-750 bg-zinc-50 dark:bg-zinc-850 text-xs font-medium text-zinc-800 dark:text-zinc-200 font-mono">
-              {{ viewingPayment.created_at ? new Date(viewingPayment.created_at).toLocaleString('uz-UZ') : '—' }}
-            </div>
-          </div>
+          <!-- 5. Ergonomic Action Footer -->
+          <div class="flex items-center gap-2 pt-1">
+            <button
+              type="button"
+              @click="viewingPayment && printReceipt(viewingPayment)"
+              class="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 text-xs font-bold rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-750 text-zinc-800 dark:text-zinc-200 transition-all cursor-pointer shadow-2xs active:scale-[0.98]"
+              title="Print 80mm Thermal Receipt"
+            >
+              <Printer class="h-3.5 w-3.5 text-zinc-600 dark:text-zinc-400" />
+              <span>Print</span>
+            </button>
 
-          <!-- Notes -->
-          <div class="flex flex-col gap-1">
-            <span class="text-xs font-semibold text-zinc-500">Notes / Description</span>
-            <div class="px-3 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-750 bg-zinc-50 dark:bg-zinc-850 text-xs text-zinc-800 dark:text-zinc-200 min-h-[50px] whitespace-pre-wrap">
-              {{ viewingPayment.notes || 'No notes attached.' }}
-            </div>
-          </div>
-        </div>
+            <button
+              type="button"
+              @click="handleEditFromModal"
+              class="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 text-xs font-bold rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-750 text-zinc-800 dark:text-zinc-200 transition-all cursor-pointer shadow-2xs active:scale-[0.98]"
+              title="Edit Payment"
+            >
+              <Pencil class="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+              <span>Edit</span>
+            </button>
 
-        <!-- Actions Footer -->
-        <div class="flex items-center gap-2 mt-2 pt-3 border-t border-zinc-100 dark:border-zinc-800">
-          <button
-            type="button"
-            @click="handleEditFromModal"
-            class="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-bold rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-750 transition-all cursor-pointer text-zinc-800 dark:text-zinc-200 shadow-2xs"
-          >
-            <Pencil class="h-3.5 w-3.5" />
-            <span>Edit</span>
-          </button>
-          <button
-            type="button"
-            @click="viewingPayment && printReceipt(viewingPayment)"
-            class="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-bold rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-750 transition-all cursor-pointer text-zinc-800 dark:text-zinc-200 shadow-2xs"
-          >
-            <Printer class="h-3.5 w-3.5" />
-            <span>Print</span>
-          </button>
-          <button
-            type="button"
-            @click="viewingPayment = null"
-            class="flex-1 py-2 text-xs font-bold rounded-xl bg-blue-600 hover:bg-blue-700 text-white transition-all cursor-pointer shadow-2xs"
-          >
-            Close
-          </button>
+            <button
+              type="button"
+              @click="handleDeleteFromModal"
+              class="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 text-xs font-bold rounded-xl border border-rose-200 dark:border-rose-900/40 bg-rose-50/50 dark:bg-rose-950/20 text-rose-600 dark:text-rose-400 hover:bg-rose-600 hover:text-white transition-all cursor-pointer shadow-2xs active:scale-[0.98]"
+              title="Delete Payment"
+            >
+              <Trash2 class="h-3.5 w-3.5" />
+              <span>Delete</span>
+            </button>
+
+            <button
+              type="button"
+              @click="viewingPayment = null"
+              class="py-2 px-4 text-xs font-bold rounded-xl bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-white transition-all cursor-pointer shadow-2xs active:scale-[0.98]"
+            >
+              Close
+            </button>
+          </div>
         </div>
       </div>
     </div>

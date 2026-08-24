@@ -7,6 +7,7 @@ import type { Student, Folder, StudentLevel, PaginatedResponse } from '@/types'
 import { useUiStore } from '@/stores/ui'
 import { useStudentDashboardStore } from '@/stores/studentDashboard'
 import { useCustomTags } from '@/composables/useCustomTags'
+import { useDocumentHelpers } from '@/composables/useDocumentHelpers'
 import {
   Search, Plus, Filter, ChevronLeft, ChevronRight,
   Folder as FolderIcon, X, Tag, Layers, Users, BookOpen
@@ -26,6 +27,7 @@ const uiStore = useUiStore()
 const dashboardStore = useStudentDashboardStore()
 const { getTagIcon, fetchTags } = useCustomTags()
 fetchTags()
+const { getEffectiveMissingDocs } = useDocumentHelpers()
 
 // Active Folder state
 const activeFolder = ref('all')
@@ -80,6 +82,10 @@ const selectedTags = computed({
 const selectedLeads = computed({
   get: () => dashboardStore.selectedLeads,
   set: (v) => dashboardStore.selectedLeads = v,
+})
+const selectedMissingDocs = computed({
+  get: () => dashboardStore.selectedMissingDocs,
+  set: (v) => dashboardStore.selectedMissingDocs = v,
 })
 
 // Modals and Drawers
@@ -334,6 +340,13 @@ const filteredStudents = computed(() => {
     })
   }
 
+  if (selectedMissingDocs.value.length > 0) {
+    list = list.filter(s => {
+      const missingList = getEffectiveMissingDocs(s)
+      return selectedMissingDocs.value.some(d => missingList.includes(d))
+    })
+  }
+
   // 4. Sort
   return [...list].sort((a, b) => {
     if (sortBy.value === 'left') {
@@ -355,7 +368,7 @@ const paginatedStudents = computed(() => {
 })
 
 // Reset page on filter changes
-watch([searchQuery, activeFolder, selectedTariffs, selectedLevels, selectedGroups, selectedCerts, selectedScores, selectedTags, selectedLeads], () => {
+watch([searchQuery, activeFolder, selectedTariffs, selectedLevels, selectedGroups, selectedCerts, selectedScores, selectedTags, selectedLeads, selectedMissingDocs], () => {
   currentPage.value = 1
 })
 
@@ -671,6 +684,7 @@ const handleApplyFilters = (filters: any) => {
   selectedScores.value = filters.scores
   selectedTags.value = filters.tags
   selectedLeads.value = filters.leads
+  selectedMissingDocs.value = filters.missingDocs || []
 }
 
 const resetAllFilters = () => {
@@ -818,6 +832,22 @@ const handleSaveFolderAdd = async (selectedIds: string[]) => {
           type="button"
           @click="selectedTags = selectedTags.filter(x => x !== tag)"
           class="text-zinc-400 hover:text-red-500 rounded-full hover:bg-red-500/10 h-4 w-4 flex items-center justify-center cursor-pointer transition-colors"
+        >
+          <X class="h-3 w-3" />
+        </button>
+      </div>
+
+      <!-- Missing Docs chips -->
+      <div
+        v-for="m in selectedMissingDocs"
+        :key="`missing-${m}`"
+        class="inline-flex items-center gap-1.5 px-3 py-1 bg-orange-50 dark:bg-orange-950/40 border border-orange-200 dark:border-orange-800 text-xs text-orange-700 dark:text-orange-300 font-semibold rounded-full shadow-xs"
+      >
+        <span>Missing: {{ m }}</span>
+        <button
+          type="button"
+          @click="selectedMissingDocs = selectedMissingDocs.filter(x => x !== m)"
+          class="text-orange-400 hover:text-red-500 rounded-full hover:bg-red-500/10 h-4 w-4 flex items-center justify-center cursor-pointer transition-colors"
         >
           <X class="h-3 w-3" />
         </button>
@@ -1097,6 +1127,7 @@ const handleSaveFolderAdd = async (selectedIds: string[]) => {
       :selected-scores="selectedScores"
       :selected-tags="selectedTags"
       :selected-leads="selectedLeads"
+      :selected-missing-docs="selectedMissingDocs"
       :matching-count="filteredStudents.length"
       @close="isFilterPanelOpen = false"
       @apply="handleApplyFilters"

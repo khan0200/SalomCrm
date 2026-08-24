@@ -355,11 +355,71 @@ onUnmounted(() => {
 
     <!-- Student Count -->
     <div class="text-xs text-zinc-500 dark:text-zinc-400 italic px-1">
-      {{ totalFilteredCount }} students
+      <span v-if="isLoading" class="inline-block h-3 w-24 rounded bg-zinc-200 dark:bg-zinc-800 animate-pulse align-middle" />
+      <template v-else>{{ totalFilteredCount }} students</template>
+    </div>
+
+    <!-- ── Loading Skeleton: Grid View ─────────────────────────────────────── -->
+    <div v-if="isLoading && viewMode === 'grid'" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+      <div
+        v-for="i in 9"
+        :key="i"
+        class="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#15171a] p-4 shadow-sm animate-pulse"
+      >
+        <div class="flex items-start justify-between gap-2 mb-3">
+          <div class="h-3.5 w-1/2 rounded bg-zinc-200 dark:bg-zinc-800" />
+          <div class="h-3 w-12 rounded bg-zinc-100 dark:bg-zinc-800/70" />
+        </div>
+        <div class="h-3 w-1/3 rounded bg-zinc-100 dark:bg-zinc-800/70 mb-4" />
+        <div class="flex items-center gap-2 mb-3">
+          <div class="h-5 w-20 rounded bg-zinc-100 dark:bg-zinc-800/70" />
+          <div class="h-5 w-16 rounded bg-zinc-100 dark:bg-zinc-800/70" />
+        </div>
+        <div class="pt-3 border-t border-zinc-100 dark:border-zinc-800/80 flex items-center justify-between">
+          <div class="h-3 w-24 rounded bg-zinc-100 dark:bg-zinc-800/70" />
+          <div class="h-3 w-14 rounded bg-zinc-100 dark:bg-zinc-800/70" />
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Loading Skeleton: Table View ────────────────────────────────────── -->
+    <div v-else-if="isLoading" class="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#111315] overflow-hidden shadow-2xs">
+      <div class="overflow-x-auto">
+        <table class="w-full border-collapse text-left">
+          <thead>
+            <tr class="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-850/60 text-[12px] font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-300 select-none">
+              <th class="px-5 py-3.5 w-[30%]">Student / Full Name</th>
+              <th class="px-5 py-3.5 w-[14%]">Group</th>
+              <th class="px-5 py-3.5 w-[22%]">Tariff</th>
+              <th class="px-5 py-3.5 w-[18%]">Balance</th>
+              <th class="px-5 py-3.5 w-[12%]">Discount</th>
+              <th class="px-5 py-3.5 text-center w-24">Actions</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-zinc-100 dark:divide-zinc-800">
+            <tr v-for="i in 12" :key="i" class="animate-pulse">
+              <td class="px-5 py-3.5">
+                <div class="h-3.5 w-3/5 rounded bg-zinc-200 dark:bg-zinc-800 mb-1.5" />
+                <div class="h-2.5 w-1/3 rounded bg-zinc-100 dark:bg-zinc-800/70" />
+              </td>
+              <td class="px-5 py-3.5"><div class="h-3 w-16 rounded bg-zinc-100 dark:bg-zinc-800/70" /></td>
+              <td class="px-5 py-3.5"><div class="h-3 w-24 rounded bg-zinc-100 dark:bg-zinc-800/70" /></td>
+              <td class="px-5 py-3.5"><div class="h-3 w-20 rounded bg-zinc-100 dark:bg-zinc-800/70" /></td>
+              <td class="px-5 py-3.5"><div class="h-3 w-14 rounded bg-zinc-100 dark:bg-zinc-800/70" /></td>
+              <td class="px-5 py-3.5">
+                <div class="flex items-center justify-center gap-1.5">
+                  <div class="h-6 w-6 rounded-md bg-zinc-100 dark:bg-zinc-800/70" />
+                  <div class="h-6 w-6 rounded-md bg-zinc-100 dark:bg-zinc-800/70" />
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
 
     <!-- ── 1. Grid View (UniApp2 Student Cards 1-to-1) ────────────────────── -->
-    <div v-if="viewMode === 'grid'" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+    <div v-else-if="viewMode === 'grid'" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
       <button
         v-for="student in students"
         :key="student.id"
@@ -533,9 +593,17 @@ onUnmounted(() => {
     <!-- Empty State -->
     <div
       v-if="students.length === 0 && !isLoading"
-      class="rounded-xl border border-zinc-200 dark:border-zinc-800 border-dashed bg-white dark:bg-[#111315] p-12 text-center text-xs text-zinc-500 dark:text-zinc-400"
+      class="rounded-xl border border-zinc-200 dark:border-zinc-800 border-dashed bg-white dark:bg-[#111315] py-16 px-6 text-center space-y-3"
     >
-      No students match your filters.
+      <div class="w-14 h-14 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center mx-auto text-zinc-400">
+        <UserX class="h-7 w-7" />
+      </div>
+      <p class="font-bold text-sm text-zinc-800 dark:text-zinc-200">No students found</p>
+      <p class="text-xs text-zinc-500 dark:text-zinc-400">
+        {{ searchQuery
+          ? 'No students match your search or filters. Try adjusting them.'
+          : 'No students are available for this view yet.' }}
+      </p>
     </div>
   </div>
 </template>

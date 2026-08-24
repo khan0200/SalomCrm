@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import {
-  X, Check, Tag, Layers, Users, Award, Bookmark, UserCheck, Hash
+  X, Check, Tag, Layers, Users, Award, Bookmark, UserCheck, Hash, FileText
 } from 'lucide-vue-next'
 import type { Student } from '@/types'
+import { useCustomTags } from '@/composables/useCustomTags'
+import { PICK_NEEDED_LIST, useDocumentHelpers } from '@/composables/useDocumentHelpers'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   isOpen: boolean
   options: {
     tariffs: { name: string; price: number }[]
@@ -22,8 +24,11 @@ const props = defineProps<{
   selectedScores: string[]
   selectedTags: string[]
   selectedLeads: string[]
+  selectedMissingDocs?: string[]
   matchingCount?: number
-}>()
+}>(), {
+  selectedMissingDocs: () => []
+})
 
 const emit = defineEmits<{
   (e: 'close'): void
@@ -35,8 +40,12 @@ const emit = defineEmits<{
     scores: string[]
     tags: string[]
     leads: string[]
+    missingDocs: string[]
   }): void
 }>()
+
+const { getEffectiveMissingDocs } = useDocumentHelpers()
+const { tagsRegistry, getTagIcon } = useCustomTags()
 
 // Draft local states
 const draftTariffs = ref<string[]>([])
@@ -46,6 +55,7 @@ const draftCerts = ref<string[]>([])
 const draftScores = ref<string[]>([])
 const draftTags = ref<string[]>([])
 const draftLeads = ref<string[]>([])
+const draftMissingDocs = ref<string[]>([])
 
 // Active category
 const activeCategory = ref<string>('tariff')
@@ -60,6 +70,7 @@ watch(() => props.isOpen, (newVal) => {
     draftScores.value = [...props.selectedScores]
     draftTags.value = [...props.selectedTags]
     draftLeads.value = [...props.selectedLeads]
+    draftMissingDocs.value = [...(props.selectedMissingDocs || [])]
     activeCategory.value = 'tariff'
   }
 }, { immediate: true })
@@ -90,10 +101,6 @@ watch(showScoreFilter, (hasScore) => {
     }
   }
 })
-
-import { useCustomTags } from '@/composables/useCustomTags'
-
-const { tagsRegistry, getTagIcon } = useCustomTags()
 
 const certOptions = ['NO CERTIFICATE', 'EXPECTED', 'TOPIK', 'SKA', 'IELTS', 'TOEFL', 'SAT', 'CEFR']
 
@@ -165,6 +172,14 @@ const categories = computed<CategoryItem[]>(() => {
 
   list.push(
     {
+      id: 'missing',
+      label: 'Missing Docs',
+      icon: FileText,
+      drafts: draftMissingDocs.value,
+      fullOpts: PICK_NEEDED_LIST,
+      labelMapping: (opt) => opt
+    },
+    {
       id: 'tag',
       label: 'Tasks / Tags',
       icon: Bookmark,
@@ -210,6 +225,10 @@ const toggleDraftOption = (catId: string, val: string) => {
     draftScores.value = draftScores.value.includes(val)
       ? draftScores.value.filter(x => x !== val)
       : [...draftScores.value, val]
+  } else if (catId === 'missing') {
+    draftMissingDocs.value = draftMissingDocs.value.includes(val)
+      ? draftMissingDocs.value.filter(x => x !== val)
+      : [...draftMissingDocs.value, val]
   } else if (catId === 'tag') {
     draftTags.value = draftTags.value.includes(val)
       ? draftTags.value.filter(x => x !== val)
@@ -229,6 +248,7 @@ const clearAll = () => {
   draftScores.value = []
   draftTags.value = []
   draftLeads.value = []
+  draftMissingDocs.value = []
 }
 
 const handleApply = () => {
@@ -239,7 +259,8 @@ const handleApply = () => {
     certs: draftCerts.value,
     scores: draftScores.value,
     tags: draftTags.value,
-    leads: draftLeads.value
+    leads: draftLeads.value,
+    missingDocs: draftMissingDocs.value
   })
 }
 
@@ -250,7 +271,8 @@ const hasDrafts = computed(() => {
     draftCerts.value.length > 0 ||
     draftScores.value.length > 0 ||
     draftTags.value.length > 0 ||
-    draftLeads.value.length > 0
+    draftLeads.value.length > 0 ||
+    draftMissingDocs.value.length > 0
 })
 
 // Dynamic Matching Students Count calculation based on unapplied draft filters
@@ -336,6 +358,13 @@ const matchingStudentsCount = computed(() => {
       if (!matchNoLead && !matchLead) return false
     }
 
+    // 8. Missing Docs filter
+    if (draftMissingDocs.value.length > 0) {
+      const missingList = getEffectiveMissingDocs(student)
+      const matchesMissing = draftMissingDocs.value.some(d => missingList.includes(d))
+      if (!matchesMissing) return false
+    }
+
     return true
   }).length
 })
@@ -371,6 +400,10 @@ const getOptionCount = (catId: string, opt: string): number => {
         const score = (scores[i] || '').trim().toUpperCase()
         return score === opt.toUpperCase()
       })
+    }
+    if (catId === 'missing') {
+      const missingList = getEffectiveMissingDocs(s)
+      return missingList.includes(opt)
     }
     if (catId === 'tag') {
       if (opt === 'Custom') {

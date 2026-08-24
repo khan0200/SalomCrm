@@ -19,12 +19,14 @@ import ExportExcelModal from './components/ExportExcelModal.vue'
 import AddStudentsToFolderModal from './components/AddStudentsToFolderModal.vue'
 import { useStudentDashboardStore } from '@/stores/studentDashboard'
 import { useCustomTags } from '@/composables/useCustomTags'
+import { useDocumentHelpers } from '@/composables/useDocumentHelpers'
 
 const queryClient = useQueryClient()
 const uiStore = useUiStore()
 const dashboardStore = useStudentDashboardStore()
 const { fetchTags } = useCustomTags()
 fetchTags()
+const { getEffectiveMissingDocs } = useDocumentHelpers()
 
 const activeFolder = ref('all')
 const currentPage = ref(1)
@@ -113,6 +115,10 @@ const selectedLeads = computed({
   get: () => dashboardStore.selectedLeads,
   set: (v) => dashboardStore.selectedLeads = v,
 })
+const selectedMissingDocs = computed({
+  get: () => dashboardStore.selectedMissingDocs,
+  set: (v) => dashboardStore.selectedMissingDocs = v,
+})
 const activeFiltersCount = computed(() => dashboardStore.activeFiltersCount)
 
 // Reset pagination to page 1 on any filter or search change
@@ -127,6 +133,7 @@ watch([
   selectedScores,
   selectedTags,
   selectedLeads,
+  selectedMissingDocs,
 ], () => {
   currentPage.value = 1
 })
@@ -302,6 +309,13 @@ const filteredStudents = computed(() => {
     list = list.filter(s => {
       if (hasNoLead && (!s.lead_by || cleanLeads.includes(s.lead_by))) return true
       return s.lead_by && cleanLeads.includes(s.lead_by)
+    })
+  }
+
+  if (selectedMissingDocs.value.length > 0) {
+    list = list.filter(s => {
+      const missingList = getEffectiveMissingDocs(s)
+      return selectedMissingDocs.value.some(d => missingList.includes(d))
     })
   }
 
@@ -611,6 +625,7 @@ const handleApplyFilters = (filters: {
   scores: string[]
   tags: string[]
   leads: string[]
+  missingDocs?: string[]
 }) => {
   selectedTariffs.value = filters.tariffs
   selectedLevels.value = filters.levels
@@ -619,6 +634,7 @@ const handleApplyFilters = (filters: {
   selectedScores.value = filters.scores
   selectedTags.value = filters.tags
   selectedLeads.value = filters.leads
+  selectedMissingDocs.value = filters.missingDocs || []
   currentPage.value = 1
   isFilterPanelOpen.value = false
 }
@@ -632,6 +648,7 @@ const resetAllFilters = () => {
   selectedScores.value = []
   selectedTags.value = []
   selectedLeads.value = []
+  selectedMissingDocs.value = []
   currentPage.value = 1
 }
 
@@ -708,6 +725,7 @@ dashboardStore.onExportExcel = handleExportExcel
       :selected-scores="selectedScores"
       :selected-tags="selectedTags"
       :selected-leads="selectedLeads"
+      :selected-missing-docs="selectedMissingDocs"
       :matching-count="totalCount"
       @close="isFilterPanelOpen = false"
       @apply="handleApplyFilters"
@@ -760,6 +778,15 @@ dashboardStore.onExportExcel = handleExportExcel
       >
         <span>Score: {{ s }}</span>
         <X class="w-3 h-3 cursor-pointer hover:text-red-500" @click="selectedScores = selectedScores.filter(x => x !== s)" />
+      </span>
+
+      <span
+        v-for="m in selectedMissingDocs"
+        :key="`m-${m}`"
+        class="inline-flex items-center gap-1 px-2.5 py-0.5 bg-orange-50 dark:bg-orange-950/40 text-orange-700 dark:text-orange-300 border border-orange-200 dark:border-orange-800 rounded-full font-medium"
+      >
+        <span>Missing: {{ m }}</span>
+        <X class="w-3 h-3 cursor-pointer hover:text-red-500" @click="selectedMissingDocs = selectedMissingDocs.filter(x => x !== m)" />
       </span>
 
       <span

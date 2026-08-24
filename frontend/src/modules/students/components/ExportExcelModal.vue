@@ -76,7 +76,7 @@ const selectedStudentIds = ref<string[]>([])
 // Field picker modal state
 const isFieldPickerOpen = ref(false)
 const fieldSearchQuery = ref('')
-const expandedFieldGroup = ref<string | null>(null)
+const expandedFieldGroup = ref<string | null>('Contact')
 
 // ── Field Definitions (1-to-1 with UniApp2) ─────────────────────────
 interface ExcelField {
@@ -195,6 +195,7 @@ watch(() => props.isOpen, (open) => {
     selectedTags.value = []
     selectedLeads.value = []
     isFieldPickerOpen.value = false
+    expandedFieldGroup.value = 'Contact'
     closeAllDropdowns()
   }
 })

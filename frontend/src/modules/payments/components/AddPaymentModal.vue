@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, computed } from 'vue'
+import { ref, watch, computed, nextTick, onMounted, onUnmounted } from 'vue'
 import { useCurrency } from '@/composables/useCurrency'
 import type { Student, Payment } from '@/types'
 import { CreditCard, X, AlertCircle } from 'lucide-vue-next'
@@ -29,6 +29,58 @@ const studentSearch = ref('')
 const notes = ref('')
 const error = ref<string | null>(null)
 const isSubmitting = ref(false)
+
+// ── Responsive Zoom Scaling for Laptop Screens ─────────────────────────
+const modalPanelRef = ref<HTMLElement | null>(null)
+const modalZoom = ref(1)
+const MIN_ZOOM = 0.65
+const VIEWPORT_MARGIN = 32
+
+const recalcZoom = () => {
+  const el = modalPanelRef.value
+  if (!el) return
+
+  const prev = modalZoom.value
+  modalZoom.value = 1
+
+  nextTick(() => {
+    if (!modalPanelRef.value) {
+      modalZoom.value = prev
+      return
+    }
+    const naturalH = modalPanelRef.value.offsetHeight
+    const naturalW = modalPanelRef.value.offsetWidth
+    if (!naturalH || !naturalW) {
+      modalZoom.value = prev
+      return
+    }
+
+    const availH = window.innerHeight - VIEWPORT_MARGIN
+    const availW = window.innerWidth - VIEWPORT_MARGIN
+    const fit = Math.min(availH / naturalH, availW / naturalW)
+
+    modalZoom.value = fit >= 1 ? 1 : Math.max(MIN_ZOOM, Math.round(fit * 1000) / 1000)
+  })
+}
+
+let resizeObserver: ResizeObserver | null = null
+
+const handleKeydown = (e: KeyboardEvent) => {
+  if (e.key === 'Escape' && props.isOpen) {
+    emit('close')
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('resize', recalcZoom)
+  window.addEventListener('keydown', handleKeydown)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', recalcZoom)
+  window.removeEventListener('keydown', handleKeydown)
+  resizeObserver?.disconnect()
+})
 
 const selectedStudent = computed(() => {
   if (!selectedStudentId.value) return null
@@ -67,6 +119,20 @@ watch(() => props.isOpen, (newVal) => {
     notes.value = ''
     error.value = null
     isSubmitting.value = false
+
+    nextTick(() => {
+      recalcZoom()
+      if (modalPanelRef.value && typeof ResizeObserver !== 'undefined') {
+        resizeObserver?.disconnect()
+        resizeObserver = new ResizeObserver(() => {
+          if (modalZoom.value === 1) recalcZoom()
+        })
+        resizeObserver.observe(modalPanelRef.value)
+      }
+    })
+  } else {
+    resizeObserver?.disconnect()
+    resizeObserver = null
   }
 })
 
@@ -124,26 +190,37 @@ const handleSubmit = () => {
 <template>
   <div
     v-if="isOpen"
-    class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs select-none"
+    class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs select-none overflow-hidden"
   >
-    <div
-      class="bg-white dark:bg-[#181a1d] border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-page-in p-6 flex flex-col gap-4 max-h-[90vh] overflow-y-auto"
-      @click.stop
-    >
-      <!-- Header -->
-      <div class="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-3">
-        <h3 class="text-base font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-          <CreditCard class="h-4 w-4 text-blue-600" />
-          <span>Add Payment</span>
-        </h3>
-        <button
-          type="button"
-          @click="emit('close')"
-          class="cursor-pointer text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
-        >
-          <X class="h-5 w-5" />
-        </button>
-      </div>
+    <div class="fixed inset-0" @click="emit('close')" />
+
+    <!-- Scale wrapper for smaller laptop displays -->
+    <div class="relative z-10 flex items-center justify-center pointer-events-auto" :style="{ zoom: modalZoom }">
+      <div
+        ref="modalPanelRef"
+        class="relative w-[565px] max-w-[calc(100vw-2rem)] rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#15171a] shadow-2xl overflow-hidden flex flex-col p-4 sm:p-5 gap-3.5 text-xs text-zinc-900 dark:text-zinc-100 animate-page-in"
+        @click.stop
+      >
+        <!-- Header -->
+        <div class="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800/80 pb-2.5">
+          <div class="flex items-center gap-2.5">
+            <div class="w-8 h-8 rounded-xl bg-blue-600/10 dark:bg-blue-500/15 text-blue-600 dark:text-blue-400 flex items-center justify-center border border-blue-500/20">
+              <CreditCard class="h-4 w-4" />
+            </div>
+            <div class="flex flex-col">
+              <h3 class="text-sm font-extrabold text-zinc-900 dark:text-zinc-100 tracking-tight">Add Payment</h3>
+              <span class="text-[10px] text-zinc-400 font-medium">Record a new payment transaction</span>
+            </div>
+          </div>
+          <button
+            type="button"
+            @click="emit('close')"
+            class="w-7 h-7 rounded-lg flex items-center justify-center text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+            title="Close (Esc)"
+          >
+            <X class="h-4 w-4" />
+          </button>
+        </div>
 
       <!-- Error Alert -->
       <div
@@ -319,4 +396,5 @@ const handleSubmit = () => {
       </form>
     </div>
   </div>
+</div>
 </template>

@@ -43,6 +43,11 @@ class StudentListSerializer(serializers.ModelSerializer):
             'is_deleted', 'status_hidden', 'invoice', 'invoice_university',
             'coa', 'embassy', 'kdb_put_date', 'kdb_take_date',
             'embassy_father_docs', 'embassy_mother_docs', 'embassy_sponsor_notes',
+            # Documents page: missing-docs checklist + physical copy counters,
+            # plus the profile fields syncMissingDocuments/search rely on.
+            'passport', 'email', 'address', 'father_phone', 'mother_phone',
+            'final_school_name', 'pick_needed', 'has_mc',
+            'bc_hand_count', 'mc_hand_count', 'apos_hand_count', 'pic_hand_count',
             'created_at'
         )
 

@@ -45,6 +45,12 @@ const routes = [
         meta: { title: 'Status Board' }
       },
       {
+        path: 'documents',
+        name: 'documents',
+        component: () => import('@/modules/documents/DocumentsPage.vue'),
+        meta: { title: 'Documents' }
+      },
+      {
         path: 'settings',
         name: 'settings',
         component: () => import('@/modules/settings/SettingsPage.vue'),
