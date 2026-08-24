@@ -261,8 +261,9 @@ class PassportExtractor:
             if full_viz_name:
                 fields['FULL_NAME'] = ExtractedField(full_viz_name, 0.98, True, 'VIZ')
 
-        if viz_father:
-            fields['FATHER_FULLNAME'] = ExtractedField(viz_father, 0.95, True, 'VIZ')
+        # FATHER_FULLNAME is intentionally not emitted: the patronymic is already
+        # part of FULL_NAME above, and the passport holder's own patronymic is not
+        # the father's full name.
         if viz_dob:
             fields['DATE_OF_BIRTH'] = ExtractedField(viz_dob, 0.97, True, 'VIZ')
         if viz_doi:
@@ -271,8 +272,8 @@ class PassportExtractor:
             fields['DATE_OF_EXPIRATION'] = ExtractedField(viz_doe, 0.95, True, 'VIZ')
         if viz_sex:
             fields['SEX'] = ExtractedField(viz_sex, 0.98, True, 'VIZ')
-        if viz_address:
-            fields['ADDRESS'] = ExtractedField(viz_address, 0.95, True, 'VIZ')
+        # ADDRESS is intentionally not emitted: the passport VIZ only carries the
+        # place of birth, which is not the student's address.
 
         return fields
 

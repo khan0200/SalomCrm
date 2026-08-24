@@ -178,11 +178,6 @@ const handlePaste = (e: ClipboardEvent) => {
       const file = item.getAsFile()
       if (file) {
         processFile(file)
-        uiStore.addToast({
-          type: 'info',
-          title: 'Screenshot Pasted',
-          message: `Loaded image from clipboard (${(file.size / 1024).toFixed(1)} KB)`
-        })
         break
       }
     }
@@ -277,20 +272,9 @@ const triggerExtraction = async () => {
       }
     }
     extractedFieldsList.value = fieldsArr
-
-    uiStore.addToast({
-      type: 'success',
-      title: 'Extraction Complete',
-      message: `Extracted ${fieldsArr.length} field(s) via ${ocrEngineUsed.value || 'PaddleOCR'}${extractionLatency.value ? ` in ${extractionLatency.value}ms` : ''}.`
-    })
   } catch (err: any) {
     console.error('Extraction failed:', err)
     extractError.value = err.response?.data?.error || 'Failed to extract document information.'
-    uiStore.addToast({
-      type: 'error',
-      title: 'Extraction Failed',
-      message: extractError.value || 'Error'
-    })
   } finally {
     isExtracting.value = false
   }

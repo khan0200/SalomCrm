@@ -34,8 +34,11 @@ class TestOCRSuffixNormalizer(unittest.TestCase):
             ("QIZ1", "QIZI"),
             ("QIZT", "QIZI"),
             ("QIZ", "QIZI"),
-            ("KIZI", "QIZI"),
-            ("KYZY", "QIZI"),
+            # KIZI is a valid passport spelling, not an OCR error: it must be
+            # preserved as-is rather than rewritten to QIZI.
+            ("KIZI", "KIZI"),
+            ("KIZL", "KIZI"),
+            ("KYZY", "KIZI"),
         ]
         for inp, expected in cases:
             res, _ = normalize_standalone_suffix(inp)
@@ -129,6 +132,43 @@ class TestOCRSuffixNormalizer(unittest.TestCase):
         self.assertEqual(normalized["MOTHER_FULLNAME"], "ZOKIROVA NODIRA ANVAR QIZI")
         self.assertEqual(normalized["PASSPORT_NUMBER"], "FA7452027")  # non-name untouched
         self.assertEqual(normalized["FINAL_SCHOOL_NAME"], "SECONDARY SCHOOL NO 14")
+
+    def test_real_names_are_never_over_corrected(self):
+        """
+        Regression guard: real given names that merely resemble a patronymic
+        suffix must be preserved verbatim. Previously ODIL -> UGLI (via the
+        'OGIL' variant), OZODA -> ZODA, EVA -> EVNA, KIZI -> QIZI.
+        """
+        preserved = [
+            "ODIL", "OZODA", "OZOD", "KIZIL", "ZOD", "EVA", "OVA", "ONA",
+            "OBID", "OSIM", "ORIF", "OLIM", "ZUHRA", "ZEBO", "OTABEK", "QOSIM",
+        ]
+        for token in preserved:
+            res, changed = normalize_standalone_suffix(token)
+            self.assertEqual(res, token, f"Real name '{token}' was over-corrected to '{res}'")
+            self.assertFalse(changed, f"Real name '{token}' should not be marked as changed")
+
+    def test_real_names_preserved_in_full_name_context(self):
+        cases = [
+            "KARIMOV AZIZ ODIL",
+            "KARIMOVA OZODA",
+            "ISROILOVA UMIDA UCHKUN KIZI",
+        ]
+        for name in cases:
+            self.assertEqual(normalize_full_name(name), name)
+
+    def test_genuine_ocr_errors_still_corrected(self):
+        """The conservative gate must not disable real OCR correction."""
+        cases = [
+            ("QIZ1", "QIZI"), ("QIZl", "QIZI"),
+            ("UGLT", "UGLI"), ("UGL1", "UGLI"),
+            ("OGIL", "UGLI"), ("OGLI", "UGLI"),
+            ("KIZL", "KIZI"),
+            ("0VICH", "OVICH"), ("EV1CH", "EVICH"), ("Z0DA", "ZODA"),
+        ]
+        for inp, expected in cases:
+            res, _ = normalize_standalone_suffix(inp)
+            self.assertEqual(res, expected, f"OCR error '{inp}' should correct to '{expected}'")
 
 
 if __name__ == "__main__":

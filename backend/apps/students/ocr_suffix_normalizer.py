@@ -25,7 +25,12 @@ CANONICAL_STANDALONE_SUFFIXES = {
         'UGLJ', 'UGLI', 'OGLY', 'UGLY'
     ],
     'QIZI': [
-        'QIZI', 'KIZI', 'KYZY', 'QIZ', 'KIZ', 'QIZl', 'QIZ1', 'QIZT', 'QIZL', 'KIZL'
+        'QIZI', 'QIZ', 'QIZl', 'QIZ1', 'QIZT', 'QIZL'
+    ],
+    # KIZI is a valid passport spelling in its own right and must never be
+    # rewritten to QIZI (they are distinct transliterations, not OCR errors).
+    'KIZI': [
+        'KIZI', 'KYZY', 'KIZ', 'KIZL', 'K1ZI', 'KIZl'
     ],
     'OVICH': [
         'OVICH', '0VICH', 'OVlCH', '0VlCH', 'OV1CH', '0V1CH', 'OVTC H', 'OVICН'
@@ -151,13 +156,56 @@ def calculate_ocr_similarity(token: str, target: str) -> float:
     return sim
 
 
+# Real given names / words that are close enough to a suffix to be caught by
+# fuzzy matching but must NEVER be rewritten (e.g. ODIL is not a garbled UGLI,
+# OZODA is not a garbled ZODA, EVA/OVA are given names, not clipped OVNA/EVNA).
+PROTECTED_NAME_TOKENS = {
+    'ODIL', 'ODILA', 'OZODA', 'OZOD', 'OBID', 'OSIM', 'ORIF', 'OLIM', 'OLIMA',
+    'ONA', 'OTA', 'OYIM', 'OGILOY', 'UGILOY', 'OYBEK', 'OGABEK',
+    'EVA', 'OVA', 'NOVA', 'SEVA', 'IVA', 'ODINA',
+    'KIZIL', 'QIZIL', 'ZUHRA', 'ZEBO', 'ZOKIR', 'ZAFAR',
+}
+
+
+def _is_ocr_plausible(token: str, target: str) -> bool:
+    """
+    True only if `token` can be explained as `target` plus known OCR confusions
+    (digit/homoglyph swaps) rather than arbitrary letter edits.
+
+    This is what separates a genuine misread ('QIZ1' -> 'QIZI') from a different
+    real word that merely looks similar ('ODIL' vs 'OGIL' -> 'UGLI').
+    """
+    t = ocr_soft_normalize(token)
+    g = ocr_soft_normalize(target)
+    if t == g:
+        return True
+    # Same length: every differing position must be a known OCR confusion pair.
+    if len(t) == len(g):
+        for c1, c2 in zip(t, g):
+            if c1 == c2:
+                continue
+            if OCR_CONFUSIONS.get(c1) == c2 or OCR_CONFUSIONS.get(c2) == c1:
+                continue
+            return False
+        return True
+    return False
+
+
 def normalize_standalone_suffix(token: str, threshold: float = DEFAULT_SIMILARITY_THRESHOLD) -> Tuple[str, bool]:
     """
     Attempts to match and normalize a standalone token into a canonical patronymic suffix.
     Returns (normalized_token, was_changed).
+
+    Correction is deliberately conservative: a token is only rewritten when it is
+    an exact known variant, or when the difference is fully explained by OCR
+    character confusions. Real names that merely resemble a suffix are preserved.
     """
     clean = token.strip().upper()
     if not clean or len(clean) < 2:
+        return token, False
+
+    # Never touch known real-word tokens, even if they resemble a suffix.
+    if clean in PROTECTED_NAME_TOKENS:
         return token, False
 
     # Check direct dictionary lookup first
@@ -168,22 +216,16 @@ def normalize_standalone_suffix(token: str, threshold: float = DEFAULT_SIMILARIT
                 return canonical, True
             return canonical, False
 
-    # Fuzzy match across all canonical candidates
+    # Fuzzy match across all canonical candidates. Only OCR-plausible rewrites
+    # are considered, so unrelated real words are left alone.
     best_candidate = None
     best_score = 0.0
 
     for canonical, variants in CANONICAL_STANDALONE_SUFFIXES.items():
-        # Check against canonical
-        score = calculate_ocr_similarity(clean, canonical)
-        if score > best_score:
-            best_score = score
-            best_candidate = canonical
-
-        # Check against known variant spellings
-        for var in variants:
-            v_score = calculate_ocr_similarity(clean, var)
-            if v_score > best_score:
-                best_score = v_score
+        for cand in [canonical] + variants:
+            score = calculate_ocr_similarity(clean, cand)
+            if score > best_score and _is_ocr_plausible(clean, cand):
+                best_score = score
                 best_candidate = canonical
 
     if best_candidate and best_score >= threshold:
