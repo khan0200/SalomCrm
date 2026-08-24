@@ -7,6 +7,7 @@ import {
 import { visaApi, type VisaType, type VisaStudent, type VisaCheckResult } from '@/api/visa'
 import { useUiStore } from '@/stores/ui'
 import { useStudentDashboardStore } from '@/stores/studentDashboard'
+import { useAuthStore } from '@/stores/auth'
 import StudentFormModal from './components/StudentFormModal.vue'
 import StudentDetailsModal from './components/StudentDetailsModal.vue'
 import StudentUniversityGroup from './components/StudentUniversityGroup.vue'
@@ -22,6 +23,7 @@ import { parseRejectionReasons } from './utils/rejectionParser'
 
 const uiStore = useUiStore()
 const dashboardStore = useStudentDashboardStore()
+const authStore = useAuthStore()
 
 // ─── State ────────────────────────────────────────────────────────────────────
 type StatusFilter = 'pending' | 'application' | 'cancelled' | 'approved'
@@ -95,6 +97,7 @@ function onContextMenu(student: VisaStudent, event: MouseEvent) {
 }
 
 async function handleFlagToggle(student: VisaStudent) {
+  if (!authStore.canEdit) return
   student.flag = !student.flag
   try {
     await visaApi.updateVisaStudent(student.passport, { flag: student.flag })
@@ -392,6 +395,7 @@ async function handleDeselectGroup(groupStudents: VisaStudent[]) {
 
 // ─── Pin ─────────────────────────────────────────────────────────────────────
 async function handlePinToggle(student: VisaStudent) {
+  if (!authStore.canEdit) return
   student.pinned = !student.pinned
   try {
     await visaApi.updateVisaStudent(student.passport, { pinned: student.pinned })
@@ -411,6 +415,7 @@ function openDetails(student: VisaStudent) {
 }
 
 function openEditModal(student: VisaStudent) {
+  if (!authStore.canEdit) return
   editingStudent.value = student
   isAddModalOpen.value = true
 }
@@ -698,13 +703,14 @@ async function handleDownloadPdf(student: VisaStudent) {
 
 // ─── Delete ───────────────────────────────────────────────────────────────────
 function promptDelete(student: VisaStudent) {
+  if (!authStore.canDelete) return
   studentToDelete.value = student
   showDeleteConfirm.value = true
   if (detailsModalOpen.value) detailsModalOpen.value = false
 }
 
 async function confirmDelete() {
-  if (!studentToDelete.value) return
+  if (!studentToDelete.value || !authStore.canDelete) return
   try {
     await visaApi.deleteVisaStudent(studentToDelete.value.passport)
     students.value = students.value.filter(s => s.passport !== studentToDelete.value!.passport)
@@ -718,6 +724,7 @@ async function confirmDelete() {
 
 // Pin / Unpin student
 async function togglePin(student: VisaStudent) {
+  if (!authStore.canEdit) return
   const newPinned = !student.pinned
   student.pinned = newPinned
   try {

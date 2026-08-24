@@ -38,3 +38,32 @@ class IsTenantUser(permissions.BasePermission):
         if request.user.is_superuser or getattr(request.user, 'role', '') == 'SUPER_ADMIN':
             return True
         return bool(getattr(request.user, 'tenant_id', None))
+
+
+class IsTenantManagerOrReadOnly(permissions.BasePermission):
+    """Allows full access to Managers, Head Managers, or Super Admins. Read-only for Tenant Staff."""
+    def has_permission(self, request, view):
+        if not (request.user and request.user.is_authenticated):
+            return False
+        if request.user.is_superuser or getattr(request.user, 'role', '') == 'SUPER_ADMIN':
+            return True
+        if not getattr(request.user, 'tenant_id', None):
+            return False
+        if request.method in permissions.SAFE_METHODS:
+            return True
+        return getattr(request.user, 'role', '') in ('HEAD_MANAGER', 'MANAGER')
+
+
+class IsTenantHeadManagerOrReadOnly(permissions.BasePermission):
+    """Allows full access to Head Managers or Super Admins. Read-only for other tenant users."""
+    def has_permission(self, request, view):
+        if not (request.user and request.user.is_authenticated):
+            return False
+        if request.user.is_superuser or getattr(request.user, 'role', '') == 'SUPER_ADMIN':
+            return True
+        if not getattr(request.user, 'tenant_id', None):
+            return False
+        if request.method in permissions.SAFE_METHODS:
+            return True
+        return getattr(request.user, 'role', '') == 'HEAD_MANAGER'
+

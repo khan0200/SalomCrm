@@ -10,7 +10,7 @@ import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment
 from openpyxl.utils import get_column_letter
 
-from apps.core.permissions import IsTenantUser
+from apps.core.permissions import IsTenantUser, IsTenantManager
 from apps.students.models import Student
 from .models import Payment, PaymentMethodTemplate, PaymentReceiverTemplate, PaymentNotePill
 from .serializers import (
@@ -26,7 +26,7 @@ class PaymentViewSet(viewsets.ModelViewSet):
     Supports filtering by student ID, method, received_by, date range, and search.
     """
     serializer_class = PaymentSerializer
-    permission_classes = [IsTenantUser]
+    permission_classes = [IsTenantManager]
 
     def get_queryset(self):
         user = self.request.user
@@ -155,7 +155,7 @@ class PaymentOverviewViewSet(viewsets.ReadOnlyModelViewSet):
     Calculates and displays students' financial positions (Balance, Discount, Tariff).
     """
     serializer_class = PaymentOverviewStudentSerializer
-    permission_classes = [IsTenantUser]
+    permission_classes = [IsTenantManager]
 
     def get_queryset(self):
         user = self.request.user
@@ -223,7 +223,7 @@ class PaymentExportView(APIView):
     """
     Exports payment history to Excel XLSX spreadsheet.
     """
-    permission_classes = [IsTenantUser]
+    permission_classes = [IsTenantManager]
 
     def get(self, request):
         user = request.user
@@ -287,7 +287,7 @@ class PaymentExportView(APIView):
 
 
 class BasePaymentOptionViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsTenantUser]
+    permission_classes = [IsTenantManager]
     pagination_class = None
     model_class = None
 

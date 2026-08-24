@@ -3,7 +3,7 @@ from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.db.models import Q
-from apps.core.permissions import IsTenantUser
+from apps.core.permissions import IsTenantUser, IsTenantManager, IsTenantManagerOrReadOnly
 from apps.students.models import Student
 from apps.students.views import alphanumeric_key
 from .serializers import (
@@ -16,7 +16,7 @@ class StatusBoardViewSet(viewsets.ModelViewSet):
     Dedicated Status Board ViewSet for General Status and KDB processing workflows.
     """
     serializer_class = StatusStudentListSerializer
-    permission_classes = [IsTenantUser]
+    permission_classes = [IsTenantManagerOrReadOnly]
     lookup_field = 'id'
 
     def get_queryset(self):
@@ -84,7 +84,7 @@ class StatusBoardViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(students_list, many=True)
         return Response(serializer.data)
 
-    @action(detail=True, methods=['patch'])
+    @action(detail=True, methods=['patch'], permission_classes=[IsTenantManager])
     def quick_update(self, request, id=None):
         student = self.get_object()
         serializer = StatusQuickUpdateSerializer(data=request.data, partial=True)
@@ -96,7 +96,7 @@ class StatusBoardViewSet(viewsets.ModelViewSet):
         student.save()
         return Response(StatusStudentListSerializer(student).data)
 
-    @action(detail=True, methods=['patch'])
+    @action(detail=True, methods=['patch'], permission_classes=[IsTenantManager])
     def embassy_drawer(self, request, id=None):
         student = self.get_object()
         serializer = EmbassyDrawerUpdateSerializer(data=request.data, partial=True)

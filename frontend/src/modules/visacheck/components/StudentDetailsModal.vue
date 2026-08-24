@@ -6,6 +6,7 @@ import {
 } from 'lucide-vue-next'
 import { visaApi, type VisaStudent, type VisaOptions } from '@/api/visa'
 import { useUiStore } from '@/stores/ui'
+import { useAuthStore } from '@/stores/auth'
 import CopyField from './CopyField.vue'
 import StatusBadge from './StatusBadge.vue'
 import VisaTypeBadge from './VisaTypeBadge.vue'
@@ -26,6 +27,7 @@ const emit = defineEmits<{
 }>()
 
 const uiStore = useUiStore()
+const authStore = useAuthStore()
 
 const isChecking = computed(() => Boolean(props.isChecking))
 
@@ -326,7 +328,7 @@ async function clearField(fieldName: ManagementField) {
                         <span class="text-sm font-semibold text-slate-900 dark:text-white truncate pr-2">
                           {{ student.tariff || 'None' }}
                         </span>
-                        <div class="flex items-center gap-2 shrink-0">
+                        <div v-if="authStore.canEdit" class="flex items-center gap-2 shrink-0">
                           <button
                             type="button"
                             @click="openEditField('tariff')"
@@ -357,7 +359,7 @@ async function clearField(fieldName: ManagementField) {
                         <span class="text-sm font-semibold text-slate-900 dark:text-white truncate pr-2">
                           {{ student.university || 'None' }}
                         </span>
-                        <div class="flex items-center gap-2 shrink-0">
+                        <div v-if="authStore.canEdit" class="flex items-center gap-2 shrink-0">
                           <button
                             type="button"
                             @click="openEditField('university')"
@@ -388,7 +390,7 @@ async function clearField(fieldName: ManagementField) {
                         <span class="text-sm font-semibold text-slate-900 dark:text-white truncate pr-2">
                           {{ student.coordinator || 'None' }}
                         </span>
-                        <div class="flex items-center gap-2 shrink-0">
+                        <div v-if="authStore.canEdit" class="flex items-center gap-2 shrink-0">
                           <button
                             type="button"
                             @click="openEditField('coordinator')"
@@ -419,7 +421,7 @@ async function clearField(fieldName: ManagementField) {
                         <span class="text-sm font-semibold text-slate-900 dark:text-white truncate pr-2">
                           {{ student.b2b || 'None' }}
                         </span>
-                        <div class="flex items-center gap-2 shrink-0">
+                        <div v-if="authStore.canEdit" class="flex items-center gap-2 shrink-0">
                           <button
                             type="button"
                             @click="openEditField('b2b')"
@@ -451,7 +453,7 @@ async function clearField(fieldName: ManagementField) {
                           <span>{{ student.flag ? 'True' : 'False' }}</span>
                           <span v-if="student.flag">🚩</span>
                         </span>
-                        <div class="flex items-center gap-2 shrink-0">
+                        <div v-if="authStore.canEdit" class="flex items-center gap-2 shrink-0">
                           <button
                             type="button"
                             @click="openEditField('flag')"
@@ -483,7 +485,7 @@ async function clearField(fieldName: ManagementField) {
                           <span>{{ student.refund_application ? 'True' : 'False' }}</span>
                           <span v-if="student.refund_application">💸</span>
                         </span>
-                        <div class="flex items-center gap-2 shrink-0">
+                        <div v-if="authStore.canEdit" class="flex items-center gap-2 shrink-0">
                           <button
                             type="button"
                             @click="openEditField('refund_application')"
@@ -512,22 +514,26 @@ async function clearField(fieldName: ManagementField) {
 
             <!-- Footer Action Buttons (Matches screenshot 100%) -->
             <div class="px-6 py-4 border-t border-slate-200 dark:border-zinc-800 flex items-center justify-between gap-4">
-              <!-- Delete -->
-              <button
-                type="button"
-                @click="emit('delete', student)"
-                class="flex items-center gap-1.5 text-sm font-semibold text-rose-600 hover:text-rose-700 px-3 py-2 rounded-md hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors"
-              >
-                <Trash2 class="size-4" />
-                <span>Delete</span>
-              </button>
+              <!-- Delete (Managers only) -->
+              <div>
+                <button
+                  v-if="authStore.canDelete"
+                  type="button"
+                  @click="emit('delete', student)"
+                  class="flex items-center gap-1.5 text-sm font-semibold text-rose-600 hover:text-rose-700 px-3 py-2 rounded-md hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors cursor-pointer"
+                >
+                  <Trash2 class="size-4" />
+                  <span>Delete</span>
+                </button>
+              </div>
 
               <div class="flex items-center gap-3">
-                <!-- Edit -->
+                <!-- Edit (Managers only) -->
                 <button
+                  v-if="authStore.canEdit"
                   type="button"
                   @click="emit('edit', student)"
-                  class="flex items-center gap-1.5 h-10 px-6 rounded-md border border-slate-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 font-semibold text-sm hover:bg-slate-50 dark:hover:bg-zinc-700 transition-colors"
+                  class="flex items-center gap-1.5 h-10 px-6 rounded-md border border-slate-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 font-semibold text-sm hover:bg-slate-50 dark:hover:bg-zinc-700 transition-colors cursor-pointer"
                 >
                   <Pencil class="size-4" />
                   <span>Edit</span>

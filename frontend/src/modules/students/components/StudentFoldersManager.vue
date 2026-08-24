@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import type { Folder } from '@/types'
 import { Plus, X } from 'lucide-vue-next'
 import BaseModal from '@/components/common/BaseModal.vue'
+import { useAuthStore } from '@/stores/auth'
 
 const props = defineProps<{
   folders: Folder[]
@@ -18,6 +19,7 @@ const emit = defineEmits<{
   (e: 'open-add-to-folder'): void
 }>()
 
+const authStore = useAuthStore()
 const isCreateModalOpen = ref(false)
 const newFolderName = ref('')
 
@@ -90,6 +92,7 @@ const activeFolderName = computed(() => {
 
         <!-- Add Folder Button -->
         <button
+          v-if="authStore.canEdit"
           @click="isCreateModalOpen = true"
           class="inline-flex items-center justify-center p-1 text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400 rounded-md hover:bg-blue-50 dark:hover:bg-zinc-800 transition-colors cursor-pointer shrink-0"
           title="Create New Folder"
@@ -148,7 +151,7 @@ const activeFolderName = computed(() => {
       <div class="flex items-center gap-3">
         <!-- Add to Folder button -->
         <button
-          v-if="isCustomFolder"
+          v-if="isCustomFolder && authStore.canEdit"
           type="button"
           @click="emit('open-add-to-folder')"
           class="not-italic inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold cursor-pointer transition-all shadow-xs"

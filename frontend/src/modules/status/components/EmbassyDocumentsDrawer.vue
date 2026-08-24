@@ -4,6 +4,7 @@ import type { Student } from '@/types'
 import {
   X, Plus, CheckCircle2, Check, ChevronDown, ChevronUp
 } from 'lucide-vue-next'
+import { useAuthStore } from '@/stores/auth'
 
 const props = defineProps<{
   isOpen: boolean
@@ -18,6 +19,8 @@ const emit = defineEmits<{
   (e: 'update-visa-status', status: string | null): void
   (e: 'update-status-hidden', isHidden: boolean): void
 }>()
+
+const authStore = useAuthStore()
 
 const activeAccordion = ref<'father' | 'mother' | 'sponsor' | null>(null)
 const newFatherDoc = ref('')
@@ -55,12 +58,12 @@ watch(() => props.isOpen, (open) => {
 })
 
 const handleToggleHidden = () => {
-  if (!props.student) return
+  if (!props.student || !authStore.canEdit) return
   emit('update-status-hidden', !props.student.status_hidden)
 }
 
 const handleAddFatherDoc = (doc: string) => {
-  if (!props.student) return
+  if (!props.student || !authStore.canEdit) return
   const trimmed = doc.trim()
   if (!trimmed) return
   const current = props.student.embassy_father_docs || []
@@ -70,13 +73,13 @@ const handleAddFatherDoc = (doc: string) => {
 }
 
 const handleRemoveFatherDoc = (doc: string) => {
-  if (!props.student) return
+  if (!props.student || !authStore.canEdit) return
   const current = props.student.embassy_father_docs || []
   emit('update-father-docs', current.filter(d => d !== doc))
 }
 
 const handleAddMotherDoc = (doc: string) => {
-  if (!props.student) return
+  if (!props.student || !authStore.canEdit) return
   const trimmed = doc.trim()
   if (!trimmed) return
   const current = props.student.embassy_mother_docs || []
@@ -86,17 +89,18 @@ const handleAddMotherDoc = (doc: string) => {
 }
 
 const handleRemoveMotherDoc = (doc: string) => {
-  if (!props.student) return
+  if (!props.student || !authStore.canEdit) return
   const current = props.student.embassy_mother_docs || []
   emit('update-mother-docs', current.filter(d => d !== doc))
 }
 
 const handleSaveSponsorNotes = () => {
+  if (!authStore.canEdit) return
   emit('update-sponsor-notes', sponsorNotes.value.trim())
 }
 
 const handleToggleVisa = (targetStatus: 'APPROVED' | 'CANCELLED') => {
-  if (!props.student) return
+  if (!props.student || !authStore.canEdit) return
   const current = props.student.embassy
   emit('update-visa-status', current === targetStatus ? null : targetStatus)
 }
@@ -147,9 +151,13 @@ const handleToggleVisa = (targetStatus: 'APPROVED' | 'CANCELLED') => {
           </div>
           <button
             type="button"
+            :disabled="!authStore.canEdit"
             @click="handleToggleHidden"
-            class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none"
-            :class="student.status_hidden ? 'bg-amber-500' : 'bg-zinc-200 dark:bg-zinc-700'"
+            class="relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none"
+            :class="[
+              student.status_hidden ? 'bg-amber-500' : 'bg-zinc-200 dark:bg-zinc-700',
+              authStore.canEdit ? 'cursor-pointer' : 'cursor-default opacity-80'
+            ]"
           >
             <span
               class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out"
@@ -185,8 +193,8 @@ const handleToggleVisa = (targetStatus: 'APPROVED' | 'CANCELLED') => {
           </div>
 
           <div v-if="activeAccordion === 'father'" class="flex flex-col gap-4 mt-4">
-            <!-- Add Father Custom Doc -->
-            <form @submit.prevent="handleAddFatherDoc(newFatherDoc)" class="flex gap-2">
+            <!-- Add Father Custom Doc (Managers only) -->
+            <form v-if="authStore.canEdit" @submit.prevent="handleAddFatherDoc(newFatherDoc)" class="flex gap-2">
               <input
                 v-model="newFatherDoc"
                 type="text"
@@ -202,8 +210,8 @@ const handleToggleVisa = (targetStatus: 'APPROVED' | 'CANCELLED') => {
               </button>
             </form>
 
-            <!-- Quick Add Grid -->
-            <div class="flex flex-col gap-1.5">
+            <!-- Quick Add Grid (Managers only) -->
+            <div v-if="authStore.canEdit" class="flex flex-col gap-1.5">
               <label class="text-[9.5px] font-bold uppercase tracking-wider text-zinc-400">
                 Quick Add
               </label>
@@ -239,6 +247,7 @@ const handleToggleVisa = (targetStatus: 'APPROVED' | 'CANCELLED') => {
               >
                 <span>{{ doc }}</span>
                 <button
+                  v-if="authStore.canEdit"
                   type="button"
                   @click="handleRemoveFatherDoc(doc)"
                   class="text-white/80 hover:text-white cursor-pointer transition-colors"
@@ -277,8 +286,8 @@ const handleToggleVisa = (targetStatus: 'APPROVED' | 'CANCELLED') => {
           </div>
 
           <div v-if="activeAccordion === 'mother'" class="flex flex-col gap-4 mt-4">
-            <!-- Add Mother Custom Doc -->
-            <form @submit.prevent="handleAddMotherDoc(newMotherDoc)" class="flex gap-2">
+            <!-- Add Mother Custom Doc (Managers only) -->
+            <form v-if="authStore.canEdit" @submit.prevent="handleAddMotherDoc(newMotherDoc)" class="flex gap-2">
               <input
                 v-model="newMotherDoc"
                 type="text"
@@ -294,8 +303,8 @@ const handleToggleVisa = (targetStatus: 'APPROVED' | 'CANCELLED') => {
               </button>
             </form>
 
-            <!-- Quick Add Grid -->
-            <div class="flex flex-col gap-1.5">
+            <!-- Quick Add Grid (Managers only) -->
+            <div v-if="authStore.canEdit" class="flex flex-col gap-1.5">
               <label class="text-[9.5px] font-bold uppercase tracking-wider text-zinc-400">
                 Quick Add
               </label>
@@ -331,6 +340,7 @@ const handleToggleVisa = (targetStatus: 'APPROVED' | 'CANCELLED') => {
               >
                 <span>{{ doc }}</span>
                 <button
+                  v-if="authStore.canEdit"
                   type="button"
                   @click="handleRemoveMotherDoc(doc)"
                   class="text-white/80 hover:text-white cursor-pointer transition-colors"
@@ -368,12 +378,13 @@ const handleToggleVisa = (targetStatus: 'APPROVED' | 'CANCELLED') => {
           <div v-if="activeAccordion === 'sponsor'" class="flex flex-col gap-3 mt-4">
             <textarea
               v-model="sponsorNotes"
+              :readonly="!authStore.canEdit"
               @blur="handleSaveSponsorNotes"
               rows="4"
               placeholder="Homiy haqida ma'lumot kiriting (Sponsor notes)..."
               class="w-full px-3.5 py-2.5 text-xs border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 rounded-xl focus:outline-none focus:border-amber-500 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 font-medium shadow-2xs resize-none"
             />
-            <div class="flex justify-end">
+            <div v-if="authStore.canEdit" class="flex justify-end">
               <button
                 type="button"
                 @click="handleSaveSponsorNotes"
@@ -387,7 +398,7 @@ const handleToggleVisa = (targetStatus: 'APPROVED' | 'CANCELLED') => {
         </div>
 
         <!-- SECTION 4: VISA STATUS -->
-        <div class="border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 bg-zinc-50/40 dark:bg-zinc-850/40 flex flex-col shadow-2xs transition-all duration-200">
+        <div v-if="authStore.canEdit" class="border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 bg-zinc-50/40 dark:bg-zinc-850/40 flex flex-col shadow-2xs transition-all duration-200">
           <div class="flex items-center justify-between">
             <h4 class="text-sm font-bold text-violet-600 dark:text-violet-400 uppercase tracking-wider flex items-center gap-1.5">
               <div class="w-2.5 h-2.5 rounded-full bg-violet-500 animate-pulse" />

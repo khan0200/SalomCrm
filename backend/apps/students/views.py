@@ -13,7 +13,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.request import Request
 from django.db.models import Q
-from apps.core.permissions import IsTenantUser, IsTenantHeadManager
+from apps.core.permissions import IsTenantUser, IsTenantHeadManager, IsTenantManager, IsTenantManagerOrReadOnly
 from .models import (
     Student, Folder, TariffOption, EducationLevelOption,
     StudentGroupOption, LeadSourceOption, CoordinatorOption,
@@ -58,15 +58,15 @@ DEFAULT_TAGS_DATA = [
 def alphanumeric_key(student_id):
     """
     Sort key for alphanumeric student IDs matching Uniapp v2 logic.
-    Splits into prefix and numeric components (e.g. 'UB120' -> ('UB', 120)).
+    Groups by letter prefix, then sorts by integer value.
+    Examples: 'UB1', 'UB2', 'UB10' (NOT 'UB1', 'UB10', 'UB2').
     """
     if not student_id:
-        return ("", 0)
-    match = re.match(r'^([A-Za-z\s_-]*)(\d*)$', str(student_id).strip())
+        return ('', 0)
+    match = re.match(r'^([A-Za-z]+)(\d+)$', str(student_id).strip())
     if match:
-        prefix = match.group(1).upper()
-        num = int(match.group(2)) if match.group(2) else 0
-        return (prefix, num)
+        prefix, num = match.groups()
+        return (prefix.upper(), int(num))
     return (str(student_id).upper(), 0)
 
 
@@ -75,7 +75,7 @@ class StudentViewSet(viewsets.ModelViewSet):
     Enterprise Student Management ViewSet with server-side filtering,
     alphanumeric ID sorting, folder scopes, soft archive/restore, and color tagging.
     """
-    permission_classes = [IsTenantUser]
+    permission_classes = [IsTenantManagerOrReadOnly]
 
     def get_serializer_class(self):
         if self.action == 'list':
@@ -344,7 +344,7 @@ class StudentViewSet(viewsets.ModelViewSet):
 class FolderViewSet(viewsets.ModelViewSet):
     """Student Folders CRUD ViewSet."""
     serializer_class = FolderSerializer
-    permission_classes = [IsTenantUser]
+    permission_classes = [IsTenantManagerOrReadOnly]
     pagination_class = None
 
     def get_queryset(self):
@@ -633,7 +633,7 @@ class StudentExportView(APIView):
 
 class BaseOptionViewSet(viewsets.ModelViewSet):
     model_class: Any = None
-    permission_classes = [IsTenantUser]
+    permission_classes = [IsTenantManagerOrReadOnly]
     pagination_class = None
 
     def get_queryset(self):
@@ -683,7 +683,7 @@ class CoordinatorOptionViewSet(BaseOptionViewSet):
 
 
 class UniversityOptionViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsTenantUser]
+    permission_classes = [IsTenantManagerOrReadOnly]
     pagination_class = None
     serializer_class = UniversityOptionSerializer
     queryset = UniversityOption.objects.all().order_by('name')
@@ -710,7 +710,7 @@ class TagOptionViewSet(BaseOptionViewSet):
 
 
 class SchoolDirectoryViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsTenantUser]
+    permission_classes = [IsTenantManagerOrReadOnly]
     pagination_class = None
     serializer_class = SchoolDirectorySerializer
     queryset = SchoolDirectory.objects.all().order_by('name')
@@ -1076,7 +1076,7 @@ class VisaStudentListCreateView(APIView):
     Dedicated endpoints for Visa Check database table (crm_visa_students).
     Completely isolated from main Student table.
     """
-    permission_classes = [IsTenantUser]
+    permission_classes = [IsTenantManagerOrReadOnly]
 
     def get(self, request: Request) -> Response:
         from .models import VisaStudent
@@ -1194,7 +1194,7 @@ class VisaStudentDetailView(APIView):
     Retrieve, Patch individual management fields, or Delete a Visa Student.
     Does NOT affect the main CRM Student database.
     """
-    permission_classes = [IsTenantUser]
+    permission_classes = [IsTenantManagerOrReadOnly]
 
     def _get_student(self, request: Request, passport: str):
         from .models import VisaStudent
@@ -1255,7 +1255,7 @@ class VisaStudentBulkDeleteView(APIView):
     """
     Deletes multiple students from the Visa database table.
     """
-    permission_classes = [IsTenantUser]
+    permission_classes = [IsTenantManager]
 
     def post(self, request: Request) -> Response:
         from .models import VisaStudent

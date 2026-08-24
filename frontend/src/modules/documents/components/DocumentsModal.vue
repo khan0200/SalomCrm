@@ -4,6 +4,7 @@ import { X, Folder, FileText, CheckSquare, CheckCircle2 } from 'lucide-vue-next'
 import type { Student } from '@/types'
 import { useDocumentHelpers } from '@/composables/useDocumentHelpers'
 import { useCurrency } from '@/composables/useCurrency'
+import { useAuthStore } from '@/stores/auth'
 
 const props = defineProps<{
   isOpen: boolean
@@ -19,6 +20,8 @@ const emit = defineEmits<{
   (e: 'toggle-mc', studentId: string): void
   (e: 'update-count', studentId: string, field: string, value: number): void
 }>()
+
+const authStore = useAuthStore()
 
 const {
   getEffectiveMissingDocs, getDocRemainingCount, PICK_NEEDED_LIST, HAND_COUNT_DOCS
@@ -139,7 +142,7 @@ const counters = computed(() => {
       isMissing,
       isMcDisabled,
       remaining,
-      isDisabled: isMissing || isMcDisabled || props.updating,
+      isDisabled: isMissing || isMcDisabled || props.updating || !authStore.canEdit,
     }
   })
 })
@@ -216,14 +219,16 @@ const counters = computed(() => {
                 <span class="block text-[9px] uppercase font-bold text-[var(--foreground-muted)] tracking-wider leading-none mb-0.5">Office</span>
                 <span class="text-[13px] font-bold text-[var(--foreground)] uppercase leading-tight whitespace-nowrap">{{ (student as any).office || '—' }}</span>
               </div>
-              <div class="w-px h-7 bg-zinc-200 dark:bg-zinc-700 shrink-0" />
-              <div class="min-w-0">
-                <span class="block text-[9px] uppercase font-bold text-[var(--foreground-muted)] tracking-wider leading-none mb-0.5">Payments Done</span>
-                <span v-if="paymentsDoneLoading" class="inline-block h-3 w-20 rounded bg-zinc-200 dark:bg-zinc-700 animate-pulse" />
-                <span v-else class="text-[13px] font-extrabold text-emerald-600 dark:text-emerald-400 leading-tight whitespace-nowrap">
-                  {{ formatCurrency(paymentsDone ?? 0) }}
-                </span>
-              </div>
+              <template v-if="authStore.canAccessPayments">
+                <div class="w-px h-7 bg-zinc-200 dark:bg-zinc-700 shrink-0" />
+                <div class="min-w-0">
+                  <span class="block text-[9px] uppercase font-bold text-[var(--foreground-muted)] tracking-wider leading-none mb-0.5">Payments Done</span>
+                  <span v-if="paymentsDoneLoading" class="inline-block h-3 w-20 rounded bg-zinc-200 dark:bg-zinc-700 animate-pulse" />
+                  <span v-else class="text-[13px] font-extrabold text-emerald-600 dark:text-emerald-400 leading-tight whitespace-nowrap">
+                    {{ formatCurrency(paymentsDone ?? 0) }}
+                  </span>
+                </div>
+              </template>
             </div>
 
             <!-- Split cards grid for Missing & Pick needed -->
@@ -253,6 +258,7 @@ const counters = computed(() => {
                       <span class="truncate uppercase tracking-wide">{{ doc }}</span>
                     </div>
                     <button
+                      v-if="authStore.canEdit"
                       type="button"
                       :disabled="updating"
                       @click="emit('toggle-pick', student.id, doc)"
@@ -277,14 +283,17 @@ const counters = computed(() => {
                     v-for="pill in PICK_NEEDED_LIST"
                     :key="pill"
                     type="button"
-                    :disabled="updating"
+                    :disabled="updating || !authStore.canEdit"
                     @click="emit('toggle-pick', student.id, pill)"
-                    class="px-2.5 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wide border cursor-pointer transition-all hover:scale-[1.03] active:scale-95 disabled:opacity-50 whitespace-nowrap h-[26px] inline-flex items-center"
-                    :class="isPillActive(pill)
-                      ? 'text-white shadow-sm border-transparent'
-                      : (pill === 'FULL OK'
-                          ? 'border-emerald-500/40 text-emerald-600 bg-emerald-500/5 hover:bg-emerald-500/10'
-                          : 'border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 bg-white dark:bg-zinc-900 hover:border-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800')"
+                    class="px-2.5 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wide border transition-all hover:scale-[1.03] active:scale-95 disabled:opacity-50 whitespace-nowrap h-[26px] inline-flex items-center"
+                    :class="[
+                      authStore.canEdit ? 'cursor-pointer' : 'cursor-default',
+                      isPillActive(pill)
+                        ? 'text-white shadow-sm border-transparent'
+                        : (pill === 'FULL OK'
+                            ? 'border-emerald-500/40 text-emerald-600 bg-emerald-500/5 hover:bg-emerald-500/10'
+                            : 'border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 bg-white dark:bg-zinc-900 hover:border-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800')
+                    ]"
                     :style="isPillActive(pill)
                       ? { backgroundColor: getPillActiveColor(pill), borderColor: getPillActiveColor(pill) }
                       : {}"
@@ -310,11 +319,11 @@ const counters = computed(() => {
                 >
                   <!-- MC enable/disable toggle -->
                   <div v-if="item.label === 'MC'" class="absolute top-3 right-3 z-10 flex items-center">
-                    <label class="relative inline-flex items-center cursor-pointer">
+                    <label class="relative inline-flex items-center" :class="authStore.canEdit ? 'cursor-pointer' : 'cursor-default'">
                       <input
                         type="checkbox"
                         :checked="student.has_mc !== false"
-                        :disabled="updating"
+                        :disabled="updating || !authStore.canEdit"
                         @change="emit('toggle-mc', student.id)"
                         class="sr-only peer"
                       />

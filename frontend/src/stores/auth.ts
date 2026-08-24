@@ -21,6 +21,13 @@ export const useAuthStore = defineStore('auth', () => {
   const isSuperAdmin = computed(() => !!user.value?.is_superuser || user.value?.role === 'SUPER_ADMIN')
   const isHeadManager = computed(() => isSuperAdmin.value || user.value?.role === 'HEAD_MANAGER')
   const isManager = computed(() => isHeadManager.value || user.value?.role === 'MANAGER')
+  const isStaff = computed(() => isAuthenticated.value && !isManager.value)
+
+  // Role-based permissions
+  const canEdit = computed(() => isManager.value)
+  const canDelete = computed(() => isManager.value)
+  const canAccessPayments = computed(() => isManager.value)
+  const canAccessSettings = computed(() => isManager.value)
 
   const currentTenant = computed<Tenant | null>(() => {
     return user.value?.tenant || null
@@ -96,6 +103,11 @@ export const useAuthStore = defineStore('auth', () => {
     isSuperAdmin,
     isHeadManager,
     isManager,
+    isStaff,
+    canEdit,
+    canDelete,
+    canAccessPayments,
+    canAccessSettings,
     currentTenant,
     login,
     loginWithTelegram,

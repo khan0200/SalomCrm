@@ -17,10 +17,12 @@ import {
   FileText
 } from 'lucide-vue-next'
 import { useStudentDashboardStore } from '@/stores/studentDashboard'
+import { useAuthStore } from '@/stores/auth'
 import { PICK_NEEDED_LIST } from '@/composables/useDocumentHelpers'
 
 const route = useRoute()
 const dashboardStore = useStudentDashboardStore()
+const authStore = useAuthStore()
 const searchInputRef = ref<HTMLInputElement | null>(null)
 
 const pathname = computed(() => route.path)
@@ -396,9 +398,9 @@ onUnmounted(() => {
         <span class="hidden sm:inline md:hidden lg:inline">Export Excel</span>
       </button>
 
-      <!-- Add Student Button (Hidden on /documents) -->
+      <!-- Add Student Button (Hidden on /documents and for Tenant Staff) -->
       <button
-        v-if="pathname !== '/documents'"
+        v-if="pathname !== '/documents' && authStore.canEdit"
         type="button"
         @click="dashboardStore.isAddStudentModalOpen = true"
         class="flex-1 md:flex-initial flex items-center justify-center gap-1.5 lg:gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 px-3.5 lg:px-4 py-1.5 text-xs md:text-sm font-bold text-white shadow-md shadow-blue-500/25 transition-all cursor-pointer select-none h-8 md:h-[34px] shrink-0 whitespace-nowrap"

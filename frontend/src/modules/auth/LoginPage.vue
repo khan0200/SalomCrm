@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
 import {
-  GraduationCap, Lock, Mail, ArrowRight,
-  AlertCircle, Sun, Moon
+  Lock, Mail, ArrowRight, AlertCircle, Sun, Moon,
+  Eye, EyeOff, ShieldCheck, Sparkles
 } from 'lucide-vue-next'
 
 const router = useRouter()
@@ -14,13 +14,14 @@ const uiStore = useUiStore()
 
 const email = ref('')
 const password = ref('')
+const showPassword = ref(false)
+const rememberMe = ref(true)
 const isLoading = ref(false)
 const error = ref<string | null>(null)
-const telegramContainer = ref<HTMLDivElement | null>(null)
 
 const handleLogin = async () => {
   if (!email.value.trim() || !password.value) {
-    error.value = 'Please enter both email and password.'
+    error.value = 'Iltimos, email va parolni kiriting.'
     return
   }
 
@@ -33,178 +34,159 @@ const handleLogin = async () => {
     })
     uiStore.addToast({
       type: 'success',
-      title: 'Welcome back!',
-      message: `Signed in as ${authStore.user?.full_name}`
+      title: 'Xush kelibsiz!',
+      message: `Tizimga kirdingiz: ${authStore.user?.full_name || authStore.user?.email}`
     })
     router.push('/students')
   } catch (err: any) {
-    error.value = err.response?.data?.detail || 'Invalid email or password.'
+    error.value = err.response?.data?.detail || 'Email yoki parol noto\'g\'ri kiritildi.'
   } finally {
     isLoading.value = false
   }
-}
-
-const handleTelegramAuth = async (user: any) => {
-  isLoading.value = true
-  error.value = null
-  try {
-    await authStore.loginWithTelegram(user)
-    uiStore.addToast({
-      type: 'success',
-      title: 'Welcome back!',
-      message: `Signed in via Telegram as ${authStore.user?.full_name}`
-    })
-    router.push('/students')
-  } catch (err: any) {
-    error.value = err.response?.data?.detail || 'Telegram authentication failed.'
-  } finally {
-    isLoading.value = false
-  }
-}
-
-onMounted(() => {
-  // Expose global onTelegramAuth handler for the Telegram Widget
-  ;(window as any).onTelegramAuth = (user: any) => {
-    handleTelegramAuth(user)
-  }
-
-  // Inject official Telegram Login Widget script
-  if (telegramContainer.value && !telegramContainer.value.hasChildNodes()) {
-    const script = document.createElement('script')
-    script.async = true
-    script.src = 'https://telegram.org/js/telegram-widget.js?22'
-    script.setAttribute('data-telegram-login', 'Koreavizabot')
-    script.setAttribute('data-size', 'large')
-    script.setAttribute('data-radius', '12')
-    script.setAttribute('data-onauth', 'onTelegramAuth(user)')
-    script.setAttribute('data-request-access', 'write')
-    telegramContainer.value.appendChild(script)
-  }
-})
-
-const fillCredentials = (e: string, p: string) => {
-  email.value = e
-  password.value = p
 }
 </script>
 
 <template>
-  <div class="min-h-screen w-screen flex items-center justify-center p-4 bg-zinc-100 dark:bg-zinc-950 select-none relative overflow-hidden">
-    <!-- Subtle Background Glows -->
-    <div class="absolute top-1/4 left-1/4 w-96 h-96 bg-brand-500/10 rounded-full blur-3xl pointer-events-none" />
-    <div class="absolute bottom-1/4 right-1/4 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+  <div class="min-h-screen w-screen flex items-center justify-center p-4 bg-slate-50 dark:bg-[#0c0e12] select-none relative overflow-hidden font-sans">
+    <!-- Ambient Background Gradients -->
+    <div class="absolute -top-40 -left-40 w-96 h-96 bg-blue-500/15 dark:bg-blue-600/10 rounded-full blur-[120px] pointer-events-none" />
+    <div class="absolute -bottom-40 -right-40 w-96 h-96 bg-emerald-500/15 dark:bg-emerald-600/10 rounded-full blur-[120px] pointer-events-none" />
+    <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-indigo-500/5 dark:bg-indigo-500/5 rounded-full blur-[140px] pointer-events-none" />
 
-    <!-- Theme Toggle at top right -->
-    <div class="absolute top-6 right-6">
+    <!-- Subtle Dot Grid Background Pattern -->
+    <div class="absolute inset-0 bg-[radial-gradient(#cbd5e1_1px,transparent_1px)] dark:bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:24px_24px] opacity-40 pointer-events-none" />
+
+    <!-- Top Right Theme Toggle -->
+    <div class="absolute top-6 right-6 z-20 flex items-center gap-2">
       <button
         @click="uiStore.toggleTheme"
-        class="p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-xs text-zinc-600 dark:text-zinc-300 shadow-xs hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+        class="flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200/80 dark:border-zinc-800 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md text-slate-700 dark:text-zinc-300 shadow-xs hover:bg-slate-100 dark:hover:bg-zinc-800/80 transition-all cursor-pointer text-xs font-semibold"
+        title="Mavzuni o'zgartirish"
       >
         <Sun v-if="uiStore.isDark" class="w-4 h-4 text-amber-400" />
-        <Moon v-else class="w-4 h-4 text-zinc-600" />
+        <Moon v-else class="w-4 h-4 text-slate-600" />
+        <span>{{ uiStore.isDark ? 'Dark' : 'Light' }}</span>
       </button>
     </div>
 
     <!-- Login Card -->
-    <div class="relative w-full max-w-md bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl shadow-2xl p-8 z-10 space-y-6">
-      <!-- Brand Header -->
-      <div class="text-center space-y-2">
-        <div class="w-12 h-12 mx-auto rounded-2xl bg-brand-500 text-white flex items-center justify-center shadow-lg shadow-brand-500/30">
-          <GraduationCap class="w-6 h-6" />
+    <div class="relative w-full max-w-[420px] bg-white/90 dark:bg-[#13161c]/90 backdrop-blur-xl border border-slate-200/80 dark:border-zinc-800/80 rounded-3xl shadow-2xl shadow-slate-200/50 dark:shadow-black/60 p-8 sm:p-9 z-10 space-y-6 transition-all">
+      
+      <!-- Brand & Header -->
+      <div class="text-center space-y-3">
+        <!-- Modern App Icon Badge -->
+        <div class="inline-flex relative items-center justify-center">
+          <div class="w-14 h-14 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-500 text-white flex items-center justify-center shadow-lg shadow-blue-500/25 ring-4 ring-blue-500/10">
+            <Sparkles class="w-7 h-7 stroke-[2.2]" />
+          </div>
         </div>
-        <h1 class="text-2xl font-black text-zinc-900 dark:text-zinc-100 tracking-tight">Salom CRM</h1>
-        <p class="text-xs font-semibold text-zinc-500 dark:text-zinc-400">
-          Educational Agency Multi-Tenant Platform &bull; v3.0
-        </p>
+
+        <div class="space-y-1">
+          <h1 class="text-2xl font-black tracking-tight text-slate-900 dark:text-white uppercase">
+            Salom CRM
+          </h1>
+          <p class="text-xs text-slate-500 dark:text-zinc-400 font-medium">
+            Agency Management &amp; Visa Platform
+          </p>
+        </div>
       </div>
 
-      <!-- Error Alert -->
-      <div v-if="error" class="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-200 text-xs font-bold flex items-center gap-2">
-        <AlertCircle class="w-4 h-4 shrink-0" />
-        <span>{{ error }}</span>
-      </div>
+      <!-- Error Notification Alert -->
+      <Transition
+        enter-active-class="transition duration-200 ease-out"
+        enter-from-class="opacity-0 -translate-y-2 scale-95"
+        enter-to-class="opacity-100 translate-y-0 scale-100"
+        leave-active-class="transition duration-150 ease-in"
+        leave-from-class="opacity-100 translate-y-0 scale-100"
+        leave-to-class="opacity-0 -translate-y-2 scale-95"
+      >
+        <div
+          v-if="error"
+          class="p-3.5 rounded-2xl bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800/60 text-rose-700 dark:text-rose-300 text-xs font-semibold flex items-center gap-2.5 shadow-xs"
+        >
+          <AlertCircle class="w-4 h-4 shrink-0 text-rose-500" />
+          <span class="flex-1 leading-snug">{{ error }}</span>
+        </div>
+      </Transition>
 
       <!-- Login Form -->
-      <form @submit.prevent="handleLogin" class="space-y-4 text-xs">
-        <div>
-          <label class="block font-bold text-zinc-700 dark:text-zinc-300 mb-1">Email Address</label>
-          <div class="relative">
-            <Mail class="w-4 h-4 text-zinc-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+      <form @submit.prevent="handleLogin" class="space-y-4">
+        <!-- Email Input -->
+        <div class="space-y-1.5">
+          <label class="block text-xs font-bold text-slate-700 dark:text-zinc-300">
+            Email manzil
+          </label>
+          <div class="relative flex items-center">
+            <Mail class="w-4 h-4 text-slate-400 dark:text-zinc-500 absolute left-3.5 pointer-events-none" />
             <input
               v-model="email"
               type="email"
-              placeholder="user@uniapp.com"
+              placeholder="example@unibridge.uz"
               required
-              class="w-full pl-10 pr-4 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 font-medium text-zinc-900 dark:text-zinc-100 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all"
+              autocomplete="email"
+              class="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-zinc-700/80 bg-slate-50/60 dark:bg-zinc-900/60 text-xs font-semibold text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-zinc-500 focus:bg-white dark:focus:bg-zinc-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 dark:focus:border-blue-500 outline-none transition-all shadow-2xs"
             />
           </div>
         </div>
 
-        <div>
-          <label class="block font-bold text-zinc-700 dark:text-zinc-300 mb-1">Password</label>
-          <div class="relative">
-            <Lock class="w-4 h-4 text-zinc-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+        <!-- Password Input with Show/Hide Toggle -->
+        <div class="space-y-1.5">
+          <div class="flex items-center justify-between">
+            <label class="block text-xs font-bold text-slate-700 dark:text-zinc-300">
+              Parol
+            </label>
+          </div>
+          <div class="relative flex items-center">
+            <Lock class="w-4 h-4 text-slate-400 dark:text-zinc-500 absolute left-3.5 pointer-events-none" />
             <input
               v-model="password"
-              type="password"
+              :type="showPassword ? 'text' : 'password'"
               placeholder="••••••••"
               required
-              class="w-full pl-10 pr-4 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 font-medium text-zinc-900 dark:text-zinc-100 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all"
+              autocomplete="current-password"
+              class="w-full pl-10 pr-10 py-2.5 rounded-xl border border-slate-200 dark:border-zinc-700/80 bg-slate-50/60 dark:bg-zinc-900/60 text-xs font-semibold text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-zinc-500 focus:bg-white dark:focus:bg-zinc-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 dark:focus:border-blue-500 outline-none transition-all shadow-2xs"
             />
+            <button
+              type="button"
+              @click="showPassword = !showPassword"
+              class="absolute right-3 p-1 rounded-md text-slate-400 hover:text-slate-600 dark:text-zinc-500 dark:hover:text-zinc-300 transition-colors cursor-pointer"
+              tabindex="-1"
+              :title="showPassword ? 'Parolni yashirish' : 'Parolni ko\'rsatish'"
+            >
+              <EyeOff v-if="showPassword" class="w-4 h-4" />
+              <Eye v-else class="w-4 h-4" />
+            </button>
           </div>
         </div>
 
+        <!-- Remember Me Checkbox -->
+        <div class="flex items-center justify-between pt-1">
+          <label class="inline-flex items-center gap-2 cursor-pointer select-none">
+            <input
+              v-model="rememberMe"
+              type="checkbox"
+              class="size-4 rounded border-slate-300 dark:border-zinc-700 text-blue-600 focus:ring-blue-500 focus:ring-offset-0 transition-colors cursor-pointer"
+            />
+            <span class="text-xs text-slate-600 dark:text-zinc-400 font-medium">Eslab qolish</span>
+          </label>
+        </div>
+
+        <!-- Submit Button -->
         <button
           type="submit"
           :disabled="isLoading"
-          class="w-full py-3 px-4 rounded-xl bg-brand-500 hover:bg-brand-600 text-white font-bold text-xs shadow-lg shadow-brand-500/30 transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
+          class="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs shadow-lg shadow-blue-500/25 active:scale-[0.98] transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed mt-2"
         >
-          <span>{{ isLoading ? 'Signing In...' : 'Sign In to Dashboard' }}</span>
-          <ArrowRight class="w-4 h-4" />
+          <span v-if="isLoading" class="inline-block size-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+          <span>{{ isLoading ? 'Kirilmoqda...' : 'Tizimga kirish' }}</span>
+          <ArrowRight v-if="!isLoading" class="w-4 h-4" />
         </button>
       </form>
 
-      <!-- Telegram Login Widget Section -->
-      <div class="space-y-3">
-        <div class="relative flex items-center justify-center">
-          <div class="border-t border-zinc-200 dark:border-zinc-800 w-full" />
-          <span class="bg-white dark:bg-zinc-900 px-3 text-[11px] font-bold uppercase tracking-wider text-zinc-400 shrink-0">
-            or sign in with
-          </span>
-          <div class="border-t border-zinc-200 dark:border-zinc-800 w-full" />
-        </div>
-
-        <!-- Official Telegram Login Widget Mount Container -->
-        <div class="flex justify-center items-center min-h-[44px]">
-          <div ref="telegramContainer" class="flex justify-center" />
-        </div>
-      </div>
-
-      <!-- Quick Fill Demo Accounts -->
-      <div class="pt-4 border-t border-zinc-100 dark:border-zinc-800 space-y-2">
-        <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block text-center">
-          Quick-Fill Demo Credentials
-        </span>
-
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
-          <button
-            type="button"
-            @click="fillCredentials('admin@uniapp.com', 'admin123456')"
-            class="p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 hover:border-brand-500 hover:bg-zinc-50 dark:hover:bg-zinc-800/60 text-left transition-colors cursor-pointer"
-          >
-            <div class="font-bold text-zinc-800 dark:text-zinc-200">Platform Super Admin</div>
-            <div class="text-[10px] text-zinc-400 font-mono truncate">admin@uniapp.com</div>
-          </button>
-
-          <button
-            type="button"
-            @click="fillCredentials('abdurazzakov_97@mail.ru', 'robocode2023@')"
-            class="p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 hover:border-brand-500 hover:bg-zinc-50 dark:hover:bg-zinc-800/60 text-left transition-colors cursor-pointer"
-          >
-            <div class="font-bold text-zinc-800 dark:text-zinc-200">Unibridge Head Manager</div>
-            <div class="text-[10px] text-zinc-400 font-mono truncate">abdurazzakov_97@mail.ru</div>
-          </button>
-        </div>
+      <!-- Security / Trust Note Footer -->
+      <div class="pt-4 border-t border-slate-100 dark:border-zinc-800/80 flex items-center justify-center gap-1.5 text-[11px] text-slate-400 dark:text-zinc-500 font-medium">
+        <ShieldCheck class="w-4 h-4 text-emerald-500" />
+        <span>Xavfsiz va shifrlangan ulanish</span>
       </div>
     </div>
   </div>

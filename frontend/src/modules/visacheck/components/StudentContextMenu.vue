@@ -2,6 +2,7 @@
 import { computed, onMounted, onBeforeUnmount } from 'vue'
 import { Eye, Edit3, Pin } from 'lucide-vue-next'
 import type { VisaStudent } from '@/api/visa'
+import { useAuthStore } from '@/stores/auth'
 
 const props = defineProps<{
   isOpen: boolean
@@ -16,6 +17,8 @@ const emit = defineEmits<{
   (e: 'edit', student: VisaStudent): void
   (e: 'toggle-pin', student: VisaStudent): void
 }>()
+
+const authStore = useAuthStore()
 
 const adjustedStyle = computed(() => {
   const menuWidth = 220
@@ -103,8 +106,9 @@ onBeforeUnmount(() => {
             <span class="text-[11px] text-zinc-400 font-medium">Details</span>
           </button>
 
-          <!-- 2. Tahrirlash (Edit) -->
+          <!-- 2. Tahrirlash (Edit - Managers only) -->
           <button
+            v-if="authStore.canEdit"
             type="button"
             class="w-full flex items-center justify-between px-3 py-2 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800/80 font-semibold transition-colors cursor-pointer"
             @click="emit('edit', student); emit('close')"
@@ -116,8 +120,9 @@ onBeforeUnmount(() => {
             <span class="text-[11px] text-zinc-400 font-medium">Edit</span>
           </button>
 
-          <!-- 3. Yuqoriga pin qilish / Pinni bekor qilish -->
+          <!-- 3. Yuqoriga pin qilish / Pinni bekor qilish (Managers only) -->
           <button
+            v-if="authStore.canEdit"
             type="button"
             class="w-full flex items-center justify-between px-3 py-2 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800/80 font-semibold transition-colors cursor-pointer"
             @click="emit('toggle-pin', student); emit('close')"

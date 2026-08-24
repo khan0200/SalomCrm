@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import type { Student } from '@/types'
 import { ROW_COLOR_MAP } from '@/types'
 import { Copy, Check, MoreVertical } from 'lucide-vue-next'
+import { useAuthStore } from '@/stores/auth'
 
 const props = defineProps<{
   student: Student
@@ -12,6 +13,8 @@ const emit = defineEmits<{
   (e: 'open-detail', id: string): void
   (e: 'open-actions', student: Student): void
 }>()
+
+const authStore = useAuthStore()
 
 const isNameCopied = ref(false)
 const isPhoneCopied = ref(false)
@@ -269,8 +272,9 @@ const universities = computed(() => {
           </div>
         </div>
 
-        <!-- Actions Menu Trigger -->
+        <!-- Actions Menu Trigger (Hidden for Tenant Staff) -->
         <button
+          v-if="authStore.canEdit"
           @click="emit('open-actions', student)"
           class="p-1.5 rounded-lg text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200 transition-colors cursor-pointer"
           title="Student Actions"

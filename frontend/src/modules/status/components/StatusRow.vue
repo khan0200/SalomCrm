@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { Student } from '@/types'
+import { useAuthStore } from '@/stores/auth'
 
 const props = defineProps<{
   student: Student
@@ -18,6 +19,8 @@ const emit = defineEmits<{
   (e: 'change-take-date', studentId: string, actionOrDate: string): void
   (e: 'open-embassy', student: Student): void
 }>()
+
+const authStore = useAuthStore()
 
 // Badge classes matching Uniapp2
 const getInvoiceBadgeClass = (status: string | null | undefined) => {
@@ -221,9 +224,10 @@ const handleContextMenu = (e: MouseEvent) => {
       <td class="px-3 py-2.5 w-[13%] whitespace-nowrap" @click.stop>
         <select
           :value="student.coa || 'NOT TAKEN'"
+          :disabled="!authStore.canEdit"
           @change="emit('change-coa', student.id, ($event.target as HTMLSelectElement).value)"
-          class="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border cursor-pointer focus:outline-none transition-all duration-200 select-none shadow-2xs"
-          :class="getCoaBadgeClass(student.coa)"
+          class="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border focus:outline-none transition-all duration-200 select-none shadow-2xs"
+          :class="[getCoaBadgeClass(student.coa), authStore.canEdit ? 'cursor-pointer' : 'cursor-default opacity-90']"
         >
           <option value="NOT TAKEN" class="bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200">Not Taken</option>
           <option value="TAKEN" class="bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200">Taken</option>
@@ -237,9 +241,10 @@ const handleContextMenu = (e: MouseEvent) => {
         <div class="flex flex-col items-start justify-center">
           <select
             :value="student.kdb_put_date || 'NO KDB'"
+            :disabled="!authStore.canEdit"
             @change="emit('change-put-date', student.id, ($event.target as HTMLSelectElement).value)"
-            class="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border cursor-pointer focus:outline-none transition-all duration-200 select-none shadow-2xs"
-            :class="getKdbBadgeClass(student.kdb_put_date)"
+            class="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border focus:outline-none transition-all duration-200 select-none shadow-2xs"
+            :class="[getKdbBadgeClass(student.kdb_put_date), authStore.canEdit ? 'cursor-pointer' : 'cursor-default opacity-90']"
           >
             <template v-if="student.kdb_put_date">
               <option :value="student.kdb_put_date" class="bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200 font-bold">
@@ -283,9 +288,10 @@ const handleContextMenu = (e: MouseEvent) => {
         <div class="flex flex-col items-start justify-center">
           <select
             :value="student.kdb_take_date || 'NO KDB'"
+            :disabled="!authStore.canEdit"
             @change="emit('change-take-date', student.id, ($event.target as HTMLSelectElement).value)"
-            class="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border cursor-pointer focus:outline-none transition-all duration-200 select-none shadow-2xs"
-            :class="getKdbBadgeClass(student.kdb_take_date)"
+            class="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border focus:outline-none transition-all duration-200 select-none shadow-2xs"
+            :class="[getKdbBadgeClass(student.kdb_take_date), authStore.canEdit ? 'cursor-pointer' : 'cursor-default opacity-90']"
           >
             <template v-if="student.kdb_take_date">
               <option :value="student.kdb_take_date" class="bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200 font-bold">
@@ -358,9 +364,10 @@ const handleContextMenu = (e: MouseEvent) => {
         <div class="flex flex-col items-start justify-center">
           <select
             :value="student.invoice || 'NOT TAKEN'"
+            :disabled="!authStore.canEdit"
             @change="emit('change-invoice', student.id, student.invoice || 'NOT TAKEN', ($event.target as HTMLSelectElement).value)"
-            class="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border cursor-pointer focus:outline-none transition-all duration-200 select-none shadow-2xs"
-            :class="getInvoiceBadgeClass(student.invoice)"
+            class="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border focus:outline-none transition-all duration-200 select-none shadow-2xs"
+            :class="[getInvoiceBadgeClass(student.invoice), authStore.canEdit ? 'cursor-pointer' : 'cursor-default opacity-90']"
           >
             <option value="NOT TAKEN" class="bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200">Not Taken</option>
             <option value="TAKEN" class="bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200">Taken</option>
@@ -382,9 +389,10 @@ const handleContextMenu = (e: MouseEvent) => {
       <td class="px-3 py-2.5 w-[9%] whitespace-nowrap" @click.stop>
         <select
           :value="student.coa || 'NOT TAKEN'"
+          :disabled="!authStore.canEdit"
           @change="emit('change-coa', student.id, ($event.target as HTMLSelectElement).value)"
-          class="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border cursor-pointer focus:outline-none transition-all duration-200 select-none shadow-2xs"
-          :class="getCoaBadgeClass(student.coa)"
+          class="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border focus:outline-none transition-all duration-200 select-none shadow-2xs"
+          :class="[getCoaBadgeClass(student.coa), authStore.canEdit ? 'cursor-pointer' : 'cursor-default opacity-90']"
         >
           <option value="NOT TAKEN" class="bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200">Not Taken</option>
           <option value="TAKEN" class="bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200">Taken</option>

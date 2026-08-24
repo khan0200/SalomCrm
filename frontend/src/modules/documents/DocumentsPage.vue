@@ -8,11 +8,13 @@ import { paymentsApi } from '@/api/payments'
 import { useStudentDashboardStore } from '@/stores/studentDashboard'
 import { useAlphanumericSort } from '@/composables/useAlphanumericSort'
 import { useDocumentHelpers, syncMissingDocuments, isFieldFilled } from '@/composables/useDocumentHelpers'
+import { useAuthStore } from '@/stores/auth'
 import DocumentsModal from './components/DocumentsModal.vue'
 import StudentFilters from '@/modules/students/components/StudentFilters.vue'
 
 const queryClient = useQueryClient()
 const dashboardStore = useStudentDashboardStore()
+const authStore = useAuthStore()
 const { compareStudentIds } = useAlphanumericSort()
 const {
   getEffectiveMissingDocs, getDocColor, getDocRemainingCount, getShortLabel,
@@ -300,36 +302,40 @@ const getDocCell = (s: Student, docName: string) => {
 
 // ── Modal open (re-syncs pick_needed before showing, as in source) ───────────
 const openStudentModal = async (student: Student) => {
-  const synced = syncMissingDocuments(student)
-  const current = student.pick_needed || []
-  const drifted = synced.length !== current.length || synced.some(d => !current.includes(d))
+  if (authStore.canEdit) {
+    const synced = syncMissingDocuments(student)
+    const current = student.pick_needed || []
+    const drifted = synced.length !== current.length || synced.some(d => !current.includes(d))
 
-  if (drifted) {
-    try {
-      await studentsApi.updateStudent(student.id, { pick_needed: synced })
-      patchStudentInCache(student.id, { pick_needed: synced })
-    } catch (err) {
-      console.error('Error syncing missing documents:', err)
+    if (drifted) {
+      try {
+        await studentsApi.updateStudent(student.id, { pick_needed: synced })
+        patchStudentInCache(student.id, { pick_needed: synced })
+      } catch (err) {
+        console.error('Error syncing missing documents:', err)
+      }
     }
   }
 
   selectedStudent.value = students.value.find(s => s.id === student.id) || student
   isModalOpen.value = true
 
-  // Fetch real payments-done total
+  // Fetch real payments-done total (only if user has payment access)
   studentPaymentsDone.value = null
-  studentPaymentsDoneLoading.value = true
-  try {
-    const res = await paymentsApi.getPaymentHistory({ student_id: student.id, page_size: 100 })
-    const total = (res.results || [])
-      .filter((p: any) => !p.is_discount && !p.is_withdrawal)
-      .reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0)
-    studentPaymentsDone.value = total
-  } catch (err) {
-    console.error('Error loading payments total:', err)
-    studentPaymentsDone.value = 0
-  } finally {
-    studentPaymentsDoneLoading.value = false
+  if (authStore.canAccessPayments) {
+    studentPaymentsDoneLoading.value = true
+    try {
+      const res = await paymentsApi.getPaymentHistory({ student_id: student.id, page_size: 100 })
+      const total = (res.results || [])
+        .filter((p: any) => !p.is_discount && !p.is_withdrawal)
+        .reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0)
+      studentPaymentsDone.value = total
+    } catch (err) {
+      console.error('Error loading payments total:', err)
+      studentPaymentsDone.value = 0
+    } finally {
+      studentPaymentsDoneLoading.value = false
+    }
   }
 }
 
@@ -356,6 +362,7 @@ const patchStudentInCache = (studentId: string, patch: Partial<Student>) => {
 
 // ── In-Modal Actions ────────────────────────────────────────────────────────
 const handleTogglePickNeeded = async (studentId: string, pill: string) => {
+  if (!authStore.canEdit) return
   const student = students.value.find(s => s.id === studentId)
   if (!student) return
 
@@ -421,6 +428,7 @@ const handleTogglePickNeeded = async (studentId: string, pill: string) => {
 }
 
 const handleToggleMcEnabled = async (studentId: string) => {
+  if (!authStore.canEdit) return
   const student = students.value.find(s => s.id === studentId)
   if (!student) return
   const newMc = !student.has_mc
@@ -438,7 +446,7 @@ const handleToggleMcEnabled = async (studentId: string) => {
 }
 
 const handleUpdateCopyCount = async (studentId: string, field: string, value: number) => {
-  if (value < 0) return
+  if (!authStore.canEdit || value < 0) return
   modalUpdating.value = true
   try {
     await studentsApi.updateStudent(studentId, { [field]: value } as Partial<Student>)

@@ -16,8 +16,10 @@ import {
   Check, ChevronDown, Folder, ExternalLink, AlertTriangle, AlertCircle,
   BookOpen, ArrowLeft, FileText, Eraser, Loader2, ArrowDownCircle
 } from 'lucide-vue-next'
+import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
+const authStore = useAuthStore()
 
 const props = defineProps<{
   isOpen: boolean
@@ -35,7 +37,7 @@ const emit = defineEmits<{
 }>()
 
 const navigateToExtract = () => {
-  if (props.student) {
+  if (props.student && authStore.canEdit) {
     router.push(`/students/${props.student.id}/extract`)
   }
 }
@@ -325,6 +327,7 @@ const handleCopy = (fieldKey: string, text?: string | null) => {
 
 // Inline Edit Handlers
 const startInlineEdit = (field: string, val: any) => {
+  if (!authStore.canEdit) return
   editingField.value = field
   editValue.value = val ? formatEditValueForField(field, String(val)) : ''
 }
@@ -335,7 +338,7 @@ const cancelInlineEdit = () => {
 }
 
 const saveInlineEdit = (field: string) => {
-  if (!props.student) return
+  if (!props.student || !authStore.canEdit) return
   emit('update-student', { [field]: editValue.value })
   editingField.value = null
 }
@@ -398,7 +401,7 @@ const studentId = computed(() => props.student?.id)
 const { data: studentPaymentsData, isLoading: isPaymentsLoading } = useQuery({
   queryKey: ['student-payments', studentId],
   queryFn: () => paymentsApi.getPaymentHistory({ student_id: studentId.value, page_size: 100 }),
-  enabled: computed(() => !!studentId.value && props.isOpen),
+  enabled: computed(() => authStore.canAccessPayments && !!studentId.value && props.isOpen),
   staleTime: 1000 * 30,
 })
 
@@ -565,7 +568,7 @@ const officeOptions = computed(() => props.options?.offices || ['ANDIJON OFFIS',
 
 // Major Modal Handlers
 const openMajorModal = (slot: number) => {
-  if (!props.student) return
+  if (!props.student || !authStore.canEdit) return
   activeStatusDropdown.value = null
   majorModalSlot.value = slot
   const current = (props.student as any)[`university_${slot}_major`] || ''
@@ -575,7 +578,7 @@ const openMajorModal = (slot: number) => {
 }
 
 const saveMajorModal = async () => {
-  if (!props.student) return
+  if (!props.student || !authStore.canEdit) return
   savingMajor.value = true
   try {
     const slot = majorModalSlot.value
@@ -590,6 +593,7 @@ const saveMajorModal = async () => {
 
 // University Status Popover Handler
 const handleStatusSelect = (slot: number, newStatus: string) => {
+  if (!props.student || !authStore.canEdit) return
   const patch: Record<string, any> = {}
   patch[`university_${slot}_status`] = newStatus
   emit('update-student', patch)
@@ -598,6 +602,7 @@ const handleStatusSelect = (slot: number, newStatus: string) => {
 
 // Clear University Slot Handler (with Confirmation)
 const clearUniversitySlot = (slot: number) => {
+  if (!props.student || !authStore.canEdit) return
   if (!window.confirm('Clear this university selection?')) return
   const patch: Record<string, any> = {}
   patch[`university_${slot}`] = null
@@ -608,7 +613,7 @@ const clearUniversitySlot = (slot: number) => {
 
 // University Edit Modal Handlers (Show ONLY University Name with live suggestions)
 const openUniversityModal = (slot: number) => {
-  if (!props.student) return
+  if (!props.student || !authStore.canEdit) return
   activeStatusDropdown.value = null
   uniModalSlot.value = slot
   const s = props.student as any
@@ -936,7 +941,7 @@ const handleGradDateChange = (part: 'y' | 'm' | 'd', e: Event) => {
 
 // School Details Modal Handlers
 const openSchoolModal = () => {
-  if (!props.student) return
+  if (!props.student || !authStore.canEdit) return
   const s = props.student
   const systemVal = (s.gpa_system || '').trim()
   const isPreset = ['4', '4.5', '5', '100'].includes(systemVal)
@@ -964,6 +969,7 @@ const openSchoolModal = () => {
 }
 
 const saveSchoolModal = async () => {
+  if (!props.student || !authStore.canEdit) return
   savingSchool.value = true
   try {
     const schoolName = (schoolForm.value.final_school_name || '').trim()
@@ -1088,7 +1094,7 @@ const updateCertValidDate = (field: 'y' | 'm' | 'd', val: string) => {
 
 // Certificate Modal Handlers
 const openCertModal = (slot: 1 | 2 | 3) => {
-  if (!props.student) return
+  if (!props.student || !authStore.canEdit) return
   certModalSlot.value = slot
   const s = props.student
   if (slot === 1) {
@@ -3146,6 +3152,7 @@ const handleRestoreStudent = () => {
 
                   <!-- 3.2 BALANCE CARD (Solid Crimson / Green) -->
                   <div
+                    v-if="authStore.canAccessPayments"
                     class="rounded-xl px-3.5 py-2.5 text-white flex flex-col justify-between shadow-xs cursor-pointer hover:brightness-105 transition-all duration-150 group/card"
                     :class="[
                       computedBalance < 0 ? 'bg-[#ff1853]' : 'bg-[#00b074]',
@@ -3172,6 +3179,7 @@ const handleRestoreStudent = () => {
 
                   <!-- 3.3 PAYMENTS DONE CARD (Solid Emerald) -->
                   <div
+                    v-if="authStore.canAccessPayments"
                     class="bg-[#00b074] rounded-xl px-3.5 py-2.5 text-white flex flex-col justify-between shadow-xs cursor-pointer hover:brightness-105 transition-all duration-150 group/card"
                     :class="[copiedField === 'payments_done' && 'animate-copy-press']"
                     @click="handleCopy('payments_done', String(computedPaymentsDone))"
@@ -3195,6 +3203,7 @@ const handleRestoreStudent = () => {
 
                   <!-- 3.4 DISCOUNT CARD (Solid Orange) -->
                   <div
+                    v-if="authStore.canAccessPayments"
                     class="bg-[#ff6700] rounded-xl px-3.5 py-2.5 text-white flex flex-col justify-between shadow-xs cursor-pointer hover:brightness-105 transition-all duration-150 group/card"
                     :class="[copiedField === 'discount' && 'animate-copy-press']"
                     @click="handleCopy('discount', String(computedDiscount))"
@@ -3218,7 +3227,7 @@ const handleRestoreStudent = () => {
 
                   <!-- 3.5 WITHDRAWN CARD (Solid Rose) -->
                   <div
-                    v-if="computedWithdrawals > 0"
+                    v-if="authStore.canAccessPayments && computedWithdrawals > 0"
                     class="bg-[#e11d48] rounded-xl px-3.5 py-2.5 text-white flex flex-col justify-between shadow-xs cursor-pointer hover:brightness-105 transition-all duration-150 group/card"
                     :class="[copiedField === 'withdrawn' && 'animate-copy-press']"
                     @click="handleCopy('withdrawn', String(computedWithdrawals))"

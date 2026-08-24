@@ -33,10 +33,17 @@ const navItems = computed<NavItem[]>(() => {
     { name: 'STUDENTS', path: '/students', icon: Users },
     { name: 'STATUS', path: '/status', icon: ClipboardList },
     { name: 'DOCUMENTS', path: '/documents', icon: FileText },
-    { name: 'PAYMENTS', path: '/payments', icon: CreditCard },
-    { name: 'VISACHECK', path: '/visacheck', icon: ShieldCheck },
-    { name: 'SETTINGS', path: '/settings', icon: Settings }
   ]
+
+  if (authStore.canAccessPayments) {
+    items.push({ name: 'PAYMENTS', path: '/payments', icon: CreditCard })
+  }
+
+  items.push({ name: 'VISACHECK', path: '/visacheck', icon: ShieldCheck })
+
+  if (authStore.canAccessSettings) {
+    items.push({ name: 'SETTINGS', path: '/settings', icon: Settings })
+  }
 
   if (authStore.isSuperAdmin) {
     items.push({ name: 'TENANTS', path: '/tenants', icon: Settings })

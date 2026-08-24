@@ -36,7 +36,7 @@ const routes = [
         path: 'payments',
         name: 'payments',
         component: PaymentsPage,
-        meta: { title: 'Payments' }
+        meta: { title: 'Payments', managerOnly: true }
       },
       {
         path: 'status',
@@ -54,7 +54,7 @@ const routes = [
         path: 'settings',
         name: 'settings',
         component: () => import('@/modules/settings/SettingsPage.vue'),
-        meta: { title: 'Settings' }
+        meta: { title: 'Settings', managerOnly: true }
       },
       {
         path: 'visacheck',
@@ -89,6 +89,8 @@ router.beforeEach((to, from, next) => {
   } else if (to.name === 'login' && authStore.isAuthenticated) {
     next({ name: 'students' })
   } else if (to.meta.superAdminOnly && !authStore.isSuperAdmin) {
+    next({ name: 'students' })
+  } else if (to.meta.managerOnly && !authStore.isManager) {
     next({ name: 'students' })
   } else {
     next()
