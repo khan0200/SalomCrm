@@ -10,6 +10,16 @@ echo "========================================="
 echo "🚀 Deploying Salom CRM to Production..."
 echo "========================================="
 
+# Ensure Node / NPM / PM2 are in PATH from AApanel NVM or root NVM
+export PATH="/www/server/nvm/versions/node/v24.19.0/bin:/www/server/nvm/versions/node/v22.14.0/bin:/www/server/nvm/versions/node/v20.18.0/bin:/www/server/nvm/versions/node/v18.20.0/bin:/root/.nvm/versions/node/v24.19.0/bin:/usr/local/bin:/usr/bin:$PATH"
+
+if [ -f /root/.nvm/nvm.sh ]; then
+    source /root/.nvm/nvm.sh 2>/dev/null || true
+fi
+
+echo "📌 Using Node: $(which node 2>/dev/null || echo 'Not found')"
+echo "📌 Using NPM: $(which npm 2>/dev/null || echo 'Not found')"
+
 PROJECT_DIR="/var/www/SalomCrm"
 cd "$PROJECT_DIR"
 
@@ -39,15 +49,20 @@ npm run build
 cd "$PROJECT_DIR"
 
 # 4. Restart Backend & Reload Nginx
-echo "🔄 Restarting Backend Service (PM2)..."
-if command -v pm2 &> /dev/null; then
-    pm2 restart salomcrm-backend || pm2 start ecosystem.config.js
-    pm2 save
+echo "🔄 Restarting Backend Service..."
+if systemctl is-active --quiet salomcrm-backend; then
+    systemctl restart salomcrm-backend
+    echo "✅ salomcrm-backend systemd service restarted."
+elif command -v pm2 &> /dev/null; then
+    pm2 restart salomcrm-backend || pm2 start ecosystem.config.js || true
+    pm2 save || true
+    echo "✅ PM2 backend restarted."
 fi
 
 echo "🌐 Reloading Nginx..."
 if command -v systemctl &> /dev/null; then
     systemctl reload nginx || systemctl restart nginx
+    echo "✅ Nginx reloaded."
 fi
 
 echo "========================================="
