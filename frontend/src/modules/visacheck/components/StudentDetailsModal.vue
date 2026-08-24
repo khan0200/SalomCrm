@@ -202,9 +202,9 @@ async function clearField(fieldName: ManagementField) {
                 <div class="space-y-4">
                   <!-- Name + Badges -->
                   <div>
-                    <div class="flex items-center gap-1.5 font-bold text-slate-900 dark:text-white text-base leading-snug">
+                    <div class="flex items-center gap-1.5 flex-wrap font-bold text-slate-900 dark:text-white text-base leading-snug">
                       <CopyField :value="student.full_name" label="Copy name">
-                        <span class="truncate block max-w-[280px]">{{ student.full_name }}</span>
+                        <span class="break-words">{{ student.full_name }}</span>
                       </CopyField>
                       <Pin v-if="student.pinned" class="size-4 text-amber-500 fill-amber-500 shrink-0" title="Pinned" />
                       <span v-if="student.flag" title="Flagged" class="text-sm select-none shrink-0">🚩</span>
