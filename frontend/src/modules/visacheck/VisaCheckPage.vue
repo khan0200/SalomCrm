@@ -158,33 +158,86 @@ function isPdfEligible(student: VisaStudent): boolean {
 
 // ─── Filtered by Search & Visa Type ───────────────────────────────────────────
 const matchingSearchAndType = computed(() => {
-  const q = searchQuery.value.toLowerCase().trim()
+  const rawQ = (searchQuery.value || '').trim().toLowerCase()
+  const qClean = rawQ.replace(/[^a-z0-9]/gi, '')
   const vType = visaTypeFilter.value
+  const mode = dashboardStore.searchMode
+
   return students.value.filter(s => {
     const sType = s.visa_type || 'Embassy'
     if (vType !== 'all' && sType !== vType) return false
-    if (!q) return true
-    const name = (s.full_name || '').toLowerCase()
+    if (!rawQ) return true
+
+    const idStr = String(s.student_id || s.id || '').toLowerCase()
+    const idClean = idStr.replace(/[^a-z0-9]/gi, '')
     const pass = (s.passport || '').toLowerCase()
-    const id   = (s.student_id || s.id || '').toLowerCase()
+    const passClean = pass.replace(/[^a-z0-9]/gi, '')
+    const appNo = (s.application_no || '').toLowerCase()
+    const appNoClean = appNo.replace(/[^a-z0-9]/gi, '')
+
+    if (mode === 'id') {
+      return (
+        idStr.includes(rawQ) ||
+        (qClean.length > 0 && idClean.includes(qClean)) ||
+        appNo.includes(rawQ) ||
+        (qClean.length > 0 && appNoClean.includes(qClean)) ||
+        pass.includes(rawQ) ||
+        (qClean.length > 0 && passClean.includes(qClean))
+      )
+    }
+
+    const name = (s.full_name || '').toLowerCase()
     const univ = (s.university || '').toLowerCase()
     const tariff = (s.tariff || '').toLowerCase()
-    return name.includes(q) || pass.includes(q) || id.includes(q) || univ.includes(q) || tariff.includes(q)
+    const bday = (s.birthday || '').toLowerCase()
+    const bdayClean = bday.replace(/[^a-z0-9]/gi, '')
+
+    return (
+      name.includes(rawQ) ||
+      pass.includes(rawQ) ||
+      (qClean.length > 0 && passClean.includes(qClean)) ||
+      idStr.includes(rawQ) ||
+      (qClean.length > 0 && idClean.includes(qClean)) ||
+      univ.includes(rawQ) ||
+      tariff.includes(rawQ) ||
+      appNo.includes(rawQ) ||
+      (qClean.length > 0 && appNoClean.includes(qClean)) ||
+      bday.includes(rawQ) ||
+      (qClean.length > 0 && bdayClean.includes(qClean))
+    )
   })
 })
 
 // ─── Sync visaTypeCounts to dashboardStore for Top Navbar ─────────────────────
 watch([students, searchQuery], () => {
-  const q = searchQuery.value.toLowerCase().trim()
+  const rawQ = (searchQuery.value || '').trim().toLowerCase()
+  const qClean = rawQ.replace(/[^a-z0-9]/gi, '')
   const res: Record<string, number> = { all: 0, Embassy: 0, 'E-Visa': 0, Regional: 0 }
+
   for (const s of students.value) {
-    if (q) {
+    if (rawQ) {
       const name = (s.full_name || '').toLowerCase()
       const pass = (s.passport || '').toLowerCase()
-      const id   = (s.student_id || s.id || '').toLowerCase()
+      const passClean = pass.replace(/[^a-z0-9]/gi, '')
+      const idStr = String(s.student_id || s.id || '').toLowerCase()
+      const idClean = idStr.replace(/[^a-z0-9]/gi, '')
       const univ = (s.university || '').toLowerCase()
       const tariff = (s.tariff || '').toLowerCase()
-      if (!name.includes(q) && !pass.includes(q) && !id.includes(q) && !univ.includes(q) && !tariff.includes(q)) continue
+      const appNo = (s.application_no || '').toLowerCase()
+      const appNoClean = appNo.replace(/[^a-z0-9]/gi, '')
+
+      const matches = (
+        name.includes(rawQ) ||
+        pass.includes(rawQ) ||
+        (qClean.length > 0 && passClean.includes(qClean)) ||
+        idStr.includes(rawQ) ||
+        (qClean.length > 0 && idClean.includes(qClean)) ||
+        univ.includes(rawQ) ||
+        tariff.includes(rawQ) ||
+        appNo.includes(rawQ) ||
+        (qClean.length > 0 && appNoClean.includes(qClean))
+      )
+      if (!matches) continue
     }
     res.all++
     const type = s.visa_type || 'Embassy'
@@ -205,9 +258,15 @@ const counts = computed(() => {
   return result
 })
 
-// ─── Filtered Students for Current Status Tab ─────────────────────────────────
+// ─── Filtered Students for Current Status Tab (or Full Database when searching) ─
 const filteredStudents = computed(() => {
-  const list = matchingSearchAndType.value.filter(s => bucketForStatus(s.status) === currentFilter.value)
+  const isSearching = !!(searchQuery.value || '').trim()
+
+  // When a search query is entered, search across ALL matching students regardless of tab
+  // so the user immediately finds any student in the entire database!
+  const list = isSearching
+    ? matchingSearchAndType.value
+    : matchingSearchAndType.value.filter(s => bucketForStatus(s.status) === currentFilter.value)
 
   return [...list].sort((a, b) => {
     if (sortBy.value === 'selected') {
@@ -290,12 +349,12 @@ const groupedStudents = computed((): { groupName: string; students: VisaStudent[
 })
 
 // ─── Show/Hide Columns ────────────────────────────────────────────────────────
-const showSelectColumn = computed(() => currentFilter.value === 'application' || currentFilter.value === 'pending')
-const showAppliedColumn = computed(() => currentFilter.value !== 'pending')
+const showSelectColumn = computed(() => !!searchQuery.value.trim() || currentFilter.value === 'application' || currentFilter.value === 'pending')
+const showAppliedColumn = computed(() => !!searchQuery.value.trim() || currentFilter.value !== 'pending')
 const showPdfColumn = computed(() =>
-  currentFilter.value === 'approved' || filteredStudents.value.some(s => isPdfEligible(s))
+  !!searchQuery.value.trim() || currentFilter.value === 'approved' || filteredStudents.value.some(s => isPdfEligible(s))
 )
-const showStatusDateColumn = computed(() => currentFilter.value === 'approved')
+const showStatusDateColumn = computed(() => !searchQuery.value.trim() && currentFilter.value === 'approved')
 
 // ─── Selection ────────────────────────────────────────────────────────────────
 const hasAnySelected = computed(() => filteredStudents.value.some(s => selectedPassports.value.has(s.passport)))
