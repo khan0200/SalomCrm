@@ -2,7 +2,7 @@
 import { ref, computed } from 'vue'
 import type { Student } from '@/types'
 import { ROW_COLOR_MAP } from '@/types'
-import { Copy, Check, MoreVertical } from 'lucide-vue-next'
+import { Copy, Check, MoreVertical, Folder, ExternalLink } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
 
 const props = defineProps<{
@@ -38,6 +38,10 @@ const copyPhone = () => {
   setTimeout(() => {
     isPhoneCopied.value = false
   }, 2000)
+}
+
+const openGoogleDrive = (url: string) => {
+  if (url) window.open(url, '_blank')
 }
 
 import { useCustomTags } from '@/composables/useCustomTags'
@@ -141,6 +145,18 @@ const universities = computed(() => {
         >
           !
         </span>
+
+        <!-- Google Drive Folder Link (opens in new tab) -->
+        <button
+          v-if="student.google_drive_url"
+          type="button"
+          @click.stop="openGoogleDrive(student.google_drive_url)"
+          class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25 hover:bg-emerald-500/25 transition-colors cursor-pointer shrink-0"
+          title="Open student's Google Drive documents folder"
+        >
+          <Folder class="w-3 h-3" />
+          <ExternalLink class="w-2.5 h-2.5 opacity-80" />
+        </button>
 
         <!-- Copy Full Name Button -->
         <button

@@ -13,7 +13,7 @@ import {
   User, Mail, Calendar, GraduationCap, Layers, Landmark,
   Tag, Building2, CheckSquare, Plus, Pencil, CheckCircle2,
   Trash2, RefreshCw, X, Maximize2, Minimize2, Copy,
-  Check, ChevronDown, Folder, ExternalLink, AlertTriangle, AlertCircle,
+  Check, ChevronDown, Folder, FolderPlus, ExternalLink, AlertTriangle, AlertCircle,
   BookOpen, ArrowLeft, FileText, Eraser, Loader2, ArrowDownCircle
 } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
@@ -1191,20 +1191,33 @@ const clearAndHideUni = (slot: number) => {
 }
 
 // Google Drive Actions
-const handleDriveAction = () => {
+const openDriveModal = () => {
+  driveUrlInput.value = props.student?.google_drive_url || ''
+  isDriveModalOpen.value = true
+}
+
+const handleDriveOpen = () => {
   if (props.student?.google_drive_url) {
     window.open(props.student.google_drive_url, '_blank')
   } else {
-    driveUrlInput.value = ''
-    isDriveModalOpen.value = true
+    openDriveModal()
   }
 }
 
 const saveDriveUrl = () => {
-  if (driveUrlInput.value.trim()) {
-    emit('update-student', { google_drive_url: driveUrlInput.value.trim() })
+  const url = driveUrlInput.value.trim()
+  if (url) {
+    emit('update-student', { google_drive_url: url })
   }
   isDriveModalOpen.value = false
+}
+
+const deleteDriveUrl = () => {
+  if (confirm('Are you sure you want to remove the Google Drive link for this student?')) {
+    emit('update-student', { google_drive_url: null, google_drive_folder_id: null })
+    driveUrlInput.value = ''
+    isDriveModalOpen.value = false
+  }
 }
 
 const handleDeleteStudent = () => {
@@ -1327,15 +1340,37 @@ const handleRestoreStudent = () => {
             </button>
 
             <!-- See documents / Google Drive Folder -->
+            <div v-if="student.google_drive_url" class="inline-flex items-center rounded-lg border border-emerald-500/40 bg-white dark:bg-zinc-800 shadow-2xs overflow-hidden">
+              <button
+                type="button"
+                @click="handleDriveOpen"
+                class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50/70 dark:hover:bg-emerald-950/30 transition-all cursor-pointer"
+                title="Open student Google Drive folder in a new tab"
+              >
+                <Folder class="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                <span>See documents</span>
+                <ExternalLink class="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+              </button>
+              <button
+                v-if="authStore.canEdit"
+                type="button"
+                @click="openDriveModal"
+                class="p-1.5 border-l border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors cursor-pointer"
+                title="Edit or delete Google Drive link"
+              >
+                <Pencil class="w-3 h-3" />
+              </button>
+            </div>
+
             <button
+              v-else
               type="button"
-              @click="handleDriveAction"
-              class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-zinc-800 hover:bg-emerald-50/60 dark:hover:bg-emerald-950/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/40 rounded-lg text-xs font-bold transition-all shadow-2xs cursor-pointer"
-              :title="student.google_drive_url ? 'Open Student Google Drive Folder' : 'Set Google Drive Folder URL'"
+              @click="openDriveModal"
+              class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-750 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 hover:border-emerald-500/50 rounded-lg text-xs font-semibold transition-all shadow-2xs cursor-pointer"
+              title="Link Google Drive folder for this student"
             >
-              <Folder class="w-3.5 h-3.5 text-emerald-600" />
-              <span>{{ student.google_drive_url ? 'See documents' : 'Create folder' }}</span>
-              <ExternalLink v-if="student.google_drive_url" class="w-3 h-3 text-emerald-600 ml-0.5" />
+              <FolderPlus class="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+              <span>Link Google Drive</span>
             </button>
 
             <!-- Delete / Restore -->
@@ -4157,25 +4192,70 @@ const handleRestoreStudent = () => {
       >
         <div class="relative w-full max-w-md overflow-hidden rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-2xl p-6 space-y-4 text-xs z-[80]">
           <div class="flex items-center justify-between pb-2 border-b border-zinc-100 dark:border-zinc-800">
-            <h3 class="text-base font-bold text-zinc-900 dark:text-zinc-100">Set Google Drive Folder</h3>
-            <button @click="isDriveModalOpen = false" class="rounded-lg p-1 text-zinc-400 hover:text-zinc-600">
+            <div class="flex items-center gap-2">
+              <div class="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+                <Folder class="w-4 h-4" />
+              </div>
+              <div>
+                <h3 class="text-sm font-bold text-zinc-900 dark:text-zinc-100">
+                  {{ student?.google_drive_url ? 'Edit Google Drive Link' : 'Link Google Drive' }}
+                </h3>
+                <p class="text-[11px] text-zinc-500 font-medium truncate max-w-[240px]">
+                  {{ student?.full_name }}
+                </p>
+              </div>
+            </div>
+            <button @click="isDriveModalOpen = false" class="rounded-lg p-1 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 cursor-pointer">
               <X class="w-4 h-4" />
             </button>
           </div>
 
-          <div>
-            <label class="block text-[10.5px] font-bold uppercase text-zinc-500 mb-1.5">Google Drive Folder URL</label>
+          <div class="space-y-2">
+            <label class="block text-[11px] font-bold uppercase tracking-wider text-zinc-500">
+              Google Drive Folder URL
+            </label>
             <input
               v-model="driveUrlInput"
               type="url"
               placeholder="https://drive.google.com/drive/folders/..."
-              class="w-full px-3.5 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 font-medium"
+              class="w-full px-3.5 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 font-medium text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all text-xs"
             />
+            <p class="text-[11px] text-zinc-400 leading-normal">
+              Paste the Google Drive folder link for this student's documents. Clicking the button will open it in a new tab.
+            </p>
           </div>
 
-          <div class="flex items-center justify-end gap-2 pt-2 border-t border-zinc-100 dark:border-zinc-800">
-            <button type="button" @click="isDriveModalOpen = false" class="px-4 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 font-bold hover:bg-zinc-100">Cancel</button>
-            <button type="button" @click="saveDriveUrl" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-md shadow-emerald-500/20">Save Folder URL</button>
+          <div class="flex items-center justify-between pt-3 border-t border-zinc-100 dark:border-zinc-800">
+            <!-- Delete Link Button (if currently linked) -->
+            <button
+              v-if="student?.google_drive_url && authStore.canEdit"
+              type="button"
+              @click="deleteDriveUrl"
+              class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 border border-rose-200 dark:border-rose-900/40 transition-colors cursor-pointer"
+              title="Remove Google Drive link"
+            >
+              <Trash2 class="w-3.5 h-3.5" />
+              <span>Delete Link</span>
+            </button>
+            <div v-else />
+
+            <div class="flex items-center gap-2">
+              <button
+                type="button"
+                @click="isDriveModalOpen = false"
+                class="px-4 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 font-bold hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                v-if="authStore.canEdit"
+                type="button"
+                @click="saveDriveUrl"
+                class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-md shadow-emerald-500/20 transition-all cursor-pointer"
+              >
+                {{ student?.google_drive_url ? 'Save Changes' : 'Add Link' }}
+              </button>
+            </div>
           </div>
         </div>
       </div>
