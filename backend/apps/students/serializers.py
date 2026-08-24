@@ -1,9 +1,13 @@
+import logging
 from rest_framework import serializers
 from .models import (
     Student, Folder, TariffOption, EducationLevelOption,
     StudentGroupOption, LeadSourceOption, CoordinatorOption
 )
 from .services import calculate_missing_documents
+from .korean_translation_service import translate_name_to_korean
+
+logger = logging.getLogger(__name__)
 
 class FolderSerializer(serializers.ModelSerializer):
     student_count = serializers.SerializerMethodField()
@@ -79,9 +83,32 @@ class StudentCreateUpdateSerializer(serializers.ModelSerializer):
         if 'pick_needed' not in validated_data or not validated_data['pick_needed']:
             validated_data['pick_needed'] = calculate_missing_documents(validated_data)
 
+        # Auto-translate English Full Name to Korean Hangul if not explicitly provided
+        if validated_data.get('full_name') and not validated_data.get('korean_name'):
+            try:
+                req = self.context.get('request')
+                translated = translate_name_to_korean(validated_data['full_name'], request=req)
+                if translated:
+                    validated_data['korean_name'] = translated
+            except Exception as e:
+                logger.error(f"Auto-translation on student create failed: {e}")
+
         return Student.objects.create(**validated_data)
 
     def update(self, instance, validated_data):
+        # If full_name was changed and korean_name was NOT explicitly sent, auto-translate full_name to Korean
+        if 'full_name' in validated_data and validated_data['full_name']:
+            new_name = validated_data['full_name'].strip()
+            old_name = (instance.full_name or '').strip()
+            if new_name != old_name and 'korean_name' not in validated_data:
+                try:
+                    req = self.context.get('request')
+                    translated = translate_name_to_korean(new_name, request=req)
+                    if translated:
+                        instance.korean_name = translated
+                except Exception as e:
+                    logger.error(f"Auto-translation on student update failed: {e}")
+
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
 

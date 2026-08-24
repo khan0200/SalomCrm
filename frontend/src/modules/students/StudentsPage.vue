@@ -398,7 +398,10 @@ const updateStudentMutation = useMutation({
       updateMasterStudentOptimistically(selectedDetailStudentId.value, s => ({ ...s, ...data }))
     }
   },
-  onSuccess: () => {
+  onSuccess: (updatedStudent) => {
+    if (updatedStudent && updatedStudent.id) {
+      updateMasterStudentOptimistically(updatedStudent.id, () => updatedStudent)
+    }
     queryClient.invalidateQueries({ queryKey: ['all-students-master'] })
     queryClient.invalidateQueries({ queryKey: ['folders'] })
     queryClient.invalidateQueries({ queryKey: ['student-options'] })

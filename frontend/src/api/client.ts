@@ -19,6 +19,15 @@ apiClient.interceptors.request.use((config) => {
     config.headers['X-Tenant-ID'] = activeTenantId
   }
 
+  const aiSettings = localStorage.getItem('ai_settings')
+  if (aiSettings) {
+    try {
+      config.headers['X-AI-Settings'] = encodeURIComponent(aiSettings)
+    } catch {
+      // ignore
+    }
+  }
+
   return config
 })
 

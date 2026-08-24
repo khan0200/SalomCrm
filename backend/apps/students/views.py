@@ -28,6 +28,7 @@ from .serializers import (
     TagOptionSerializer, SchoolDirectorySerializer, MajorOptionSerializer
 )
 from .services import archive_student, restore_student, permanent_delete_student
+from .korean_translation_service import translate_name_to_korean
 
 logger = logging.getLogger(__name__)
 
@@ -339,10 +340,56 @@ class StudentViewSet(viewsets.ModelViewSet):
         student.status_row_color = None
         student.task_tags = []
         student.save(update_fields=['row_color', 'status_row_color', 'task_tags', 'updated_at'])
+    @action(detail=True, methods=['post'], url_path='translate-korean')
+    def translate_korean(self, request, pk=None):
+        """Translates/transliterates student's English Full Name to Korean using AI."""
+        student = self.get_object()
+        full_name = request.data.get('full_name') or student.full_name
+        if not full_name or not str(full_name).strip():
+            return Response({'error': 'Student has no Full Name'}, status=status.HTTP_400_BAD_REQUEST)
+
+        translated = translate_name_to_korean(str(full_name).strip(), request=request)
+        if translated:
+            student.korean_name = translated
+            if request.data.get('full_name'):
+                student.full_name = str(full_name).strip().upper()
+                student.save(update_fields=['full_name', 'korean_name', 'updated_at'])
+            else:
+                student.save(update_fields=['korean_name', 'updated_at'])
+            return Response({
+                'status': 'success',
+                'id': student.id,
+                'full_name': student.full_name,
+                'korean_name': student.korean_name
+            })
+        return Response({'error': 'AI translation failed'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(detail=False, methods=['post'], url_path='batch-translate-korean')
+    def batch_translate_korean(self, request):
+        """Translates Korean names for all students missing or with incomplete Korean names."""
+        req: Any = self.request
+        user = req.user
+        tenant = getattr(req, 'tenant', None) or getattr(user, 'tenant', None)
+        qs = Student.objects.filter(is_deleted=False)
+        if tenant:
+            qs = qs.filter(tenant=tenant)
+
+        updated_count = 0
+        for s in qs:
+            if not s.full_name or not s.full_name.strip():
+                continue
+            is_empty = not s.korean_name or not s.korean_name.strip()
+            is_incomplete = s.korean_name and len(s.korean_name.split()) == 1 and len(s.full_name.split()) > 1
+            if is_empty or is_incomplete:
+                translated = translate_name_to_korean(s.full_name, request=request)
+                if translated:
+                    s.korean_name = translated
+                    s.save(update_fields=['korean_name', 'updated_at'])
+                    updated_count += 1
+
         return Response({
-            'status': 'Cleared',
-            'row_color': None,
-            'task_tags': []
+            'status': 'success',
+            'updated_count': updated_count
         })
 
 

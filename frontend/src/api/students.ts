@@ -95,6 +95,11 @@ export const studentsApi = {
     return response.data
   },
 
+  translateKorean: async (id: string, fullName?: string): Promise<{ status: string; id: string; full_name: string; korean_name: string }> => {
+    const response = await apiClient.post(`/students/${id}/translate-korean/`, fullName ? { full_name: fullName } : {})
+    return response.data
+  },
+
   getFolders: async (): Promise<Folder[]> => {
     const response = await apiClient.get('/folders/')
     return response.data.results || response.data

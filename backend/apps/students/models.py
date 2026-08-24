@@ -208,6 +208,33 @@ class Student(TenantAwareModel):
             if m:
                 self.google_drive_folder_id = m.group(1)
 
+        # Automatic English-to-Korean transliteration sync
+        if self.full_name:
+            should_translate = False
+            if not self.korean_name or not self.korean_name.strip():
+                should_translate = True
+            elif self.pk:
+                try:
+                    orig = Student.objects.filter(pk=self.pk).values('full_name', 'korean_name').first()
+                    # If full_name changed and korean_name was not manually updated in this save
+                    if orig and orig['full_name'] != self.full_name and orig['korean_name'] == self.korean_name:
+                        should_translate = True
+                except Exception:
+                    pass
+
+            if should_translate:
+                try:
+                    from .korean_translation_service import translate_name_to_korean
+                    translated = translate_name_to_korean(self.full_name)
+                    if translated:
+                        self.korean_name = translated
+                        if kwargs.get('update_fields') is not None and 'korean_name' not in kwargs['update_fields']:
+                            update_fields = list(kwargs['update_fields'])
+                            update_fields.append('korean_name')
+                            kwargs['update_fields'] = update_fields
+                except Exception:
+                    pass
+
         super().save(*args, **kwargs)
 
 
