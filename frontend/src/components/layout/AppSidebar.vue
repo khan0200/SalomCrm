@@ -165,14 +165,19 @@ const handleLogout = () => {
         <Moon v-else class="w-4 h-4 text-zinc-600" />
       </button>
 
-      <!-- User Avatar -->
-      <div
-        class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white select-none shadow-xs hover:ring-2 hover:ring-blue-500/40 transition-all cursor-default"
+      <!-- User Avatar: opens Staff Management for head managers -->
+      <component
+        :is="authStore.isHeadManager ? 'router-link' : 'div'"
+        :to="authStore.isHeadManager ? { name: 'staff' } : undefined"
+        class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white select-none shadow-xs hover:ring-2 hover:ring-blue-500/40 transition-all"
+        :class="authStore.isHeadManager ? 'cursor-pointer' : 'cursor-default'"
         style="background: linear-gradient(135deg, #3b7ff5, #6366f1)"
-        :title="`${authStore.user?.full_name || 'User'} (${authStore.user?.role || ''})`"
+        :title="authStore.isHeadManager
+          ? `${authStore.user?.full_name || 'User'} (${authStore.user?.role || ''}) — Manage Staff`
+          : `${authStore.user?.full_name || 'User'} (${authStore.user?.role || ''})`"
       >
         {{ authStore.user?.full_name ? authStore.user.full_name.slice(0, 2).toUpperCase() : 'UA' }}
-      </div>
+      </component>
 
       <!-- Logout -->
       <button

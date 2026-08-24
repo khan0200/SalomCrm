@@ -1,4 +1,5 @@
 from rest_framework import viewsets, permissions, status
+from rest_framework.exceptions import ValidationError, PermissionDenied
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework_simplejwt.views import TokenObtainPairView
@@ -149,7 +150,9 @@ class UserViewSet(viewsets.ModelViewSet):
     serializer_class = UserSerializer
 
     def get_permissions(self):
-        if self.action in ('create', 'destroy'):
+        # Mutating another user (or any role change) is a Head Manager action.
+        # Without this, a STAFF user could PATCH their own role to HEAD_MANAGER.
+        if self.action in ('create', 'destroy', 'update', 'partial_update'):
             return [IsTenantHeadManager()]
         return [IsTenantUser()]
 
@@ -174,4 +177,24 @@ class UserViewSet(viewsets.ModelViewSet):
             serializer.save(tenant=user.tenant)
         else:
             serializer.save()
+
+    def perform_update(self, serializer):
+        user = self.request.user
+        # Never allow a tenant user to move someone into another tenant.
+        if not (user.is_superuser or user.role == 'SUPER_ADMIN'):
+            serializer.save(tenant=user.tenant)
+        else:
+            serializer.save()
+
+    def perform_destroy(self, instance):
+        user = self.request.user
+        # A head manager must not delete their own account (would lock the
+        # agency out of staff management), nor a platform super admin.
+        if instance.pk == user.pk:
+            raise ValidationError('You cannot delete your own account.')
+        if instance.role == 'SUPER_ADMIN' and not (
+            user.is_superuser or getattr(user, 'role', '') == 'SUPER_ADMIN'
+        ):
+            raise PermissionDenied('You cannot delete a platform super admin.')
+        instance.delete()
 

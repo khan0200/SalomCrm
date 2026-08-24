@@ -67,6 +67,12 @@ const routes = [
         name: 'tenants',
         component: TenantsPage,
         meta: { title: 'Tenants Management', superAdminOnly: true }
+      },
+      {
+        path: 'staff',
+        name: 'staff',
+        component: () => import('@/modules/staff/StaffPage.vue'),
+        meta: { title: 'Staff Management', headManagerOnly: true }
       }
     ]
   },
@@ -89,6 +95,8 @@ router.beforeEach((to, from, next) => {
   } else if (to.name === 'login' && authStore.isAuthenticated) {
     next({ name: 'students' })
   } else if (to.meta.superAdminOnly && !authStore.isSuperAdmin) {
+    next({ name: 'students' })
+  } else if (to.meta.headManagerOnly && !authStore.isHeadManager) {
     next({ name: 'students' })
   } else if (to.meta.managerOnly && !authStore.isManager) {
     next({ name: 'students' })

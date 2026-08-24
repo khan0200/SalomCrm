@@ -8,7 +8,9 @@ User = get_user_model()
 class BranchSerializer(serializers.ModelSerializer):
     class Meta:
         model = Branch
-        fields = ('id', 'name', 'code', 'address', 'phone', 'is_active', 'created_at')
+        # Branch only defines id/name (+ tenant, created_at); listing fields the
+        # model does not have raises ImproperlyConfigured at serializer build time.
+        fields = ('id', 'name', 'created_at')
         read_only_fields = ('id', 'created_at')
 
 
@@ -30,7 +32,12 @@ class TenantSerializer(serializers.ModelSerializer):
         return obj.users.count()
 
     def get_student_count(self, obj):
-        return getattr(obj, 'students_count', None) or obj.crm_students_set.filter(is_deleted=False).count()
+        # Accessor comes from TenantAwareModel's related_name pattern
+        # "%(app_label)s_%(class)s_set" -> students_student_set.
+        count = getattr(obj, 'students_count', None)
+        if count is not None:
+            return count
+        return obj.students_student_set.filter(is_deleted=False).count()
 
 
 class TenantCreateWithAdminSerializer(serializers.ModelSerializer):
