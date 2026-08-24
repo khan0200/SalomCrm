@@ -11,6 +11,7 @@ import {
   Edit2,
   Trash2,
   CheckCircle2,
+  CheckCheck,
   Loader2,
   Check,
   AlertCircle,
@@ -295,28 +296,72 @@ const triggerExtraction = async () => {
   }
 }
 
-// Check if an extracted field already matches the current student in the database
-const isFieldAlreadyMatching = (fieldKey: string, fieldValue: string): boolean => {
-  if (!student.value) return false
-  const cleanKey = fieldKey.replace(/_/g, ' ').toUpperCase().trim()
-  const dbField = FIELD_MAPPING[cleanKey] || FIELD_MAPPING[fieldKey]
-  if (!dbField) return false
+// Save All Fields at once
+const isSavingAll = ref(false)
+const handleSaveAllFields = async () => {
+  if (!student.value || extractedFieldsList.value.length === 0) return
+  isSavingAll.value = true
+  const updatePayload: Partial<Student> = {}
+  const savedKeys: string[] = []
 
-  const currentVal = student.value[dbField]
-  if (currentVal === null || currentVal === undefined) return false
+  for (const field of extractedFieldsList.value) {
+    if (savedFields.value[field.key]) continue
+    const cleanKey = field.key.replace(/_/g, ' ').toUpperCase().trim()
+    const dbField = FIELD_MAPPING[cleanKey] || FIELD_MAPPING[field.key]
+    if (!dbField) continue
 
-  let curStr = String(currentVal).trim().toUpperCase()
-  let newStr = String(fieldValue).trim().toUpperCase()
+    let finalValue: any = field.value.trim()
+    if (dbField === 'gender') {
+      const char = finalValue.toUpperCase()[0]
+      finalValue = char === 'M' ? 'MALE' : (char === 'F' ? 'FEMALE' : finalValue)
+    } else if (dbField === 'passport') {
+      finalValue = finalValue.replace(/\s/g, '').toUpperCase()
+    } else if (dbField === 'phone1' || dbField === 'phone2') {
+      const digits = finalValue.replace(/\D/g, '')
+      let cleanDigits = digits
+      if (cleanDigits.startsWith('998') && cleanDigits.length === 12) {
+        cleanDigits = cleanDigits.slice(3)
+      } else if (cleanDigits.length > 9) {
+        cleanDigits = cleanDigits.slice(-9)
+      }
+      if (cleanDigits.length === 9) {
+        finalValue = `${cleanDigits.slice(0, 2)}-${cleanDigits.slice(2, 5)}-${cleanDigits.slice(5, 7)}-${cleanDigits.slice(7, 9)}`
+      }
+    } else if (['full_name', 'address', 'final_school_name', 'major', 'father_name', 'mother_name'].includes(dbField as string)) {
+      finalValue = finalValue.toUpperCase()
+    }
 
-  if (dbField === 'gender') {
-    newStr = newStr.startsWith('M') ? 'MALE' : (newStr.startsWith('F') ? 'FEMALE' : newStr)
+    updatePayload[dbField] = finalValue
+    savedKeys.push(field.key)
   }
-  if (dbField === 'passport') {
-    newStr = newStr.replace(/\s/g, '')
-    curStr = curStr.replace(/\s/g, '')
+
+  if (Object.keys(updatePayload).length === 0) {
+    isSavingAll.value = false
+    return
   }
 
-  return curStr === newStr && newStr !== ''
+  try {
+    await studentsApi.updateStudent(studentId.value, updatePayload)
+    for (const k of savedKeys) {
+      savedFields.value[k] = true
+    }
+    await refetchStudent()
+    queryClient.invalidateQueries({ queryKey: ['students'] })
+    uiStore.addToast({
+      type: 'success',
+      title: 'All Fields Saved',
+      message: `Successfully saved ${savedKeys.length} field(s) to student profile.`
+    })
+  } catch (err: any) {
+    console.error('Failed to save all fields:', err)
+    uiStore.addToast({
+      type: 'error',
+      title: 'Save All Failed',
+      message: err.response?.data?.detail || 'Could not save all fields.'
+    })
+  } finally {
+    isSavingAll.value = false
+  }
 }
 
 // Copy to Clipboard
@@ -633,6 +678,16 @@ const getInitials = (name?: string) => {
               Extracted Profile Fields
             </h3>
             <div class="flex items-center gap-2">
+              <button
+                v-if="extractedFieldsList.length > 0 && !isExtracting"
+                @click="handleSaveAllFields"
+                :disabled="isSavingAll"
+                class="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] uppercase font-extrabold tracking-wider transition-all flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-[0.96] disabled:opacity-50"
+              >
+                <Loader2 v-if="isSavingAll" class="w-3.5 h-3.5 animate-spin" />
+                <CheckCheck v-else class="w-3.5 h-3.5" />
+                <span>Save All Fields</span>
+              </button>
               <span
                 v-if="extractionLatency"
                 class="px-2 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500 text-[10px] font-mono font-bold"
@@ -701,7 +756,7 @@ const getInitials = (name?: string) => {
               :key="idx"
               :class="[
                 'p-3 rounded-xl border flex items-center justify-between gap-3 transition-all',
-                savedFields[field.key] || isFieldAlreadyMatching(field.key, field.value)
+                savedFields[field.key]
                   ? 'border-emerald-500/40 bg-emerald-50/50 dark:bg-emerald-950/20'
                   : 'border-zinc-200 dark:border-zinc-800 bg-zinc-50/60 dark:bg-zinc-850/60 hover:border-zinc-300 dark:hover:border-zinc-700'
               ]"
@@ -770,22 +825,22 @@ const getInitials = (name?: string) => {
 
                 <!-- Save to Profile Button -->
                 <button
-                  :disabled="savedFields[field.key] || isFieldAlreadyMatching(field.key, field.value) || savingFieldKey === field.key"
+                  :disabled="savedFields[field.key] || savingFieldKey === field.key"
                   @click="handleSaveFieldToProfile(field.key, field.value)"
                   :class="[
                     'px-3 py-1.5 rounded-lg text-[10px] font-extrabold uppercase transition-all flex items-center gap-1 select-none border cursor-pointer',
-                    savedFields[field.key] || isFieldAlreadyMatching(field.key, field.value)
+                    savedFields[field.key]
                       ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 cursor-default'
                       : 'bg-emerald-600 hover:bg-emerald-500 border-emerald-600 text-white shadow-xs active:scale-[0.96]'
                   ]"
                 >
                   <Loader2 v-if="savingFieldKey === field.key" class="w-3 h-3 animate-spin" />
-                  <template v-else-if="savedFields[field.key] || isFieldAlreadyMatching(field.key, field.value)">
+                  <template v-else-if="savedFields[field.key]">
                     <CheckCircle2 class="w-3 h-3 text-emerald-500" />
                     <span>Saved</span>
                   </template>
                   <template v-else>
-                    <span>Save to &gt;&gt;</span>
+                    <span>Save To &gt;&gt;</span>
                   </template>
                 </button>
               </div>
