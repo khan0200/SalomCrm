@@ -768,8 +768,15 @@ class ExtractDocumentView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request: Request):
-        from .ocr_service import process_document_ephemeral
-        from .ocr_preprocessor import PreprocessError
+        try:
+            from .ocr_service import process_document_ephemeral
+            from .ocr_preprocessor import PreprocessError
+        except ImportError as ie:
+            logger.exception(f"OCR dependencies failed to load: {ie}")
+            return Response(
+                {'error': f'OCR engine is not properly installed on the server: {str(ie)}'},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE
+            )
 
         file_obj = request.FILES.get('file')
         if not file_obj:
@@ -866,10 +873,13 @@ class ExtractDocumentView(APIView):
 
             return Response(extracted_data, status=status.HTTP_200_OK)
         except PreprocessError as pe:
+            logger.warning(f"Document preprocessing error: {pe}")
             return Response({'error': str(pe)}, status=status.HTTP_400_BAD_REQUEST)
         except TimeoutError as te:
+            logger.warning(f"OCR timeout error: {te}")
             return Response({'error': str(te)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
         except Exception as e:
+            logger.exception(f"Unhandled document extraction error: {e}")
             return Response({'error': f'Failed to process document: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 

@@ -5,13 +5,18 @@ import psutil
 from PIL import Image, ImageDraw
 from django.core.management.base import BaseCommand
 
-import paddle
+try:
+    import paddle
+except ImportError:
+    paddle = None
+
 from apps.students.ocr_service import OCREngineManager, process_document_ephemeral
 
 
 def get_current_memory_mb() -> float:
     process = psutil.Process(os.getpid())
     return process.memory_info().rss / (1024 * 1024)
+
 
 
 def create_synthetic_passport_image() -> bytes:
@@ -52,14 +57,17 @@ def create_synthetic_diploma_image() -> bytes:
 
 
 class Command(BaseCommand):
-    help = 'Benchmark PaddleOCR performance, latency, and memory footprint.'
+    help = 'Benchmark OCR performance, latency, and memory footprint.'
 
     def handle(self, *args, **options):
         self.stdout.write("=" * 60)
         self.stdout.write("      SALOM CRM OCR SYSTEM PERFORMANCE BENCHMARK")
         self.stdout.write("=" * 60)
-        self.stdout.write(f"Paddle Version: {paddle.__version__}")
-        self.stdout.write(f"CUDA / GPU Compiled: {paddle.is_compiled_with_cuda()}")
+        if paddle:
+            self.stdout.write(f"Paddle Version: {paddle.__version__}")
+            self.stdout.write(f"CUDA / GPU Compiled: {paddle.is_compiled_with_cuda()}")
+        else:
+            self.stdout.write("Paddle OCR: Not installed (RapidOCR ONNX engine active)")
         self.stdout.write(f"Initial Memory Usage: {get_current_memory_mb():.2f} MB\n")
 
         passport_bytes = create_synthetic_passport_image()

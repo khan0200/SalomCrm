@@ -1,11 +1,23 @@
 import io
 import time
 import threading
+import logging
 from typing import Dict, Any, List, Optional, Tuple
 
 import numpy as np
-from paddleocr import PaddleOCR
-from rapidocr_onnxruntime import RapidOCR
+
+logger = logging.getLogger(__name__)
+
+# Safe dynamic imports for OCR engines
+try:
+    from rapidocr_onnxruntime import RapidOCR
+except ImportError:
+    RapidOCR = None
+
+try:
+    from paddleocr import PaddleOCR
+except ImportError:
+    PaddleOCR = None
 
 from .ocr_preprocessor import prepare_document_images, PreprocessError
 from .ocr_normalizer import ExtractedField
@@ -26,22 +38,28 @@ class OCREngineManager:
     _lock = threading.Lock()
 
     def __init__(self):
-        self.paddle_ocr: Optional[PaddleOCR] = None
-        self.rapid_ocr: Optional[RapidOCR] = None
+        self.paddle_ocr: Optional[Any] = None
+        self.rapid_ocr: Optional[Any] = None
         self._init_engines()
 
     def _init_engines(self):
-        # 1. Initialize PaddleOCR as primary engine
-        try:
-            self.paddle_ocr = PaddleOCR(use_angle_cls=False, lang='en', show_log=False)
-        except Exception:
-            self.paddle_ocr = None
+        # 1. Initialize RapidOCR (fast, self-contained ONNX engine)
+        if RapidOCR is not None:
+            try:
+                self.rapid_ocr = RapidOCR()
+                logger.info("[OCR Manager] RapidOCR initialized successfully.")
+            except Exception as e:
+                logger.warning(f"[OCR Manager] RapidOCR initialization error: {e}")
+                self.rapid_ocr = None
 
-        # 2. Initialize RapidOCR as secondary / fallback engine
-        try:
-            self.rapid_ocr = RapidOCR()
-        except Exception:
-            self.rapid_ocr = None
+        # 2. Initialize PaddleOCR if available
+        if PaddleOCR is not None:
+            try:
+                self.paddle_ocr = PaddleOCR(use_angle_cls=False, lang='en', show_log=False)
+                logger.info("[OCR Manager] PaddleOCR initialized successfully.")
+            except Exception as e:
+                logger.warning(f"[OCR Manager] PaddleOCR initialization error: {e}")
+                self.paddle_ocr = None
 
     @classmethod
     def get_instance(cls) -> 'OCREngineManager':
