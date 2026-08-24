@@ -47,6 +47,7 @@ class CustomUserChangeForm(forms.ModelForm):
 
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):
+    add_form_template = None
     form = CustomUserChangeForm
     add_form = CustomUserCreationForm
 
