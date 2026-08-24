@@ -57,13 +57,23 @@ class StudentDetailSerializer(serializers.ModelSerializer):
     Full comprehensive serializer for Student Detail Drawer and standalone detail view.
     """
     creator_name = serializers.SerializerMethodField()
+    created_by = serializers.SerializerMethodField()
 
     class Meta:
         model = Student
         fields = '__all__'
 
     def get_creator_name(self, obj):
-        return getattr(obj.created_by, 'full_name', None) if getattr(obj, 'created_by', None) else None
+        try:
+            if obj.created_by:
+                return getattr(obj.created_by, 'full_name', None) or getattr(obj.created_by, 'email', None)
+        except Exception:
+            return None
+        return None
+
+    def get_created_by(self, obj):
+        return str(obj.created_by_id) if obj.created_by_id else None
+
 
 
 class StudentCreateUpdateSerializer(serializers.ModelSerializer):

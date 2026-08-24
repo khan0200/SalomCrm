@@ -18,8 +18,11 @@ class PaymentSerializer(serializers.ModelSerializer):
         read_only_fields = ('id', 'created_at', 'updated_at')
 
     def get_created_by_name(self, obj):
-        if obj.created_by:
-            return obj.created_by.full_name or obj.created_by.email or 'Staff'
+        try:
+            if obj.created_by:
+                return obj.created_by.full_name or obj.created_by.email or 'Staff'
+        except Exception:
+            pass
         return obj.received_by or 'Staff'
 
 
