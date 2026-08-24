@@ -220,6 +220,16 @@ CORS_ALLOW_HEADERS = [
     'x-tenant-id',
 ]
 
+# CSRF Trusted Origins
+CSRF_TRUSTED_ORIGINS = [
+    'http://localhost:3000',
+    'http://localhost:3001',
+    'http://127.0.0.1:3000',
+    'http://127.0.0.1:3001',
+    'http://localhost:8000',
+    'http://127.0.0.1:8000',
+]
+
 # Telegram OAuth Settings
 TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN', '8628603817:AAEDMIsRb0JRichfx_NmwhMszHpiNiUEI-4')
 TELEGRAM_BOT_USERNAME = os.getenv('TELEGRAM_BOT_USERNAME', 'Koreavizabot')
