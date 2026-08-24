@@ -60,9 +60,15 @@ elif command -v pm2 &> /dev/null; then
 fi
 
 echo "🌐 Reloading Nginx..."
-if command -v systemctl &> /dev/null; then
-    systemctl reload nginx || systemctl restart nginx
-    echo "✅ Nginx reloaded."
+if [ -x /www/server/nginx/sbin/nginx ]; then
+    /www/server/nginx/sbin/nginx -s reload
+    echo "✅ aaPanel Nginx reloaded successfully."
+elif command -v systemctl &> /dev/null && systemctl is-active --quiet nginx; then
+    systemctl reload nginx
+    echo "✅ systemd Nginx reloaded."
+else
+    /etc/init.d/nginx reload 2>/dev/null || true
+    echo "✅ Nginx reload attempted."
 fi
 
 echo "========================================="
