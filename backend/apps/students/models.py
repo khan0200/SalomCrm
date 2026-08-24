@@ -200,6 +200,14 @@ class Student(TenantAwareModel):
             val = getattr(self, attr, None)
             if isinstance(val, str) and val:
                 setattr(self, attr, val.strip().upper())
+
+        # Auto-extract Google Drive Folder ID from URL if not explicitly provided
+        if self.google_drive_url and not self.google_drive_folder_id:
+            import re
+            m = re.search(r'folders/([a-zA-Z0-9_-]+)', str(self.google_drive_url)) or re.search(r'id=([a-zA-Z0-9_-]+)', str(self.google_drive_url))
+            if m:
+                self.google_drive_folder_id = m.group(1)
+
         super().save(*args, **kwargs)
 
 

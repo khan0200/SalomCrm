@@ -1207,7 +1207,10 @@ const handleDriveOpen = () => {
 const saveDriveUrl = () => {
   const url = driveUrlInput.value.trim()
   if (url) {
-    emit('update-student', { google_drive_url: url })
+    let folderId: string | null = null
+    const m = url.match(/folders\/([a-zA-Z0-9_-]+)/) || url.match(/id=([a-zA-Z0-9_-]+)/)
+    if (m) folderId = m[1]
+    emit('update-student', { google_drive_url: url, google_drive_folder_id: folderId })
   }
   isDriveModalOpen.value = false
 }

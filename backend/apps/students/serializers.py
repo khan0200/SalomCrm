@@ -48,6 +48,7 @@ class StudentListSerializer(serializers.ModelSerializer):
             'passport', 'email', 'address', 'father_phone', 'mother_phone',
             'final_school_name', 'pick_needed', 'has_mc',
             'bc_hand_count', 'mc_hand_count', 'apos_hand_count', 'pic_hand_count',
+            'google_drive_url', 'google_drive_folder_id',
             'created_at'
         )
 
