@@ -335,13 +335,6 @@ const paginatedStudents = computed(() => {
   return sortedStudents.value.slice(start, start + ITEMS_PER_PAGE)
 })
 
-// Lookup of archived student IDs, used to push their payments to the bottom
-const archivedStudentIds = computed(() => {
-  const set = new Set<string>()
-  allStudents.value.forEach(s => { if (s.is_deleted) set.add(String(s.id)) })
-  return set
-})
-
 // ── Filtered Payments ─────────────────────────────────────────────────
 const filteredPayments = computed(() => {
   return allPayments.value.filter(p => {
@@ -359,13 +352,12 @@ const filteredPayments = computed(() => {
   })
 })
 
-// Payments belonging to archived students sort after all active ones,
-// preserving the existing (newest-first) order within each group.
+// Strictly sort payments by Date and Time descending (latest always on top, even for archived students)
 const sortedPayments = computed(() => {
   return [...filteredPayments.value].sort((a, b) => {
-    const aArchived = a.student_id && archivedStudentIds.value.has(String(a.student_id)) ? 1 : 0
-    const bArchived = b.student_id && archivedStudentIds.value.has(String(b.student_id)) ? 1 : 0
-    return aArchived - bArchived
+    const timeA = a.created_at ? new Date(a.created_at).getTime() : 0
+    const timeB = b.created_at ? new Date(b.created_at).getTime() : 0
+    return timeB - timeA
   })
 })
 
