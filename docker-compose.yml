@@ -3,28 +3,28 @@ version: '3.8'
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: uniapp3_postgres
+    container_name: salomcrm_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-uniapp3_db}
-      POSTGRES_USER: ${POSTGRES_USER:-uniapp3_user}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-uniapp3_secret_pass}
+      POSTGRES_DB: ${POSTGRES_DB:-salomcrm_db}
+      POSTGRES_USER: ${POSTGRES_USER:-salomcrm_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-SalomCrmSecret2026!}
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-uniapp3_user} -d ${POSTGRES_DB:-uniapp3_db}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-salomcrm_user} -d ${POSTGRES_DB:-salomcrm_db}"]
       interval: 5s
       timeout: 5s
       retries: 5
 
   redis:
     image: redis:7-alpine
-    container_name: uniapp3_redis
+    container_name: salomcrm_redis
     restart: unless-stopped
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT:-6379}:6379"
     volumes:
       - redis_data:/data
 
@@ -32,14 +32,17 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: uniapp3_backend
+    container_name: salomcrm_backend
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
-      SECRET_KEY: ${SECRET_KEY:-uniapp3_production_secret_key_change_in_prod}
-      DEBUG: ${DEBUG:-False}
-      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost,127.0.0.1,backend}
-      DATABASE_URL: postgres://${POSTGRES_USER:-uniapp3_user}:${POSTGRES_PASSWORD:-uniapp3_secret_pass}@postgres:5432/${POSTGRES_DB:-uniapp3_db}
-      REDIS_URL: redis://redis:6379/1
+      DJANGO_SECRET_KEY: ${SECRET_KEY:-salomcrm_production_secret_key_2026}
+      DJANGO_DEBUG: ${DEBUG:-False}
+      DJANGO_ALLOWED_HOSTS: ${ALLOWED_HOSTS:-*}
+      DATABASE_URL: ${DATABASE_URL:-postgres://salomcrm_user:SalomCrmSecret2026!@postgres:5432/salomcrm_db}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
     depends_on:
       postgres:
         condition: service_healthy
@@ -47,18 +50,21 @@ services:
         condition: service_started
     ports:
       - "8000:8000"
+    volumes:
+      - backend_media:/app/media
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: uniapp3_frontend
+    container_name: salomcrm_frontend
     restart: unless-stopped
     depends_on:
       - backend
     ports:
-      - "3000:80"
+      - "${FRONTEND_PORT:-80}:80"
 
 volumes:
   postgres_data:
   redis_data:
+  backend_media:
