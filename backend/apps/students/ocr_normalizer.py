@@ -19,6 +19,7 @@ def extract_dates_from_text(text: str) -> list[str]:
     Extracts all valid ISO YYYY-MM-DD dates from any text string.
     Handles:
     - DD MM YYYY, DD.MM.YYYY, DD/MM/YYYY, DD-MM-YYYY (e.g. '18 08 2007', '18.08.2007')
+    - Partially separated: '18-082007', '2808 2030', '18 082007', '18.082007'
     - YYYY MM DD, YYYY.MM.DD, YYYY/MM/DD, YYYY-MM-DD (e.g. '2007 08 18')
     - 8-digit continuous DDMMYYYY (e.g. '18082007') or YYYYMMDD ('20070818')
     - Dates embedded in lines with words/numbers: '18 08 2007 M ANDIJAN REGION'
@@ -29,60 +30,71 @@ def extract_dates_from_text(text: str) -> list[str]:
 
     found_dates: list[str] = []
 
+    def _add_date(d: int, m: int, y: int):
+        if 1 <= m <= 12 and 1 <= d <= 31 and 1900 <= y <= 2100:
+            iso = f"{y:04d}-{m:02d}-{d:02d}"
+            if iso not in found_dates:
+                found_dates.append(iso)
+
     # 1. Clean OCR typos (O/o -> 0 in date-like contexts)
     cleaned_text = re.sub(r'(?<=\d)[Oo](?=\d)', '0', text)
     cleaned_text = re.sub(r'(?<=\s)[Oo](?=\d)', '0', cleaned_text)
     cleaned_text = re.sub(r'(?<=\d)[Oo](?=\s)', '0', cleaned_text)
 
     # 2. Match standard 3-part dates: DD [./ -] MM [./ -] YYYY
-    patterns_dmy = [
-        r'\b([0-3]?\d)[\.\s\/\-]+([0-1]?\d)[\.\s\/\-]+(19\d\d|20\d\d)\b',
-        r'\b(19\d\d|20\d\d)[\.\s\/\-]+([0-1]?\d)[\.\s\/\-]+([0-3]?\d)\b',
-    ]
-
-    for match in re.finditer(patterns_dmy[0], cleaned_text):
-        d_str, m_str, y_str = match.groups()
+    for match in re.finditer(r'\b([0-3]?\d)[\.\s\/\-]+([0-1]?\d)[\.\s\/\-]+(19\d\d|20\d\d)\b', cleaned_text):
         try:
-            d, m, y = int(d_str), int(m_str), int(y_str)
-            if 1 <= m <= 12 and 1 <= d <= 31 and 1900 <= y <= 2100:
-                iso = f"{y:04d}-{m:02d}-{d:02d}"
-                if iso not in found_dates:
-                    found_dates.append(iso)
+            _add_date(int(match.group(1)), int(match.group(2)), int(match.group(3)))
         except Exception:
             pass
 
-    for match in re.finditer(patterns_dmy[1], cleaned_text):
-        y_str, m_str, d_str = match.groups()
+    for match in re.finditer(r'\b(19\d\d|20\d\d)[\.\s\/\-]+([0-1]?\d)[\.\s\/\-]+([0-3]?\d)\b', cleaned_text):
         try:
-            y, m, d = int(y_str), int(m_str), int(d_str)
-            if 1 <= m <= 12 and 1 <= d <= 31 and 1900 <= y <= 2100:
-                iso = f"{y:04d}-{m:02d}-{d:02d}"
-                if iso not in found_dates:
-                    found_dates.append(iso)
+            _add_date(int(match.group(3)), int(match.group(2)), int(match.group(1)))
         except Exception:
             pass
 
-    # 3. Match 8-digit continuous numbers: DDMMYYYY or YYYYMMDD
+    # 3. Partially separated 2-part dates:
+    # Pattern A: DD [sep] MMYYYY (e.g. '18-082007', '18 082007', '18.082007')
+    for match in re.finditer(r'\b([0-3]?\d)[\.\s\/\-]+([0-1]\d)(19\d\d|20\d\d)\b', cleaned_text):
+        try:
+            _add_date(int(match.group(1)), int(match.group(2)), int(match.group(3)))
+        except Exception:
+            pass
+
+    # Pattern B: DDMM [sep] YYYY (e.g. '2808 2030', '2808-2030', '2808.2030')
+    for match in re.finditer(r'\b([0-3]\d)([0-1]\d)[\.\s\/\-]+(19\d\d|20\d\d)\b', cleaned_text):
+        try:
+            _add_date(int(match.group(1)), int(match.group(2)), int(match.group(3)))
+        except Exception:
+            pass
+
+    # Pattern C: YYYY [sep] MMDD (e.g. '2030-0828', '2030 0828')
+    for match in re.finditer(r'\b(19\d\d|20\d\d)[\.\s\/\-]+([0-1]\d)([0-3]\d)\b', cleaned_text):
+        try:
+            _add_date(int(match.group(3)), int(match.group(2)), int(match.group(1)))
+        except Exception:
+            pass
+
+    # Pattern D: YYYYMM [sep] DD (e.g. '203008-28', '203008 28')
+    for match in re.finditer(r'\b(19\d\d|20\d\d)([0-1]\d)[\.\s\/\-]+([0-3]\d)\b', cleaned_text):
+        try:
+            _add_date(int(match.group(3)), int(match.group(2)), int(match.group(1)))
+        except Exception:
+            pass
+
+    # 4. Match 8-digit continuous numbers: DDMMYYYY or YYYYMMDD
     for match in re.finditer(r'\b(\d{8})\b', cleaned_text):
         digits = match.group(1)
         # Try DDMMYYYY
         try:
-            d, m, y = int(digits[:2]), int(digits[2:4]), int(digits[4:])
-            if 1 <= m <= 12 and 1 <= d <= 31 and 1900 <= y <= 2100:
-                iso = f"{y:04d}-{m:02d}-{d:02d}"
-                if iso not in found_dates:
-                    found_dates.append(iso)
-                    continue
+            _add_date(int(digits[:2]), int(digits[2:4]), int(digits[4:]))
         except Exception:
             pass
 
         # Try YYYYMMDD
         try:
-            y, m, d = int(digits[:4]), int(digits[4:6]), int(digits[6:])
-            if 1 <= m <= 12 and 1 <= d <= 31 and 1900 <= y <= 2100:
-                iso = f"{y:04d}-{m:02d}-{d:02d}"
-                if iso not in found_dates:
-                    found_dates.append(iso)
+            _add_date(int(digits[6:]), int(digits[4:6]), int(digits[:4]))
         except Exception:
             pass
 

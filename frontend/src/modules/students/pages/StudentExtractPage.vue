@@ -91,6 +91,8 @@ const FIELD_MAPPING: Record<string, keyof Student> = {
   'PHONE 1': 'phone1',
   'PHONE 2': 'phone2',
   'ADDRESS': 'address',
+  'PLACE OF BIRTH': 'address',
+  'PLACE_OF_BIRTH': 'address',
   'FINAL SCHOOL NAME': 'final_school_name',
   'FINAL_SCHOOL_NAME': 'final_school_name',
   'NAME OF SCHOOL': 'final_school_name',

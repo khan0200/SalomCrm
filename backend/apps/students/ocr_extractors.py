@@ -140,8 +140,23 @@ class PassportExtractor:
                             viz_father = normalize_patronymic(cand)
                             break
 
+            # Place of Birth / Address (TUG'ILGAN JOYI / PLACE OF BIRTH)
+            is_pob_label = any(k in clean_l for k in ['TUGILGANJOYI', 'PLACEOFBIRTH', 'МЕСТОРОЖДЕНИЯ', 'TUGILGANJOYL'])
+            if is_pob_label and not viz_address:
+                after = re.sub(r'^.*?(TUGILGANJOYI|PLACEOFBIRTH|МЕСТОРОЖДЕНИЯ|TUGILGANJOYL|TUG\'ILGAN JOYI|PLACE OF BIRTH)[/:\s]*', '', up, flags=re.IGNORECASE).strip()
+                after_clean = re.sub(r'[^A-ZА-Я0-9]', '', after)
+                if after and not is_passport_header_label(after_clean) and len(after) >= 3 and after not in ('M', 'F') and not re.match(r'^[\d\s\.\-\/]+$', after):
+                    viz_address = normalize_address(after)
+                else:
+                    for j in range(i + 1, min(i + 4, len(all_raw_lines))):
+                        cand = all_raw_lines[j].strip().upper()
+                        cand_clean = re.sub(r'[^A-ZА-Я0-9]', '', cand)
+                        if not is_passport_header_label(cand_clean) and len(cand) >= 3 and cand not in ('M', 'F') and not re.match(r'^[\d\s\.\-\/]+$', cand):
+                            viz_address = normalize_address(cand)
+                            break
+
             # Date of Birth (TUG'ILGAN SANASI / DATE OF BIRTH)
-            is_pob = any(k in clean_l for k in ['TUGILGANJOYI', 'PLACEOFBIRTH', 'МЕСТОРОЖДЕНИЯ'])
+            is_pob = any(k in clean_l for k in ['TUGILGANJOYI', 'PLACEOFBIRTH', 'МЕСТОРОЖДЕНИЯ', 'TUGILGANJOYL'])
             is_dob_label = any(k in clean_l for k in ['TUGILGANSANASI', 'DATEOFBIRTH', 'DATEOFB', 'ДАТАРОЖДЕНИЯ', 'BIRTHDATE', 'TUGILGANKUNI', 'TUGILGANYILI'])
             if (is_dob_label or ('TUGILGAN' in clean_l and not is_pob)) and not viz_dob:
                 for j in range(i, min(i + 4, len(all_raw_lines))):
@@ -183,6 +198,15 @@ class PassportExtractor:
                 clean_single = line.strip().upper()
                 if clean_single in ('M', 'F'):
                     viz_sex = 'MALE' if clean_single == 'M' else 'FEMALE'
+                    break
+
+        # Standalone address/region fallback (search for Region/City names)
+        if not viz_address:
+            for line in all_raw_lines:
+                cand = line.strip().upper()
+                cand_clean = re.sub(r'[^A-ZА-Я0-9]', '', cand)
+                if any(rk in cand_clean for rk in ['REGION', 'VILOYATI', 'VILOYAT', 'TUMANI', 'TUMAN', 'SHAHAR', 'SHAHRI']) and not is_passport_header_label(cand_clean):
+                    viz_address = normalize_address(cand)
                     break
 
         # 3. Comprehensive Global Document Date Disambiguation & Cross-Validation
@@ -237,6 +261,8 @@ class PassportExtractor:
             if full_viz_name:
                 fields['FULL_NAME'] = ExtractedField(full_viz_name, 0.98, True, 'VIZ')
 
+        if viz_father:
+            fields['FATHER_FULLNAME'] = ExtractedField(viz_father, 0.95, True, 'VIZ')
         if viz_dob:
             fields['DATE_OF_BIRTH'] = ExtractedField(viz_dob, 0.97, True, 'VIZ')
         if viz_doi:
@@ -245,6 +271,8 @@ class PassportExtractor:
             fields['DATE_OF_EXPIRATION'] = ExtractedField(viz_doe, 0.95, True, 'VIZ')
         if viz_sex:
             fields['SEX'] = ExtractedField(viz_sex, 0.98, True, 'VIZ')
+        if viz_address:
+            fields['ADDRESS'] = ExtractedField(viz_address, 0.95, True, 'VIZ')
 
         return fields
 
