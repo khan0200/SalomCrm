@@ -2345,9 +2345,6 @@ const handleRestoreStudent = () => {
                             {{ student.tariff }}
                           </span>
                           <span v-else class="text-[13px] font-semibold text-rose-600">Not provided</span>
-                          <span v-if="student.tariff && computedTariffPrice > 0" class="text-[12px] font-semibold text-zinc-400 font-mono tracking-tight">
-                            {{ formatCurrency(computedTariffPrice) }}
-                          </span>
                         </div>
                       </template>
                     </div>
