@@ -226,23 +226,23 @@ const groupHasSelected = computed(() =>
             <span v-else>Checked: {{ formatTimestampCompact(st.last_checked) }}</span>
           </div>
 
-          <div class="grid grid-cols-2 gap-1.5 pt-2.5 border-t border-zinc-100 dark:border-zinc-800">
+          <div class="grid grid-cols-[1fr,auto] gap-1.5 pt-2.5 border-t border-zinc-100 dark:border-zinc-800">
             <button
               type="button"
               :disabled="checkingPassports.has(st.passport)"
               @click.stop="emit('refresh', st)"
-              class="h-9 rounded-md bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 disabled:opacity-50 transition-colors"
+              class="flex-1 bg-[#0B4133] hover:bg-[#0E5240] text-white font-bold text-xs flex items-center justify-center gap-1.5 disabled:opacity-50 transition-colors select-none cursor-pointer"
             >
-              <RefreshCw class="size-3.5" :class="{ 'animate-spin': checkingPassports.has(st.passport) }" />
-              Check
+              <RefreshCw v-if="checkingPassports.has(st.passport)" class="size-3.5 animate-spin" />
+              <span>Check</span>
             </button>
             <button
               type="button"
               @click.stop="emit('details', st)"
-              class="h-9 rounded-md bg-amber-400 hover:bg-amber-500 text-amber-950 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors"
+              class="w-14 bg-[#FAB005] hover:bg-[#E5A000] text-zinc-950 font-bold text-xs flex items-center justify-center transition-colors select-none cursor-pointer shrink-0"
+              aria-label="View details"
             >
-              <Eye class="size-3.5" />
-              View
+              <Eye class="size-4.5 text-zinc-950 stroke-[2.2]" />
             </button>
           </div>
         </div>
@@ -412,19 +412,19 @@ const groupHasSelected = computed(() =>
                   <button
                     type="button"
                     :disabled="checkingPassports.has(st.passport)"
-                    class="px-4 py-2 h-full font-bold text-white text-xs bg-blue-600 hover:bg-blue-500 transition-colors rounded-none disabled:opacity-50 flex items-center gap-1.5 whitespace-nowrap cursor-pointer"
+                    class="flex-1 px-4 py-2 h-full font-bold text-white text-xs bg-[#0B4133] hover:bg-[#0E5240] transition-colors rounded-none disabled:opacity-50 flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer select-none"
                     @click.stop="emit('refresh', st)"
                   >
-                    <RefreshCw class="size-3.5" :class="{ 'animate-spin': checkingPassports.has(st.passport) }" />
-                    Check
+                    <RefreshCw v-if="checkingPassports.has(st.passport)" class="size-3.5 animate-spin" />
+                    <span>Check</span>
                   </button>
                   <button
                     type="button"
-                    class="px-3.5 py-2 h-full bg-amber-400 hover:bg-amber-500 dark:bg-amber-500 dark:hover:bg-amber-400 text-amber-950 dark:text-slate-950 rounded-none transition-colors flex items-center justify-center cursor-pointer"
+                    class="w-12 py-2 h-full bg-[#FAB005] hover:bg-[#E5A000] text-zinc-950 rounded-none transition-colors flex items-center justify-center cursor-pointer select-none shrink-0"
                     aria-label="View details"
                     @click.stop="emit('details', st)"
                   >
-                    <Eye class="size-4.5" />
+                    <Eye class="size-4.5 text-zinc-950 stroke-[2.2]" />
                   </button>
                 </div>
               </td>
