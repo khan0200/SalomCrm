@@ -5,6 +5,7 @@ from typing import Dict, Any, List, Optional, Tuple
 from .ocr_normalizer import (
     ExtractedField,
     normalize_date,
+    extract_dates_from_text,
     normalize_passport_number,
     normalize_gender,
     normalize_phone_number,
@@ -99,7 +100,6 @@ class PassportExtractor:
 
             # Surname (FAMILIYASI / SURNAME)
             if any(k in clean_l for k in ['FAMILIYASI', 'SURNAME', 'ФАМИЛИЯ']) and not viz_surname:
-                # Check line itself if value follows label
                 after = re.sub(r'^.*?(FAMILIYASI|SURNAME|ФАМИЛИЯ)[/:\s]*', '', up).strip()
                 after_clean = re.sub(r'[^A-ZА-Я0-9]', '', after)
                 if after and not is_passport_header_label(after_clean) and len(after) >= 2:
@@ -141,27 +141,32 @@ class PassportExtractor:
                             break
 
             # Date of Birth (TUG'ILGAN SANASI / DATE OF BIRTH)
-            if any(k in clean_l for k in ['TUGILGANSANASI', 'DATEOFBIRTH', 'ДАТАРОЖДЕНИЯ']) and not viz_dob:
+            is_pob = any(k in clean_l for k in ['TUGILGANJOYI', 'PLACEOFBIRTH', 'МЕСТОРОЖДЕНИЯ'])
+            is_dob_label = any(k in clean_l for k in ['TUGILGANSANASI', 'DATEOFBIRTH', 'DATEOFB', 'ДАТАРОЖДЕНИЯ', 'BIRTHDATE', 'TUGILGANKUNI', 'TUGILGANYILI'])
+            if (is_dob_label or ('TUGILGAN' in clean_l and not is_pob)) and not viz_dob:
                 for j in range(i, min(i + 4, len(all_raw_lines))):
-                    d = normalize_date(all_raw_lines[j])
-                    if d:
-                        viz_dob = d
+                    dates = extract_dates_from_text(all_raw_lines[j])
+                    birth_dates = [d for d in dates if int(d[:4]) <= 2018]
+                    if birth_dates:
+                        viz_dob = birth_dates[0]
                         break
+                    elif dates and not viz_dob:
+                        viz_dob = dates[0]
 
             # Date of Issue (BERILGAN SANASI / DATE OF ISSUE)
-            if any(k in clean_l for k in ['BERILGANSANASI', 'DATEOFISSUE', 'ДАТАВЫДАЧИ']) and not viz_doi:
+            if any(k in clean_l for k in ['BERILGANSANASI', 'DATEOFISSUE', 'ДАТАВЫДАЧИ', 'ISSUEDATE', 'BERILGANKUNI', 'BERILGANYILI']) and not viz_doi:
                 for j in range(i, min(i + 4, len(all_raw_lines))):
-                    d = normalize_date(all_raw_lines[j])
-                    if d:
-                        viz_doi = d
+                    dates = extract_dates_from_text(all_raw_lines[j])
+                    if dates:
+                        viz_doi = dates[0]
                         break
 
             # Date of Expiry (AMAL QILISH MUDDATI / DATE OF EXPIRY)
-            if any(k in clean_l for k in ['AMALQILISHMUDDATI', 'DATEOFEXPIRY', 'DATEOFEXPIRATION', 'СРОКДЕЙСТВИЯ']) and not viz_doe:
+            if any(k in clean_l for k in ['AMALQILISHMUDDATI', 'AMALQILISH', 'DATEOFEXPIRY', 'DATEOFEXPIRATION', 'EXPIRYDATE', 'EXPIRATIONDATE', 'СРОКДЕЙСТВИЯ']) and not viz_doe:
                 for j in range(i, min(i + 4, len(all_raw_lines))):
-                    d = normalize_date(all_raw_lines[j])
-                    if d:
-                        viz_doe = d
+                    dates = extract_dates_from_text(all_raw_lines[j])
+                    if dates:
+                        viz_doe = dates[0]
                         break
 
             # Sex (JINSI / SEX - handles OCR reading JINSLSEX / JINSI/SEX)
@@ -171,6 +176,7 @@ class PassportExtractor:
                     if g:
                         viz_sex = g
                         break
+
         # Standalone sex fallback (search for isolated 'M' or 'F' lines)
         if not viz_sex:
             for line in all_raw_lines:
@@ -179,21 +185,50 @@ class PassportExtractor:
                     viz_sex = 'MALE' if clean_single == 'M' else 'FEMALE'
                     break
 
-        # Fallback date collection in chronological order [DOB, DOI, DOE]
-        all_found_dates = []
-        for line in all_raw_lines:
-            d = normalize_date(line)
-            if d and d not in all_found_dates:
-                all_found_dates.append(d)
+        # 3. Comprehensive Global Document Date Disambiguation & Cross-Validation
+        all_doc_dates: List[str] = []
+        for d in extract_dates_from_text(upper_text):
+            if d not in all_doc_dates:
+                all_doc_dates.append(d)
+        doc_dates = sorted(all_doc_dates)
 
-        if all_found_dates:
-            sorted_dates = sorted(all_found_dates)
-            if not viz_dob and len(sorted_dates) >= 1:
-                viz_dob = sorted_dates[0]
-            if not viz_doe and len(sorted_dates) >= 2:
-                viz_doe = sorted_dates[-1]
-            if not viz_doi and len(sorted_dates) >= 3:
-                viz_doi = sorted_dates[1]
+        birth_candidates = [d for d in doc_dates if 1940 <= int(d[:4]) <= 2018]
+        issue_candidates = [d for d in doc_dates if 2000 <= int(d[:4]) <= 2026]
+        expiry_candidates = [d for d in doc_dates if 2024 <= int(d[:4]) <= 2040]
+
+        # Reconcile Date of Birth (must NEVER be equal to Issue/Expiry date or in future)
+        if not viz_dob or int(viz_dob[:4]) > 2018 or viz_dob == viz_doi or viz_dob == viz_doe:
+            if birth_candidates:
+                viz_dob = birth_candidates[0]
+            elif len(doc_dates) >= 3 and doc_dates[0] != viz_doi and doc_dates[0] != viz_doe:
+                viz_dob = doc_dates[0]
+            else:
+                viz_dob = None
+
+        # Reconcile Date of Issue
+        if not viz_doi or (viz_dob and viz_doi <= viz_dob):
+            valid_issues = [d for d in issue_candidates if not viz_dob or d > viz_dob]
+            if valid_issues:
+                viz_doi = valid_issues[0]
+            elif len(doc_dates) >= 2:
+                remaining = [d for d in doc_dates if d != (viz_dob or '') and d != (viz_doe or '')]
+                if remaining:
+                    viz_doi = remaining[0]
+
+        # Reconcile Date of Expiry
+        if not viz_doe or (viz_doi and viz_doe <= viz_doi):
+            valid_expiries = [d for d in expiry_candidates if not viz_doi or d > viz_doi]
+            if valid_expiries:
+                viz_doe = valid_expiries[-1]
+            elif doc_dates and doc_dates[-1] != (viz_dob or '') and doc_dates[-1] != (viz_doi or ''):
+                viz_doe = doc_dates[-1]
+
+        # Invariant check: DOB strictly < DOI < DOE
+        if viz_dob and viz_doi and viz_dob >= viz_doi:
+            if birth_candidates:
+                viz_dob = birth_candidates[0]
+            else:
+                viz_dob = None
 
         # Assemble Full Name (Surname + Given Names + Father's Name)
         if viz_surname or viz_given or viz_father:
