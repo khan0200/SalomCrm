@@ -13,9 +13,11 @@ import {
   Award,
   Contact,
   Bookmark,
-  Check
+  Check,
+  MoreVertical
 } from 'lucide-vue-next'
 import type { Student } from '@/types'
+import { ROW_COLOR_MAP } from '@/types'
 import { useUiStore } from '@/stores/ui'
 import { useAlphanumericSort } from '@/composables/useAlphanumericSort'
 import XLSX from 'xlsx-js-style'
@@ -37,6 +39,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'close'): void
+  (e: 'open-detail', id: string): void
 }>()
 
 const uiStore = useUiStore()
@@ -394,6 +397,42 @@ const toggleStudentSelection = (id: string) => {
   } else {
     selectedStudentIds.value.push(id)
   }
+}
+
+// ── Table row display helpers (match StudentRow.vue / PaymentStudentOverview.vue) ──
+const getTariffDisplayName = (s: Student): string => {
+  if (!s.tariff) return 'NO TARIFF'
+  if (s.tariff === 'E-VISA') {
+    const hasCert = !!s.language_certificate && s.language_certificate !== 'NO CERTIFICATE'
+    return `E-VISA ${hasCert ? '(TIL SERTIFIKATLI)' : '(TIL SERTIFIKATISIZ)'}`
+  }
+  return s.tariff
+}
+
+const getLevelBadgeClass = (level?: string | null) => {
+  switch (level?.toUpperCase()) {
+    case 'COLLEGE': return 'bg-[#6554c0] text-white'
+    case 'LANGUAGE COURSE': return 'bg-[#ffab00] text-zinc-900'
+    case 'MASTERS': return 'bg-[#00875a] text-white'
+    case 'MASTER NO CERTIFICATE': return 'bg-[#00875a] text-white'
+    case 'BACHELOR': return 'bg-[#0052cc] text-white'
+    default: return 'bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-300'
+  }
+}
+
+const getRowStripeStyle = (s: Student) => {
+  const colorKey = s.row_color?.toUpperCase()
+  if (!colorKey || !ROW_COLOR_MAP[colorKey]) return {}
+  return { borderLeft: `4px solid ${ROW_COLOR_MAP[colorKey].ball}` }
+}
+
+const getStudentCerts = (s: Student) => {
+  const list = [
+    { type: s.language_certificate, score: s.certificate_score },
+    { type: s.language_certificate_2, score: s.certificate_score_2 },
+    { type: s.language_certificate_3, score: s.certificate_score_3 },
+  ]
+  return list.filter(c => c.type && c.type !== 'NO CERTIFICATE')
 }
 
 // ── Column width helper ─────────────────────────────────────────────
@@ -945,17 +984,17 @@ onUnmounted(() => {
 
       <!-- Student Selection Counter & Select All -->
       <div class="flex items-center justify-between mb-2 text-xs font-bold text-zinc-700 dark:text-zinc-300">
-        <label class="flex items-center gap-2 cursor-pointer select-none">
+        <label class="flex items-center gap-2 cursor-pointer select-none uppercase tracking-wide text-[11px]">
           <input
             type="checkbox"
             :checked="isAllFilteredSelected"
             @change="toggleSelectAllFiltered"
             class="h-4 w-4 rounded border-zinc-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
           />
-          <span>Select All ({{ filteredStudents.length }} matching)</span>
+          <span>Select Students to Export</span>
         </label>
-        <span class="text-blue-600 dark:text-blue-400 font-bold font-mono">
-          {{ selectedStudentIds.length }} students selected
+        <span class="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide bg-emerald-500 text-white shadow-2xs">
+          {{ selectedStudentIds.length }} selected
         </span>
       </div>
 
@@ -966,12 +1005,9 @@ onUnmounted(() => {
             <tr>
               <th class="p-2.5 w-10 text-center"></th>
               <th class="p-2.5 w-20">ID</th>
-              <th class="p-2.5">Name</th>
-              <th class="p-2.5">Phone</th>
-              <th class="p-2.5">Tariff</th>
+              <th class="p-2.5">Full Name</th>
               <th class="p-2.5">Level</th>
-              <th class="p-2.5">Language Cert</th>
-              <th class="p-2.5">University</th>
+              <th class="p-2.5 text-right">Actions</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-zinc-100 dark:divide-zinc-800">
@@ -981,6 +1017,7 @@ onUnmounted(() => {
               @click="toggleStudentSelection(s.id)"
               class="hover:bg-blue-50/50 dark:hover:bg-blue-950/20 cursor-pointer transition-colors"
               :class="selectedStudentIds.includes(s.id) ? 'bg-blue-50/30 dark:bg-blue-950/10' : ''"
+              :style="getRowStripeStyle(s)"
             >
               <td class="p-2.5 text-center" @click.stop>
                 <input
@@ -990,17 +1027,52 @@ onUnmounted(() => {
                   class="h-3.5 w-3.5 rounded border-zinc-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                 />
               </td>
-              <td class="p-2.5 font-bold font-mono text-zinc-900 dark:text-zinc-100">{{ s.id }}</td>
-              <td class="p-2.5 font-bold text-zinc-900 dark:text-zinc-100">{{ s.full_name }}</td>
-              <td class="p-2.5 text-zinc-600 dark:text-zinc-400 font-mono">{{ s.phone1 || '-' }}</td>
-              <td class="p-2.5">
-                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 dark:bg-blue-950/40 text-blue-600">
-                  {{ s.tariff || 'NO TARIFF' }}
-                </span>
+              <td class="p-2.5 align-top">
+                <div class="inline-flex items-center justify-center px-2 py-1 text-[11px] font-mono font-bold bg-[#007aff] text-white rounded-[4px] shadow-2xs min-w-[34px]">
+                  {{ s.id }}
+                </div>
+                <div class="mt-1 text-[9px] font-bold uppercase tracking-wide text-zinc-400 dark:text-zinc-500 whitespace-nowrap">
+                  {{ getTariffDisplayName(s) }}
+                </div>
               </td>
-              <td class="p-2.5 font-medium">{{ s.level || '-' }}</td>
-              <td class="p-2.5 font-medium text-emerald-600 dark:text-emerald-400">{{ s.language_certificate || '-' }}</td>
-              <td class="p-2.5 text-zinc-600 dark:text-zinc-400 truncate max-w-[140px]">{{ s.university_1 || '-' }}</td>
+              <td class="p-2.5 font-bold text-zinc-900 dark:text-zinc-100 uppercase align-top">{{ s.full_name }}</td>
+              <td class="p-2.5 align-top">
+                <div class="flex flex-wrap gap-1">
+                  <span
+                    v-if="s.level"
+                    class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide shadow-2xs"
+                    :class="getLevelBadgeClass(s.level)"
+                  >
+                    {{ s.level }}
+                  </span>
+                  <span
+                    v-if="s.level2"
+                    class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide bg-[#ffab00] text-zinc-900 shadow-2xs"
+                  >
+                    {{ s.level2 }}
+                  </span>
+                </div>
+                <div v-if="getStudentCerts(s).length > 0" class="flex flex-wrap gap-1 mt-1">
+                  <span
+                    v-for="(c, cIdx) in getStudentCerts(s)"
+                    :key="cIdx"
+                    class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold shadow-2xs"
+                    :class="c.type?.toUpperCase() === 'TOPIK' ? 'bg-rose-500 text-white' : 'bg-blue-600 text-white'"
+                  >
+                    <span>{{ c.type }}</span>
+                    <span v-if="c.score" class="opacity-90 font-mono">{{ c.score }}</span>
+                  </span>
+                </div>
+              </td>
+              <td class="p-2.5 text-right align-top" @click.stop="emit('open-detail', s.id); emit('close')">
+                <button
+                  type="button"
+                  class="inline-flex items-center justify-center w-6 h-6 rounded-md bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700 cursor-pointer transition-colors"
+                  title="Open student"
+                >
+                  <MoreVertical class="w-3.5 h-3.5" />
+                </button>
+              </td>
             </tr>
           </tbody>
         </table>

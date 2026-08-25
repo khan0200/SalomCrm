@@ -951,6 +951,7 @@ dashboardStore.onExportExcel = handleExportExcel
       :folders="folders"
       :options="options"
       @close="dashboardStore.isExcelModalOpen = false"
+      @open-detail="openDetail"
     />
   </div>
 </template>
