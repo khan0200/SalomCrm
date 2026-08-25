@@ -1,10 +1,16 @@
 """
-SSH + pm2 deployment for SalomCRM (no Docker).
+SSH deployment for SalomCRM.
+
+The server runs the backend as a systemd unit (salomcrm-backend.service)
+behind nginx, with the virtualenv at the repo root (NOT inside backend/).
+Do not introduce a second process manager here: running gunicorn under pm2
+alongside the systemd unit makes both fight over port 8000 and takes the
+site down.
 
 Usage:
     python deploy.py             # deploy latest main
-    python deploy.py --setup     # first run: install system deps, pm2, nginx
     python deploy.py --logs      # tail backend logs
+    python deploy.py --status    # service + health check only
 
 Credentials come from the environment, so no password is stored in this file:
     DEPLOY_HOST      (default 178.238.231.210)
@@ -20,25 +26,35 @@ try:
 except ImportError:
     sys.exit("paramiko is required:  pip install paramiko")
 
+# Server output (systemd's bullet, box drawing, etc.) is UTF-8; the Windows
+# console defaults to cp1252 and would raise UnicodeEncodeError on it.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 
 HOST = os.environ.get("DEPLOY_HOST", "178.238.231.210")
 USER = os.environ.get("DEPLOY_USER", "root")
 PASSWORD = os.environ.get("DEPLOY_PASSWORD")
 KEYFILE = os.environ.get("DEPLOY_KEY")
 
-APP_DIR = os.environ.get("DEPLOY_APP_DIR", "/root/SalomCrm")
+APP_DIR = os.environ.get("DEPLOY_APP_DIR", "/var/www/SalomCrm")
 BRANCH = os.environ.get("DEPLOY_BRANCH", "main")
 BACKEND_PORT = "8000"
-PM2_BACKEND = "salomcrm-backend"
+SERVICE = "salomcrm-backend.service"
 
 
 def connect():
     client = paramiko.SSHClient()
     client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     if KEYFILE:
-        client.connect(HOST, username=USER, key_filename=KEYFILE, timeout=20)
+        client.connect(HOST, username=USER, key_filename=KEYFILE, timeout=20,
+                       allow_agent=False, look_for_keys=False)
     elif PASSWORD:
-        client.connect(HOST, username=USER, password=PASSWORD, timeout=20)
+        client.connect(HOST, username=USER, password=PASSWORD, timeout=20,
+                       allow_agent=False, look_for_keys=False)
     else:
         sys.exit(
             "No credentials found. Set DEPLOY_PASSWORD or DEPLOY_KEY first:\n"
@@ -48,12 +64,12 @@ def connect():
     return client
 
 
-def run(client, command, check=True, label=None):
+def run(client, command, check=True, label=None, timeout=600):
     """Run a command on the server, streaming its output."""
     if label:
         print("\n=== %s ===" % label)
     print("$ %s" % command)
-    stdin, stdout, stderr = client.exec_command(command, get_pty=True)
+    stdin, stdout, stderr = client.exec_command(command, get_pty=True, timeout=timeout)
     lines = []
     for line in iter(stdout.readline, ""):
         line = line.rstrip()
@@ -69,86 +85,79 @@ def run(client, command, check=True, label=None):
     return code, "\n".join(lines)
 
 
-def find_app_dir(client):
-    finder = (
-        'test -d %s/.git && echo %s || '
-        'find /root /var/www /home /opt -maxdepth 3 -name ".git" -type d 2>/dev/null '
-        '| grep -i salom | head -1 | xargs -r dirname'
-    ) % (APP_DIR, APP_DIR)
-    code, out = run(client, finder, check=False, label="Locating project")
-    path = out.strip().splitlines()[-1].strip() if out.strip() else ""
-    if not path:
+def check_app_dir(client):
+    code, _ = run(client, "test -d %s/.git" % APP_DIR, check=False,
+                  label="Locating project")
+    if code != 0:
         raise SystemExit(
-            "Project not found on %s. Clone it first:\n"
-            "  git clone https://github.com/khan0200/SalomCrm.git %s" % (HOST, APP_DIR)
+            "No git checkout at %s on %s.\n"
+            "Set DEPLOY_APP_DIR if the project lives elsewhere." % (APP_DIR, HOST)
         )
-    print("  -> using %s" % path)
-    return path
+    print("  -> using %s" % APP_DIR)
+    return APP_DIR
 
 
-NGINX_TEMPLATE = """server {
-    listen 80;
-    server_name _;
-    client_max_body_size 25M;
-
-    root APP_PATH/frontend/dist;
-    index index.html;
-
-    location / {
-        try_files $uri $uri/ /index.html;
-    }
-
-    location /api/ {
-        proxy_pass http://127.0.0.1:PORT;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-
-    location /admin/ {
-        proxy_pass http://127.0.0.1:PORT;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-
-    location /static/ {
-        alias APP_PATH/backend/staticfiles/;
-    }
-
-    location /media/ {
-        alias APP_PATH/backend/media/;
-    }
-}
-"""
+def health_check(client):
+    run(client, "systemctl status %s --no-pager | head -8" % SERVICE,
+        check=False, label="Service status")
+    cmd = (
+        "curl -s -o /dev/null -w 'backend:%{http_code}\\n' http://127.0.0.1:"
+        + BACKEND_PORT + "/api/docs/; "
+        "curl -s -o /dev/null -w 'site:%{http_code}\\n' http://127.0.0.1/"
+    )
+    _, out = run(client, cmd, check=False, label="Health check")
+    return out
 
 
-def setup(client, path):
-    """One-time provisioning: system packages, Node, pm2, nginx."""
-    run(client, "apt-get update -qq", label="System packages")
+def upload_frontend(client, path):
+    """
+    Upload the locally built frontend/dist to the server.
+
+    Node is not installed on the server, so the bundle cannot be built there.
+    frontend/dist is also gitignored, so `git pull` never brings it across —
+    it has to be built locally (npm run build) and copied up, or the site
+    keeps serving the previous bundle.
+    """
+    local_dist = os.path.join(os.path.dirname(os.path.abspath(__file__)), "frontend", "dist")
+    index_html = os.path.join(local_dist, "index.html")
+    if not os.path.isfile(index_html):
+        raise SystemExit(
+            "No local build at %s.\nRun:  cd frontend && npm run build" % local_dist
+        )
+
+    print("\n=== Uploading frontend build ===")
+    print("  local: %s" % local_dist)
+
+    remote_dist = "%s/frontend/dist" % path
+    remote_tmp = "%s/frontend/dist.incoming" % path
+
+    # Stage into a temp dir, then swap, so a failed upload never leaves the
+    # site serving a half-written bundle.
+    run(client, "rm -rf %s && mkdir -p %s" % (remote_tmp, remote_tmp), check=True)
+
+    sftp = client.open_sftp()
+    count = 0
+    try:
+        for root, _dirs, files in os.walk(local_dist):
+            rel = os.path.relpath(root, local_dist).replace("\\", "/")
+            remote_dir = remote_tmp if rel == "." else "%s/%s" % (remote_tmp, rel)
+            if rel != ".":
+                try:
+                    sftp.mkdir(remote_dir)
+                except IOError:
+                    pass
+            for name in files:
+                sftp.put(os.path.join(root, name), "%s/%s" % (remote_dir, name))
+                count += 1
+                print("  + %s/%s" % (rel if rel != "." else "", name))
+    finally:
+        sftp.close()
+
     run(client,
-        "DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "
-        "python3-venv python3-pip libpq-dev gcc nginx curl git")
-
-    if run(client, "command -v node", check=False)[0] != 0:
-        run(client,
-            "curl -fsSL https://deb.nodesource.com/setup_20.x | bash - "
-            "&& apt-get install -y -qq nodejs",
-            label="Installing Node 20")
-
-    if run(client, "command -v pm2", check=False)[0] != 0:
-        run(client, "npm install -g pm2", label="Installing pm2")
-
-    conf = NGINX_TEMPLATE.replace("APP_PATH", path).replace("PORT", BACKEND_PORT)
-    run(client,
-        "cat > /etc/nginx/sites-available/salomcrm <<'NGINXCONF'\n%sNGINXCONF" % conf,
-        label="Writing nginx config")
-    run(client,
-        "ln -sf /etc/nginx/sites-available/salomcrm /etc/nginx/sites-enabled/salomcrm "
-        "&& rm -f /etc/nginx/sites-enabled/default && nginx -t && systemctl reload nginx")
-    print("\nProvisioning complete.")
+        "rm -rf %s.old && mv %s %s.old 2>/dev/null; mv %s %s && rm -rf %s.old"
+        % (remote_dist, remote_dist, remote_dist, remote_tmp, remote_dist, remote_dist),
+        check=True)
+    print("  uploaded %d files" % count)
 
 
 def deploy(client, path):
@@ -156,59 +165,52 @@ def deploy(client, path):
         label="Pulling latest code")
     run(client, "cd %s && git log -1 --oneline" % path)
 
+    # venv lives at the repo root, one level above backend/
     run(client,
-        "cd %s/backend && (test -d venv || python3 -m venv venv) && "
-        "./venv/bin/pip install -q --upgrade pip && "
-        "./venv/bin/pip install -q -r requirements.txt gunicorn" % path,
+        "cd %s/backend && ../venv/bin/pip install -q -r requirements.txt gunicorn" % path,
         label="Backend dependencies")
-    run(client, "cd %s/backend && ./venv/bin/python manage.py migrate --noinput" % path,
+    run(client, "cd %s/backend && ../venv/bin/python manage.py migrate --noinput" % path,
         label="Database migrations")
-    run(client, "cd %s/backend && ./venv/bin/python manage.py collectstatic --noinput" % path,
+    run(client, "cd %s/backend && ../venv/bin/python manage.py collectstatic --noinput" % path,
         label="Collecting static files")
 
-    run(client, "cd %s/frontend && npm ci --silent" % path, label="Frontend dependencies")
-    run(client, "cd %s/frontend && npm run build" % path, label="Building frontend")
+    upload_frontend(client, path)
 
-    if run(client, "pm2 describe %s > /dev/null 2>&1" % PM2_BACKEND, check=False)[0] == 0:
-        run(client, "pm2 restart %s --update-env" % PM2_BACKEND, label="Restarting backend")
+    run(client, "systemctl restart %s" % SERVICE, label="Restarting backend")
+
+    # nginx here is not managed by systemd (it is started by the hosting
+    # panel), so `systemctl reload nginx` fails. Reload via the binary if it
+    # is running; a static dist swap does not strictly need it either way.
+    run(client,
+        "nginx -t >/dev/null 2>&1 && nginx -s reload 2>/dev/null"
+        " && echo 'nginx reloaded' || echo 'nginx reload skipped (serves new files anyway)'",
+        check=False, label="Reloading nginx")
+
+    run(client, "sleep 4", check=False)
+    out = health_check(client)
+
+    if "backend:200" in out.replace(" ", ""):
+        print("\nDeploy complete — backend healthy.")
     else:
-        run(client,
-            "cd %s/backend && pm2 start ./venv/bin/gunicorn --name %s --interpreter none "
-            "-- config.wsgi:application --bind 127.0.0.1:%s --workers 3 --timeout 120"
-            % (path, PM2_BACKEND, BACKEND_PORT),
-            label="Starting backend under pm2")
-
-    run(client, "pm2 save", check=False)
-    run(client, "systemctl reload nginx", check=False, label="Reloading nginx")
-
-    run(client, "pm2 list", check=False, label="Status")
-    code, out = run(client,
-        "sleep 3; curl -s -o /dev/null -w '%%{http_code}' http://127.0.0.1:%s/api/docs/" % BACKEND_PORT,
-        check=False, label="Health check")
-    status = out.strip().splitlines()[-1].strip() if out.strip() else "?"
-    if status.startswith(("2", "3")):
-        print("\n  Backend healthy (HTTP %s)." % status)
-    else:
-        print("\n  WARNING: health check returned '%s'. Inspect with: python deploy.py --logs" % status)
-    print("\nDeploy complete.")
+        print("\nWARNING: backend did not return 200. Inspect with: python deploy.py --logs")
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--setup", action="store_true", help="provision the server (first run)")
     parser.add_argument("--logs", action="store_true", help="tail backend logs")
+    parser.add_argument("--status", action="store_true", help="service status + health check only")
     args = parser.parse_args()
 
     print("Connecting to %s@%s ..." % (USER, HOST))
     client = connect()
     print("Connected.")
     try:
-        path = find_app_dir(client)
+        path = check_app_dir(client)
         if args.logs:
-            run(client, "pm2 logs %s --lines 80 --nostream" % PM2_BACKEND, check=False)
+            run(client, "journalctl -u %s -n 80 --no-pager" % SERVICE, check=False)
+        elif args.status:
+            health_check(client)
         else:
-            if args.setup:
-                setup(client, path)
             deploy(client, path)
     finally:
         client.close()
