@@ -20,6 +20,20 @@ export const tenantsApi = {
     return response.data
   },
 
+  updateTenant: async (id: string, data: {
+    name?: string
+    branding_color?: string
+    description?: string
+  }): Promise<Tenant> => {
+    const response = await apiClient.patch(`/tenants/${id}/`, data)
+    return response.data
+  },
+
+  deleteTenant: async (id: string) => {
+    const response = await apiClient.delete(`/tenants/${id}/`)
+    return response.data
+  },
+
   deactivateTenant: async (id: string) => {
     const response = await apiClient.post(`/tenants/${id}/deactivate/`)
     return response.data
