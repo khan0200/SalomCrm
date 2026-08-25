@@ -473,7 +473,7 @@ const labelForOption = (opt: string) => {
   return opt
 }
 
-const DOC_BADGE_BASE = 'h-6 w-6 shrink-0 rounded-full inline-flex items-center justify-center leading-none font-bold text-[11px] shadow-2xs border'
+const DOC_BADGE_BASE = 'h-8 w-8 shrink-0 rounded-full inline-flex items-center justify-center leading-none font-bold text-[12px] shadow-2xs border'
 </script>
 
 <template>
@@ -605,7 +605,7 @@ const DOC_BADGE_BASE = 'h-6 w-6 shrink-0 rounded-full inline-flex items-center j
             <tr class="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-850/60">
               <th class="px-4 py-2.5 text-[10.5px] uppercase font-bold text-zinc-500 dark:text-zinc-400 tracking-wider">ID / Name</th>
               <th class="px-4 py-2.5 text-[10.5px] uppercase font-bold text-zinc-500 dark:text-zinc-400 tracking-wider">Missing</th>
-              <th v-for="d in HAND_COUNT_DOCS" :key="d.label" class="px-2 py-2.5 text-center text-[10.5px] uppercase font-bold text-zinc-500 dark:text-zinc-400 tracking-wider w-[56px]">
+              <th v-for="d in HAND_COUNT_DOCS" :key="d.label" class="px-3.5 py-2.5 text-center text-[10.5px] uppercase font-bold text-zinc-500 dark:text-zinc-400 tracking-wider w-[62px]">
                 {{ d.label }}
               </th>
             </tr>
@@ -623,8 +623,8 @@ const DOC_BADGE_BASE = 'h-6 w-6 shrink-0 rounded-full inline-flex items-center j
                   <div class="h-4 w-10 rounded-full bg-zinc-100 dark:bg-zinc-800/70" />
                 </div>
               </td>
-              <td v-for="d in HAND_COUNT_DOCS" :key="d.label" class="px-2 py-2 text-center">
-                <div class="h-6 w-6 rounded-full bg-zinc-100 dark:bg-zinc-800/70 mx-auto" />
+              <td v-for="d in HAND_COUNT_DOCS" :key="d.label" class="px-3.5 py-2 text-center">
+                <div class="h-8 w-8 rounded-full bg-zinc-100 dark:bg-zinc-800/70 mx-auto" />
               </td>
             </tr>
           </tbody>
@@ -660,7 +660,7 @@ const DOC_BADGE_BASE = 'h-6 w-6 shrink-0 rounded-full inline-flex items-center j
                 </button>
               </th>
               <th class="px-4 py-2.5 text-[10.5px] uppercase font-bold text-zinc-500 dark:text-zinc-400 tracking-wider">Missing</th>
-              <th v-for="d in HAND_COUNT_DOCS" :key="d.label" class="px-2 py-2.5 text-center text-[10.5px] uppercase font-bold text-zinc-500 dark:text-zinc-400 tracking-wider w-[56px]">
+              <th v-for="d in HAND_COUNT_DOCS" :key="d.label" class="px-3.5 py-2.5 text-center text-[10.5px] uppercase font-bold text-zinc-500 dark:text-zinc-400 tracking-wider w-[62px]">
                 {{ d.label }}
               </th>
             </tr>
@@ -711,7 +711,7 @@ const DOC_BADGE_BASE = 'h-6 w-6 shrink-0 rounded-full inline-flex items-center j
               </td>
 
               <!-- Doc counters -->
-              <td v-for="d in HAND_COUNT_DOCS" :key="d.label" class="px-2 py-2 text-center align-middle">
+              <td v-for="d in HAND_COUNT_DOCS" :key="d.label" class="px-3.5 py-2 text-center align-middle">
                 <span
                   v-if="getDocCell(s, d.name).na"
                   :class="DOC_BADGE_BASE"
