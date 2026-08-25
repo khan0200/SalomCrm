@@ -17,6 +17,7 @@ import {
 } from 'lucide-vue-next'
 import type { Student } from '@/types'
 import { useUiStore } from '@/stores/ui'
+import { useAlphanumericSort } from '@/composables/useAlphanumericSort'
 import XLSX from 'xlsx-js-style'
 
 const props = defineProps<{
@@ -39,6 +40,7 @@ const emit = defineEmits<{
 }>()
 
 const uiStore = useUiStore()
+const { compareStudentIds } = useAlphanumericSort()
 
 // ── Search & Filter State inside Modal ──────────────────────────────
 const searchType = ref<'all' | 'id' | 'name' | 'phone' | 'university'>('all')
@@ -70,6 +72,33 @@ const closeAllDropdowns = () => {
   isLeadDropdownOpen.value = false
 }
 
+type DropdownKey = 'folder' | 'tariff' | 'level' | 'group' | 'cert' | 'tag' | 'lead'
+const dropdownRefs: Record<DropdownKey, typeof isFolderDropdownOpen> = {
+  folder: isFolderDropdownOpen,
+  tariff: isTariffDropdownOpen,
+  level: isLevelDropdownOpen,
+  group: isGroupDropdownOpen,
+  cert: isCertDropdownOpen,
+  tag: isTagDropdownOpen,
+  lead: isLeadDropdownOpen,
+}
+const toggleDropdown = (key: DropdownKey) => {
+  const target = dropdownRefs[key]
+  const wasOpen = target.value
+  closeAllDropdowns()
+  target.value = !wasOpen
+}
+
+const toggleInList = (list: string[], value: string) => {
+  const idx = list.indexOf(value)
+  if (idx === -1) list.push(value)
+  else list.splice(idx, 1)
+}
+
+const CERT_OPTIONS = ['NO CERTIFICATE', 'TOPIK', 'IELTS', 'TOEFL', 'CEFR', 'SAT', 'SKA']
+const PREDEFINED_TAGS = ['Call', 'Apply', 'Documents', 'Payment']
+const TAG_OPTIONS = [...PREDEFINED_TAGS, 'Custom']
+
 // Student selection
 const selectedStudentIds = ref<string[]>([])
 
@@ -89,6 +118,20 @@ interface ExcelField {
 interface FieldGroup {
   title: string
   fields: ExcelField[]
+}
+
+const formatGpa = (gpa: string | null | undefined, system: string | null | undefined): string => {
+  const score = (gpa || '').trim()
+  if (!score) return ''
+  const scale = (system || '').trim()
+  return scale ? `${score}/${scale}` : score
+}
+
+const formatCertificate = (cert: string | null | undefined, score: string | null | undefined): string => {
+  const name = (cert || '').trim()
+  const points = (score || '').trim()
+  if (name && points) return `${name} ${points}`
+  return name || points
 }
 
 const FIELD_GROUPS: FieldGroup[] = [
@@ -120,7 +163,7 @@ const FIELD_GROUPS: FieldGroup[] = [
     fields: [
       { key: 'final_school_name', label: 'Final School Name', checked: true, get: (s) => s.final_school_name || '' },
       { key: 'major', label: 'Major', checked: true, get: (s) => s.major || '' },
-      { key: 'gpa', label: 'GPA', checked: true, get: (s) => (s.gpa ? `${s.gpa} (${s.gpa_system || 100})` : '') },
+      { key: 'gpa', label: 'GPA', checked: true, get: (s) => formatGpa(s.gpa, s.gpa_system) },
       { key: 'degree_no', label: 'Degree No', checked: false, get: (s) => s.degree_no || '' },
       { key: 'date_of_entry', label: 'Date of Entry', checked: false, get: (s) => s.date_of_entry || '' },
       { key: 'date_of_graduation', label: 'Date of Graduation', checked: false, get: (s) => (s.graduation_expected ? 'EXPECTED' : (s.date_of_graduation || '')) },
@@ -136,9 +179,9 @@ const FIELD_GROUPS: FieldGroup[] = [
       { key: 'tariff', label: 'Tariff', checked: false, get: (s) => s.tariff || '' },
       { key: 'level', label: 'Level to Study', checked: true, get: (s) => s.level || '' },
       { key: 'level2', label: 'Level to Study 2', checked: false, get: (s) => s.level2 || '' },
-      { key: 'language_certificate', label: 'Language Certificate', checked: true, get: (s) => (s.language_certificate ? `${s.language_certificate} ${s.certificate_score || ''}`.trim() : '') },
-      { key: 'language_certificate_2', label: 'Language Certificate 2', checked: false, get: (s) => (s.language_certificate_2 ? `${s.language_certificate_2} ${s.certificate_score_2 || ''}`.trim() : '') },
-      { key: 'language_certificate_3', label: 'Language Certificate 3', checked: false, get: (s) => (s.language_certificate_3 ? `${s.language_certificate_3} ${s.certificate_score_3 || ''}`.trim() : '') },
+      { key: 'language_certificate', label: 'Language Certificate', checked: true, get: (s) => formatCertificate(s.language_certificate, s.certificate_score) },
+      { key: 'language_certificate_2', label: 'Language Certificate 2', checked: false, get: (s) => formatCertificate(s.language_certificate_2, s.certificate_score_2) },
+      { key: 'language_certificate_3', label: 'Language Certificate 3', checked: false, get: (s) => formatCertificate(s.language_certificate_3, s.certificate_score_3) },
     ]
   },
   {
@@ -250,17 +293,29 @@ const filteredStudents = computed(() => {
     // Groups
     if (selectedGroups.value.length > 0 && !selectedGroups.value.includes(s.student_group || '')) return false
 
-    // Language Certs
+    // Language Certs (NO CERTIFICATE / EXPECTED are special, not raw cert names)
     if (selectedCerts.value.length > 0) {
-      const certs = [s.language_certificate, s.language_certificate_2, s.language_certificate_3].filter(Boolean)
-      const match = selectedCerts.value.some(c => certs.includes(c))
-      if (!match) return false
+      let matchesCert = false
+      if (selectedCerts.value.includes('NO CERTIFICATE')) {
+        if (!s.language_certificate || s.language_certificate === 'NO CERTIFICATE') matchesCert = true
+      }
+      if (selectedCerts.value.includes('EXPECTED')) {
+        const expected = [s.certificate_score, s.certificate_score_2, s.certificate_score_3]
+          .some(sc => (sc || '').toUpperCase() === 'EXPECTED')
+        if (expected) matchesCert = true
+      }
+      const certs = [s.language_certificate, s.language_certificate_2, s.language_certificate_3]
+      if (certs.some(c => c && c !== 'NO CERTIFICATE' && selectedCerts.value.includes(c))) matchesCert = true
+      if (!matchesCert) return false
     }
 
-    // Tags
+    // Tags ("Custom" = any tag not in the predefined set)
     if (selectedTags.value.length > 0) {
       const tags = s.task_tags || []
-      const match = selectedTags.value.some(t => tags.includes(t))
+      const match = selectedTags.value.some(tag => {
+        if (tag === 'Custom') return tags.some(t => !PREDEFINED_TAGS.includes(t))
+        return tags.includes(tag)
+      })
       if (!match) return false
     }
 
@@ -270,6 +325,53 @@ const filteredStudents = computed(() => {
     return true
   })
 })
+
+// ── Active filter summary (chips + clear-all) ────────────────────────
+const hasActiveFilters = computed(() =>
+  selectedFolders.value.length > 0 ||
+  selectedTariffs.value.length > 0 ||
+  selectedLevels.value.length > 0 ||
+  selectedGroups.value.length > 0 ||
+  selectedCerts.value.length > 0 ||
+  selectedTags.value.length > 0 ||
+  selectedLeads.value.length > 0
+)
+
+const activeFilterChips = computed(() => {
+  const chips: { key: string; label: string; clear: () => void }[] = []
+  if (selectedFolders.value.length > 0) {
+    chips.push({ key: 'folder', label: `Folder: ${selectedFolders.value.length}`, clear: () => { selectedFolders.value = [] } })
+  }
+  if (selectedTariffs.value.length > 0) {
+    chips.push({ key: 'tariff', label: `Tariff: ${selectedTariffs.value.length}`, clear: () => { selectedTariffs.value = [] } })
+  }
+  if (selectedLevels.value.length > 0) {
+    chips.push({ key: 'level', label: `Level: ${selectedLevels.value.length}`, clear: () => { selectedLevels.value = [] } })
+  }
+  if (selectedGroups.value.length > 0) {
+    chips.push({ key: 'group', label: `Group: ${selectedGroups.value.length}`, clear: () => { selectedGroups.value = [] } })
+  }
+  if (selectedCerts.value.length > 0) {
+    chips.push({ key: 'cert', label: `Certificate: ${selectedCerts.value.length}`, clear: () => { selectedCerts.value = [] } })
+  }
+  if (selectedTags.value.length > 0) {
+    chips.push({ key: 'tag', label: `Tag: ${selectedTags.value.length}`, clear: () => { selectedTags.value = [] } })
+  }
+  if (selectedLeads.value.length > 0) {
+    chips.push({ key: 'lead', label: `Lead: ${selectedLeads.value.length}`, clear: () => { selectedLeads.value = [] } })
+  }
+  return chips
+})
+
+const clearAllExcelFilters = () => {
+  selectedFolders.value = []
+  selectedTariffs.value = []
+  selectedLevels.value = []
+  selectedGroups.value = []
+  selectedCerts.value = []
+  selectedTags.value = []
+  selectedLeads.value = []
+}
 
 const isAllFilteredSelected = computed(() => {
   if (filteredStudents.value.length === 0) return false
@@ -347,41 +449,76 @@ const styleWorksheet = (ws: any) => {
     }
   }
 
-  const rowEven = {
-    font: { name: 'Segoe UI', sz: 10 },
-    fill: { fgColor: { rgb: 'F2F6FB' } },
-    alignment: { horizontal: 'center', vertical: 'center' },
-    border: {
-      top: { style: 'thin', color: { rgb: 'D9D9D9' } },
-      bottom: { style: 'thin', color: { rgb: 'D9D9D9' } },
-      left: { style: 'thin', color: { rgb: 'D9D9D9' } },
-      right: { style: 'thin', color: { rgb: 'D9D9D9' } }
-    }
+  const thinBorder = {
+    top: { style: 'thin', color: { rgb: 'D9D9D9' } },
+    bottom: { style: 'thin', color: { rgb: 'D9D9D9' } },
+    left: { style: 'thin', color: { rgb: 'D9D9D9' } },
+    right: { style: 'thin', color: { rgb: 'D9D9D9' } }
   }
+  const zebraFill = (isEven: boolean) => ({ fgColor: { rgb: isEven ? 'F2F6FB' : 'FFFFFF' } })
+  const baseFont = { name: 'Segoe UI', sz: 10 }
 
-  const rowOdd = {
-    font: { name: 'Segoe UI', sz: 10 },
-    fill: { fgColor: { rgb: 'FFFFFF' } },
-    alignment: { horizontal: 'center', vertical: 'center' },
-    border: {
-      top: { style: 'thin', color: { rgb: 'D9D9D9' } },
-      bottom: { style: 'thin', color: { rgb: 'D9D9D9' } },
-      left: { style: 'thin', color: { rgb: 'D9D9D9' } },
-      right: { style: 'thin', color: { rgb: 'D9D9D9' } }
-    }
-  }
+  const dataStyle = (align: 'left' | 'center' | 'right', isEven: boolean) => ({
+    font: baseFont,
+    fill: zebraFill(isEven),
+    alignment: { horizontal: align, vertical: 'center' },
+    border: thinBorder
+  })
+
+  // Columns whose header (matched by substring, case-insensitive) should be
+  // center-aligned rather than the default left alignment.
+  const CENTER_HEADERS = [
+    'NO', 'STUDENT ID', 'SEX', 'BIRTHDAY', 'PASSPORT', 'DATE OF ISSUE',
+    'DATE OF EXPIRATION', 'STATUS', 'SCORE', 'PRIORITY', 'DATE & TIME',
+    'DATE', 'PHONE', 'TARIFF', 'GROUP', 'OFFICE', 'LEAD', 'LEVEL'
+  ]
+  // Columns whose header indicates a currency/amount value: right-aligned and
+  // coerced to a numeric cell with a thousands-separator format, matching how
+  // Excel displays money regardless of whether the source value was a string.
+  const CURRENCY_HEADERS = ['UZS', 'BALANCE', 'DISCOUNT', 'AMOUNT']
 
   for (let r = startCell.r; r <= endCell.r; r++) {
     for (let c = startCell.c; c <= endCell.c; c++) {
       const address = encodeCell(c, r)
-      if (!ws[address]) continue
+      // Backfill missing cells as empty text so borders render across the
+      // full rectangle even where a row had no value for that column.
+      if (!ws[address]) {
+        ws[address] = { t: 's', v: '' }
+      }
+      const cell = ws[address]
+
       if (r === 0) {
-        ws[address].s = headerStyle
+        cell.s = headerStyle
+        continue
+      }
+
+      const isEven = r % 2 === 0
+      const headerCell = ws[encodeCell(c, 0)]
+      const headerName = headerCell ? String(headerCell.v).toUpperCase() : ''
+
+      if (CURRENCY_HEADERS.some(h => headerName.includes(h))) {
+        cell.s = dataStyle('right', isEven)
+        if (cell.v !== '' && cell.v !== null && cell.v !== undefined) {
+          const num = parseFloat(String(cell.v).replace(/,/g, ''))
+          if (!isNaN(num)) {
+            cell.t = 'n'
+            cell.v = num
+            cell.z = '#,##0'
+          }
+        }
+      } else if (CENTER_HEADERS.some(h => headerName.includes(h))) {
+        cell.s = dataStyle('center', isEven)
       } else {
-        ws[address].s = r % 2 === 0 ? rowEven : rowOdd
+        cell.s = dataStyle('left', isEven)
       }
     }
   }
+
+  const rowHeights: { hpx: number }[] = [{ hpx: 28 }]
+  for (let r = 1; r <= endCell.r; r++) {
+    rowHeights.push({ hpx: 22 })
+  }
+  ws['!rows'] = rowHeights
 }
 
 // ── Download Excel Action ───────────────────────────────────────────
@@ -397,7 +534,7 @@ const downloadSelectedAsExcel = () => {
 
   const selectedStudents = props.students
     .filter(s => selectedStudentIds.value.includes(s.id))
-    .sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true, sensitivity: 'base' }))
+    .sort((a, b) => compareStudentIds(a.id, b.id, 'asc'))
 
   const allChecked = FIELD_GROUPS.flatMap(g => g.fields).filter(f => checkedFields.value.includes(f.key))
   const idField = allChecked.find(f => f.key === 'id')
@@ -536,11 +673,11 @@ onUnmounted(() => {
           </div>
 
           <!-- Folder Filter Dropdown -->
-          <div class="w-full md:w-44 relative">
+          <div class="w-full md:w-40 relative">
             <label class="block text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-1">Folder</label>
             <button
               type="button"
-              @click="isFolderDropdownOpen = !isFolderDropdownOpen"
+              @click="toggleDropdown('folder')"
               class="w-full h-9 px-2.5 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-xs font-semibold text-zinc-800 dark:text-zinc-200 flex items-center justify-between cursor-pointer"
             >
               <div class="flex items-center gap-1.5 truncate">
@@ -554,6 +691,7 @@ onUnmounted(() => {
             <div
               v-if="isFolderDropdownOpen"
               class="absolute left-0 mt-1 w-52 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 shadow-xl py-1 z-40 max-h-60 overflow-y-auto text-xs"
+              @click.stop
             >
               <label class="px-3 py-1.5 flex items-center gap-2 hover:bg-zinc-50 dark:hover:bg-zinc-700 cursor-pointer font-bold">
                 <input
@@ -589,6 +727,219 @@ onUnmounted(() => {
               </label>
             </div>
           </div>
+
+          <!-- Tariff Filter Dropdown -->
+          <div class="w-full md:w-40 relative">
+            <label class="block text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-1">Tariff</label>
+            <button
+              type="button"
+              @click="toggleDropdown('tariff')"
+              class="w-full h-9 px-2.5 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-xs font-semibold text-zinc-800 dark:text-zinc-200 flex items-center justify-between cursor-pointer"
+            >
+              <div class="flex items-center gap-1.5 truncate">
+                <Award class="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                <span class="truncate">{{ selectedTariffs.length === 0 ? 'All Tariffs' : `${selectedTariffs.length} selected` }}</span>
+              </div>
+              <ChevronDown class="w-3.5 h-3.5 text-zinc-400 shrink-0 ml-1" />
+            </button>
+            <div
+              v-if="isTariffDropdownOpen"
+              class="absolute left-0 mt-1 w-48 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 shadow-xl py-1 z-40 max-h-60 overflow-y-auto text-xs"
+              @click.stop
+            >
+              <label class="px-3 py-1.5 flex items-center gap-2 hover:bg-zinc-50 dark:hover:bg-zinc-700 cursor-pointer font-bold">
+                <input type="checkbox" :checked="selectedTariffs.length === 0" @change="selectedTariffs = []" class="rounded text-blue-600" />
+                <span>All Tariffs</span>
+              </label>
+              <div class="h-px bg-zinc-100 dark:bg-zinc-700 my-1" />
+              <label class="px-3 py-1.5 flex items-center gap-2 hover:bg-zinc-50 dark:hover:bg-zinc-700 cursor-pointer">
+                <input type="checkbox" :checked="selectedTariffs.includes('NO_TARIFF')" @change="toggleInList(selectedTariffs, 'NO_TARIFF')" class="rounded text-blue-600" />
+                <span>No Tariff</span>
+              </label>
+              <label v-for="t in options.tariffs" :key="t" class="px-3 py-1.5 flex items-center gap-2 hover:bg-zinc-50 dark:hover:bg-zinc-700 cursor-pointer">
+                <input type="checkbox" :checked="selectedTariffs.includes(t)" @change="toggleInList(selectedTariffs, t)" class="rounded text-blue-600" />
+                <span class="truncate">{{ t }}</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Level Filter Dropdown -->
+          <div class="w-full md:w-40 relative">
+            <label class="block text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-1">Level</label>
+            <button
+              type="button"
+              @click="toggleDropdown('level')"
+              class="w-full h-9 px-2.5 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-xs font-semibold text-zinc-800 dark:text-zinc-200 flex items-center justify-between cursor-pointer"
+            >
+              <div class="flex items-center gap-1.5 truncate">
+                <GraduationCap class="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                <span class="truncate">{{ selectedLevels.length === 0 ? 'All Levels' : `${selectedLevels.length} selected` }}</span>
+              </div>
+              <ChevronDown class="w-3.5 h-3.5 text-zinc-400 shrink-0 ml-1" />
+            </button>
+            <div
+              v-if="isLevelDropdownOpen"
+              class="absolute left-0 mt-1 w-48 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 shadow-xl py-1 z-40 max-h-60 overflow-y-auto text-xs"
+              @click.stop
+            >
+              <label class="px-3 py-1.5 flex items-center gap-2 hover:bg-zinc-50 dark:hover:bg-zinc-700 cursor-pointer font-bold">
+                <input type="checkbox" :checked="selectedLevels.length === 0" @change="selectedLevels = []" class="rounded text-blue-600" />
+                <span>All Levels</span>
+              </label>
+              <div class="h-px bg-zinc-100 dark:bg-zinc-700 my-1" />
+              <label v-for="l in options.levels" :key="l" class="px-3 py-1.5 flex items-center gap-2 hover:bg-zinc-50 dark:hover:bg-zinc-700 cursor-pointer">
+                <input type="checkbox" :checked="selectedLevels.includes(l)" @change="toggleInList(selectedLevels, l)" class="rounded text-blue-600" />
+                <span class="truncate">{{ l }}</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Group Filter Dropdown -->
+          <div class="w-full md:w-40 relative">
+            <label class="block text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-1">Group</label>
+            <button
+              type="button"
+              @click="toggleDropdown('group')"
+              class="w-full h-9 px-2.5 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-xs font-semibold text-zinc-800 dark:text-zinc-200 flex items-center justify-between cursor-pointer"
+            >
+              <div class="flex items-center gap-1.5 truncate">
+                <Users class="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                <span class="truncate">{{ selectedGroups.length === 0 ? 'All Groups' : `${selectedGroups.length} selected` }}</span>
+              </div>
+              <ChevronDown class="w-3.5 h-3.5 text-zinc-400 shrink-0 ml-1" />
+            </button>
+            <div
+              v-if="isGroupDropdownOpen"
+              class="absolute left-0 mt-1 w-48 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 shadow-xl py-1 z-40 max-h-60 overflow-y-auto text-xs"
+              @click.stop
+            >
+              <label class="px-3 py-1.5 flex items-center gap-2 hover:bg-zinc-50 dark:hover:bg-zinc-700 cursor-pointer font-bold">
+                <input type="checkbox" :checked="selectedGroups.length === 0" @change="selectedGroups = []" class="rounded text-blue-600" />
+                <span>All Groups</span>
+              </label>
+              <div class="h-px bg-zinc-100 dark:bg-zinc-700 my-1" />
+              <label v-for="g in options.groups" :key="g" class="px-3 py-1.5 flex items-center gap-2 hover:bg-zinc-50 dark:hover:bg-zinc-700 cursor-pointer">
+                <input type="checkbox" :checked="selectedGroups.includes(g)" @change="toggleInList(selectedGroups, g)" class="rounded text-blue-600" />
+                <span class="truncate">{{ g }}</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Certificate Filter Dropdown -->
+          <div class="w-full md:w-40 relative">
+            <label class="block text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-1">Certificate</label>
+            <button
+              type="button"
+              @click="toggleDropdown('cert')"
+              class="w-full h-9 px-2.5 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-xs font-semibold text-zinc-800 dark:text-zinc-200 flex items-center justify-between cursor-pointer"
+            >
+              <div class="flex items-center gap-1.5 truncate">
+                <Bookmark class="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                <span class="truncate">{{ selectedCerts.length === 0 ? 'All Certificates' : `${selectedCerts.length} selected` }}</span>
+              </div>
+              <ChevronDown class="w-3.5 h-3.5 text-zinc-400 shrink-0 ml-1" />
+            </button>
+            <div
+              v-if="isCertDropdownOpen"
+              class="absolute left-0 mt-1 w-48 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 shadow-xl py-1 z-40 max-h-60 overflow-y-auto text-xs"
+              @click.stop
+            >
+              <label class="px-3 py-1.5 flex items-center gap-2 hover:bg-zinc-50 dark:hover:bg-zinc-700 cursor-pointer font-bold">
+                <input type="checkbox" :checked="selectedCerts.length === 0" @change="selectedCerts = []" class="rounded text-blue-600" />
+                <span>All Certificates</span>
+              </label>
+              <div class="h-px bg-zinc-100 dark:bg-zinc-700 my-1" />
+              <label v-for="c in CERT_OPTIONS" :key="c" class="px-3 py-1.5 flex items-center gap-2 hover:bg-zinc-50 dark:hover:bg-zinc-700 cursor-pointer">
+                <input type="checkbox" :checked="selectedCerts.includes(c)" @change="toggleInList(selectedCerts, c)" class="rounded text-blue-600" />
+                <span class="truncate">{{ c }}</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Tags Filter Dropdown -->
+          <div class="w-full md:w-40 relative">
+            <label class="block text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-1">Tags</label>
+            <button
+              type="button"
+              @click="toggleDropdown('tag')"
+              class="w-full h-9 px-2.5 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-xs font-semibold text-zinc-800 dark:text-zinc-200 flex items-center justify-between cursor-pointer"
+            >
+              <div class="flex items-center gap-1.5 truncate">
+                <Tag class="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                <span class="truncate">{{ selectedTags.length === 0 ? 'All Tags' : `${selectedTags.length} selected` }}</span>
+              </div>
+              <ChevronDown class="w-3.5 h-3.5 text-zinc-400 shrink-0 ml-1" />
+            </button>
+            <div
+              v-if="isTagDropdownOpen"
+              class="absolute left-0 mt-1 w-48 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 shadow-xl py-1 z-40 max-h-60 overflow-y-auto text-xs"
+              @click.stop
+            >
+              <label class="px-3 py-1.5 flex items-center gap-2 hover:bg-zinc-50 dark:hover:bg-zinc-700 cursor-pointer font-bold">
+                <input type="checkbox" :checked="selectedTags.length === 0" @change="selectedTags = []" class="rounded text-blue-600" />
+                <span>All Tags</span>
+              </label>
+              <div class="h-px bg-zinc-100 dark:bg-zinc-700 my-1" />
+              <label v-for="tg in TAG_OPTIONS" :key="tg" class="px-3 py-1.5 flex items-center gap-2 hover:bg-zinc-50 dark:hover:bg-zinc-700 cursor-pointer">
+                <input type="checkbox" :checked="selectedTags.includes(tg)" @change="toggleInList(selectedTags, tg)" class="rounded text-blue-600" />
+                <span class="truncate">{{ tg }}</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Lead By Filter Dropdown -->
+          <div class="w-full md:w-40 relative">
+            <label class="block text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-1">Lead By</label>
+            <button
+              type="button"
+              @click="toggleDropdown('lead')"
+              class="w-full h-9 px-2.5 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-xs font-semibold text-zinc-800 dark:text-zinc-200 flex items-center justify-between cursor-pointer"
+            >
+              <div class="flex items-center gap-1.5 truncate">
+                <Contact class="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                <span class="truncate">{{ selectedLeads.length === 0 ? 'All Leads' : `${selectedLeads.length} selected` }}</span>
+              </div>
+              <ChevronDown class="w-3.5 h-3.5 text-zinc-400 shrink-0 ml-1" />
+            </button>
+            <div
+              v-if="isLeadDropdownOpen"
+              class="absolute left-0 mt-1 w-48 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 shadow-xl py-1 z-40 max-h-60 overflow-y-auto text-xs"
+              @click.stop
+            >
+              <label class="px-3 py-1.5 flex items-center gap-2 hover:bg-zinc-50 dark:hover:bg-zinc-700 cursor-pointer font-bold">
+                <input type="checkbox" :checked="selectedLeads.length === 0" @change="selectedLeads = []" class="rounded text-blue-600" />
+                <span>All Leads</span>
+              </label>
+              <div class="h-px bg-zinc-100 dark:bg-zinc-700 my-1" />
+              <label class="px-3 py-1.5 flex items-center gap-2 hover:bg-zinc-50 dark:hover:bg-zinc-700 cursor-pointer">
+                <input type="checkbox" :checked="selectedLeads.includes('NO_LEADBY')" @change="toggleInList(selectedLeads, 'NO_LEADBY')" class="rounded text-blue-600" />
+                <span>No Lead by</span>
+              </label>
+              <label v-for="ld in options.leads" :key="ld" class="px-3 py-1.5 flex items-center gap-2 hover:bg-zinc-50 dark:hover:bg-zinc-700 cursor-pointer">
+                <input type="checkbox" :checked="selectedLeads.includes(ld)" @change="toggleInList(selectedLeads, ld)" class="rounded text-blue-600" />
+                <span class="truncate">{{ ld }}</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Active filter chips + Clear -->
+        <div v-if="hasActiveFilters" class="flex items-center gap-1.5 flex-wrap pt-0.5">
+          <span
+            v-for="chip in activeFilterChips"
+            :key="chip.key"
+            class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800"
+          >
+            {{ chip.label }}
+            <X class="w-2.5 h-2.5 cursor-pointer hover:text-rose-500" @click="chip.clear()" />
+          </span>
+          <button
+            type="button"
+            @click="clearAllExcelFilters"
+            class="text-[10px] font-bold text-rose-600 hover:text-rose-700 cursor-pointer"
+          >
+            Clear All
+          </button>
         </div>
       </div>
 
