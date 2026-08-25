@@ -1430,11 +1430,21 @@ const handleRestoreStudent = () => {
               <button
                 type="button"
                 @click="handleRestoreStudent"
-                class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-zinc-800 hover:bg-emerald-50 border border-emerald-500/40 text-emerald-600 rounded-lg text-xs font-bold transition-all cursor-pointer"
+                class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-zinc-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 border border-emerald-500/40 text-emerald-600 dark:text-emerald-400 rounded-lg text-xs font-bold transition-all cursor-pointer shadow-2xs"
                 title="Restore student profile"
               >
                 <RefreshCw class="w-3.5 h-3.5" />
                 <span>Restore</span>
+              </button>
+              <button
+                v-if="authStore.canEdit"
+                type="button"
+                @click="isPermanentConfirmOpen = true"
+                class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-zinc-800 hover:bg-rose-50 dark:hover:bg-rose-950/30 border border-rose-500/40 text-rose-600 dark:text-rose-400 rounded-lg text-xs font-bold transition-all cursor-pointer shadow-2xs"
+                title="Permanently delete student profile"
+              >
+                <Trash2 class="w-3.5 h-3.5 text-rose-500" />
+                <span>Permanently Delete</span>
               </button>
             </template>
             <template v-else>
