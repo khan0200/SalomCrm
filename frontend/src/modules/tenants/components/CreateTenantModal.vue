@@ -15,7 +15,6 @@ const emit = defineEmits<{
 const form = ref({
   name: '',
   slug: '',
-  branding_color: '#007aff',
   description: '',
   admin_email: '',
   admin_full_name: '',
@@ -30,8 +29,7 @@ watch(() => props.isOpen, (newVal) => {
     form.value = {
       name: '',
       slug: '',
-      branding_color: '#007aff',
-      description: '',
+          description: '',
       admin_email: '',
       admin_full_name: '',
       admin_password: '',
@@ -99,31 +97,14 @@ const handleSubmit = () => {
         </div>
       </div>
 
-      <div class="grid grid-cols-2 gap-3">
-        <div>
-          <label class="block font-bold text-zinc-700 dark:text-zinc-300 mb-1">Branding Color</label>
-          <div class="flex items-center gap-2">
-            <input
-              v-model="form.branding_color"
-              type="color"
-              class="w-8 h-8 rounded-lg border-0 cursor-pointer p-0 bg-transparent"
-            />
-            <input
-              v-model="form.branding_color"
-              type="text"
-              class="flex-1 px-3 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 font-mono"
-            />
-          </div>
-        </div>
-        <div>
-          <label class="block font-bold text-zinc-700 dark:text-zinc-300 mb-1">Description</label>
-          <input
-            v-model="form.description"
-            type="text"
-            placeholder="Optional agency note..."
-            class="w-full px-3 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800"
-          />
-        </div>
+      <div>
+        <label class="block font-bold text-zinc-700 dark:text-zinc-300 mb-1">Description</label>
+        <input
+          v-model="form.description"
+          type="text"
+          placeholder="Optional agency note..."
+          class="w-full px-3 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800"
+        />
       </div>
 
       <div class="pt-3 border-t border-zinc-100 dark:border-zinc-800 space-y-3">

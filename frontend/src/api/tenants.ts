@@ -17,7 +17,6 @@ export const tenantsApi = {
   createTenant: async (data: {
     name: string
     slug: string
-    branding_color?: string
     description?: string
     admin_email: string
     admin_full_name: string
@@ -29,7 +28,6 @@ export const tenantsApi = {
 
   updateTenant: async (id: string, data: {
     name?: string
-    branding_color?: string
     description?: string
   }): Promise<Tenant> => {
     const response = await apiClient.patch(`/tenants/${id}/`, data)

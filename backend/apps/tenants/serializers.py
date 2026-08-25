@@ -22,7 +22,7 @@ class TenantSerializer(serializers.ModelSerializer):
     class Meta:
         model = Tenant
         fields = (
-            'id', 'name', 'slug', 'is_active', 'logo_url', 'branding_color',
+            'id', 'name', 'slug', 'is_active', 'logo_url',
             'description', 'settings', 'user_count', 'student_count',
             'branches', 'created_at', 'updated_at'
         )
@@ -51,7 +51,7 @@ class TenantCreateWithAdminSerializer(serializers.ModelSerializer):
     class Meta:
         model = Tenant
         fields = (
-            'id', 'name', 'slug', 'is_active', 'logo_url', 'branding_color',
+            'id', 'name', 'slug', 'is_active', 'logo_url',
             'description', 'admin_email', 'admin_full_name', 'admin_password'
         )
 

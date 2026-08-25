@@ -33,7 +33,6 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
                 'id': str(user.tenant.id),
                 'name': user.tenant.name,
                 'slug': user.tenant.slug,
-                'branding_color': user.tenant.branding_color,
                 'logo_url': user.tenant.logo_url
             } if user.tenant else None,
             'branch': {

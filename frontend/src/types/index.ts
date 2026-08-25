@@ -6,7 +6,6 @@ export interface Tenant {
   slug: string
   is_active: boolean
   logo_url?: string | null
-  branding_color?: string
   description?: string | null
   user_count?: number
   student_count?: number

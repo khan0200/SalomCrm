@@ -67,7 +67,7 @@ const exitTenantContext = () => {
 
 // ── Edit ──────────────────────────────────────────────────────────────
 const editingTenant = ref<Tenant | null>(null)
-const editForm = ref({ name: '', branding_color: '#007aff', description: '' })
+const editForm = ref({ name: '', description: '' })
 
 // Login credentials live on the tenant's Head Manager users, not on the
 // Tenant row. A tenant can have several, so the admin to edit is picked
@@ -161,7 +161,6 @@ const openEdit = (t: Tenant) => {
   editingTenant.value = t
   editForm.value = {
     name: t.name || '',
-    branding_color: t.branding_color || '#007aff',
     description: t.description || '',
   }
   loadAdmins(t.id)
@@ -194,7 +193,6 @@ const submitEdit = () => {
   }
   updateTenantMutation.mutate({
     name: editForm.value.name.trim(),
-    branding_color: editForm.value.branding_color,
     description: editForm.value.description,
   })
 }
@@ -332,13 +330,7 @@ const openDelete = (t: Tenant) => {
         <div>
           <!-- Header with Color & Status -->
           <div class="flex items-center justify-between mb-2">
-            <div class="flex items-center gap-2.5">
-              <div
-                class="w-3.5 h-3.5 rounded-full shadow-2xs"
-                :style="{ backgroundColor: t.branding_color || '#007aff' }"
-              />
-              <span class="font-mono font-bold text-zinc-400 uppercase text-[11px]">{{ t.slug }}</span>
-            </div>
+            <span class="font-mono font-bold text-zinc-400 uppercase text-[11px]">{{ t.slug }}</span>
 
             <span
               class="px-2 py-0.5 rounded-full text-[10px] font-bold"
@@ -466,14 +458,6 @@ const openDelete = (t: Tenant) => {
           <p class="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1">
             The slug is permanent — existing records reference it.
           </p>
-        </div>
-
-        <div>
-          <label class="block font-bold text-zinc-700 dark:text-zinc-300 mb-1">Branding Color</label>
-          <div class="flex items-center gap-2">
-            <input v-model="editForm.branding_color" type="color" class="w-8 h-8 rounded-lg border-0 cursor-pointer p-0 bg-transparent" />
-            <input v-model="editForm.branding_color" type="text" class="flex-1 px-3 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 font-mono" />
-          </div>
         </div>
 
         <div>
