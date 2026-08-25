@@ -104,17 +104,6 @@ const eduLevel = computed(() => {
   return [props.student.level, props.student.level2].filter(Boolean).join(', ') || 'No Level'
 })
 
-// Match color based on the design: APOSTILLE -> orange, BIRTH CERTIFICATE -> yellow-orange
-const getMissingRowColor = (doc: string) => {
-  if (doc === 'APOSTILLE') return '#ea580c'
-  if (doc === 'BIRTH CERTIFICATE') return '#f59e0b'
-  if (doc === 'MARRIAGE CERTIFICATE') return '#2563eb'
-  if (doc === 'AJRASHGANLIK') return '#ec4899'
-  if (doc === 'Foreign passport') return '#ea580c'
-  if (doc === 'FULL OK') return '#10b981'
-  return '#6b7280'
-}
-
 const isPillActive = (pill: string) => {
   const pick = props.student?.pick_needed || []
   return pick.includes(pill)
@@ -158,168 +147,143 @@ const counters = computed(() => {
     >
       <div v-if="isOpen && student" class="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-auto">
         <!-- Backdrop -->
-        <div class="fixed inset-0 bg-black/50" @click="emit('close')" />
+        <div class="fixed inset-0 bg-black/50 backdrop-blur-[2px]" @click="emit('close')" />
 
         <!-- Scale wrapper -->
         <div class="relative z-10" :style="{ zoom: modalZoom }">
           <div
             ref="modalPanelRef"
-            class="relative w-[986px] max-w-[calc(100vw-2rem)] rounded-2xl border border-zinc-300 dark:border-zinc-700 bg-[var(--surface-elevated)] p-5 shadow-2xl flex flex-col gap-4"
+            class="relative w-[820px] max-w-[calc(100vw-2rem)] rounded-[28px] border border-[var(--border)] bg-[var(--surface-elevated)] shadow-2xl flex flex-col overflow-hidden"
           >
-            <!-- Close Button -->
-            <button
-              :disabled="updating"
-              @click="emit('close')"
-              class="absolute right-4 top-4 rounded-full p-1.5 text-[var(--foreground-muted)] hover:bg-zinc-200 dark:hover:bg-zinc-700 hover:text-[var(--foreground)] transition-all cursor-pointer disabled:opacity-50 border border-zinc-300 dark:border-zinc-700"
-            >
-              <X class="h-4 w-4" />
-            </button>
-
             <!-- Header -->
-            <div class="flex items-center gap-3 pr-12">
-              <div class="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center text-white shrink-0 shadow-sm">
-                <Folder class="h-[18px] w-[18px]" />
+            <div class="px-6 pt-6 pb-5 flex items-start gap-3.5 border-b border-[var(--border)]">
+              <div class="w-10 h-10 rounded-2xl bg-blue-500/12 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0">
+                <Folder class="h-5 w-5" />
               </div>
-              <div class="min-w-0">
-                <h2 class="text-[15px] font-extrabold text-[var(--foreground)] select-all uppercase tracking-wide leading-tight truncate">
-                  Documents: {{ student.full_name }}
+              <div class="min-w-0 flex-1 pt-0.5">
+                <h2 class="text-[15px] font-bold text-[var(--foreground)] leading-tight truncate">
+                  {{ student.full_name }}
                 </h2>
-                <p class="text-[11px] text-[var(--foreground-muted)] font-medium">Manage student documents</p>
+                <p class="text-[12px] text-[var(--foreground-muted)] mt-0.5">Document checklist</p>
               </div>
+              <button
+                :disabled="updating"
+                @click="emit('close')"
+                class="w-8 h-8 shrink-0 rounded-full flex items-center justify-center text-[var(--foreground-muted)] bg-[var(--surface)] hover:bg-zinc-200 dark:hover:bg-zinc-700 hover:text-[var(--foreground)] transition-all cursor-pointer disabled:opacity-50"
+              >
+                <X class="h-4 w-4" />
+              </button>
             </div>
 
-            <!-- Student Info Strip -->
-            <div class="px-3.5 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-[var(--background)] flex items-center gap-x-5 gap-y-2 flex-wrap select-text">
-              <div class="min-w-0">
-                <span class="block text-[9px] uppercase font-bold text-[var(--foreground-muted)] tracking-wider leading-none mb-0.5">Student ID</span>
-                <span class="text-[13px] font-extrabold text-[#007aff] font-mono leading-tight">{{ student.id }}</span>
-              </div>
-              <div class="w-px h-7 bg-zinc-200 dark:bg-zinc-700 shrink-0" />
-              <div class="min-w-0">
-                <span class="block text-[9px] uppercase font-bold text-[var(--foreground-muted)] tracking-wider leading-none mb-1">Status</span>
-                <span v-if="student.is_deleted" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase bg-rose-500/10 text-rose-600 border border-rose-500/20 leading-none">
-                  <span class="w-1.5 h-1.5 rounded-full bg-rose-500" /> Deleted
-                </span>
-                <span v-else class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 leading-none">
-                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Active
-                </span>
-              </div>
-              <div class="w-px h-7 bg-zinc-200 dark:bg-zinc-700 shrink-0" />
-              <div class="min-w-0">
-                <span class="block text-[9px] uppercase font-bold text-[var(--foreground-muted)] tracking-wider leading-none mb-0.5">Group</span>
-                <span class="text-[13px] font-bold text-[var(--foreground)] uppercase leading-tight whitespace-nowrap">{{ student.student_group || 'No Group' }}</span>
-              </div>
-              <div class="w-px h-7 bg-zinc-200 dark:bg-zinc-700 shrink-0" />
-              <div class="min-w-0 flex-1">
-                <span class="block text-[9px] uppercase font-bold text-[var(--foreground-muted)] tracking-wider leading-none mb-0.5">Edu-Level</span>
-                <span class="text-[13px] font-bold text-[var(--foreground)] uppercase leading-tight block truncate" :title="eduLevel">{{ eduLevel }}</span>
-              </div>
-              <div class="w-px h-7 bg-zinc-200 dark:bg-zinc-700 shrink-0" />
-              <div class="min-w-0">
-                <span class="block text-[9px] uppercase font-bold text-[var(--foreground-muted)] tracking-wider leading-none mb-0.5">Office</span>
-                <span class="text-[13px] font-bold text-[var(--foreground)] uppercase leading-tight whitespace-nowrap">{{ (student as any).office || '—' }}</span>
-              </div>
-              <template v-if="authStore.canAccessPayments">
-                <div class="w-px h-7 bg-zinc-200 dark:bg-zinc-700 shrink-0" />
-                <div class="min-w-0">
-                  <span class="block text-[9px] uppercase font-bold text-[var(--foreground-muted)] tracking-wider leading-none mb-0.5">Payments Done</span>
-                  <span v-if="paymentsDoneLoading" class="inline-block h-3 w-20 rounded bg-zinc-200 dark:bg-zinc-700 animate-pulse" />
-                  <span v-else class="text-[13px] font-extrabold text-emerald-600 dark:text-emerald-400 leading-tight whitespace-nowrap">
-                    {{ formatCurrency(paymentsDone ?? 0) }}
-                  </span>
-                </div>
-              </template>
-            </div>
-
-            <!-- Split cards grid for Missing & Pick needed -->
-            <div class="grid grid-cols-1 md:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] gap-3.5">
-              <!-- Missing Documents Column -->
-              <div class="border border-zinc-300 dark:border-zinc-700 rounded-xl p-3.5 flex flex-col gap-2.5 bg-[var(--surface-elevated)]">
-                <h3 class="text-[12px] font-bold text-[var(--foreground)] flex items-center gap-1.5 uppercase tracking-wide">
-                  <FileText class="h-4 w-4 text-rose-500" />
-                  Missing documents
-                  <span v-if="missingDocs.length" class="ml-auto text-[10px] font-extrabold text-white bg-rose-500 rounded-full px-1.5 py-0.5 leading-none">
-                    {{ missingDocs.length }}
-                  </span>
-                </h3>
-
-                <div class="flex flex-col gap-1.5 overflow-y-auto max-h-[268px] pr-1">
-                  <span v-if="missingDocs.length === 0" class="text-[11px] text-[var(--foreground-muted)] italic font-semibold py-2">
-                    No missing documents specified.
-                  </span>
-                  <div
-                    v-for="doc in missingDocs"
-                    :key="doc"
-                    class="flex items-center justify-between pl-2.5 pr-1.5 py-2 rounded-lg text-[11px] font-bold text-white shadow-sm w-full transition-all"
-                    :style="{ backgroundColor: getMissingRowColor(doc) }"
-                  >
-                    <div class="flex items-center gap-1.5 min-w-0">
-                      <FileText class="h-3.5 w-3.5 text-white shrink-0" />
-                      <span class="truncate uppercase tracking-wide">{{ doc }}</span>
-                    </div>
-                    <button
-                      v-if="authStore.canEdit"
-                      type="button"
-                      :disabled="updating"
-                      @click="emit('toggle-pick', student.id, doc)"
-                      class="p-1 hover:bg-white/20 rounded-md transition-all cursor-pointer disabled:opacity-50 text-white shrink-0"
-                      title="Remove document"
-                    >
-                      <X class="h-3.5 w-3.5" />
-                    </button>
+            <!-- Scrollable body -->
+            <div class="px-6 py-5 flex flex-col gap-5 overflow-y-auto max-h-[min(76vh,700px)]">
+              <!-- Student Info Strip (iOS grouped-list style) -->
+              <div class="rounded-2xl bg-[var(--surface)] border border-[var(--border)] overflow-hidden">
+                <div class="grid grid-cols-2 sm:grid-cols-3 divide-x divide-y divide-[var(--border)] [&>*:nth-child(3n)]:border-r-0 sm:[&>*:nth-child(2n)]:border-r">
+                  <div class="px-4 py-3">
+                    <span class="block text-[10px] uppercase font-semibold text-[var(--foreground-muted)] tracking-wide mb-0.5">Student ID</span>
+                    <span class="text-[13px] font-bold text-blue-600 dark:text-blue-400 font-mono">{{ student.id }}</span>
+                  </div>
+                  <div class="px-4 py-3">
+                    <span class="block text-[10px] uppercase font-semibold text-[var(--foreground-muted)] tracking-wide mb-0.5">Status</span>
+                    <span v-if="student.is_deleted" class="inline-flex items-center gap-1.5 text-[13px] font-bold text-rose-600 dark:text-rose-400">
+                      <span class="w-1.5 h-1.5 rounded-full bg-rose-500" /> Deleted
+                    </span>
+                    <span v-else class="inline-flex items-center gap-1.5 text-[13px] font-bold text-emerald-600 dark:text-emerald-400">
+                      <span class="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Active
+                    </span>
+                  </div>
+                  <div class="px-4 py-3">
+                    <span class="block text-[10px] uppercase font-semibold text-[var(--foreground-muted)] tracking-wide mb-0.5">Group</span>
+                    <span class="text-[13px] font-semibold text-[var(--foreground)] truncate block">{{ student.student_group || '—' }}</span>
+                  </div>
+                  <div class="px-4 py-3">
+                    <span class="block text-[10px] uppercase font-semibold text-[var(--foreground-muted)] tracking-wide mb-0.5">Edu-Level</span>
+                    <span class="text-[13px] font-semibold text-[var(--foreground)] truncate block" :title="eduLevel">{{ eduLevel }}</span>
+                  </div>
+                  <div class="px-4 py-3">
+                    <span class="block text-[10px] uppercase font-semibold text-[var(--foreground-muted)] tracking-wide mb-0.5">Office</span>
+                    <span class="text-[13px] font-semibold text-[var(--foreground)] truncate block">{{ (student as any).office || '—' }}</span>
+                  </div>
+                  <div v-if="authStore.canAccessPayments" class="px-4 py-3">
+                    <span class="block text-[10px] uppercase font-semibold text-[var(--foreground-muted)] tracking-wide mb-0.5">Payments Done</span>
+                    <span v-if="paymentsDoneLoading" class="inline-block h-3.5 w-16 rounded bg-zinc-200 dark:bg-zinc-700 animate-pulse" />
+                    <span v-else class="text-[13px] font-bold text-emerald-600 dark:text-emerald-400">
+                      {{ formatCurrency(paymentsDone ?? 0) }}
+                    </span>
                   </div>
                 </div>
               </div>
 
-              <!-- Pick Needed Column -->
-              <div class="border border-zinc-300 dark:border-zinc-700 rounded-xl p-3.5 flex flex-col gap-2.5 bg-[var(--surface-elevated)]">
-                <h3 class="text-[12px] font-bold text-[var(--foreground)] flex items-center gap-1.5 uppercase tracking-wide">
-                  <CheckSquare class="h-4 w-4 text-emerald-500" />
-                  Pick needed
-                </h3>
+              <!-- Document Checklist: one list, each pill IS the missing-doc state.
+                   The old layout showed the same 22 items twice — once as
+                   "Missing Documents" (whichever pills are toggled on) and
+                   again as "Pick Needed" (all 22, with active ones filled in).
+                   A toggled-on pill already means "required/missing"; there is
+                   nothing a second list could say that this one doesn't. -->
+              <div class="rounded-2xl bg-[var(--surface)] border border-[var(--border)] p-4 flex flex-col gap-3">
+                <div class="flex items-center justify-between">
+                  <h3 class="text-[12px] font-bold text-[var(--foreground)] uppercase tracking-wide flex items-center gap-1.5">
+                    <FileText class="h-3.5 w-3.5 text-[var(--foreground-muted)]" />
+                    Document Checklist
+                  </h3>
+                  <span
+                    class="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full"
+                    :class="missingDocs.includes('FULL OK') || missingDocs.length === 0
+                      ? 'bg-emerald-500/12 text-emerald-600 dark:text-emerald-400'
+                      : 'bg-rose-500/12 text-rose-600 dark:text-rose-400'"
+                  >
+                    {{ missingDocs.includes('FULL OK') || missingDocs.length === 0
+                      ? 'Complete'
+                      : `${missingDocs.length} missing` }}
+                  </span>
+                </div>
 
-                <div class="flex flex-wrap gap-1.5 overflow-y-auto max-h-[268px] pr-1 content-start">
+                <div class="flex flex-wrap gap-1.5">
                   <button
                     v-for="pill in PICK_NEEDED_LIST"
                     :key="pill"
                     type="button"
                     :disabled="updating || !authStore.canEdit"
                     @click="emit('toggle-pick', student.id, pill)"
-                    class="px-2.5 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wide border transition-all hover:scale-[1.03] active:scale-95 disabled:opacity-50 whitespace-nowrap h-[26px] inline-flex items-center"
+                    class="px-3 py-1.5 rounded-full text-[11px] font-semibold uppercase tracking-wide border transition-all active:scale-95 disabled:opacity-50 whitespace-nowrap inline-flex items-center gap-1.5"
                     :class="[
                       authStore.canEdit ? 'cursor-pointer' : 'cursor-default',
                       isPillActive(pill)
                         ? 'text-white shadow-sm border-transparent'
                         : (pill === 'FULL OK'
-                            ? 'border-emerald-500/40 text-emerald-600 bg-emerald-500/5 hover:bg-emerald-500/10'
-                            : 'border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 bg-white dark:bg-zinc-900 hover:border-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800')
+                            ? 'border-emerald-500/40 text-emerald-600 dark:text-emerald-400 bg-emerald-500/5 hover:bg-emerald-500/10'
+                            : 'border-[var(--border)] text-[var(--foreground-muted)] bg-[var(--surface-elevated)] hover:border-zinc-400 dark:hover:border-zinc-600')
                     ]"
                     :style="isPillActive(pill)
                       ? { backgroundColor: getPillActiveColor(pill), borderColor: getPillActiveColor(pill) }
                       : {}"
                   >
+                    <X v-if="isPillActive(pill) && authStore.canEdit" class="h-3 w-3 opacity-70" />
                     {{ pill }}
                   </button>
                 </div>
               </div>
-            </div>
 
-            <!-- Physical Copies In Hand -->
-            <div class="border border-[var(--border)] rounded-2xl p-5 flex flex-col gap-4 bg-[var(--surface-elevated)]">
-              <h3 class="text-sm font-bold text-[var(--foreground)] flex items-center gap-2">
-                <Folder class="h-[18px] w-[18px] text-blue-500" />
-                Physical Copies In Hand (Override)
-              </h3>
+              <!-- Physical Copies In Hand -->
+              <div class="rounded-2xl bg-[var(--surface)] border border-[var(--border)] p-4 flex flex-col gap-3.5">
+                <h3 class="text-[12px] font-bold text-[var(--foreground)] uppercase tracking-wide flex items-center gap-1.5">
+                  <CheckSquare class="h-3.5 w-3.5 text-[var(--foreground-muted)]" />
+                  Physical Copies In Hand
+                </h3>
 
-              <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-                <div
-                  v-for="item in counters"
-                  :key="item.key"
-                  class="relative rounded-2xl border border-[var(--border)] bg-gray-50 dark:bg-zinc-950 p-4 flex flex-col items-center justify-between min-h-[100px] select-none shadow-sm"
-                >
-                  <!-- MC enable/disable toggle -->
-                  <div v-if="item.label === 'MC'" class="absolute top-3 right-3 z-10 flex items-center">
-                    <label class="relative inline-flex items-center" :class="authStore.canEdit ? 'cursor-pointer' : 'cursor-default'">
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                  <div
+                    v-for="item in counters"
+                    :key="item.key"
+                    class="relative rounded-2xl bg-[var(--surface-elevated)] px-3 py-3.5 flex flex-col items-center gap-2.5 select-none"
+                  >
+                    <!-- MC enable/disable toggle -->
+                    <label
+                      v-if="item.label === 'MC'"
+                      class="absolute top-2.5 right-2.5"
+                      :class="authStore.canEdit ? 'cursor-pointer' : 'cursor-default'"
+                    >
                       <input
                         type="checkbox"
                         :checked="student.has_mc !== false"
@@ -327,52 +291,52 @@ const counters = computed(() => {
                         @change="emit('toggle-mc', student.id)"
                         class="sr-only peer"
                       />
-                      <div class="w-8 h-[18px] bg-gray-200 peer-focus:outline-none rounded-full dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3.5 after:w-3.5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600" />
+                      <div class="w-7 h-4 bg-zinc-300 dark:bg-zinc-700 rounded-full peer-checked:bg-blue-500 transition-colors after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:after:translate-x-3" />
                     </label>
-                  </div>
 
-                  <span class="text-[10px] uppercase font-bold text-[var(--foreground-muted)] tracking-wider mb-2">{{ item.label }}</span>
+                    <span class="text-[10px] uppercase font-semibold text-[var(--foreground-muted)] tracking-wide">{{ item.label }}</span>
 
-                  <div class="flex items-center justify-between w-full mt-2 px-1">
-                    <button
-                      type="button"
-                      :disabled="item.isDisabled || item.remaining <= 0"
-                      @click="emit('update-count', student.id, item.key, item.remaining - 1)"
-                      class="h-8 w-8 rounded-full border border-gray-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-gray-600 dark:text-gray-300 flex items-center justify-center hover:bg-gray-100 dark:hover:bg-zinc-700 active:scale-95 disabled:opacity-40 disabled:pointer-events-none cursor-pointer transition-all text-sm font-bold shadow-sm"
-                    >
-                      -
-                    </button>
+                    <div class="flex items-center gap-3">
+                      <button
+                        type="button"
+                        :disabled="item.isDisabled || item.remaining <= 0"
+                        @click="emit('update-count', student.id, item.key, item.remaining - 1)"
+                        class="h-7 w-7 rounded-full bg-[var(--surface)] border border-[var(--border)] text-[var(--foreground-muted)] flex items-center justify-center hover:bg-zinc-100 dark:hover:bg-zinc-800 active:scale-90 disabled:opacity-30 disabled:pointer-events-none cursor-pointer transition-all text-sm font-bold"
+                      >
+                        −
+                      </button>
 
-                    <span
-                      class="font-extrabold text-base w-12 text-center"
-                      :class="item.isMcDisabled
-                        ? 'text-gray-400 dark:text-gray-600'
-                        : (item.remaining > 0 ? 'text-[#007aff]' : 'text-gray-700 dark:text-gray-300')"
-                    >
-                      {{ item.isMcDisabled ? 'N/A' : item.remaining }}
-                    </span>
+                      <span
+                        class="font-bold text-[15px] w-8 text-center tabular-nums"
+                        :class="item.isMcDisabled
+                          ? 'text-[var(--foreground-subtle)]'
+                          : (item.remaining > 0 ? 'text-blue-600 dark:text-blue-400' : 'text-[var(--foreground-muted)]')"
+                      >
+                        {{ item.isMcDisabled ? '—' : item.remaining }}
+                      </span>
 
-                    <button
-                      type="button"
-                      :disabled="item.isDisabled"
-                      @click="emit('update-count', student.id, item.key, item.remaining + 1)"
-                      class="h-8 w-8 rounded-full border border-gray-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-gray-600 dark:text-gray-300 flex items-center justify-center hover:bg-gray-100 dark:hover:bg-zinc-700 active:scale-95 disabled:opacity-40 disabled:pointer-events-none cursor-pointer transition-all text-sm font-bold shadow-sm"
-                    >
-                      +
-                    </button>
+                      <button
+                        type="button"
+                        :disabled="item.isDisabled"
+                        @click="emit('update-count', student.id, item.key, item.remaining + 1)"
+                        class="h-7 w-7 rounded-full bg-[var(--surface)] border border-[var(--border)] text-[var(--foreground-muted)] flex items-center justify-center hover:bg-zinc-100 dark:hover:bg-zinc-800 active:scale-90 disabled:opacity-30 disabled:pointer-events-none cursor-pointer transition-all text-sm font-bold"
+                      >
+                        +
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
 
             <!-- Footer -->
-            <div class="flex justify-end mt-2">
+            <div class="px-6 py-4 border-t border-[var(--border)] flex justify-end">
               <button
                 type="button"
                 @click="emit('close')"
-                class="bg-[#007aff] hover:bg-blue-600 text-white rounded-full px-6 py-2.5 flex items-center gap-2 font-bold text-sm shadow-md active:scale-[0.96] transition-all cursor-pointer"
+                class="bg-blue-600 hover:bg-blue-700 text-white rounded-full px-6 py-2.5 flex items-center gap-2 font-bold text-[13px] shadow-sm active:scale-[0.97] transition-all cursor-pointer"
               >
-                <CheckCircle2 class="h-[18px] w-[18px]" />
+                <CheckCircle2 class="h-4 w-4" />
                 Done
               </button>
             </div>
