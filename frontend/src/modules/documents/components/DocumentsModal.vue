@@ -104,6 +104,22 @@ const eduLevel = computed(() => {
   return [props.student.level, props.student.level2].filter(Boolean).join(', ') || 'No Level'
 })
 
+// PICK_NEEDED_LIST is a fixed, hand-maintained set of pills. The backend
+// separately auto-computes pick_needed from student fields (phone, passport,
+// education level, photo count) using its own labels -- OTA-ONA, DIPLOM /
+// ATTESTAT, BAKALAVR DIPLOM, TELEFON, PASSPORT, 3x4 RASM -- none of which are
+// in PICK_NEEDED_LIST. Rendering only the fixed list meant a real value like
+// OTA-ONA could count toward "3 missing" yet have no pill to show it on.
+// Appending whatever is actually on the student's own pick_needed guarantees
+// every real value always has a pill, however it got there.
+const checklistPills = computed(() => {
+  const pills = [...PICK_NEEDED_LIST]
+  for (const doc of props.student?.pick_needed || []) {
+    if (!pills.includes(doc)) pills.push(doc)
+  }
+  return pills
+})
+
 const isPillActive = (pill: string) => {
   const pick = props.student?.pick_needed || []
   return pick.includes(pill)
@@ -115,6 +131,14 @@ const getPillActiveColor = (pill: string) => {
   if (pill === 'MARRIAGE CERTIFICATE') return '#2563eb'
   if (pill === 'AJRASHGANLIK') return '#ec4899'
   if (pill === 'FULL OK') return '#10b981'
+  // Backend-computed labels (see calculate_missing_documents) — colors match
+  // the ones already used for these same strings in the students table.
+  if (pill === 'OTA-ONA') return '#059669'
+  if (pill === 'DIPLOM / ATTESTAT') return '#2563eb'
+  if (pill === 'BAKALAVR DIPLOM') return '#8b5cf6'
+  if (pill === '3x4 RASM') return '#ea580c'
+  if (pill === 'TELEFON') return '#0891b2'
+  if (pill === 'PASSPORT') return '#dc2626'
   return '#4b5563'
 }
 
@@ -241,7 +265,7 @@ const counters = computed(() => {
 
                 <div class="flex flex-wrap gap-1.5">
                   <button
-                    v-for="pill in PICK_NEEDED_LIST"
+                    v-for="pill in checklistPills"
                     :key="pill"
                     type="button"
                     :disabled="updating || !authStore.canEdit"
