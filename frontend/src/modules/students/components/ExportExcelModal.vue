@@ -681,13 +681,12 @@ onUnmounted(() => {
         class="mb-4 space-y-3 bg-zinc-50 dark:bg-zinc-850/60 border border-zinc-200 dark:border-zinc-750 rounded-xl p-3.5 shadow-2xs"
         @click.stop
       >
-        <div class="flex flex-col md:flex-row gap-2.5 items-end">
-          <!-- Search Type -->
-          <div class="w-full md:w-36">
-            <label class="block text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-1">Search Type</label>
+        <!-- Search Row -->
+        <div class="flex items-stretch gap-0 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 overflow-hidden focus-within:border-blue-500 transition-colors">
+          <div class="relative shrink-0 border-r border-zinc-200 dark:border-zinc-700">
             <select
               v-model="searchType"
-              class="w-full h-9 px-2.5 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-xs font-semibold text-zinc-800 dark:text-zinc-200 focus:outline-none focus:border-blue-500 cursor-pointer"
+              class="h-10 pl-3 pr-7 bg-transparent text-xs font-bold text-zinc-600 dark:text-zinc-300 focus:outline-none cursor-pointer appearance-none"
             >
               <option value="all">All Fields</option>
               <option value="id">ID</option>
@@ -695,35 +694,36 @@ onUnmounted(() => {
               <option value="phone">Phone</option>
               <option value="university">University</option>
             </select>
+            <ChevronDown class="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-zinc-400 pointer-events-none" />
           </div>
-
-          <!-- Search Query -->
-          <div class="flex-1 w-full">
-            <label class="block text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-1">Search Query</label>
-            <div class="relative">
-              <Search class="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-400 pointer-events-none" />
-              <input
-                v-model="searchQuery"
-                type="text"
-                placeholder="Search students..."
-                class="w-full h-9 pl-8 pr-3 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-xs text-zinc-800 dark:text-zinc-200 focus:outline-none focus:border-blue-500"
-              />
-            </div>
+          <div class="relative flex-1">
+            <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-400 pointer-events-none" />
+            <input
+              v-model="searchQuery"
+              type="text"
+              placeholder="Search by name, ID, phone, university..."
+              class="w-full h-10 pl-9 pr-3 bg-transparent text-xs text-zinc-800 dark:text-zinc-200 focus:outline-none"
+            />
           </div>
+        </div>
 
+        <!-- Filter Grid -->
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-2">
           <!-- Folder Filter Dropdown -->
-          <div class="w-full md:w-40 relative">
-            <label class="block text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-1">Folder</label>
+          <div class="relative">
             <button
               type="button"
               @click="toggleDropdown('folder')"
-              class="w-full h-9 px-2.5 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-xs font-semibold text-zinc-800 dark:text-zinc-200 flex items-center justify-between cursor-pointer"
+              class="w-full h-9 px-2.5 rounded-lg text-xs font-semibold flex items-center justify-between cursor-pointer border transition-colors"
+              :class="selectedFolders.length > 0
+                ? 'bg-blue-50 dark:bg-blue-950/40 border-blue-300 dark:border-blue-800 text-blue-700 dark:text-blue-300'
+                : 'bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:border-zinc-300 dark:hover:border-zinc-600'"
             >
               <div class="flex items-center gap-1.5 truncate">
-                <Folder class="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-                <span class="truncate">{{ selectedFolders.length === 0 ? 'All Folders' : `${selectedFolders.length} selected` }}</span>
+                <Folder class="w-3.5 h-3.5 shrink-0 opacity-70" />
+                <span class="truncate">{{ selectedFolders.length === 0 ? 'Folder' : `Folder · ${selectedFolders.length}` }}</span>
               </div>
-              <ChevronDown class="w-3.5 h-3.5 text-zinc-400 shrink-0 ml-1" />
+              <ChevronDown class="w-3.5 h-3.5 shrink-0 ml-1 opacity-60" />
             </button>
 
             <!-- Popover -->
@@ -768,18 +768,20 @@ onUnmounted(() => {
           </div>
 
           <!-- Tariff Filter Dropdown -->
-          <div class="w-full md:w-40 relative">
-            <label class="block text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-1">Tariff</label>
+          <div class="relative">
             <button
               type="button"
               @click="toggleDropdown('tariff')"
-              class="w-full h-9 px-2.5 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-xs font-semibold text-zinc-800 dark:text-zinc-200 flex items-center justify-between cursor-pointer"
+              class="w-full h-9 px-2.5 rounded-lg text-xs font-semibold flex items-center justify-between cursor-pointer border transition-colors"
+              :class="selectedTariffs.length > 0
+                ? 'bg-blue-50 dark:bg-blue-950/40 border-blue-300 dark:border-blue-800 text-blue-700 dark:text-blue-300'
+                : 'bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:border-zinc-300 dark:hover:border-zinc-600'"
             >
               <div class="flex items-center gap-1.5 truncate">
-                <Award class="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-                <span class="truncate">{{ selectedTariffs.length === 0 ? 'All Tariffs' : `${selectedTariffs.length} selected` }}</span>
+                <Award class="w-3.5 h-3.5 shrink-0 opacity-70" />
+                <span class="truncate">{{ selectedTariffs.length === 0 ? 'Tariff' : `Tariff · ${selectedTariffs.length}` }}</span>
               </div>
-              <ChevronDown class="w-3.5 h-3.5 text-zinc-400 shrink-0 ml-1" />
+              <ChevronDown class="w-3.5 h-3.5 shrink-0 ml-1 opacity-60" />
             </button>
             <div
               v-if="isTariffDropdownOpen"
@@ -803,18 +805,20 @@ onUnmounted(() => {
           </div>
 
           <!-- Level Filter Dropdown -->
-          <div class="w-full md:w-40 relative">
-            <label class="block text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-1">Level</label>
+          <div class="relative">
             <button
               type="button"
               @click="toggleDropdown('level')"
-              class="w-full h-9 px-2.5 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-xs font-semibold text-zinc-800 dark:text-zinc-200 flex items-center justify-between cursor-pointer"
+              class="w-full h-9 px-2.5 rounded-lg text-xs font-semibold flex items-center justify-between cursor-pointer border transition-colors"
+              :class="selectedLevels.length > 0
+                ? 'bg-blue-50 dark:bg-blue-950/40 border-blue-300 dark:border-blue-800 text-blue-700 dark:text-blue-300'
+                : 'bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:border-zinc-300 dark:hover:border-zinc-600'"
             >
               <div class="flex items-center gap-1.5 truncate">
-                <GraduationCap class="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-                <span class="truncate">{{ selectedLevels.length === 0 ? 'All Levels' : `${selectedLevels.length} selected` }}</span>
+                <GraduationCap class="w-3.5 h-3.5 shrink-0 opacity-70" />
+                <span class="truncate">{{ selectedLevels.length === 0 ? 'Level' : `Level · ${selectedLevels.length}` }}</span>
               </div>
-              <ChevronDown class="w-3.5 h-3.5 text-zinc-400 shrink-0 ml-1" />
+              <ChevronDown class="w-3.5 h-3.5 shrink-0 ml-1 opacity-60" />
             </button>
             <div
               v-if="isLevelDropdownOpen"
@@ -834,18 +838,20 @@ onUnmounted(() => {
           </div>
 
           <!-- Group Filter Dropdown -->
-          <div class="w-full md:w-40 relative">
-            <label class="block text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-1">Group</label>
+          <div class="relative">
             <button
               type="button"
               @click="toggleDropdown('group')"
-              class="w-full h-9 px-2.5 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-xs font-semibold text-zinc-800 dark:text-zinc-200 flex items-center justify-between cursor-pointer"
+              class="w-full h-9 px-2.5 rounded-lg text-xs font-semibold flex items-center justify-between cursor-pointer border transition-colors"
+              :class="selectedGroups.length > 0
+                ? 'bg-blue-50 dark:bg-blue-950/40 border-blue-300 dark:border-blue-800 text-blue-700 dark:text-blue-300'
+                : 'bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:border-zinc-300 dark:hover:border-zinc-600'"
             >
               <div class="flex items-center gap-1.5 truncate">
-                <Users class="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-                <span class="truncate">{{ selectedGroups.length === 0 ? 'All Groups' : `${selectedGroups.length} selected` }}</span>
+                <Users class="w-3.5 h-3.5 shrink-0 opacity-70" />
+                <span class="truncate">{{ selectedGroups.length === 0 ? 'Group' : `Group · ${selectedGroups.length}` }}</span>
               </div>
-              <ChevronDown class="w-3.5 h-3.5 text-zinc-400 shrink-0 ml-1" />
+              <ChevronDown class="w-3.5 h-3.5 shrink-0 ml-1 opacity-60" />
             </button>
             <div
               v-if="isGroupDropdownOpen"
@@ -865,18 +871,20 @@ onUnmounted(() => {
           </div>
 
           <!-- Certificate Filter Dropdown -->
-          <div class="w-full md:w-40 relative">
-            <label class="block text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-1">Certificate</label>
+          <div class="relative">
             <button
               type="button"
               @click="toggleDropdown('cert')"
-              class="w-full h-9 px-2.5 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-xs font-semibold text-zinc-800 dark:text-zinc-200 flex items-center justify-between cursor-pointer"
+              class="w-full h-9 px-2.5 rounded-lg text-xs font-semibold flex items-center justify-between cursor-pointer border transition-colors"
+              :class="selectedCerts.length > 0
+                ? 'bg-blue-50 dark:bg-blue-950/40 border-blue-300 dark:border-blue-800 text-blue-700 dark:text-blue-300'
+                : 'bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:border-zinc-300 dark:hover:border-zinc-600'"
             >
               <div class="flex items-center gap-1.5 truncate">
-                <Bookmark class="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-                <span class="truncate">{{ selectedCerts.length === 0 ? 'All Certificates' : `${selectedCerts.length} selected` }}</span>
+                <Bookmark class="w-3.5 h-3.5 shrink-0 opacity-70" />
+                <span class="truncate">{{ selectedCerts.length === 0 ? 'Certificate' : `Certificate · ${selectedCerts.length}` }}</span>
               </div>
-              <ChevronDown class="w-3.5 h-3.5 text-zinc-400 shrink-0 ml-1" />
+              <ChevronDown class="w-3.5 h-3.5 shrink-0 ml-1 opacity-60" />
             </button>
             <div
               v-if="isCertDropdownOpen"
@@ -896,18 +904,20 @@ onUnmounted(() => {
           </div>
 
           <!-- Tags Filter Dropdown -->
-          <div class="w-full md:w-40 relative">
-            <label class="block text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-1">Tags</label>
+          <div class="relative">
             <button
               type="button"
               @click="toggleDropdown('tag')"
-              class="w-full h-9 px-2.5 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-xs font-semibold text-zinc-800 dark:text-zinc-200 flex items-center justify-between cursor-pointer"
+              class="w-full h-9 px-2.5 rounded-lg text-xs font-semibold flex items-center justify-between cursor-pointer border transition-colors"
+              :class="selectedTags.length > 0
+                ? 'bg-blue-50 dark:bg-blue-950/40 border-blue-300 dark:border-blue-800 text-blue-700 dark:text-blue-300'
+                : 'bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:border-zinc-300 dark:hover:border-zinc-600'"
             >
               <div class="flex items-center gap-1.5 truncate">
-                <Tag class="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-                <span class="truncate">{{ selectedTags.length === 0 ? 'All Tags' : `${selectedTags.length} selected` }}</span>
+                <Tag class="w-3.5 h-3.5 shrink-0 opacity-70" />
+                <span class="truncate">{{ selectedTags.length === 0 ? 'Tags' : `Tags · ${selectedTags.length}` }}</span>
               </div>
-              <ChevronDown class="w-3.5 h-3.5 text-zinc-400 shrink-0 ml-1" />
+              <ChevronDown class="w-3.5 h-3.5 shrink-0 ml-1 opacity-60" />
             </button>
             <div
               v-if="isTagDropdownOpen"
@@ -927,18 +937,20 @@ onUnmounted(() => {
           </div>
 
           <!-- Lead By Filter Dropdown -->
-          <div class="w-full md:w-40 relative">
-            <label class="block text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-1">Lead By</label>
+          <div class="relative">
             <button
               type="button"
               @click="toggleDropdown('lead')"
-              class="w-full h-9 px-2.5 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-xs font-semibold text-zinc-800 dark:text-zinc-200 flex items-center justify-between cursor-pointer"
+              class="w-full h-9 px-2.5 rounded-lg text-xs font-semibold flex items-center justify-between cursor-pointer border transition-colors"
+              :class="selectedLeads.length > 0
+                ? 'bg-blue-50 dark:bg-blue-950/40 border-blue-300 dark:border-blue-800 text-blue-700 dark:text-blue-300'
+                : 'bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:border-zinc-300 dark:hover:border-zinc-600'"
             >
               <div class="flex items-center gap-1.5 truncate">
-                <Contact class="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-                <span class="truncate">{{ selectedLeads.length === 0 ? 'All Leads' : `${selectedLeads.length} selected` }}</span>
+                <Contact class="w-3.5 h-3.5 shrink-0 opacity-70" />
+                <span class="truncate">{{ selectedLeads.length === 0 ? 'Lead By' : `Lead By · ${selectedLeads.length}` }}</span>
               </div>
-              <ChevronDown class="w-3.5 h-3.5 text-zinc-400 shrink-0 ml-1" />
+              <ChevronDown class="w-3.5 h-3.5 shrink-0 ml-1 opacity-60" />
             </button>
             <div
               v-if="isLeadDropdownOpen"
@@ -1031,11 +1043,13 @@ onUnmounted(() => {
                 <div class="inline-flex items-center justify-center px-2 py-1 text-[11px] font-mono font-bold bg-[#007aff] text-white rounded-[4px] shadow-2xs min-w-[34px]">
                   {{ s.id }}
                 </div>
-                <div class="mt-1 text-[9px] font-bold uppercase tracking-wide text-zinc-400 dark:text-zinc-500 whitespace-nowrap">
+              </td>
+              <td class="p-2.5 align-top">
+                <div class="font-bold text-zinc-900 dark:text-zinc-100 uppercase">{{ s.full_name }}</div>
+                <div class="mt-0.5 text-[9px] font-bold uppercase tracking-wide text-zinc-400 dark:text-zinc-500 whitespace-nowrap">
                   {{ getTariffDisplayName(s) }}
                 </div>
               </td>
-              <td class="p-2.5 font-bold text-zinc-900 dark:text-zinc-100 uppercase align-top">{{ s.full_name }}</td>
               <td class="p-2.5 align-top">
                 <div class="flex flex-wrap gap-1">
                   <span
