@@ -4,7 +4,6 @@ from .models import (
     Student, Folder, TariffOption, EducationLevelOption,
     StudentGroupOption, LeadSourceOption, CoordinatorOption
 )
-from .services import calculate_missing_documents
 from .korean_translation_service import translate_name_to_korean
 
 logger = logging.getLogger(__name__)
@@ -79,9 +78,14 @@ class StudentCreateUpdateSerializer(serializers.ModelSerializer):
         read_only_fields = ('balance', 'discount', 'tenant', 'created_by', 'created_at', 'updated_at')
 
     def create(self, validated_data):
-        # Auto-compute initial missing documents checklist
-        if 'pick_needed' not in validated_data or not validated_data['pick_needed']:
-            validated_data['pick_needed'] = calculate_missing_documents(validated_data)
+        # pick_needed is a manual checklist (PICK_NEEDED_LIST on the frontend);
+        # it is no longer auto-computed here. It previously used its own label
+        # set (TELEFON, PASSPORT, MANZIL, OTA-ONA, DIPLOM / ATTESTAT, BAKALAVR
+        # DIPLOM, 3x4 RASM) that overlapped, under different names, with pills
+        # the checklist already has (2 ta nomer, Foreign passport, Manzil,
+        # 3.5x4.5) and forcibly reset on every save regardless of what the
+        # client sent, so removing a pill could never actually persist.
+        validated_data.setdefault('pick_needed', [])
 
         # Auto-translate English Full Name to Korean Hangul if not explicitly provided
         if validated_data.get('full_name') and not validated_data.get('korean_name'):
@@ -128,16 +132,9 @@ class StudentCreateUpdateSerializer(serializers.ModelSerializer):
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
 
-        # Auto-sync missing documents checklist
-        instance.pick_needed = calculate_missing_documents({
-            'phone1': instance.phone1,
-            'passport': instance.passport,
-            'address': instance.address,
-            'father_phone': instance.father_phone,
-            'mother_phone': instance.mother_phone,
-            'level': instance.level,
-            'pic_hand_count': instance.pic_hand_count
-        })
+        # pick_needed is no longer force-recomputed here (see create() above):
+        # whatever the client sent for it in validated_data was already applied
+        # by the loop above, and is left alone.
 
         instance.save()
 

@@ -4,48 +4,6 @@ from apps.audit.services import log_audit_event
 
 atomic: Any = transaction.atomic
 
-def calculate_missing_documents(student_dict):
-    """
-    Computes list of missing document / field tags matching Uniapp v2 validation rules.
-    """
-    missing = []
-    
-    # 1. Phone number
-    phone1 = student_dict.get('phone1')
-    if not phone1 or not str(phone1).strip():
-        missing.append('TELEFON')
-
-    # 2. Passport
-    passport = student_dict.get('passport')
-    if not passport or not str(passport).strip():
-        missing.append('PASSPORT')
-
-    # 3. Address
-    address = student_dict.get('address')
-    if not address or not str(address).strip():
-        missing.append('MANZIL')
-
-    # 4. Parents
-    father_phone = student_dict.get('father_phone')
-    mother_phone = student_dict.get('mother_phone')
-    if not father_phone and not mother_phone:
-        missing.append('OTA-ONA')
-
-    # 5. Diploma / Certificate by Education Level
-    level = student_dict.get('level')
-    if level in ('COLLEGE', 'BACHELOR', 'LANGUAGE COURSE'):
-        missing.append('DIPLOM / ATTESTAT')
-    elif level in ('MASTERS', 'MASTER NO CERTIFICATE'):
-        missing.append('BAKALAVR DIPLOM')
-
-    # 6. Photos
-    pic_count = student_dict.get('pic_hand_count', 0) or 0
-    if pic_count < 8:
-        missing.append('3x4 RASM')
-
-    return missing
-
-
 def archive_student(student, user=None):
     """Soft-delete/archive a student."""
     with atomic():
