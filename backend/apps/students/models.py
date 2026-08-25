@@ -305,9 +305,25 @@ class CoordinatorOption(SimpleTenantModel):
 
 
 class UniversityOption(models.Model):
-    """Mapped to 'universities' table."""
+    """
+    Mapped to 'universities' table.
+
+    Per-tenant: every tenant starts from the same default list, but each
+    tenant's additions and edits are its own and never affect other tenants.
+    Declares the tenant FK directly rather than extending SimpleTenantModel,
+    which would switch the primary key to a UUID and orphan existing rows.
+    """
     id = models.BigAutoField(primary_key=True)
     name = models.CharField(max_length=255)
+    tenant = models.ForeignKey(
+        'tenants.Tenant',
+        on_delete=models.CASCADE,
+        related_name='students_universityoption_set',
+        db_column='tenant_id',
+        db_index=True,
+        null=True,
+        blank=True,
+    )
     created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)
 
     class Meta:

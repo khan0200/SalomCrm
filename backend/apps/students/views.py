@@ -479,7 +479,7 @@ class StudentOptionsViewSet(viewsets.ViewSet):
         groups = list(StudentGroupOption.objects.filter(tenant=tenant).values_list('name', flat=True)) if tenant else []
         leads = list(LeadSourceOption.objects.filter(tenant=tenant).values_list('name', flat=True)) if tenant else []
         coordinators = list(CoordinatorOption.objects.filter(tenant=tenant).values_list('name', flat=True)) if tenant else []
-        universities = list(UniversityOption.objects.values_list('name', flat=True).order_by('name'))
+        universities = list(UniversityOption.objects.filter(tenant=tenant).values_list('name', flat=True).order_by('name')) if tenant else []
         folders_qs = Folder.objects.filter(tenant=tenant).order_by('name') if tenant else Folder.objects.all().order_by('name')
 
         all_count = Student.objects.filter(tenant=tenant, is_deleted=False).count() if tenant else Student.objects.filter(is_deleted=False).count()
@@ -734,11 +734,12 @@ class CoordinatorOptionViewSet(BaseOptionViewSet):
     serializer_class = CoordinatorOptionSerializer
 
 
-class UniversityOptionViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsTenantManagerOrReadOnly]
-    pagination_class = None
+class UniversityOptionViewSet(BaseOptionViewSet):
+    # Per-tenant like every other option list: each tenant starts from the same
+    # defaults, and its edits are its own. Previously this was a single global
+    # list, so one agency adding or deleting a university changed it for all.
+    model_class = UniversityOption
     serializer_class = UniversityOptionSerializer
-    queryset = UniversityOption.objects.all().order_by('name')
 
 
 class UniversityStatusOptionViewSet(BaseOptionViewSet):

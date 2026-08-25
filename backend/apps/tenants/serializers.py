@@ -78,4 +78,10 @@ class TenantCreateWithAdminSerializer(serializers.ModelSerializer):
         from apps.students.models import Folder
         Folder.objects.create(tenant=tenant, name='KDB')
 
+        # 4. Seed the shared default option lists. These are per-tenant: the
+        # new agency starts from the same universities and university statuses
+        # as everyone else, and its later edits stay its own.
+        from apps.students.default_options import seed_default_options
+        seed_default_options(tenant)
+
         return tenant
