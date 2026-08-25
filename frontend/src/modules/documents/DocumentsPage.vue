@@ -7,7 +7,7 @@ import { studentsApi } from '@/api/students'
 import { paymentsApi } from '@/api/payments'
 import { useStudentDashboardStore } from '@/stores/studentDashboard'
 import { useAlphanumericSort } from '@/composables/useAlphanumericSort'
-import { useDocumentHelpers, syncMissingDocuments, isFieldFilled } from '@/composables/useDocumentHelpers'
+import { useDocumentHelpers, syncMissingDocuments, isFieldFilled, CERT_SLOTS } from '@/composables/useDocumentHelpers'
 import { useAuthStore } from '@/stores/auth'
 import DocumentsModal from './components/DocumentsModal.vue'
 import StudentFilters from '@/modules/students/components/StudentFilters.vue'
@@ -375,17 +375,41 @@ const handleTogglePickNeeded = async (studentId: string, pill: string) => {
     if (pill === '2 ta nomer') {
       const phoneFields = [student.phone1, student.phone2, student.father_phone, student.mother_phone]
       if (phoneFields.filter(isFieldFilled).length < 2) {
-        alert('Talabaga kamida 2 ta nomer kirgizing!')
+        alert("TALABANING 2 TA NOMERINI KIRITING, O'ZI O'CHIB KETADI")
         return
       }
     } else if (pill === 'Email') {
       if (!isFieldFilled(student.email)) { alert('Email manzilini kirgizing!'); return }
     } else if (pill === 'Foreign passport') {
-      if (!isFieldFilled(student.passport)) { alert('Pasport raqamini kirgizing!'); return }
+      // Locked: the only way to clear this pill is filling the Passport
+      // field in Student Details. Clicking X here must never remove it
+      // directly -- it can only explain how to clear it.
+      if (!isFieldFilled(student.passport)) {
+        alert("PASSPORT RAQAM KIRITING, O'ZI O'CHIB KETADI")
+        return
+      }
     } else if (pill === 'Manzil') {
-      if (!isFieldFilled(student.address)) { alert('Talabaning manzilini kirgizing!'); return }
+      if (!isFieldFilled(student.address)) {
+        alert("MANZIL KIRITING, O'ZI O'CHIB KETADI")
+        return
+      }
     } else if (pill === 'Edu-Level') {
       if (!isFieldFilled(student.level)) { alert("Ta'lim darajasini kirgizing!"); return }
+    } else {
+      // Certificate-name pills (IELTS/TOEFL/TOPIK/...) added because a
+      // certificate slot's score is EXPECTED. Locked the same way: only
+      // entering the real score in Student Details clears it.
+      const certSlot = CERT_SLOTS.find(({ cert }) => {
+        const name = (student[cert] as string | null | undefined)?.trim().toUpperCase()
+        return name === pill
+      })
+      if (certSlot) {
+        const scoreVal = (student[certSlot.score] as string | null | undefined)?.trim().toUpperCase()
+        if (scoreVal === 'EXPECTED') {
+          alert(`${pill} NATIJASINI KIRITING, O'ZI O'CHIB KETADI`)
+          return
+        }
+      }
     }
   }
 
@@ -403,9 +427,11 @@ const handleTogglePickNeeded = async (studentId: string, pill: string) => {
         showMessage = 'Email ni tekshirib oling, Bazaga kiritish esdan chiqmasin! Iltimos'
       } else if (pill === 'Manzil') {
         showMessage = 'Manzil ingliz tilida yozing iltimos. Bazaga kiritish esdan chiqmasin'
-      } else if (['IELTS', 'TOEFL', 'SKA', 'TOPIK', 'SAT', 'CEFR'].includes(pill)) {
-        showMessage = "Til sertifikati va darajasini talabani bazasiga yozib qo'ying!"
       }
+      // Certificate-name pills (IELTS/TOEFL/...) can only exist while their
+      // slot's score is EXPECTED, and removal for that case is blocked above
+      // before reaching here -- so there is no "successfully removed" state
+      // for them to report.
     } else {
       updatedPick.push(pill)
     }

@@ -36,6 +36,16 @@ export const HAND_COUNT_DOCS = [
  * Centralized validation that automatically synchronizes a student's
  * profile fields with their Missing Documents (pick_needed) array.
  */
+// Certificates whose score can be "EXPECTED" (result not in hand yet). If a
+// certificate is set with an EXPECTED score, that certificate's own name
+// becomes a missing-document pill (e.g. "IELTS" for an expected IELTS
+// score). Filling in the real score is the only way to clear it.
+export const CERT_SLOTS: Array<{ cert: keyof Student; score: keyof Student }> = [
+  { cert: 'language_certificate', score: 'certificate_score' },
+  { cert: 'language_certificate_2', score: 'certificate_score_2' },
+  { cert: 'language_certificate_3', score: 'certificate_score_3' },
+]
+
 export function syncMissingDocuments(student: Student): string[] {
   const currentPick = student && Array.isArray(student.pick_needed) ? [...student.pick_needed] : []
 
@@ -78,6 +88,28 @@ export function syncMissingDocuments(student: Student): string[] {
   updateDoc('Foreign passport', needsPassport)
   updateDoc('Manzil', needsAddress)
   updateDoc('Edu-Level', needsLevel)
+
+  // 6. Certificates with an EXPECTED score: pill named after the certificate
+  // itself, not a fixed label, since it can be IELTS, TOEFL, TOPIK, etc.
+  // updateDoc both adds it when EXPECTED and removes it otherwise (score
+  // filled in, or the certificate slot changed to a different exam).
+  //
+  // KNOWN_CERT_NAMES (not "whatever the fields currently say") is what a
+  // stale pill is checked against: if a slot's certificate is CHANGED (e.g.
+  // IELTS -> TOPIK) rather than cleared, "IELTS" no longer appears in any
+  // field, so deriving the strip-list from current field values would never
+  // catch it. Checking against the fixed set of real certificate names does.
+  const KNOWN_CERT_NAMES = new Set(['IELTS', 'TOEFL', 'SKA', 'TOPIK', 'SAT', 'CEFR'])
+  const expectedCertNames = new Set<string>()
+  for (const { cert, score } of CERT_SLOTS) {
+    const certName = (student[cert] as string | null | undefined)?.trim().toUpperCase()
+    const scoreVal = (student[score] as string | null | undefined)?.trim().toUpperCase()
+    if (!certName || certName === 'NO CERTIFICATE') continue
+    const isExpected = scoreVal === 'EXPECTED'
+    updateDoc(certName, isExpected)
+    if (isExpected) expectedCertNames.add(certName)
+  }
+  updated = updated.filter(d => !KNOWN_CERT_NAMES.has(d) || expectedCertNames.has(d))
 
   return updated
 }

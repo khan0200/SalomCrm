@@ -236,6 +236,10 @@ const handleSubmit = () => {
     student_group: studentGroup.value || null,
     lead_by: leadBy.value || null,
     coordinator: coordinator.value || null,
+    // Every new student starts with Apostille on the checklist. 2 ta nomer
+    // and Manzil need no seeding here — syncMissingDocuments derives both
+    // automatically from the (still empty) phone/address fields.
+    pick_needed: ['APOSTILLE'],
   })
 }
 </script>
