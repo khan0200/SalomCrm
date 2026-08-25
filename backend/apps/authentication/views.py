@@ -175,21 +175,31 @@ class UserViewSet(viewsets.ModelViewSet):
             return User.objects.all()
         return User.objects.filter(tenant=tenant)
 
-    def perform_create(self, serializer):
+    def _target_tenant(self):
+        """
+        Tenant a created/updated user must belong to.
+
+        For a Super Admin this is whichever tenant they have switched into
+        (X-Tenant-ID); they have no tenant of their own, so without this a
+        new user was saved with tenant=NULL and then matched no tenant's
+        Staff list -- it looked like the save had silently failed.
+        """
         user = self.request.user
-        # Enforce tenant assignment for non-superadmins
-        if not (user.is_superuser or user.role == 'SUPER_ADMIN'):
-            serializer.save(tenant=user.tenant)
-        else:
-            serializer.save()
+        return getattr(self.request, 'tenant', None) or getattr(user, 'tenant', None)
+
+    def perform_create(self, serializer):
+        tenant = self._target_tenant()
+        if tenant is None:
+            raise ValidationError(
+                'No tenant selected. Switch into a tenant on the Tenants page '
+                'before adding staff.'
+            )
+        serializer.save(tenant=tenant)
 
     def perform_update(self, serializer):
-        user = self.request.user
-        # Never allow a tenant user to move someone into another tenant.
-        if not (user.is_superuser or user.role == 'SUPER_ADMIN'):
-            serializer.save(tenant=user.tenant)
-        else:
-            serializer.save()
+        # Pin to the existing tenant so a user can never be moved between
+        # tenants by editing them.
+        serializer.save(tenant=serializer.instance.tenant)
 
     def perform_destroy(self, instance):
         user = self.request.user

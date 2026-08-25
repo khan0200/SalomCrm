@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
 import { staffApi } from '@/api/staff'
+import { tenantsApi } from '@/api/tenants'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
 import type { UserProfile, UserRole } from '@/types'
@@ -17,6 +18,29 @@ const uiStore = useUiStore()
 const isAddModalOpen = ref(false)
 const editingMember = ref<UserProfile | null>(null)
 const deletingMember = ref<UserProfile | null>(null)
+
+// A Super Admin has no tenant of their own; staff are created into whichever
+// tenant they have switched into, so the page needs to name it and refuse to
+// add staff when no tenant is selected.
+const isSuperAdmin = computed(() => authStore.isSuperAdmin)
+const activeTenantId = computed(() => authStore.activeTenantId)
+
+const { data: tenantsData } = useQuery({
+  queryKey: ['tenants'],
+  queryFn: () => tenantsApi.getTenants(),
+  enabled: isSuperAdmin,
+  staleTime: 1000 * 60 * 5,
+})
+
+const activeTenantName = computed(() => {
+  if (authStore.user?.tenant?.name) return authStore.user.tenant.name
+  const list: any = tenantsData.value
+  const arr = Array.isArray(list) ? list : (list?.results || [])
+  return arr.find((t: any) => t.id === activeTenantId.value)?.name || null
+})
+
+// Super Admins can only add staff while viewing a specific tenant.
+const canAddStaff = computed(() => !isSuperAdmin.value || !!activeTenantId.value)
 
 const openAdd = () => {
   editingMember.value = null
@@ -132,16 +156,22 @@ const deleteStaffMutation = useMutation({
           <span>Staff Management</span>
         </h1>
         <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-          Team members of
-          <span class="font-semibold text-zinc-700 dark:text-zinc-300">
-            {{ authStore.user?.tenant?.name || 'your agency' }}
-          </span>.
+          <template v-if="activeTenantName">
+            Team members of
+            <span class="font-semibold text-zinc-700 dark:text-zinc-300">{{ activeTenantName }}</span>.
+          </template>
+          <template v-else-if="isSuperAdmin">
+            No tenant selected — switch into one on the Tenants page to manage its staff.
+          </template>
+          <template v-else>Team members of your agency.</template>
         </p>
       </div>
 
       <button
         @click="openAdd()"
-        class="px-4 py-2 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-xs font-bold shadow-md shadow-brand-500/25 transition-all cursor-pointer flex items-center gap-1.5"
+        :disabled="!canAddStaff"
+        :title="canAddStaff ? 'Add a staff member' : 'Switch into a tenant first'"
+        class="px-4 py-2 rounded-xl bg-brand-500 hover:bg-brand-600 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-bold shadow-md shadow-brand-500/25 transition-all cursor-pointer flex items-center gap-1.5"
       >
         <Plus class="w-4 h-4" />
         <span>Add New Staff</span>

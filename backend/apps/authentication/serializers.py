@@ -68,6 +68,9 @@ class UserCreateUpdateSerializer(serializers.ModelSerializer):
             'branch', 'avatar_url', 'phone',
             'telegram_id', 'telegram_username', 'is_active'
         )
+        # The view sets the tenant from the request context; accepting it from
+        # the client would let a caller place a user in another tenant.
+        read_only_fields = ('tenant',)
 
     def create(self, validated_data):
         password = validated_data.pop('password', None)
