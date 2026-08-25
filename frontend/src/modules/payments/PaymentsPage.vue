@@ -412,13 +412,40 @@ const backgroundRefreshAll = () => {
   queryClient.invalidateQueries({ queryKey: ['student-payments'] })
 }
 
+// Patches the Balance/Discount columns on the overview table (this page's own
+// list) the instant a payment/discount/withdrawal is submitted, mirroring the
+// same formula the backend applies in recalculate_student_financials:
+// balance = (payments + discount) - tariff - withdrawals. This must run
+// silently in the background — the API call itself is still in flight, this
+// only updates what the user sees while it completes.
+const patchOverviewBalance = (studentId: string, balanceDelta: number, discountDelta: number = 0) => {
+  queryClient.setQueryData(['payment-overview-all'], (old: any) => {
+    if (!old?.results) return old
+    return {
+      ...old,
+      results: old.results.map((s: Student) =>
+        s.id === studentId
+          ? {
+              ...s,
+              balance: Number(s.balance || 0) + balanceDelta,
+              discount: Number(s.discount || 0) + discountDelta,
+            }
+          : s
+      ),
+    }
+  })
+}
+
 // ── Mutations ─────────────────────────────────────────────────────────
 const createPaymentMutation = useMutation({
   mutationFn: (data: any) => paymentsApi.createPayment(data),
   onMutate: (data: any) => {
-    // Optimistically inject a temporary payment record
+    // Give the new row a stable id so onSuccess can find and replace this
+    // exact record (recomputing "now" a second time, as before, could miss
+    // it and leave a duplicate until the next full refetch).
+    const tempId = `temp-${Date.now()}`
     const tempPayment: Payment = {
-      id: `temp-${Date.now()}`,
+      id: tempId,
       student_id: data.student_id,
       student_full_name: allStudents.value.find(s => s.id === data.student_id)?.full_name || null,
       student_name: null,
@@ -432,19 +459,24 @@ const createPaymentMutation = useMutation({
       created_at: new Date().toISOString(),
     }
     injectPaymentToCache(tempPayment)
-    isAddModalOpen.value = false
+    // Silently update Balance/Discount on the overview table right away —
+    // the Save Payment button's spinner covers the actual network request,
+    // this just keeps the table from looking stale while that's in flight.
+    patchOverviewBalance(data.student_id, data.amount, data.is_discount ? data.amount : 0)
+    return { tempId }
   },
-  onSuccess: (res) => {
-    // Replace temp record with real server response
-    removePaymentFromCache(`temp-${Math.floor(Date.now() / 1000) * 1000}`)
+  onSuccess: (res, _vars, context) => {
+    if (context?.tempId) removePaymentFromCache(context.tempId)
     backgroundRefreshAll()
+    isAddModalOpen.value = false
     uiStore.addToast({
       type: 'success',
       title: 'Payment Recorded',
       message: `Payment of ${new Intl.NumberFormat('uz-UZ').format(res.amount)} UZS recorded.`
     })
   },
-  onError: (err: any) => {
+  onError: (err: any, _vars, context) => {
+    if (context?.tempId) removePaymentFromCache(context.tempId)
     backgroundRefreshAll()
     uiStore.addToast({
       type: 'error',
@@ -457,8 +489,9 @@ const createPaymentMutation = useMutation({
 const withdrawMutation = useMutation({
   mutationFn: (data: any) => paymentsApi.createWithdrawal(data),
   onMutate: (data: any) => {
+    const tempId = `temp-${Date.now()}`
     const tempPayment: Payment = {
-      id: `temp-${Date.now()}`,
+      id: tempId,
       student_id: data.student_id,
       student_full_name: allStudents.value.find(s => s.id === data.student_id)?.full_name || null,
       student_name: null,
@@ -472,17 +505,22 @@ const withdrawMutation = useMutation({
       created_at: new Date().toISOString(),
     }
     injectPaymentToCache(tempPayment)
-    isWithdrawModalOpen.value = false
+    // Withdrawal increases debt, so it's a negative shift on balance.
+    patchOverviewBalance(data.student_id, -Math.abs(data.amount))
+    return { tempId }
   },
-  onSuccess: (res) => {
+  onSuccess: (res, _vars, context) => {
+    if (context?.tempId) removePaymentFromCache(context.tempId)
     backgroundRefreshAll()
+    isWithdrawModalOpen.value = false
     uiStore.addToast({
       type: 'warning',
       title: 'Withdrawal Recorded',
       message: `Withdrawal of ${new Intl.NumberFormat('uz-UZ').format(Math.abs(res.amount))} UZS recorded.`
     })
   },
-  onError: (err: any) => {
+  onError: (err: any, _vars, context) => {
+    if (context?.tempId) removePaymentFromCache(context.tempId)
     backgroundRefreshAll()
     uiStore.addToast({
       type: 'error',
@@ -500,7 +538,10 @@ const editPaymentMutation = useMutation({
   onMutate: (data: any) => {
     if (!editingPayment.value) return
     const paymentId = editingPayment.value.id
+    const studentId = editingPayment.value.student_id
+    const wasDiscount = editingPayment.value.is_discount
     const isWithdrawal = editingPayment.value.is_withdrawal
+    const oldSignedAmount = Number(editingPayment.value.amount) || 0
     const updatedAmount = isWithdrawal ? -Math.abs(data.amount) : Math.abs(data.amount)
 
     // Optimistically update the payment in history cache
@@ -528,10 +569,18 @@ const editPaymentMutation = useMutation({
         })
       }
     })
-    isEditModalOpen.value = false
+    // Shift the overview Balance/Discount columns by exactly the change in
+    // this payment's amount (balance moves by the same signed delta the
+    // ledger sum would; discount only if this payment is a discount row).
+    if (studentId) {
+      const balanceDelta = updatedAmount - oldSignedAmount
+      const discountDelta = wasDiscount ? balanceDelta : 0
+      patchOverviewBalance(studentId, balanceDelta, discountDelta)
+    }
   },
   onSuccess: () => {
     backgroundRefreshAll()
+    isEditModalOpen.value = false
     uiStore.addToast({
       type: 'success',
       title: 'Payment Updated',
@@ -804,6 +853,7 @@ const exportPaymentHistoryToExcel = async () => {
     <!-- Add Payment Modal -->
     <AddPaymentModal
       :is-open="isAddModalOpen"
+      :is-submitting="createPaymentMutation.isPending.value"
       :preselected-student-id="preselectedStudentId"
       :students="allStudents"
       :payments="allPayments"
@@ -817,6 +867,7 @@ const exportPaymentHistoryToExcel = async () => {
     <!-- Withdraw Modal -->
     <WithdrawModal
       :is-open="isWithdrawModalOpen"
+      :is-submitting="withdrawMutation.isPending.value"
       :preselected-student-id="preselectedStudentId"
       :students="allStudents"
       @close="isWithdrawModalOpen = false"
@@ -826,6 +877,7 @@ const exportPaymentHistoryToExcel = async () => {
     <!-- Edit Payment Modal -->
     <EditPaymentModal
       :is-open="isEditModalOpen"
+      :is-submitting="editPaymentMutation.isPending.value"
       :payment="editingPayment"
       :students="allStudents"
       :payment-methods="paymentMethods"

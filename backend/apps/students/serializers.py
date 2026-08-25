@@ -93,7 +93,15 @@ class StudentCreateUpdateSerializer(serializers.ModelSerializer):
             except Exception as e:
                 logger.error(f"Auto-translation on student create failed: {e}")
 
-        return Student.objects.create(**validated_data)
+        student = Student.objects.create(**validated_data)
+
+        # A tariff assigned at creation must immediately set balance to
+        # -tariff_price, same as assigning one later via update().
+        if student.tariff:
+            from apps.payments.services import recalculate_student_financials
+            student = recalculate_student_financials(student)
+
+        return student
 
     def update(self, instance, validated_data):
         # If full_name was changed and korean_name was NOT explicitly sent, auto-translate full_name to Korean
@@ -108,6 +116,14 @@ class StudentCreateUpdateSerializer(serializers.ModelSerializer):
                         instance.korean_name = translated
                 except Exception as e:
                     logger.error(f"Auto-translation on student update failed: {e}")
+
+        # Detect tariff/certificate changes before overwriting instance fields,
+        # since E-VISA pricing depends on both.
+        financials_changed = (
+            ('tariff' in validated_data and validated_data['tariff'] != instance.tariff) or
+            ('language_certificate' in validated_data and
+             validated_data['language_certificate'] != instance.language_certificate)
+        )
 
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
@@ -124,6 +140,16 @@ class StudentCreateUpdateSerializer(serializers.ModelSerializer):
         })
 
         instance.save()
+
+        # Recompute balance immediately so the tariff price becomes debt
+        # (balance = -tariff_price plus existing payments/discounts/withdrawals)
+        # rather than sitting at 0 until a payment happens to be recorded.
+        # This must be synchronous, not deferred, since external consumers
+        # (e.g. the Telegram bot) may read balance right after this request.
+        if financials_changed:
+            from apps.payments.services import recalculate_student_financials
+            instance = recalculate_student_financials(instance)
+
         return instance
 
     def to_representation(self, instance):

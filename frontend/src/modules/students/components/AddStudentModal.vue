@@ -5,11 +5,12 @@ import { settingsApi } from '@/api/settings'
 import {
   UserPlus, X, AlertCircle, CheckCircle2, Hash, User, Building2,
   Award, GraduationCap, School, Users, UserCheck, ShieldCheck,
-  Loader2, Check, ChevronDown, Sparkles
+  Check, ChevronDown, Sparkles
 } from 'lucide-vue-next'
 
 const props = defineProps<{
   isOpen: boolean
+  isSubmitting?: boolean
   options?: {
     tariffs?: Array<{ name: string; price?: number } | string>
     levels?: string[]
@@ -36,7 +37,6 @@ const studentGroup = ref('')
 const leadBy = ref('')
 const coordinator = ref('')
 
-const submitting = ref(false)
 const modalError = ref<string | null>(null)
 const modalSuccess = ref(false)
 
@@ -165,7 +165,6 @@ watch(() => props.isOpen, (newVal) => {
     coordinator.value = ''
     modalError.value = null
     modalSuccess.value = false
-    submitting.value = false
     isUniversityDropdownOpen.value = false
     highlightedUniversityIndex.value = 0
   }
@@ -175,13 +174,13 @@ const handleKeyDown = (e: KeyboardEvent) => {
   if (!props.isOpen) return
 
   // Ctrl+Enter or Cmd+Enter to Submit quickly
-  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && !submitting.value) {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && !props.isSubmitting) {
     e.preventDefault()
     handleSubmit()
     return
   }
 
-  if (e.key === 'Escape' && !submitting.value) {
+  if (e.key === 'Escape' && !props.isSubmitting) {
     if (isUniversityDropdownOpen.value) {
       isUniversityDropdownOpen.value = false
     } else {
@@ -209,7 +208,9 @@ onUnmounted(() => {
   document.removeEventListener('click', handleOutsideClick, true)
 })
 
-const handleSubmit = async () => {
+const handleSubmit = () => {
+  if (props.isSubmitting) return
+
   if (!studentId.value.trim()) {
     modalError.value = 'Student ID is required (e.g. F101).'
     return
@@ -223,26 +224,19 @@ const handleSubmit = async () => {
     return
   }
 
-  submitting.value = true
   modalError.value = null
 
-  try {
-    emit('submit', {
-      id: studentId.value.trim().toUpperCase(),
-      full_name: fullName.value.trim().toUpperCase(),
-      office: office.value || null,
-      tariff: tariff.value || null,
-      level: level.value || null,
-      university_1: university1.value ? university1.value.trim().toUpperCase() : null,
-      student_group: studentGroup.value || null,
-      lead_by: leadBy.value || null,
-      coordinator: coordinator.value || null,
-    })
-  } catch (err: any) {
-    modalError.value = err.message || 'Failed to register student.'
-  } finally {
-    submitting.value = false
-  }
+  emit('submit', {
+    id: studentId.value.trim().toUpperCase(),
+    full_name: fullName.value.trim().toUpperCase(),
+    office: office.value || null,
+    tariff: tariff.value || null,
+    level: level.value || null,
+    university_1: university1.value ? university1.value.trim().toUpperCase() : null,
+    student_group: studentGroup.value || null,
+    lead_by: leadBy.value || null,
+    coordinator: coordinator.value || null,
+  })
 }
 </script>
 
@@ -260,7 +254,7 @@ const handleSubmit = async () => {
       <div
         v-if="isOpen"
         class="fixed inset-0 z-[60] flex items-center justify-center p-3 sm:p-4 bg-black/45 dark:bg-black/70 backdrop-blur-md"
-        @mousedown.self="() => { if (!submitting) emit('close') }"
+        @mousedown.self="() => { if (!isSubmitting) emit('close') }"
       >
         <!-- Modal Card with Apple Continuous Squircles & Spring Animation -->
         <Transition
@@ -284,9 +278,6 @@ const handleSubmit = async () => {
                 <div>
                   <h2 class="text-sm sm:text-base font-bold text-zinc-900 dark:text-white tracking-tight leading-tight flex items-center gap-2">
                     <span>Add New Student</span>
-                    <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 border border-blue-200/60 dark:border-blue-800/60">
-                      <Sparkles class="w-2.5 h-2.5" /> CRM
-                    </span>
                   </h2>
                   <p class="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">
                     Register a new student into the master roster
@@ -301,7 +292,7 @@ const handleSubmit = async () => {
                 </kbd>
                 <button
                   type="button"
-                  :disabled="submitting"
+                  :disabled="isSubmitting"
                   @click="emit('close')"
                   class="w-7 h-7 rounded-full bg-zinc-100 hover:bg-zinc-200/80 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 flex items-center justify-center transition-all cursor-pointer active:scale-90"
                   title="Close (Esc)"
@@ -368,7 +359,7 @@ const handleSubmit = async () => {
                           type="text"
                           required
                           autofocus
-                          :disabled="submitting || modalSuccess"
+                          :disabled="isSubmitting || modalSuccess"
                           placeholder="F101"
                           @input="studentId = studentId.toUpperCase()"
                           class="w-full h-9 pl-2 pr-2.5 bg-transparent text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none font-mono font-bold text-xs uppercase"
@@ -388,7 +379,7 @@ const handleSubmit = async () => {
                           v-model="fullName"
                           type="text"
                           required
-                          :disabled="submitting || modalSuccess"
+                          :disabled="isSubmitting || modalSuccess"
                           placeholder="BAXTIYOR ALIMOV"
                           @input="fullName = fullName.toUpperCase()"
                           class="w-full h-9 pl-2 pr-7 bg-transparent text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none font-semibold text-xs uppercase"
@@ -433,7 +424,7 @@ const handleSubmit = async () => {
                         :key="opt"
                         type="button"
                         @click="office = opt"
-                        :disabled="submitting || modalSuccess"
+                        :disabled="isSubmitting || modalSuccess"
                         class="flex-1 py-1.5 px-3 rounded-[9px] text-xs font-semibold transition-all duration-200 flex items-center justify-center gap-1.5 select-none cursor-pointer active:scale-[0.98]"
                         :class="office === opt
                           ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white shadow-xs font-bold'
@@ -449,7 +440,7 @@ const handleSubmit = async () => {
                       <select
                         v-model="office"
                         required
-                        :disabled="submitting || modalSuccess"
+                        :disabled="isSubmitting || modalSuccess"
                         class="w-full h-9 pl-3 pr-8 rounded-[11px] border border-zinc-300/90 dark:border-zinc-700/80 bg-white dark:bg-zinc-850 text-zinc-900 dark:text-zinc-100 text-xs font-medium focus:outline-none focus:border-blue-500 focus:ring-3 focus:ring-blue-500/15 cursor-pointer appearance-none shadow-2xs"
                       >
                         <option value="">Select Office</option>
@@ -470,7 +461,7 @@ const handleSubmit = async () => {
                       <div class="relative">
                         <select
                           v-model="tariff"
-                          :disabled="submitting || modalSuccess"
+                          :disabled="isSubmitting || modalSuccess"
                           class="w-full h-9 pl-3 pr-8 rounded-[11px] border border-zinc-300/90 dark:border-zinc-700/80 bg-white dark:bg-zinc-850 text-zinc-900 dark:text-zinc-100 text-xs font-medium focus:outline-none focus:border-blue-500 focus:ring-3 focus:ring-blue-500/15 cursor-pointer appearance-none shadow-2xs transition-all"
                         >
                           <option value="">Select Tariff</option>
@@ -489,7 +480,7 @@ const handleSubmit = async () => {
                       <div class="relative">
                         <select
                           v-model="level"
-                          :disabled="submitting || modalSuccess"
+                          :disabled="isSubmitting || modalSuccess"
                           class="w-full h-9 pl-3 pr-8 rounded-[11px] border border-zinc-300/90 dark:border-zinc-700/80 bg-white dark:bg-zinc-850 text-zinc-900 dark:text-zinc-100 text-xs font-medium focus:outline-none focus:border-blue-500 focus:ring-3 focus:ring-blue-500/15 cursor-pointer appearance-none shadow-2xs transition-all"
                         >
                           <option value="">Select Level</option>
@@ -517,7 +508,7 @@ const handleSubmit = async () => {
                       <input
                         v-model="university1"
                         type="text"
-                        :disabled="submitting || modalSuccess"
+                        :disabled="isSubmitting || modalSuccess"
                         placeholder="Type university name (e.g. SEJONG)..."
                         @input="() => { university1 = university1.toUpperCase(); isUniversityDropdownOpen = true; highlightedUniversityIndex = 0; }"
                         @focus="isUniversityDropdownOpen = true"
@@ -598,7 +589,7 @@ const handleSubmit = async () => {
                       <div class="relative">
                         <select
                           v-model="studentGroup"
-                          :disabled="submitting || modalSuccess"
+                          :disabled="isSubmitting || modalSuccess"
                           class="w-full h-9 pl-3 pr-8 rounded-[11px] border border-zinc-300/90 dark:border-zinc-700/80 bg-white dark:bg-zinc-850 text-zinc-900 dark:text-zinc-100 text-xs font-medium focus:outline-none focus:border-blue-500 focus:ring-3 focus:ring-blue-500/15 cursor-pointer appearance-none shadow-2xs transition-all"
                         >
                           <option value="">Select Group</option>
@@ -617,7 +608,7 @@ const handleSubmit = async () => {
                       <div class="relative">
                         <select
                           v-model="leadBy"
-                          :disabled="submitting || modalSuccess"
+                          :disabled="isSubmitting || modalSuccess"
                           class="w-full h-9 pl-3 pr-8 rounded-[11px] border border-zinc-300/90 dark:border-zinc-700/80 bg-white dark:bg-zinc-850 text-zinc-900 dark:text-zinc-100 text-xs font-medium focus:outline-none focus:border-blue-500 focus:ring-3 focus:ring-blue-500/15 cursor-pointer appearance-none shadow-2xs transition-all"
                         >
                           <option value="">Select Lead By</option>
@@ -636,7 +627,7 @@ const handleSubmit = async () => {
                       <div class="relative">
                         <select
                           v-model="coordinator"
-                          :disabled="submitting || modalSuccess"
+                          :disabled="isSubmitting || modalSuccess"
                           class="w-full h-9 pl-3 pr-8 rounded-[11px] border border-zinc-300/90 dark:border-zinc-700/80 bg-white dark:bg-zinc-850 text-zinc-900 dark:text-zinc-100 text-xs font-medium focus:outline-none focus:border-blue-500 focus:ring-3 focus:ring-blue-500/15 cursor-pointer appearance-none shadow-2xs transition-all"
                         >
                           <option value="">Select Coordinator</option>
@@ -662,7 +653,7 @@ const handleSubmit = async () => {
               <div class="flex items-center gap-2">
                 <button
                   type="button"
-                  :disabled="submitting || modalSuccess"
+                  :disabled="isSubmitting || modalSuccess"
                   @click="emit('close')"
                   class="px-4 py-2 rounded-[12px] text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-all cursor-pointer disabled:opacity-50 active:scale-95 select-none"
                 >
@@ -671,12 +662,11 @@ const handleSubmit = async () => {
                 <button
                   type="submit"
                   form="add-student-form"
-                  :disabled="submitting || modalSuccess"
+                  :disabled="isSubmitting || modalSuccess"
                   class="px-5 py-2 rounded-[12px] text-xs font-bold bg-gradient-to-b from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white transition-all cursor-pointer select-none disabled:opacity-50 flex items-center gap-2 shadow-sm shadow-blue-500/30 active:scale-95"
                 >
-                  <Loader2 v-if="submitting" class="w-3.5 h-3.5 animate-spin" />
-                  <Sparkles v-else class="w-3.5 h-3.5" />
-                  <span>{{ submitting ? 'Saving...' : 'Save Student' }}</span>
+                  <Sparkles class="w-3.5 h-3.5" :class="{ 'animate-sparkle': isSubmitting }" />
+                  <span>{{ isSubmitting ? 'Saving...' : 'Save Student' }}</span>
                 </button>
               </div>
             </div>

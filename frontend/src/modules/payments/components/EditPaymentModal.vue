@@ -2,10 +2,11 @@
 import { ref, watch, computed, nextTick, onMounted, onUnmounted } from 'vue'
 import { useCurrency } from '@/composables/useCurrency'
 import type { Payment, Student } from '@/types'
-import { Pencil, X, AlertCircle } from 'lucide-vue-next'
+import { Pencil, X, AlertCircle, Loader2 } from 'lucide-vue-next'
 
 const props = defineProps<{
   isOpen: boolean
+  isSubmitting?: boolean
   payment: Payment | null
   students: Student[]
   paymentMethods: string[]
@@ -24,7 +25,6 @@ const method = ref('')
 const receivedBy = ref('')
 const notes = ref('')
 const error = ref<string | null>(null)
-const isSubmitting = ref(false)
 
 // ── Responsive Zoom Scaling for Laptop Screens ─────────────────────────
 const modalPanelRef = ref<HTMLElement | null>(null)
@@ -62,9 +62,14 @@ const recalcZoom = () => {
 let resizeObserver: ResizeObserver | null = null
 
 const handleKeydown = (e: KeyboardEvent) => {
-  if (e.key === 'Escape' && props.isOpen) {
+  if (e.key === 'Escape' && props.isOpen && !props.isSubmitting) {
     emit('close')
   }
+}
+
+const handleClose = () => {
+  if (props.isSubmitting) return
+  emit('close')
 }
 
 onMounted(() => {
@@ -107,7 +112,6 @@ watch(() => [props.isOpen, props.payment], ([isOpenVal]) => {
     receivedBy.value = props.payment.received_by || allReceivers.value[0]
     notes.value = props.payment.notes || ''
     error.value = null
-    isSubmitting.value = false
 
     nextTick(() => {
       recalcZoom()
@@ -131,7 +135,7 @@ const onAmountChange = (e: Event) => {
 }
 
 const handleSubmit = () => {
-  if (!props.payment) return
+  if (!props.payment || props.isSubmitting) return
   const rawAmount = parseAmount(amountInput.value)
   if (!rawAmount || rawAmount <= 0) {
     error.value = 'Please enter a valid amount!'
@@ -149,7 +153,6 @@ const handleSubmit = () => {
   const isNegative = Number(props.payment.amount) < 0
   const newAmount = isNegative ? -rawAmount : rawAmount
 
-  isSubmitting.value = true
   emit('submit', {
     amount: newAmount,
     method: method.value,
@@ -164,7 +167,7 @@ const handleSubmit = () => {
     v-if="isOpen && payment"
     class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs select-none overflow-hidden"
   >
-    <div class="fixed inset-0" @click="emit('close')" />
+    <div class="fixed inset-0" @click="handleClose" />
 
     <!-- Scale wrapper for smaller laptop displays -->
     <div class="relative z-10 flex items-center justify-center pointer-events-auto" :style="{ zoom: modalZoom }">
@@ -186,8 +189,9 @@ const handleSubmit = () => {
           </div>
           <button
             type="button"
-            @click="emit('close')"
-            class="w-7 h-7 rounded-lg flex items-center justify-center text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+            @click="handleClose"
+            :disabled="isSubmitting"
+            class="w-7 h-7 rounded-lg flex items-center justify-center text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
             title="Close (Esc)"
           >
             <X class="h-4 w-4" />
@@ -271,9 +275,10 @@ const handleSubmit = () => {
           <button
             type="submit"
             :disabled="isSubmitting"
-            class="mt-1 w-full py-2.5 rounded-xl bg-blue-600 text-white font-bold text-xs hover:bg-blue-700 active:scale-[0.98] transition-all cursor-pointer disabled:opacity-50 shadow-2xs"
+            class="mt-1 w-full py-2.5 rounded-xl bg-blue-600 text-white font-bold text-xs hover:bg-blue-700 active:scale-[0.98] transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-2xs flex items-center justify-center gap-2"
           >
-            {{ isSubmitting ? 'Saving...' : 'Save Changes' }}
+            <Loader2 v-if="isSubmitting" class="w-4 h-4 animate-spin" />
+            <span>{{ isSubmitting ? 'Saving...' : 'Save Changes' }}</span>
           </button>
         </form>
       </div>

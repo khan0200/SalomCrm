@@ -111,7 +111,16 @@ def record_payment(tenant, student, amount, method, received_by, notes='', is_di
         )
 
         if student:
-            recalculate_student_financials(student)
+            # recalculate_student_financials fetches and saves a SEPARATE
+            # instance (select_for_update), so the caller's `student` object
+            # never sees the new balance in memory unless we refresh it here.
+            # Without this, a Telegram notification built right after this
+            # call (or from payment.student) reports the pre-recalculation
+            # balance, since Django does not mutate `student` in place.
+            updated_student = recalculate_student_financials(student)
+            student.balance = updated_student.balance
+            student.discount = updated_student.discount
+            payment.student = student
 
         action_name = 'DISCOUNT_RECORDED' if is_discount else ('WITHDRAWAL_RECORDED' if is_withdrawal else 'PAYMENT_RECORDED')
         log_audit_event(
@@ -142,7 +151,9 @@ def edit_payment(payment, amount, method, received_by, notes=None, user=None):
         payment.save(update_fields=['amount', 'method', 'received_by', 'notes', 'updated_at'])
 
         if payment.student:
-            recalculate_student_financials(payment.student)
+            updated_student = recalculate_student_financials(payment.student)
+            payment.student.balance = updated_student.balance
+            payment.student.discount = updated_student.discount
 
         log_audit_event(
             action='PAYMENT_UPDATED',
@@ -167,7 +178,9 @@ def delete_payment(payment, user=None):
         payment.delete()
 
         if student:
-            recalculate_student_financials(student)
+            updated_student = recalculate_student_financials(student)
+            student.balance = updated_student.balance
+            student.discount = updated_student.discount
 
         log_audit_event(
             action='PAYMENT_DELETED',

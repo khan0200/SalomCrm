@@ -143,3 +143,162 @@ class FinancialIntegrityTestCase(TestCase):
 
         price_none_cert = get_tariff_price('E-VISA', None)
         self.assertEqual(price_none_cert, Decimal('24000000'))
+
+
+class StudentSerializerFinancialSyncTestCase(TestCase):
+    """
+    Regression coverage for assigning/changing a tariff through the Student
+    update API: balance must become -tariff_price immediately, not sit at 0
+    until a payment happens to be recorded. External consumers (e.g. the
+    Telegram bot) read balance right after this request, so the recalculation
+    must be synchronous.
+    """
+    def setUp(self):
+        self.tenant = Tenant.objects.create(id='sync-tenant', name='Sync Tenant', slug='sync-tenant')
+        self.user = User.objects.create_user(
+            email='sync@example.com',
+            password='pass',
+            full_name='Sync Manager',
+            role='MANAGER',
+            tenant=self.tenant
+        )
+        self.student = Student.objects.create(
+            id='UB300',
+            full_name='SYNC TEST STUDENT',
+            tenant=self.tenant,
+            created_by=self.user
+        )
+
+    def _serializer(self):
+        from apps.students.serializers import StudentCreateUpdateSerializer
+        class FakeRequest:
+            def __init__(self, user):
+                self.user = user
+        return StudentCreateUpdateSerializer(context={'request': FakeRequest(self.user)})
+
+    def test_assigning_tariff_immediately_sets_negative_balance(self):
+        self.assertEqual(self.student.balance, Decimal('0.00'))
+        updated = self._serializer().update(self.student, {'tariff': 'PREMIUM'})
+        self.assertEqual(updated.balance, Decimal('-32500000.00'))
+
+    def test_full_flow_matches_manual_ledger(self):
+        """Matches the exact scenario reported: assign tariff, pay, discount, withdraw."""
+        ser = self._serializer()
+        student = ser.update(self.student, {'tariff': 'PREMIUM'})
+        self.assertEqual(student.balance, Decimal('-32500000.00'))
+
+        record_payment(tenant=self.tenant, student=student, amount=10000000,
+                        method='Naqd', received_by='Manager', user=self.user)
+        student.refresh_from_db()
+        self.assertEqual(student.balance, Decimal('-22500000.00'))
+
+        record_payment(tenant=self.tenant, student=student, amount=2000000,
+                        method='Discount', received_by='Manager', is_discount=True, user=self.user)
+        student.refresh_from_db()
+        self.assertEqual(student.balance, Decimal('-20500000.00'))
+
+        record_payment(tenant=self.tenant, student=student, amount=500000,
+                        method='Withdrawal', received_by='Manager', is_withdrawal=True, user=self.user)
+        student.refresh_from_db()
+        self.assertEqual(student.balance, Decimal('-21000000.00'))
+
+    def test_changing_tariff_recalculates_against_existing_ledger(self):
+        ser = self._serializer()
+        student = ser.update(self.student, {'tariff': 'PREMIUM'})
+        record_payment(tenant=self.tenant, student=student, amount=10000000,
+                        method='Naqd', received_by='Manager', user=self.user)
+        student.refresh_from_db()
+
+        student = ser.update(student, {'tariff': 'STANDART'})
+        self.assertEqual(student.balance, Decimal('-3000000.00'))
+
+    def test_unrelated_field_update_does_not_change_balance(self):
+        ser = self._serializer()
+        student = ser.update(self.student, {'tariff': 'PREMIUM'})
+        record_payment(tenant=self.tenant, student=student, amount=5000000,
+                        method='Naqd', received_by='Manager', user=self.user)
+        student.refresh_from_db()
+        balance_before = student.balance
+
+        student = ser.update(student, {'phone1': '901234567'})
+        self.assertEqual(student.balance, balance_before)
+
+    def test_create_with_tariff_sets_negative_balance(self):
+        ser = self._serializer()
+        student = ser.create({
+            'id': 'UB301',
+            'full_name': 'SYNC CREATE STUDENT',
+            'tenant': self.tenant,
+            'created_by': self.user,
+            'tariff': 'STANDART',
+        })
+        self.assertEqual(student.balance, Decimal('-13000000.00'))
+
+
+class RecordPaymentCallerRefreshTestCase(TestCase):
+    """
+    Regression coverage for the Telegram-bot-shows-stale-balance bug:
+    record_payment/edit_payment/delete_payment recalculate a SEPARATE student
+    instance internally (select_for_update), so the caller's own `student`
+    variable never saw the new balance unless explicitly refreshed. A bot
+    notification built from that stale variable right after the call reported
+    the pre-payment (or pre-deletion) balance instead of the recalculated one.
+    """
+    def setUp(self):
+        self.tenant = Tenant.objects.create(id='refresh-tenant', name='Refresh Tenant', slug='refresh-tenant')
+        self.user = User.objects.create_user(
+            email='refresh@example.com',
+            password='pass',
+            full_name='Refresh Manager',
+            role='MANAGER',
+            tenant=self.tenant
+        )
+        self.student = Student.objects.create(
+            id='UB400',
+            full_name='REFRESH TEST STUDENT',
+            tenant=self.tenant,
+            tariff='VISA PLUS',
+            created_by=self.user
+        )
+        recalculate_student_financials(self.student)
+        self.student.refresh_from_db()
+
+    def test_record_payment_refreshes_caller_student_reference(self):
+        # VISA PLUS = 65,000,000; student starts at -65,000,000.
+        self.assertEqual(self.student.balance, Decimal('-65000000.00'))
+
+        payment = record_payment(
+            tenant=self.tenant, student=self.student, amount=5000000,
+            method='Karta Abdulaziz', received_by='ABDULAZIZ', user=self.user
+        )
+        # The caller's own `student` object (not a re-fetched copy) must
+        # already reflect the recalculated balance right after the call —
+        # this is exactly what a Telegram notification reads.
+        self.assertEqual(self.student.balance, Decimal('-60000000.00'))
+        self.assertEqual(payment.student.balance, Decimal('-60000000.00'))
+
+    def test_edit_payment_refreshes_caller_student_reference(self):
+        payment = record_payment(
+            tenant=self.tenant, student=self.student, amount=5000000,
+            method='Naqd', received_by='Manager', user=self.user
+        )
+        self.student.refresh_from_db()
+        self.assertEqual(self.student.balance, Decimal('-60000000.00'))
+
+        payment.refresh_from_db()
+        edit_payment(payment, amount=10000000, method='Naqd', received_by='Manager', user=self.user)
+        self.assertEqual(payment.student.balance, Decimal('-55000000.00'))
+
+    def test_delete_payment_refreshes_caller_student_reference(self):
+        payment = record_payment(
+            tenant=self.tenant, student=self.student, amount=5000000,
+            method='Naqd', received_by='Manager', user=self.user
+        )
+        self.student.refresh_from_db()
+        self.assertEqual(self.student.balance, Decimal('-60000000.00'))
+
+        student_ref = payment.student
+        delete_payment(payment, user=self.user)
+        # student_ref is the SAME object destroy() would pass to the
+        # delete-notification; it must show the rolled-back balance.
+        self.assertEqual(student_ref.balance, Decimal('-65000000.00'))

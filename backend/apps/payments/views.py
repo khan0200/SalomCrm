@@ -162,13 +162,18 @@ class PaymentViewSet(viewsets.ModelViewSet):
         payment = self.get_object()
         student = getattr(payment, 'student', None)
 
+        # Delete first, then notify: notifying beforehand reported the
+        # pre-deletion (pre-rollback) balance instead of the recalculated one.
+        # delete_payment() refreshes `student` in place, so this reference is
+        # safe to read from after the call.
+        delete_payment(payment, user=request.user)
+
         try:
             from apps.core.telegram_service import notify_payment_deleted
             notify_payment_deleted(payment, student)
-        except Exception as e:
+        except Exception:
             pass
 
-        delete_payment(payment, user=request.user)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 

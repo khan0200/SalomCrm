@@ -20,7 +20,7 @@ def escape_html(text: Any) -> str:
     return html.escape(str(text).strip())
 
 def format_uzs(amount: Any) -> str:
-    """Format decimal/int currency to 1 000 000 format."""
+    """Format decimal/int currency to 1 000 000 format (magnitude only, no sign)."""
     try:
         val = abs(int(Decimal(str(amount))))
         return f"{val:,}".replace(",", " ")
@@ -30,6 +30,23 @@ def format_uzs(amount: Any) -> str:
             return f"{val:,}".replace(",", " ")
         except Exception:
             return str(amount)
+
+def format_uzs_signed(amount: Any) -> str:
+    """
+    Format a balance to 1 000 000 format, preserving its sign.
+    A negative balance is remaining debt and must render as e.g. "-60 000 000",
+    not the unsigned amount format_uzs() gives (which is correct for payment
+    amounts, but would hide the debt/overpayment distinction for balance).
+    """
+    try:
+        val = int(Decimal(str(amount)))
+    except Exception:
+        try:
+            val = int(float(amount))
+        except Exception:
+            return str(amount)
+    sign = "-" if val < 0 else ""
+    return f"{sign}{abs(val):,}".replace(",", " ")
 
 def _send_telegram_worker(bot_token: str, chat_ids: List[str], message: str) -> None:
     """Worker executed in background thread."""
@@ -128,7 +145,7 @@ def notify_payment_received(payment: Any, student: Optional[Any] = None) -> None
                     tariff_name += " (TIL SERTIFIKATISIZ)"
 
         amount_str = format_uzs(payment.amount)
-        balance_str = format_uzs(student_obj.balance) if student_obj and student_obj.balance is not None else "-"
+        balance_str = format_uzs_signed(student_obj.balance) if student_obj and student_obj.balance is not None else "-"
         method = escape_html(payment.method or "-")
         received_by = escape_html(payment.received_by or "-")
         notes = escape_html(payment.notes or "")
@@ -158,7 +175,7 @@ def notify_discount_added(payment: Any, student: Optional[Any] = None) -> None:
         safe_name = escape_html(payment.student_name or (student_obj.full_name if student_obj else "Unknown"))
 
         amount_str = format_uzs(payment.amount)
-        balance_str = format_uzs(student_obj.balance) if student_obj and student_obj.balance is not None else "-"
+        balance_str = format_uzs_signed(student_obj.balance) if student_obj and student_obj.balance is not None else "-"
         notes = escape_html(payment.notes or "")
         cur_date = datetime.now().strftime("%d/%m/%Y")
 
@@ -183,7 +200,7 @@ def notify_withdrawal(payment: Any, student: Optional[Any] = None) -> None:
         safe_name = escape_html(payment.student_name or (student_obj.full_name if student_obj else "General Withdrawal"))
 
         amount_str = format_uzs(payment.amount)
-        balance_str = format_uzs(student_obj.balance) if student_obj and student_obj.balance is not None else "-"
+        balance_str = format_uzs_signed(student_obj.balance) if student_obj and student_obj.balance is not None else "-"
         notes = escape_html(payment.notes or "")
         cur_date = datetime.now().strftime("%d/%m/%Y")
 
@@ -208,7 +225,7 @@ def notify_payment_deleted(payment: Any, student: Optional[Any] = None) -> None:
         safe_name = escape_html(payment.student_name or (student_obj.full_name if student_obj else "Unknown"))
 
         amount_str = format_uzs(payment.amount)
-        balance_str = format_uzs(student_obj.balance) if student_obj and student_obj.balance is not None else "-"
+        balance_str = format_uzs_signed(student_obj.balance) if student_obj and student_obj.balance is not None else "-"
 
         msg = (
             f"🟥 <b>Payment Deleted</b>\n\n"

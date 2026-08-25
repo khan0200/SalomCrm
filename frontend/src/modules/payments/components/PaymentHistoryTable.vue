@@ -4,7 +4,7 @@ import type { Payment } from '@/types'
 import {
   Search, FileSpreadsheet, Pencil, Trash2, Printer,
   Receipt, X, User, LayoutGrid, Table as TableIcon,
-  Copy, Check, Calendar, Clock, ArrowDownLeft, ArrowUpRight, Tag
+  Copy, Check, Clock, ArrowDownLeft, ArrowUpRight, Tag
 } from 'lucide-vue-next'
 
 const props = defineProps<{
@@ -586,224 +586,199 @@ const printReceipt = (payment: Payment) => {
           class="relative w-[565px] max-w-[calc(100vw-2rem)] rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#15171a] shadow-2xl overflow-hidden flex flex-col p-4 sm:p-5 gap-3.5 text-xs text-zinc-900 dark:text-zinc-100 animate-page-in"
           @click.stop
         >
-          <!-- 1. Header Bar -->
-          <div class="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800/80 pb-2.5">
-            <div class="flex items-center gap-2.5">
-              <div class="w-8 h-8 rounded-xl bg-blue-600/10 dark:bg-blue-500/15 text-blue-600 dark:text-blue-400 flex items-center justify-center border border-blue-500/20">
-                <Receipt class="h-4 w-4" />
-              </div>
-              <div class="flex flex-col">
-                <div class="flex items-center gap-2">
-                  <h3 class="text-sm font-extrabold text-zinc-900 dark:text-zinc-100 tracking-tight">Payment Details</h3>
-                  <!-- Short Receipt / Payment ID Badge with Copy -->
-                  <button
-                    type="button"
-                    @click="handleCopy('id', viewingPayment.id)"
-                    class="group inline-flex items-center gap-1 font-mono text-[10.5px] font-bold px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-850 hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-750 transition-colors cursor-pointer"
-                    :title="'Click to copy full ID: ' + viewingPayment.id"
-                  >
-                    <span>#{{ String(viewingPayment.id).replace(/-/g, '').slice(-8).toUpperCase() }}</span>
-                    <Check v-if="copiedField === 'id'" class="w-3 h-3 text-emerald-500" />
-                    <Copy v-else class="w-3 h-3 text-zinc-400 group-hover:text-zinc-600 dark:group-hover:text-zinc-300" />
-                  </button>
-                </div>
-                <span class="text-[10px] text-zinc-400 font-medium">Recorded transaction record</span>
-              </div>
+          <!-- 1. Header -->
+          <div class="flex items-start justify-between gap-3">
+            <div class="flex flex-col gap-0.5 min-w-0">
+              <h3 class="text-[15px] font-bold text-zinc-900 dark:text-zinc-100 tracking-tight leading-tight">
+                Payment Details
+              </h3>
+              <button
+                type="button"
+                @click="handleCopy('id', viewingPayment.id)"
+                class="group inline-flex items-center gap-1 self-start font-mono text-[10.5px] font-medium text-zinc-400 dark:text-zinc-500 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors cursor-pointer"
+                :title="'Click to copy full ID: ' + viewingPayment.id"
+              >
+                <span>#{{ String(viewingPayment.id).replace(/-/g, '').slice(-8).toUpperCase() }}</span>
+                <Check v-if="copiedField === 'id'" class="w-3 h-3 text-emerald-500" />
+                <Copy v-else class="w-2.5 h-2.5 opacity-0 group-hover:opacity-100 transition-opacity" />
+              </button>
             </div>
 
             <button
               type="button"
               @click="viewingPayment = null"
-              class="w-7 h-7 rounded-lg flex items-center justify-center text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+              class="w-7 h-7 shrink-0 rounded-full flex items-center justify-center text-zinc-400 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors cursor-pointer active:scale-90"
               title="Close (Esc)"
             >
-              <X class="h-4 w-4" />
+              <X class="h-3.5 w-3.5" />
             </button>
           </div>
 
-          <!-- 2. Hero Amount & Key Badges (High-density compact card) -->
+          <!-- 2. Hero Amount -->
           <div
-            class="rounded-xl border p-3.5 flex flex-col gap-2.5 transition-all"
+            class="rounded-2xl px-4 py-4 flex flex-col items-center gap-2.5 text-center"
             :class="Number(viewingPayment.amount) < 0
-              ? 'border-rose-500/25 bg-rose-500/5 dark:bg-rose-500/10'
+              ? 'bg-rose-500/8 dark:bg-rose-500/12'
               : viewingPayment.is_discount
-                ? 'border-pink-500/25 bg-pink-500/5 dark:bg-pink-500/10'
-                : 'border-emerald-500/25 bg-emerald-500/5 dark:bg-emerald-500/10'"
+                ? 'bg-pink-500/8 dark:bg-pink-500/12'
+                : 'bg-emerald-500/8 dark:bg-emerald-500/12'"
           >
-            <!-- Amount Row with 1-click Copy -->
-            <div class="flex items-center justify-between">
-              <div class="flex flex-col">
-                <span class="text-[10px] uppercase font-bold tracking-wider text-zinc-400 dark:text-zinc-500">
-                  Total Transaction Amount
-                </span>
-                <button
-                  type="button"
-                  @click="handleCopy('amount', formatAmount(Math.abs(Number(viewingPayment.amount))))"
-                  class="group inline-flex items-baseline gap-1.5 text-left cursor-pointer transition-transform active:scale-[0.99]"
-                  title="Click to copy amount"
-                >
-                  <span
-                    class="font-mono text-xl sm:text-2xl font-black tracking-tight"
-                    :class="Number(viewingPayment.amount) < 0
-                      ? 'text-rose-600 dark:text-rose-400'
-                      : viewingPayment.is_discount
-                        ? 'text-pink-600 dark:text-pink-400'
-                        : 'text-emerald-600 dark:text-emerald-400'"
-                  >
-                    {{ Number(viewingPayment.amount) < 0 ? '-' : '+' }}{{ formatAmount(Math.abs(Number(viewingPayment.amount))) }}
-                  </span>
-                  <span class="font-mono text-xs font-bold text-zinc-500 dark:text-zinc-400">UZS</span>
-                  <Check v-if="copiedField === 'amount'" class="w-3.5 h-3.5 text-emerald-500 inline ml-1 self-center" />
-                  <Copy v-else class="w-3.5 h-3.5 text-zinc-400 opacity-0 group-hover:opacity-100 transition-opacity self-center" />
-                </button>
-              </div>
+            <!-- Type pill -->
+            <span
+              class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider"
+              :class="Number(viewingPayment.amount) < 0
+                ? 'bg-rose-500/15 text-rose-700 dark:text-rose-300'
+                : viewingPayment.is_discount
+                  ? 'bg-pink-500/15 text-pink-700 dark:text-pink-300'
+                  : 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'"
+            >
+              <ArrowDownLeft v-if="Number(viewingPayment.amount) < 0" class="w-3 h-3" />
+              <ArrowUpRight v-else class="w-3 h-3" />
+              <span>{{ Number(viewingPayment.amount) < 0 ? 'Withdrawal' : (viewingPayment.is_discount ? 'Discount' : 'Payment') }}</span>
+            </span>
 
-              <!-- Transaction Type Tag -->
+            <!-- Amount -->
+            <button
+              type="button"
+              @click="handleCopy('amount', formatAmount(Math.abs(Number(viewingPayment.amount))))"
+              class="group flex items-baseline justify-center gap-1.5 cursor-pointer transition-transform active:scale-[0.98]"
+              title="Click to copy amount"
+            >
               <span
-                class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-extrabold uppercase tracking-wide border shadow-2xs"
+                class="font-mono text-[30px] leading-none font-bold tracking-tight tabular-nums"
                 :class="Number(viewingPayment.amount) < 0
-                  ? 'bg-rose-500/15 border-rose-500/30 text-rose-700 dark:text-rose-300'
+                  ? 'text-rose-600 dark:text-rose-400'
                   : viewingPayment.is_discount
-                    ? 'bg-pink-500/15 border-pink-500/30 text-pink-700 dark:text-pink-300'
-                    : 'bg-emerald-500/15 border-emerald-500/30 text-emerald-700 dark:text-emerald-300'"
+                    ? 'text-pink-600 dark:text-pink-400'
+                    : 'text-emerald-600 dark:text-emerald-400'"
               >
-                <ArrowDownLeft v-if="Number(viewingPayment.amount) < 0" class="w-3.5 h-3.5" />
-                <ArrowUpRight v-else class="w-3.5 h-3.5" />
-                <span>{{ Number(viewingPayment.amount) < 0 ? 'Withdrawal' : (viewingPayment.is_discount ? 'Discount' : 'Payment') }}</span>
+                {{ Number(viewingPayment.amount) < 0 ? '−' : '+' }}{{ formatAmount(Math.abs(Number(viewingPayment.amount))) }}
               </span>
-            </div>
+              <span class="font-mono text-[13px] font-semibold text-zinc-400 dark:text-zinc-500">UZS</span>
+              <Check v-if="copiedField === 'amount'" class="w-3.5 h-3.5 text-emerald-500 self-center ml-0.5" />
+              <Copy v-else class="w-3.5 h-3.5 text-zinc-400 opacity-0 group-hover:opacity-100 transition-opacity self-center ml-0.5" />
+            </button>
 
-            <!-- Inline Method & Receiver Pills -->
-            <div class="flex items-center gap-2 pt-2 border-t border-zinc-200/50 dark:border-zinc-800/60 flex-wrap">
-              <div class="flex items-center gap-1.5">
-                <span class="text-[10.5px] font-semibold text-zinc-500 dark:text-zinc-400">Method:</span>
-                <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[10.5px] font-bold uppercase tracking-wider bg-white/80 dark:bg-zinc-800/90 text-zinc-800 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-700 shadow-2xs">
-                  {{ viewingPayment.method || '—' }}
-                </span>
-              </div>
-              <span class="text-zinc-300 dark:text-zinc-700">•</span>
-              <div class="flex items-center gap-1.5">
-                <span class="text-[10.5px] font-semibold text-zinc-500 dark:text-zinc-400">Received by:</span>
-                <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[10.5px] font-bold uppercase tracking-wider bg-white/80 dark:bg-zinc-800/90 text-zinc-800 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-700 shadow-2xs">
-                  {{ viewingPayment.received_by || '—' }}
-                </span>
-              </div>
+            <!-- Method · Receiver -->
+            <div class="flex items-center justify-center gap-1.5 text-[11px] text-zinc-500 dark:text-zinc-400 font-medium flex-wrap">
+              <span class="font-semibold text-zinc-700 dark:text-zinc-300">{{ viewingPayment.method || '—' }}</span>
+              <span class="text-zinc-300 dark:text-zinc-600">·</span>
+              <span>received by</span>
+              <span class="font-semibold text-zinc-700 dark:text-zinc-300">{{ viewingPayment.received_by || '—' }}</span>
             </div>
           </div>
 
-          <!-- 3. Compact 2-Column Info Grid -->
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-            <!-- Student Card -->
-            <div class="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/80 dark:bg-zinc-850/60 p-2.5 flex flex-col justify-between gap-1.5">
-              <div class="flex items-center justify-between">
-                <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Student</span>
-                <button
-                  v-if="viewingPayment.student_id"
-                  type="button"
-                  @click="handleCopy('student', viewingPayment.student_id)"
-                  class="text-[10px] font-mono font-bold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 cursor-pointer"
-                  title="Click to copy Student ID"
-                >
-                  <span>{{ viewingPayment.student_id }}</span>
-                  <Check v-if="copiedField === 'student'" class="w-3 h-3 text-emerald-500" />
-                  <Copy v-else class="w-2.5 h-2.5 text-blue-400" />
-                </button>
-              </div>
-
-              <div class="flex flex-col">
+          <!-- 3. Grouped Detail List (iOS inset-grouped style) -->
+          <div class="rounded-2xl bg-zinc-50 dark:bg-zinc-850/60 divide-y divide-zinc-200/70 dark:divide-zinc-800 overflow-hidden">
+            <!-- Student -->
+            <div class="flex items-center justify-between gap-3 px-3.5 py-2.5">
+              <span class="text-[11.5px] text-zinc-500 dark:text-zinc-400 shrink-0">Student</span>
+              <div class="flex items-center gap-2 min-w-0">
                 <span
-                  class="font-bold text-zinc-900 dark:text-zinc-100 uppercase tracking-tight text-[12.5px] truncate"
+                  class="text-[12.5px] font-semibold text-zinc-900 dark:text-zinc-100 truncate text-right"
                   :title="viewingPayment.student_full_name || viewingPayment.student_name || 'General Payment'"
                 >
                   {{ viewingPayment.student_full_name || viewingPayment.student_name || 'General Payment' }}
                 </span>
-                <span v-if="!viewingPayment.student_id" class="text-[10.5px] text-zinc-400 italic">
-                  No Student Profile Linked
-                </span>
+                <button
+                  v-if="viewingPayment.student_id"
+                  type="button"
+                  @click="handleCopy('student', viewingPayment.student_id)"
+                  class="group inline-flex items-center gap-1 shrink-0 px-1.5 py-0.5 rounded-md font-mono text-[10.5px] font-bold text-blue-600 dark:text-blue-400 bg-blue-500/10 hover:bg-blue-500/20 transition-colors cursor-pointer"
+                  title="Click to copy Student ID"
+                >
+                  <span>{{ viewingPayment.student_id }}</span>
+                  <Check v-if="copiedField === 'student'" class="w-2.5 h-2.5 text-emerald-500" />
+                  <Copy v-else class="w-2.5 h-2.5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                </button>
               </div>
             </div>
 
-            <!-- Metadata & Timing Card -->
-            <div class="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/80 dark:bg-zinc-850/60 p-2.5 flex flex-col justify-between gap-1.5">
-              <div class="flex items-center justify-between">
-                <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Registered By</span>
-                <div class="flex items-center gap-1 text-[11px] font-bold uppercase text-zinc-800 dark:text-zinc-200">
-                  <User class="w-3 h-3 text-zinc-400" />
-                  <span>{{ viewingPayment.created_by_name || viewingPayment.received_by || 'Staff' }}</span>
-                </div>
-              </div>
-
-              <div class="flex items-center justify-between pt-1 border-t border-zinc-200/50 dark:border-zinc-800/60 text-[10.5px]">
-                <span class="text-zinc-400 font-medium flex items-center gap-1">
-                  <Calendar class="w-3 h-3 text-zinc-400" />
-                  <span>Date &amp; Time</span>
-                </span>
-                <span class="font-mono font-semibold text-zinc-800 dark:text-zinc-200">
-                  {{ formatTimestamp(viewingPayment.created_at) || '—' }}
-                </span>
-              </div>
+            <!-- Registered by -->
+            <div class="flex items-center justify-between gap-3 px-3.5 py-2.5">
+              <span class="text-[11.5px] text-zinc-500 dark:text-zinc-400 shrink-0">Registered by</span>
+              <span class="text-[12.5px] font-semibold text-zinc-900 dark:text-zinc-100 truncate">
+                {{ viewingPayment.created_by_name || viewingPayment.received_by || 'Staff' }}
+              </span>
             </div>
-          </div>
 
-          <!-- 4. Notes / Description Section (Compact Quote) -->
-          <div class="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/60 dark:bg-zinc-850/40 p-2.5 flex flex-col gap-1 border-l-3 border-l-blue-500">
-            <div class="flex items-center justify-between">
-              <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Notes / Details</span>
-              <button
-                v-if="viewingPayment.notes"
-                type="button"
-                @click="handleCopy('notes', viewingPayment.notes)"
-                class="text-[10px] text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 flex items-center gap-1 cursor-pointer"
-                title="Copy notes"
+            <!-- Date -->
+            <div class="flex items-center justify-between gap-3 px-3.5 py-2.5">
+              <span class="text-[11.5px] text-zinc-500 dark:text-zinc-400 shrink-0">Date &amp; time</span>
+              <span class="font-mono text-[12px] font-medium text-zinc-700 dark:text-zinc-300 tabular-nums">
+                {{ formatTimestamp(viewingPayment.created_at) || '—' }}
+              </span>
+            </div>
+
+            <!-- Notes -->
+            <div class="px-3.5 py-2.5 flex flex-col gap-1">
+              <div class="flex items-center justify-between gap-3">
+                <span class="text-[11.5px] text-zinc-500 dark:text-zinc-400">Notes</span>
+                <button
+                  v-if="viewingPayment.notes"
+                  type="button"
+                  @click="handleCopy('notes', viewingPayment.notes)"
+                  class="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 flex items-center gap-1 cursor-pointer shrink-0"
+                  title="Copy notes"
+                >
+                  <Check v-if="copiedField === 'notes'" class="w-3 h-3 text-emerald-500" />
+                  <Copy v-else class="w-2.5 h-2.5" />
+                </button>
+              </div>
+              <p
+                class="text-[12.5px] leading-relaxed whitespace-pre-wrap"
+                :class="viewingPayment.notes
+                  ? 'text-zinc-800 dark:text-zinc-200'
+                  : 'text-zinc-400 dark:text-zinc-500 italic'"
               >
-                <Check v-if="copiedField === 'notes'" class="w-3 h-3 text-emerald-500" />
-                <Copy v-else class="w-2.5 h-2.5" />
-              </button>
+                {{ viewingPayment.notes || 'No notes attached.' }}
+              </p>
             </div>
-            <p class="text-[11.5px] text-zinc-700 dark:text-zinc-300 leading-snug whitespace-pre-wrap">
-              {{ viewingPayment.notes || 'No notes or description attached to this transaction.' }}
-            </p>
           </div>
 
-          <!-- 5. Ergonomic Action Footer -->
-          <div class="flex items-center gap-2 pt-1">
-            <button
-              type="button"
-              @click="viewingPayment && printReceipt(viewingPayment)"
-              class="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 text-xs font-bold rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-750 text-zinc-800 dark:text-zinc-200 transition-all cursor-pointer shadow-2xs active:scale-[0.98]"
-              title="Print 80mm Thermal Receipt"
-            >
-              <Printer class="h-3.5 w-3.5 text-zinc-600 dark:text-zinc-400" />
-              <span>Print</span>
-            </button>
-
-            <button
-              type="button"
-              @click="handleEditFromModal"
-              class="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 text-xs font-bold rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-750 text-zinc-800 dark:text-zinc-200 transition-all cursor-pointer shadow-2xs active:scale-[0.98]"
-              title="Edit Payment"
-            >
-              <Pencil class="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
-              <span>Edit</span>
-            </button>
-
-            <button
-              type="button"
-              @click="handleDeleteFromModal"
-              class="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 text-xs font-bold rounded-xl border border-rose-200 dark:border-rose-900/40 bg-rose-50/50 dark:bg-rose-950/20 text-rose-600 dark:text-rose-400 hover:bg-rose-600 hover:text-white transition-all cursor-pointer shadow-2xs active:scale-[0.98]"
-              title="Delete Payment"
-            >
-              <Trash2 class="h-3.5 w-3.5" />
-              <span>Delete</span>
-            </button>
-
+          <!-- 4. Actions -->
+          <div class="flex flex-col gap-2 pt-0.5">
+            <!-- Primary -->
             <button
               type="button"
               @click="viewingPayment = null"
-              class="py-2 px-4 text-xs font-bold rounded-xl bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-white transition-all cursor-pointer shadow-2xs active:scale-[0.98]"
+              class="w-full py-2.5 text-[13px] font-semibold rounded-xl bg-blue-600 hover:bg-blue-700 text-white transition-all cursor-pointer active:scale-[0.99] shadow-sm shadow-blue-600/25"
             >
-              Close
+              Done
             </button>
+
+            <!-- Secondary row -->
+            <div class="flex items-center gap-2">
+              <button
+                type="button"
+                @click="viewingPayment && printReceipt(viewingPayment)"
+                class="flex-1 flex items-center justify-center gap-1.5 py-2 text-[12px] font-semibold rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-750 text-zinc-700 dark:text-zinc-200 transition-all cursor-pointer active:scale-[0.98]"
+                title="Print 80mm Thermal Receipt"
+              >
+                <Printer class="h-3.5 w-3.5" />
+                <span>Print</span>
+              </button>
+
+              <button
+                type="button"
+                @click="handleEditFromModal"
+                class="flex-1 flex items-center justify-center gap-1.5 py-2 text-[12px] font-semibold rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-750 text-zinc-700 dark:text-zinc-200 transition-all cursor-pointer active:scale-[0.98]"
+                title="Edit Payment"
+              >
+                <Pencil class="h-3.5 w-3.5" />
+                <span>Edit</span>
+              </button>
+
+              <button
+                type="button"
+                @click="handleDeleteFromModal"
+                class="flex-1 flex items-center justify-center gap-1.5 py-2 text-[12px] font-semibold rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 transition-all cursor-pointer active:scale-[0.98]"
+                title="Delete Payment"
+              >
+                <Trash2 class="h-3.5 w-3.5" />
+                <span>Delete</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>

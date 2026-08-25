@@ -20,6 +20,7 @@ import AddStudentsToFolderModal from './components/AddStudentsToFolderModal.vue'
 import { useStudentDashboardStore } from '@/stores/studentDashboard'
 import { useCustomTags } from '@/composables/useCustomTags'
 import { useDocumentHelpers } from '@/composables/useDocumentHelpers'
+import { getTariffPrice } from '@/utils/tariff'
 
 const queryClient = useQueryClient()
 const uiStore = useUiStore()
@@ -372,6 +373,12 @@ const createStudentMutation = useMutation({
     queryClient.invalidateQueries({ queryKey: ['all-students-master'] })
     queryClient.invalidateQueries({ queryKey: ['folders'] })
     queryClient.invalidateQueries({ queryKey: ['student-options'] })
+    // A tariff set at creation writes balance server-side (see
+    // recalculate_student_financials); the Payments page keeps its own
+    // separate cache of the same student/balance data and must be told too,
+    // or it keeps showing pre-creation figures until a full page reload.
+    queryClient.invalidateQueries({ queryKey: ['payment-overview-all'] })
+    queryClient.invalidateQueries({ queryKey: ['payment-history-all'] })
     isAddModalOpen.value = false
     uiStore.addToast({
       type: 'success',
@@ -395,7 +402,21 @@ const updateStudentMutation = useMutation({
   },
   onMutate: async (data) => {
     if (selectedDetailStudentId.value) {
-      updateMasterStudentOptimistically(selectedDetailStudentId.value, s => ({ ...s, ...data }))
+      updateMasterStudentOptimistically(selectedDetailStudentId.value, s => {
+        const merged = { ...s, ...data }
+        // Assigning/changing a tariff moves debt onto balance server-side
+        // (balance = -tariff_price + existing payments/discounts/withdrawals).
+        // Estimate that same shift here so the optimistic patch is never a
+        // self-contradictory state (new tariff + stale old balance), which
+        // is what caused "Payments Done" to flash the tariff price instead
+        // of the real (zero) amount paid.
+        if ('tariff' in data && data.tariff !== s.tariff) {
+          const oldTariffPrice = getTariffPrice(s.tariff, s.language_certificate, options.value?.tariffs || [])
+          const newTariffPrice = getTariffPrice(data.tariff as string, (data as any).language_certificate ?? s.language_certificate, options.value?.tariffs || [])
+          merged.balance = Number(s.balance || 0) + oldTariffPrice - newTariffPrice
+        }
+        return merged
+      })
     }
   },
   onSuccess: (updatedStudent) => {
@@ -406,6 +427,16 @@ const updateStudentMutation = useMutation({
     queryClient.invalidateQueries({ queryKey: ['folders'] })
     queryClient.invalidateQueries({ queryKey: ['student-options'] })
     queryClient.invalidateQueries({ queryKey: ['student-detail', selectedDetailStudentId.value] })
+    // Assigning/changing a tariff (or recording other financial fields here)
+    // recalculates balance server-side. The Payments page reads that same
+    // balance from its own cache keys, which are otherwise never told this
+    // student changed — without this it keeps showing the pre-update balance
+    // until a full page reload forces a refetch.
+    queryClient.invalidateQueries({ queryKey: ['payment-overview-all'] })
+    queryClient.invalidateQueries({ queryKey: ['payment-history-all'] })
+    if (selectedDetailStudentId.value) {
+      queryClient.invalidateQueries({ queryKey: ['student-payments', selectedDetailStudentId.value] })
+    }
     uiStore.addToast({
       type: 'success',
       title: 'Student Updated',
@@ -882,6 +913,7 @@ dashboardStore.onExportExcel = handleExportExcel
 
     <AddStudentModal
       :is-open="isAddModalOpen"
+      :is-submitting="createStudentMutation.isPending.value"
       :options="options"
       @close="isAddModalOpen = false"
       @submit="data => createStudentMutation.mutate(data)"

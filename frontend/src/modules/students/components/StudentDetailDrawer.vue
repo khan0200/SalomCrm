@@ -467,32 +467,28 @@ const computedTariffPrice = computed(() => {
   )
 })
 
+// Payments Done / Discount are derived strictly from the fetched payments
+// ledger, never estimated from balance/tariff. An estimate formula here was
+// the source of a real bug: it assumed balance already reflected the tariff
+// deduction, so a freshly-assigned tariff with zero real payments displayed
+// the tariff price itself as "Payments Done". Once the query has resolved,
+// an empty list unambiguously means zero payments/discount — no guessing.
 const computedPaymentsDone = computed(() => {
-  // Only standard payments (non-discount, non-withdrawal)
-  if (studentPayments.value && studentPayments.value.length > 0) {
-    return studentPayments.value
-      .filter(p => !p.is_discount && !p.is_withdrawal)
-      .reduce((sum, p) => sum + (Number(p.amount) || 0), 0)
+  if (!studentPaymentsData.value) {
+    return Number((props.student as any)?.payments_sum || (props.student as any)?.total_paid || 0)
   }
-  // Instant 0ms fallback while payments query is in-flight
-  if (props.student?.balance !== undefined && props.student?.tariff) {
-    const tariffVal = computedTariffPrice.value
-    const balVal = Number(props.student.balance || 0)
-    const discVal = Number(props.student.discount || 0)
-    const estPaid = (balVal + tariffVal) - discVal
-    if (estPaid >= 0) return estPaid
-  }
-  return Number((props.student as any)?.payments_sum || (props.student as any)?.total_paid || 0)
+  return studentPayments.value
+    .filter(p => !p.is_discount && !p.is_withdrawal)
+    .reduce((sum, p) => sum + (Number(p.amount) || 0), 0)
 })
 
 const computedDiscount = computed(() => {
-  if (studentPayments.value && studentPayments.value.length > 0) {
-    const fromPayments = studentPayments.value
-      .filter(p => p.is_discount && Number(p.amount) > 0)
-      .reduce((sum, p) => sum + Number(p.amount), 0)
-    if (fromPayments > 0) return fromPayments
+  if (!studentPaymentsData.value) {
+    return Number(props.student?.discount || 0)
   }
-  return Number(props.student?.discount || 0)
+  return studentPayments.value
+    .filter(p => p.is_discount && Number(p.amount) > 0)
+    .reduce((sum, p) => sum + Number(p.amount), 0)
 })
 
 const computedWithdrawals = computed(() => {
@@ -1276,6 +1272,7 @@ const handleDeleteStudent = () => {
   const name = props.student?.full_name || 'student'
   if (!confirm(`Are you sure you want to delete student profile "${name}"?`)) return
   emit('archive')
+  emit('close')
 }
 
 const handleRestoreStudent = () => {
@@ -3289,7 +3286,7 @@ const handleRestoreStudent = () => {
                         <Copy v-else class="w-3 h-3" />
                       </button>
                     </div>
-                    <div v-if="isPaymentsLoading && !student?.tariff" class="h-5 w-28 bg-white/30 rounded-md animate-pulse mt-0.5" />
+                    <div v-if="isPaymentsLoading && !studentPaymentsData" class="h-5 w-28 bg-white/30 rounded-md animate-pulse mt-0.5" />
                     <div v-else class="mt-0.5 text-[14.5px] font-extrabold tracking-tight font-mono leading-tight">
                       {{ formatCurrency(computedBalance) }}
                     </div>
@@ -3313,7 +3310,7 @@ const handleRestoreStudent = () => {
                         <Copy v-else class="w-3 h-3" />
                       </button>
                     </div>
-                    <div v-if="isPaymentsLoading && student?.balance === undefined" class="h-5 w-28 bg-white/30 rounded-md animate-pulse mt-0.5" />
+                    <div v-if="isPaymentsLoading && !studentPaymentsData" class="h-5 w-28 bg-white/30 rounded-md animate-pulse mt-0.5" />
                     <div v-else class="mt-0.5 text-[14.5px] font-extrabold tracking-tight font-mono leading-tight">
                       {{ formatCurrency(computedPaymentsDone) }}
                     </div>
@@ -3337,7 +3334,7 @@ const handleRestoreStudent = () => {
                         <Copy v-else class="w-3 h-3" />
                       </button>
                     </div>
-                    <div v-if="isPaymentsLoading && student?.discount === undefined" class="h-5 w-24 bg-white/30 rounded-md animate-pulse mt-0.5" />
+                    <div v-if="isPaymentsLoading && !studentPaymentsData" class="h-5 w-24 bg-white/30 rounded-md animate-pulse mt-0.5" />
                     <div v-else class="mt-0.5 text-[14.5px] font-extrabold tracking-tight font-mono leading-tight">
                       {{ formatCurrency(computedDiscount) }}
                     </div>
