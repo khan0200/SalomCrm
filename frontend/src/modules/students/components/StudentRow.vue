@@ -61,9 +61,11 @@ const rowBgStyle = computed(() => {
 })
 
 const isDocumentComplete = computed(() => {
-  // If passport, photo, and diploma or transcripts uploaded
-  const s = props.student
-  return !!(s.passport && s.phone1)
+  // Green check = Apostille is not on the student's missing-documents
+  // checklist; amber warning = it is. Apostille is a manual pill (see
+  // PICK_NEEDED_LIST / the Document Checklist modal), so this reads
+  // pick_needed directly rather than any other document/profile field.
+  return !(props.student.pick_needed || []).includes('APOSTILLE')
 })
 
 const getLevelBadgeClass = (level?: string | null) => {
@@ -129,14 +131,14 @@ const universities = computed(() => {
         <!-- Document Status Indicator -->
         <span
           v-if="isDocumentComplete"
-          title="All required details / documents completed"
+          title="Apostille not missing"
           class="inline-flex items-center justify-center w-4 h-4 rounded-full bg-emerald-500 text-white text-[9px] font-bold shadow-xs shrink-0"
         >
           ✓
         </span>
         <span
           v-else
-          title="Missing documents or information"
+          title="Apostille missing"
           class="inline-flex items-center justify-center w-4 h-4 rounded-full bg-amber-500 text-white text-[9px] font-black shadow-xs shrink-0"
         >
           !
