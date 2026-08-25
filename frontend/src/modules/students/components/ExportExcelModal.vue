@@ -230,7 +230,7 @@ const checkedFields = ref<string[]>(
 // When modal opens, select all students by default
 watch(() => props.isOpen, (open) => {
   if (open) {
-    selectedStudentIds.value = props.students.map(s => s.id)
+    selectedStudentIds.value = []
     searchQuery.value = ''
     searchType.value = 'all'
     selectedFolders.value = []
@@ -249,7 +249,7 @@ watch(() => props.isOpen, (open) => {
 // ── Filtered Students List ──────────────────────────────────────────
 const filteredStudents = computed(() => {
   const q = searchQuery.value.trim().toLowerCase()
-  return props.students.filter(s => {
+  const filtered = props.students.filter(s => {
     // Search query
     if (q) {
       if (searchType.value === 'id' && !s.id.toLowerCase().includes(q)) return false
@@ -327,6 +327,9 @@ const filteredStudents = computed(() => {
 
     return true
   })
+
+  // Active students always before archived ones; stable within each group.
+  return [...filtered].sort((a, b) => Number(!!a.is_deleted) - Number(!!b.is_deleted))
 })
 
 // ── Active filter summary (chips + clear-all) ────────────────────────
@@ -1028,7 +1031,10 @@ onUnmounted(() => {
               :key="s.id"
               @click="toggleStudentSelection(s.id)"
               class="hover:bg-blue-50/50 dark:hover:bg-blue-950/20 cursor-pointer transition-colors"
-              :class="selectedStudentIds.includes(s.id) ? 'bg-blue-50/30 dark:bg-blue-950/10' : ''"
+              :class="[
+                selectedStudentIds.includes(s.id) ? 'bg-blue-50/30 dark:bg-blue-950/10' : '',
+                s.is_deleted ? 'opacity-60' : ''
+              ]"
               :style="getRowStripeStyle(s)"
             >
               <td class="p-2.5 text-center" @click.stop>
@@ -1045,7 +1051,15 @@ onUnmounted(() => {
                 </div>
               </td>
               <td class="p-2.5 align-top">
-                <div class="font-bold text-zinc-900 dark:text-zinc-100 uppercase">{{ s.full_name }}</div>
+                <div class="flex items-center gap-1.5">
+                  <span class="font-bold text-zinc-900 dark:text-zinc-100 uppercase">{{ s.full_name }}</span>
+                  <span
+                    v-if="s.is_deleted"
+                    class="px-1.5 py-0.5 rounded text-[9px] font-bold tracking-wider uppercase bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20 shrink-0"
+                  >
+                    Archive
+                  </span>
+                </div>
                 <div class="mt-0.5 text-[9px] font-bold uppercase tracking-wide text-zinc-400 dark:text-zinc-500 whitespace-nowrap">
                   {{ getTariffDisplayName(s) }}
                 </div>
