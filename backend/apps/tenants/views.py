@@ -42,6 +42,94 @@ class TenantViewSet(viewsets.ModelViewSet):
         tenant.save(update_fields=['is_active'])
         return Response({'status': 'Tenant activated'})
 
+    @action(detail=True, methods=['get'], permission_classes=[IsPlatformSuperAdmin])
+    def admins(self, request, pk=None):
+        """
+        Head Managers of this tenant. A tenant can have several, so the client
+        must name which one to act on rather than guessing at "the" admin.
+        """
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        tenant = self.get_object()
+        admins = User.objects.filter(
+            tenant=tenant, role='HEAD_MANAGER'
+        ).order_by('date_joined')
+        return Response([
+            {
+                'id': str(u.id),
+                'email': u.email,
+                'full_name': u.full_name,
+                'is_active': u.is_active,
+            }
+            for u in admins
+        ])
+
+    @action(detail=True, methods=['post'], url_path='admin-credentials',
+            permission_classes=[IsPlatformSuperAdmin])
+    def admin_credentials(self, request, pk=None):
+        """
+        Update one tenant admin's login email and/or password.
+
+        Credentials belong to a User, not to the Tenant row, so the target
+        user_id is required and must belong to this tenant.
+        """
+        from django.contrib.auth import get_user_model
+        from django.core.exceptions import ValidationError as DjangoValidationError
+        from django.contrib.auth.password_validation import validate_password
+        User = get_user_model()
+
+        tenant = self.get_object()
+        user_id = request.data.get('user_id')
+        email = (request.data.get('email') or '').strip().lower()
+        password = request.data.get('password') or ''
+        full_name = (request.data.get('full_name') or '').strip()
+
+        if not user_id:
+            return Response({'detail': 'user_id is required.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        target = User.objects.filter(id=user_id, tenant=tenant).first()
+        if not target:
+            return Response({'detail': 'That user does not belong to this tenant.'},
+                            status=status.HTTP_404_NOT_FOUND)
+
+        updated = []
+
+        if email and email != target.email:
+            if User.objects.filter(email__iexact=email).exclude(id=target.id).exists():
+                return Response({'detail': 'That email is already in use.'},
+                                status=status.HTTP_400_BAD_REQUEST)
+            target.email = email
+            updated.append('email')
+
+        if full_name and full_name != target.full_name:
+            target.full_name = full_name
+            updated.append('full_name')
+
+        if password:
+            try:
+                validate_password(password, target)
+            except DjangoValidationError as e:
+                return Response({'detail': ' '.join(str(m) for m in e.messages)},
+                                status=status.HTTP_400_BAD_REQUEST)
+            target.set_password(password)
+            updated.append('password')
+
+        if not updated:
+            return Response({'detail': 'Nothing to update.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        target.save()
+        return Response({
+            'status': 'Credentials updated',
+            'updated': updated,
+            'user': {
+                'id': str(target.id),
+                'email': target.email,
+                'full_name': target.full_name,
+            },
+        })
+
 
 class BranchViewSet(viewsets.ModelViewSet):
     """Branch / Office ViewSet for tenant-specific locations."""

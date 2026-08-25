@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
-import { tenantsApi } from '@/api/tenants'
+import { tenantsApi, type TenantAdmin } from '@/api/tenants'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
 import type { Tenant } from '@/types'
@@ -69,6 +69,94 @@ const exitTenantContext = () => {
 const editingTenant = ref<Tenant | null>(null)
 const editForm = ref({ name: '', branding_color: '#007aff', description: '' })
 
+// Login credentials live on the tenant's Head Manager users, not on the
+// Tenant row. A tenant can have several, so the admin to edit is picked
+// explicitly rather than guessed.
+const tenantAdmins = ref<TenantAdmin[]>([])
+const isLoadingAdmins = ref(false)
+const selectedAdminId = ref('')
+const credForm = ref({ email: '', full_name: '', password: '' })
+
+const selectedAdmin = computed(() =>
+  tenantAdmins.value.find(a => a.id === selectedAdminId.value) || null
+)
+
+const loadAdmins = async (tenantId: string) => {
+  isLoadingAdmins.value = true
+  tenantAdmins.value = []
+  selectedAdminId.value = ''
+  credForm.value = { email: '', full_name: '', password: '' }
+  try {
+    tenantAdmins.value = await tenantsApi.getTenantAdmins(tenantId)
+    if (tenantAdmins.value.length === 1) {
+      selectAdmin(tenantAdmins.value[0].id)
+    }
+  } catch (err: any) {
+    uiStore.addToast({
+      type: 'error',
+      title: 'Could Not Load Admins',
+      message: err.response?.data?.detail || err.message || 'Failed to load tenant admins'
+    })
+  } finally {
+    isLoadingAdmins.value = false
+  }
+}
+
+const selectAdmin = (id: string) => {
+  selectedAdminId.value = id
+  const a = tenantAdmins.value.find(x => x.id === id)
+  credForm.value = {
+    email: a?.email || '',
+    full_name: a?.full_name || '',
+    password: '',
+  }
+}
+
+const updateCredentialsMutation = useMutation({
+  mutationFn: (payload: any) =>
+    tenantsApi.updateTenantAdminCredentials(editingTenant.value!.id, payload),
+  onSuccess: (res: any) => {
+    credForm.value.password = ''
+    if (editingTenant.value) loadAdmins(editingTenant.value.id)
+    queryClient.invalidateQueries({ queryKey: ['staff'] })
+    uiStore.addToast({
+      type: 'success',
+      title: 'Credentials Updated',
+      message: `Updated ${(res?.updated || []).join(', ')} for ${res?.user?.email || 'admin'}.`
+    })
+  },
+  onError: (err: any) => {
+    uiStore.addToast({
+      type: 'error',
+      title: 'Update Failed',
+      message: err.response?.data?.detail || err.message || 'Could not update credentials'
+    })
+  }
+})
+
+const submitCredentials = () => {
+  if (!selectedAdminId.value) {
+    uiStore.addToast({ type: 'error', title: 'Select an Admin', message: 'Choose which admin to update.' })
+    return
+  }
+  const payload: Record<string, string> = { user_id: selectedAdminId.value }
+  const a = selectedAdmin.value
+  if (credForm.value.email.trim() && credForm.value.email.trim() !== a?.email) {
+    payload.email = credForm.value.email.trim()
+  }
+  if (credForm.value.full_name.trim() && credForm.value.full_name.trim() !== a?.full_name) {
+    payload.full_name = credForm.value.full_name.trim()
+  }
+  if (credForm.value.password) {
+    payload.password = credForm.value.password
+  }
+  if (Object.keys(payload).length === 1) {
+    uiStore.addToast({ type: 'error', title: 'Nothing Changed', message: 'Change an email, name, or password first.' })
+    return
+  }
+  updateCredentialsMutation.mutate(payload)
+}
+
 const openEdit = (t: Tenant) => {
   editingTenant.value = t
   editForm.value = {
@@ -76,6 +164,7 @@ const openEdit = (t: Tenant) => {
     branding_color: t.branding_color || '#007aff',
     description: t.description || '',
   }
+  loadAdmins(t.id)
 }
 
 const updateTenantMutation = useMutation({
@@ -416,6 +505,94 @@ const openDelete = (t: Tenant) => {
           </button>
         </div>
       </form>
+
+      <!-- Admin login credentials (separate from the tenant record above) -->
+      <div class="mt-5 pt-4 border-t border-zinc-100 dark:border-zinc-800 space-y-3 text-xs">
+        <div>
+          <h4 class="font-bold text-zinc-800 dark:text-zinc-200">Admin Login</h4>
+          <p class="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">
+            Email and password belong to a person, not the agency. Pick which admin to update.
+          </p>
+        </div>
+
+        <div v-if="isLoadingAdmins" class="flex items-center gap-2 text-zinc-500 py-2">
+          <Loader2 class="w-4 h-4 animate-spin" />
+          <span>Loading admins...</span>
+        </div>
+
+        <div v-else-if="!tenantAdmins.length" class="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300 flex items-start gap-2">
+          <AlertTriangle class="w-4 h-4 shrink-0 mt-0.5" />
+          <span>This tenant has no head manager, so nobody can sign in to it.</span>
+        </div>
+
+        <template v-else>
+          <div>
+            <label class="block font-bold text-zinc-700 dark:text-zinc-300 mb-1">
+              Admin <span class="text-rose-500">*</span>
+            </label>
+            <select
+              :value="selectedAdminId"
+              @change="selectAdmin(($event.target as HTMLSelectElement).value)"
+              class="w-full px-3 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 font-semibold focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none cursor-pointer"
+            >
+              <option value="" disabled>Select an admin...</option>
+              <option v-for="a in tenantAdmins" :key="a.id" :value="a.id">
+                {{ a.full_name || 'Unnamed' }} — {{ a.email }}
+              </option>
+            </select>
+            <p v-if="tenantAdmins.length > 1" class="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1">
+              {{ tenantAdmins.length }} head managers on this tenant.
+            </p>
+          </div>
+
+          <template v-if="selectedAdminId">
+            <div>
+              <label class="block font-bold text-zinc-700 dark:text-zinc-300 mb-1">Full Name</label>
+              <input
+                v-model="credForm.full_name"
+                type="text"
+                class="w-full px-3 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 font-medium focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none"
+              />
+            </div>
+
+            <div>
+              <label class="block font-bold text-zinc-700 dark:text-zinc-300 mb-1">Login Email</label>
+              <input
+                v-model="credForm.email"
+                type="email"
+                class="w-full px-3 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 font-medium focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none"
+              />
+            </div>
+
+            <div>
+              <label class="block font-bold text-zinc-700 dark:text-zinc-300 mb-1">New Password</label>
+              <input
+                v-model="credForm.password"
+                type="password"
+                placeholder="••••••••"
+                autocomplete="new-password"
+                class="w-full px-3 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 font-medium focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none"
+              />
+              <p class="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1">
+                Leave blank to keep the current password. Changing it signs this person out of nothing — they keep working until their token expires.
+              </p>
+            </div>
+
+            <div class="flex items-center justify-end pt-1">
+              <button
+                type="button"
+                :disabled="updateCredentialsMutation.isPending.value"
+                @click="submitCredentials"
+                class="px-4 py-2 rounded-xl bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 font-bold hover:bg-zinc-800 dark:hover:bg-white disabled:opacity-60 disabled:cursor-not-allowed transition-all cursor-pointer flex items-center gap-1.5"
+              >
+                <Loader2 v-if="updateCredentialsMutation.isPending.value" class="w-4 h-4 animate-spin" />
+                <Check v-else class="w-4 h-4" />
+                <span>Update Login</span>
+              </button>
+            </div>
+          </template>
+        </template>
+      </div>
     </BaseModal>
 
     <!-- Delete Tenant -->

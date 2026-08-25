@@ -1,6 +1,13 @@
 import apiClient from './client'
 import type { Tenant, Branch, PaginatedResponse } from '@/types'
 
+export interface TenantAdmin {
+  id: string
+  email: string
+  full_name: string
+  is_active: boolean
+}
+
 export const tenantsApi = {
   getTenants: async (): Promise<Tenant[] | PaginatedResponse<Tenant>> => {
     const response = await apiClient.get('/tenants/')
@@ -31,6 +38,21 @@ export const tenantsApi = {
 
   deleteTenant: async (id: string) => {
     const response = await apiClient.delete(`/tenants/${id}/`)
+    return response.data
+  },
+
+  getTenantAdmins: async (id: string): Promise<TenantAdmin[]> => {
+    const response = await apiClient.get(`/tenants/${id}/admins/`)
+    return response.data
+  },
+
+  updateTenantAdminCredentials: async (id: string, data: {
+    user_id: string
+    email?: string
+    full_name?: string
+    password?: string
+  }) => {
+    const response = await apiClient.post(`/tenants/${id}/admin-credentials/`, data)
     return response.data
   },
 
