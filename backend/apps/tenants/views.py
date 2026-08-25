@@ -50,12 +50,17 @@ class BranchViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
+        # Honour the tenant a Super Admin has switched into (X-Tenant-ID via
+        # TenantMiddleware), not just an explicit ?tenant_id= parameter.
+        tenant = getattr(self.request, 'tenant', None) or getattr(user, 'tenant', None)
         if user.is_superuser or getattr(user, 'role', '') == 'SUPER_ADMIN':
             tenant_id = self.request.query_params.get('tenant_id')
             if tenant_id:
                 return Branch.objects.filter(tenant_id=tenant_id)
+            if tenant:
+                return Branch.objects.filter(tenant=tenant)
             return Branch.objects.all()
-        return Branch.objects.filter(tenant=user.tenant)
+        return Branch.objects.filter(tenant=tenant)
 
     def perform_create(self, serializer):
         user = self.request.user

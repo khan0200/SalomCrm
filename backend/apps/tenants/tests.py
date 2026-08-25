@@ -121,3 +121,33 @@ class TenantIsolationTestCase(TestCase):
         ids = [item['id'] for item in response.data['results']]
         self.assertIn('UB01', ids)
         self.assertIn('APEX01', ids)
+
+    def test_super_admin_switched_into_tenant_sees_only_that_tenant_users(self):
+        """
+        Regression: the Staff page leaked every tenant's users while a Super
+        Admin was switched into one tenant. UserViewSet.get_queryset only
+        honoured an explicit ?tenant_id= and ignored request.tenant, which is
+        what TenantMiddleware sets from the X-Tenant-ID header.
+        """
+        self.client.force_authenticate(user=self.super_admin)
+
+        response = self.client.get('/api/users/', HTTP_X_TENANT_ID=self.tenant_a.id)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        emails = [u['email'] for u in response.data['results']]
+        self.assertIn('user_a@unibridge.com', emails)
+        self.assertNotIn('user_b@apex.com', emails)
+
+        response = self.client.get('/api/users/', HTTP_X_TENANT_ID=self.tenant_b.id)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        emails = [u['email'] for u in response.data['results']]
+        self.assertIn('user_b@apex.com', emails)
+        self.assertNotIn('user_a@unibridge.com', emails)
+
+    def test_super_admin_without_tenant_context_sees_all_users(self):
+        """Scoping by X-Tenant-ID must not break the platform-wide view."""
+        self.client.force_authenticate(user=self.super_admin)
+        response = self.client.get('/api/users/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        emails = [u['email'] for u in response.data['results']]
+        self.assertIn('user_a@unibridge.com', emails)
+        self.assertIn('user_b@apex.com', emails)

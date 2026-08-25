@@ -163,12 +163,18 @@ class UserViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
+        # request.tenant is set by TenantMiddleware from the X-Tenant-ID header
+        # when a Super Admin switches into a tenant's context. Ignoring it here
+        # leaked every tenant's users into that tenant's Staff page.
+        tenant = getattr(self.request, 'tenant', None) or getattr(user, 'tenant', None)
         if user.is_superuser or getattr(user, 'role', '') == 'SUPER_ADMIN':
             tenant_id = self.request.query_params.get('tenant_id')
             if tenant_id:
                 return User.objects.filter(tenant_id=tenant_id)
+            if tenant:
+                return User.objects.filter(tenant=tenant)
             return User.objects.all()
-        return User.objects.filter(tenant=user.tenant)
+        return User.objects.filter(tenant=tenant)
 
     def perform_create(self, serializer):
         user = self.request.user

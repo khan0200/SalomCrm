@@ -18,5 +18,9 @@ class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
             tenant_id = self.request.query_params.get('tenant_id')
             if tenant_id:
                 return AuditLog.objects.filter(tenant_id=tenant_id)
+            # `tenant` above already accounts for X-Tenant-ID; respect it so a
+            # Super Admin viewing one agency does not see every tenant's logs.
+            if tenant:
+                return AuditLog.objects.filter(tenant=tenant)
             return AuditLog.objects.all()
         return AuditLog.objects.filter(tenant=tenant)
