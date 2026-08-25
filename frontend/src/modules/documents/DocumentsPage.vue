@@ -414,16 +414,22 @@ const handleTogglePickNeeded = async (studentId: string, pill: string) => {
   // Run syncMissingDocuments to ensure required fields remain consistent
   updatedPick = syncMissingDocuments({ ...student, pick_needed: updatedPick } as Student)
 
-  modalUpdating.value = true
+  // Pill removal must read as instant: patch the cache (and the open modal)
+  // immediately, then save silently in the background. Previously the whole
+  // pill grid disabled itself until the request resolved, so an X click
+  // looked like it was "waiting to be deleted" instead of just disappearing.
+  const previousPick = student.pick_needed ? [...student.pick_needed] : []
+  patchStudentInCache(studentId, { pick_needed: updatedPick })
+  if (showMessage) alert(showMessage)
+
   try {
     await studentsApi.updateStudent(studentId, { pick_needed: updatedPick })
-    patchStudentInCache(studentId, { pick_needed: updatedPick })
-    if (showMessage) alert(showMessage)
   } catch (err: any) {
     console.error('Error updating pick needed:', err)
+    // Roll back only on real failure, so a slow-but-successful save never
+    // flickers the UI back and forth.
+    patchStudentInCache(studentId, { pick_needed: previousPick })
     alert(err.response?.data?.detail || err.message || 'Failed to update missing documents list.')
-  } finally {
-    modalUpdating.value = false
   }
 }
 
