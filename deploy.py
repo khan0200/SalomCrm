@@ -76,25 +76,42 @@ def connect():
 
 def run(client, command, check=True, label=None, timeout=900, node=False):
     """Run a command on the server, streaming its output."""
+    import time
     if label:
-        print("\n=== %s ===" % label)
+        print("\n=== %s ===" % label, flush=True)
     shown = command
     command = (ENV + command) if node else command
-    print("$ %s" % shown)
-    stdin, stdout, stderr = client.exec_command(command, get_pty=True, timeout=timeout)
-    lines = []
-    for line in iter(stdout.readline, ""):
-        line = line.rstrip()
-        if line:
-            print("  %s" % line)
-            lines.append(line)
-    code = stdout.channel.recv_exit_status()
-    err = stderr.read().decode(errors="replace").strip()
-    if err:
-        print("  [stderr] %s" % err)
+    print("$ %s" % shown, flush=True)
+    
+    transport = client.get_transport()
+    channel = transport.open_session()
+    channel.set_combine_stderr(True)
+    channel.exec_command(command)
+    
+    output = []
+    while True:
+        if channel.recv_ready():
+            data = channel.recv(4096).decode('utf-8', errors='replace')
+            if not data:
+                break
+            sys.stdout.write(data)
+            sys.stdout.flush()
+            output.append(data)
+        elif channel.exit_status_ready():
+            while channel.recv_ready():
+                data = channel.recv(4096).decode('utf-8', errors='replace')
+                if data:
+                    sys.stdout.write(data)
+                    sys.stdout.flush()
+                    output.append(data)
+            break
+        else:
+            time.sleep(0.05)
+
+    code = channel.recv_exit_status()
     if check and code != 0:
         raise SystemExit("\nFAILED (exit %s): %s" % (code, shown))
-    return code, "\n".join(lines)
+    return code, "".join(output)
 
 
 def check_app_dir(client):
