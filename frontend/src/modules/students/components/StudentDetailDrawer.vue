@@ -176,9 +176,35 @@ const formatPassportValue = (value?: string | null) => {
   return `${letters}${digits}`
 }
 
+const dateFields = new Set(['birthday', 'passport_issue_date', 'passport_expire_date'])
+
+// Masks free digit typing into YYYY-MM-DD as the user types — a dash is
+// inserted the moment the year (or month) reaches full length, not only
+// once the next digit has been typed.
+const formatDateValue = (value?: string | null) => {
+  if (!value) return ''
+  const digits = value.replace(/\D/g, '').slice(0, 8)
+  const year = digits.slice(0, 4)
+  const month = digits.slice(4, 6)
+  const day = digits.slice(6, 8)
+  let result = year
+  if (digits.length >= 4) result += '-' + month
+  if (digits.length >= 6) result += '-' + day
+  return result
+}
+
+const isValidDateValue = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value)
+
+// Always-uppercase-on-edit fields — kept as plain string keys (not sourced
+// from fieldModalConfig) because formatEditValueForField/onInlineInput run
+// before fieldModalConfig is declared further down this setup script.
+const uppercaseFields = new Set(['full_name', 'father_name', 'mother_name', 'address', 'id'])
+
 const formatEditValueForField = (field: string, value: string) => {
   if (phoneFields.has(field)) return formatPhoneValue(value)
   if (field === 'passport') return formatPassportValue(value)
+  if (dateFields.has(field)) return formatDateValue(value)
+  if (uppercaseFields.has(field)) return value.toUpperCase()
   return value
 }
 
@@ -343,6 +369,55 @@ const cancelInlineEdit = () => {
   editingField.value = null
   editValue.value = ''
 }
+
+// Field Modal Config — drives the shared "Edit <Field>" popup used by every
+// simple field (as opposed to the multi-field Educational Background /
+// Certificate / University modals, which have their own bespoke modals).
+type FieldModalType = 'text' | 'phone' | 'passport' | 'select' | 'date' | 'textarea' | 'email'
+interface FieldModalDef {
+  label: string
+  type: FieldModalType
+  options?: () => string[]
+  placeholder?: string
+  uppercase?: boolean
+}
+
+const fieldModalConfig: Record<string, FieldModalDef> = {
+  full_name: { label: 'Full Name', type: 'text', uppercase: true },
+  korean_name: { label: 'Full Name (Korean)', type: 'text' },
+  gender: { label: 'Sex', type: 'select', options: () => ['MALE', 'FEMALE'] },
+  birthday: { label: 'Birthday', type: 'date' },
+  passport: { label: 'Passport', type: 'passport' },
+  passport_issue_date: { label: 'Date of Issue', type: 'date' },
+  passport_expire_date: { label: 'Date of Expiration', type: 'date' },
+  phone1: { label: 'Phone 1', type: 'phone', placeholder: '88-146-47-07' },
+  phone2: { label: 'Phone 2', type: 'phone', placeholder: '88-083-56-83' },
+  email: { label: 'Email', type: 'email' },
+  address: { label: 'Address', type: 'textarea', uppercase: true },
+  tariff: { label: 'Tariff', type: 'select', options: () => tariffOptions.value },
+  level: { label: 'Level to Study', type: 'select', options: () => levelOptions.value },
+  level2: { label: 'Level to Study 2', type: 'select', options: () => levelOptions.value },
+  father_name: { label: 'Father Fullname', type: 'text', uppercase: true },
+  mother_name: { label: 'Mother Fullname', type: 'text', uppercase: true },
+  father_phone: { label: 'Father Phone', type: 'phone' },
+  mother_phone: { label: 'Mother Phone', type: 'phone' },
+  father_job: { label: 'Father Job', type: 'text' },
+  mother_job: { label: 'Mother Job', type: 'text' },
+  notes: { label: 'Notes', type: 'textarea' },
+  office: { label: 'Office', type: 'select', options: () => officeOptions.value },
+  id: { label: 'Student ID', type: 'text', uppercase: true },
+  student_group: { label: 'Group', type: 'select', options: () => groupOptions.value },
+  lead_by: { label: 'Lead By', type: 'select', options: () => leadByOptions.value },
+  coordinator: { label: 'Kordinator', type: 'select', options: () => coordinatorOptions.value },
+}
+
+const isFieldModalOpen = computed(() => editingField.value !== null && !!fieldModalConfig[editingField.value])
+const activeFieldModalDef = computed(() => (editingField.value && fieldModalConfig[editingField.value]) || null)
+const isFieldModalValueInvalid = computed(() => {
+  if (!editingField.value || !dateFields.has(editingField.value)) return false
+  const val = String(editValue.value || '').trim()
+  return val.length > 0 && !isValidDateValue(val)
+})
 
 const isTranslatingKorean = ref(false)
 
@@ -517,40 +592,6 @@ const { data: settingsUniversitiesData } = useQuery({
   staleTime: 1000 * 60 * 5,
 })
 
-const FALLBACK_UNIVERSITIES = [
-  "KONKUK UNIVERSITY (GWANGJIN, SEOUL)",
-  "SEJONG UNIVERSITY (GWANGJIN, SEOUL)",
-  "KOOKMIN UNIVERSITY (SEONGBUK, SEOUL)",
-  "GACHON UNIVERSITY (GLOBAL CAMPUS, SEONGNAM)",
-  "HANYANG UNIVERSITY (ERICA CAMPUS, ANSAN)",
-  "CHUNG-ANG UNIVERSITY (SEOUL CAMPUS)",
-  "DONGGUK UNIVERSITY (SEOUL CAMPUS)",
-  "INHA UNIVERSITY (INCHEON)",
-  "INCHEON NATIONAL UNIVERSITY (INCHEON)",
-  "KYUNG HEE UNIVERSITY (SEOUL/GLOBAL)",
-  "WOOSUK UNIVERSITY (WANJU / JINCHEON)",
-  "JEONJU UNIVERSITY (JEONJU)",
-  "SUN MOON UNIVERSITY (ASAN)",
-  "YEUNGNAM UNIVERSITY (GYEONGSAN)",
-  "KYUNGPOOK NATIONAL UNIVERSITY (DAEGU)",
-  "PUSAN NATIONAL UNIVERSITY (BUSAN)",
-  "DONG-A UNIVERSITY (BUSAN)",
-  "KYUNGSUNG UNIVERSITY (BUSAN)",
-  "HONGIK UNIVERSITY (SEOUL)",
-  "SOONGSIL UNIVERSITY (SEOUL)",
-  "AJOU UNIVERSITY (SUWON)",
-  "DANKOOK UNIVERSITY (JUKJEON)",
-  "MYONGJI UNIVERSITY (SEOUL / YONGIN)",
-  "SANGMYUNG UNIVERSITY (SEOUL)",
-  "HANSUNG UNIVERSITY (SEOUL)",
-  "SEOKYEONG UNIVERSITY (SEOUL)",
-  "CHUNGBUK NATIONAL UNIVERSITY (CHEONGJU)",
-  "CHONNAM NATIONAL UNIVERSITY (GWANGJU)",
-  "CHONBUK NATIONAL UNIVERSITY (JEONJU)",
-  "KANGWON NATIONAL UNIVERSITY (CHUNCHEON)",
-  "JEJU NATIONAL UNIVERSITY (JEJU)"
-]
-
 const allUniversities = computed<string[]>(() => {
   const set = new Set<string>()
 
@@ -576,9 +617,6 @@ const allUniversities = computed<string[]>(() => {
     })
   }
 
-  // Add fallback partner universities
-  FALLBACK_UNIVERSITIES.forEach(u => set.add(u.toUpperCase()))
-
   return Array.from(set).sort((a, b) => a.localeCompare(b))
 })
 
@@ -587,10 +625,40 @@ const showUniSuggestions = ref(false)
 const filteredUniSuggestions = computed(() => {
   if (!showUniSuggestions.value) return []
   const query = tempUniName.value.trim().toLowerCase()
-  if (query.length < 3) return []
-  const list = allUniversities.value.filter(u => u.toLowerCase().includes(query)).slice(0, 15)
-  if (list.length === 1 && list[0].toLowerCase() === query) return []
-  return list
+  if (query.length < 2) return []
+
+  const matching = allUniversities.value.filter(u => u.toLowerCase().includes(query))
+  if (matching.length === 1 && matching[0].toLowerCase() === query) return []
+
+  // Smart ranking:
+  // Rank 0: Whole university name starts with query (e.g. "SEOUL NATIONAL UNIVERSITY...")
+  // Rank 1: Main university name (before parentheses) starts with query
+  // Rank 2: A word in the main university name starts with query (e.g. "UNIVERSITY OF SEOUL")
+  // Rank 3: Main university name contains query
+  // Rank 4: Parentheses/Location contains query (e.g. "CHUNG-ANG UNIVERSITY (SEOUL)")
+  const getRank = (name: string): number => {
+    const lower = name.toLowerCase()
+    const mainPart = lower.split('(')[0].trim()
+    const bracketPart = lower.includes('(') ? lower.substring(lower.indexOf('(')) : ''
+
+    if (lower.startsWith(query)) return 0
+    if (mainPart.startsWith(query)) return 1
+
+    const words = mainPart.split(/[\s\-–—/]+/)
+    if (words.some(w => w.startsWith(query))) return 2
+
+    if (mainPart.includes(query)) return 3
+    if (bracketPart.includes(query)) return 4
+
+    return 5
+  }
+
+  return matching.sort((a, b) => {
+    const rankA = getRank(a)
+    const rankB = getRank(b)
+    if (rankA !== rankB) return rankA - rankB
+    return a.localeCompare(b)
+  }).slice(0, 20)
 })
 
 const selectUniSuggestion = (sug: string) => {
@@ -599,7 +667,7 @@ const selectUniSuggestion = (sug: string) => {
 }
 
 const onUniInput = () => {
-  showUniSuggestions.value = tempUniName.value.trim().length >= 3
+  showUniSuggestions.value = tempUniName.value.trim().length >= 2
 }
 
 // Option lists
@@ -1567,36 +1635,8 @@ const handleRestoreStudent = () => {
                     </div>
 
                     <div class="mt-1">
-                      <template v-if="editingField === (nameLanguage === 'KR' ? 'korean_name' : 'full_name')">
-                        <div class="relative w-full min-w-0" @click.stop @keydown.enter="saveInlineEdit(nameLanguage === 'KR' ? 'korean_name' : 'full_name')" @keydown.esc="cancelInlineEdit">
-                          <input
-                            v-model="editValue"
-                            type="text"
-                            class="w-full pl-2.5 pr-14 py-1 text-xs font-bold uppercase bg-zinc-50 dark:bg-zinc-800 border border-blue-500 rounded-lg outline-none"
-                            autoFocus
-                          />
-                          <div class="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                            <button
-                              type="button"
-                              @click="saveInlineEdit(nameLanguage === 'KR' ? 'korean_name' : 'full_name')"
-                              class="h-5 w-5 inline-flex items-center justify-center rounded bg-emerald-500 hover:bg-emerald-600 text-white cursor-pointer active:scale-90 transition-all shadow-2xs"
-                              title="Save"
-                            >
-                              <Check class="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              type="button"
-                              @click="cancelInlineEdit"
-                              class="h-5 w-5 inline-flex items-center justify-center rounded bg-rose-500 hover:bg-rose-600 text-white cursor-pointer active:scale-90 transition-all shadow-2xs"
-                              title="Cancel"
-                            >
-                              <X class="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </div>
-                      </template>
                       <!-- Skeleton Loader when AI Translating to Korean -->
-                      <template v-else-if="nameLanguage === 'KR' && (isTranslatingKorean || (!student.korean_name && student.full_name))">
+                      <template v-if="nameLanguage === 'KR' && (isTranslatingKorean || (!student.korean_name && student.full_name))">
                         <div class="flex items-center gap-2 py-0.5">
                           <div class="h-4.5 w-48 rounded-md bg-gradient-to-r from-zinc-200 via-zinc-300 to-zinc-200 dark:from-zinc-800 dark:via-zinc-700 dark:to-zinc-800 animate-pulse"></div>
                           <span class="text-[10px] font-bold text-amber-500 dark:text-amber-400 flex items-center gap-1">
@@ -1703,40 +1743,8 @@ const handleRestoreStudent = () => {
                         </div>
                       </div>
                       <div class="mt-0.5">
-                        <template v-if="editingField === 'gender'">
-                          <div class="relative w-full min-w-0" @click.stop @keydown.esc="cancelInlineEdit">
-                            <select
-                              v-model="editValue"
-                              class="w-full pl-2.5 pr-14 py-1 text-xs font-bold uppercase bg-zinc-50 dark:bg-zinc-800 border border-blue-500 rounded-lg outline-none"
-                              autoFocus
-                            >
-                              <option value="MALE">MALE</option>
-                              <option value="FEMALE">FEMALE</option>
-                            </select>
-                            <div class="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                              <button
-                                type="button"
-                                @click="saveInlineEdit('gender')"
-                                class="h-5 w-5 inline-flex items-center justify-center rounded bg-emerald-500 hover:bg-emerald-600 text-white cursor-pointer active:scale-90 transition-all shadow-2xs"
-                                title="Save"
-                              >
-                                <Check class="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                type="button"
-                                @click="cancelInlineEdit"
-                                class="h-5 w-5 inline-flex items-center justify-center rounded bg-rose-500 hover:bg-rose-600 text-white cursor-pointer active:scale-90 transition-all shadow-2xs"
-                                title="Cancel"
-                              >
-                                <X class="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </div>
-                        </template>
-                        <template v-else>
-                          <span v-if="student.gender" class="text-[13.5px] font-bold text-zinc-900 dark:text-zinc-100 uppercase tracking-tight">{{ student.gender }}</span>
-                          <span v-else class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
-                        </template>
+                        <span v-if="student.gender" class="text-[13.5px] font-bold text-zinc-900 dark:text-zinc-100 uppercase tracking-tight">{{ student.gender }}</span>
+                        <span v-else class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
                       </div>
                     </div>
 
@@ -1763,38 +1771,8 @@ const handleRestoreStudent = () => {
                         </div>
                       </div>
                       <div class="mt-0.5">
-                        <template v-if="editingField === 'birthday'">
-                          <div class="relative w-full min-w-0" @click.stop @keydown.enter="saveInlineEdit('birthday')" @keydown.esc="cancelInlineEdit">
-                            <input
-                              v-model="editValue"
-                              type="date"
-                              class="w-full pl-2.5 pr-14 py-1 text-xs font-bold bg-zinc-50 dark:bg-zinc-800 border border-blue-500 rounded-lg outline-none"
-                              autoFocus
-                            />
-                            <div class="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                              <button
-                                type="button"
-                                @click="saveInlineEdit('birthday')"
-                                class="h-5 w-5 inline-flex items-center justify-center rounded bg-emerald-500 hover:bg-emerald-600 text-white cursor-pointer active:scale-90 transition-all shadow-2xs"
-                                title="Save"
-                              >
-                                <Check class="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                type="button"
-                                @click="cancelInlineEdit"
-                                class="h-5 w-5 inline-flex items-center justify-center rounded bg-rose-500 hover:bg-rose-600 text-white cursor-pointer active:scale-90 transition-all shadow-2xs"
-                                title="Cancel"
-                              >
-                                <X class="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </div>
-                        </template>
-                        <template v-else>
-                          <span v-if="student.birthday" class="text-[13.5px] font-bold font-mono text-zinc-900 dark:text-zinc-100 tracking-tight">{{ student.birthday }}</span>
-                          <span v-else class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
-                        </template>
+                        <span v-if="student.birthday" class="text-[13.5px] font-bold font-mono text-zinc-900 dark:text-zinc-100 tracking-tight">{{ student.birthday }}</span>
+                        <span v-else class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
                       </div>
                     </div>
                   </div>
@@ -1824,39 +1802,8 @@ const handleRestoreStudent = () => {
                         </div>
                       </div>
                       <div class="mt-0.5">
-                        <template v-if="editingField === 'passport'">
-                          <div class="relative w-full min-w-0" @click.stop @keydown.enter="saveInlineEdit('passport')" @keydown.esc="cancelInlineEdit">
-                            <input
-                              :value="editValue"
-                              @input="onInlineInput('passport', $event)"
-                              type="text"
-                              class="w-full pl-2.5 pr-14 py-1 text-xs font-bold uppercase font-mono bg-zinc-50 dark:bg-zinc-800 border border-blue-500 rounded-lg outline-none"
-                              autoFocus
-                            />
-                            <div class="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                              <button
-                                type="button"
-                                @click="saveInlineEdit('passport')"
-                                class="h-5 w-5 inline-flex items-center justify-center rounded bg-emerald-500 hover:bg-emerald-600 text-white cursor-pointer active:scale-90 transition-all shadow-2xs"
-                                title="Save"
-                              >
-                                <Check class="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                type="button"
-                                @click="cancelInlineEdit"
-                                class="h-5 w-5 inline-flex items-center justify-center rounded bg-rose-500 hover:bg-rose-600 text-white cursor-pointer active:scale-90 transition-all shadow-2xs"
-                                title="Cancel"
-                              >
-                                <X class="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </div>
-                        </template>
-                        <template v-else>
-                          <span v-if="student.passport" class="text-[13.5px] font-bold font-mono text-zinc-900 dark:text-zinc-100 uppercase tracking-tight">{{ student.passport }}</span>
-                          <span v-else class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
-                        </template>
+                        <span v-if="student.passport" class="text-[13.5px] font-bold font-mono text-zinc-900 dark:text-zinc-100 uppercase tracking-tight">{{ student.passport }}</span>
+                        <span v-else class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
                       </div>
                     </div>
 
@@ -1883,38 +1830,8 @@ const handleRestoreStudent = () => {
                         </div>
                       </div>
                       <div class="mt-0.5">
-                        <template v-if="editingField === 'passport_issue_date'">
-                          <div class="relative w-full min-w-0" @click.stop @keydown.enter="saveInlineEdit('passport_issue_date')" @keydown.esc="cancelInlineEdit">
-                            <input
-                              v-model="editValue"
-                              type="date"
-                              class="w-full pl-2.5 pr-14 py-1 text-xs font-bold bg-zinc-50 dark:bg-zinc-800 border border-blue-500 rounded-lg outline-none"
-                              autoFocus
-                            />
-                            <div class="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                              <button
-                                type="button"
-                                @click="saveInlineEdit('passport_issue_date')"
-                                class="h-5 w-5 inline-flex items-center justify-center rounded bg-emerald-500 hover:bg-emerald-600 text-white cursor-pointer active:scale-90 transition-all shadow-2xs"
-                                title="Save"
-                              >
-                                <Check class="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                type="button"
-                                @click="cancelInlineEdit"
-                                class="h-5 w-5 inline-flex items-center justify-center rounded bg-rose-500 hover:bg-rose-600 text-white cursor-pointer active:scale-90 transition-all shadow-2xs"
-                                title="Cancel"
-                              >
-                                <X class="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </div>
-                        </template>
-                        <template v-else>
-                          <span v-if="student.passport_issue_date" class="text-[13.5px] font-bold font-mono text-zinc-900 dark:text-zinc-100 tracking-tight">{{ student.passport_issue_date }}</span>
-                          <span v-else class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
-                        </template>
+                        <span v-if="student.passport_issue_date" class="text-[13.5px] font-bold font-mono text-zinc-900 dark:text-zinc-100 tracking-tight">{{ student.passport_issue_date }}</span>
+                        <span v-else class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
                       </div>
                     </div>
 
@@ -1941,38 +1858,8 @@ const handleRestoreStudent = () => {
                         </div>
                       </div>
                       <div class="mt-0.5">
-                        <template v-if="editingField === 'passport_expire_date'">
-                          <div class="relative w-full min-w-0" @click.stop @keydown.enter="saveInlineEdit('passport_expire_date')" @keydown.esc="cancelInlineEdit">
-                            <input
-                              v-model="editValue"
-                              type="date"
-                              class="w-full pl-2.5 pr-14 py-1 text-xs font-bold bg-zinc-50 dark:bg-zinc-800 border border-blue-500 rounded-lg outline-none"
-                              autoFocus
-                            />
-                            <div class="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                              <button
-                                type="button"
-                                @click="saveInlineEdit('passport_expire_date')"
-                                class="h-5 w-5 inline-flex items-center justify-center rounded bg-emerald-500 hover:bg-emerald-600 text-white cursor-pointer active:scale-90 transition-all shadow-2xs"
-                                title="Save"
-                              >
-                                <Check class="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                type="button"
-                                @click="cancelInlineEdit"
-                                class="h-5 w-5 inline-flex items-center justify-center rounded bg-rose-500 hover:bg-rose-600 text-white cursor-pointer active:scale-90 transition-all shadow-2xs"
-                                title="Cancel"
-                              >
-                                <X class="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </div>
-                        </template>
-                        <template v-else>
-                          <span v-if="student.passport_expire_date" class="text-[13.5px] font-bold font-mono text-zinc-900 dark:text-zinc-100 tracking-tight">{{ student.passport_expire_date }}</span>
-                          <span v-else class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
-                        </template>
+                        <span v-if="student.passport_expire_date" class="text-[13.5px] font-bold font-mono text-zinc-900 dark:text-zinc-100 tracking-tight">{{ student.passport_expire_date }}</span>
+                        <span v-else class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
                       </div>
                     </div>
                   </div>
@@ -2012,40 +1899,8 @@ const handleRestoreStudent = () => {
                       </div>
                     </div>
                     <div class="mt-0.5">
-                      <template v-if="editingField === 'phone1'">
-                        <div class="relative w-full min-w-0" @click.stop @keydown.enter="saveInlineEdit('phone1')" @keydown.esc="cancelInlineEdit">
-                          <input
-                            :value="editValue"
-                            @input="onInlineInput('phone1', $event)"
-                            type="text"
-                            placeholder="88-146-47-07"
-                            class="w-full pl-2.5 pr-14 py-1 text-xs font-bold font-mono bg-zinc-50 dark:bg-zinc-800 border border-blue-500 rounded-lg outline-none"
-                            autoFocus
-                          />
-                          <div class="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                            <button
-                              type="button"
-                              @click="saveInlineEdit('phone1')"
-                              class="h-5 w-5 inline-flex items-center justify-center rounded bg-emerald-500 hover:bg-emerald-600 text-white cursor-pointer active:scale-90 transition-all shadow-2xs"
-                              title="Save"
-                            >
-                              <Check class="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              type="button"
-                              @click="cancelInlineEdit"
-                              class="h-5 w-5 inline-flex items-center justify-center rounded bg-rose-500 hover:bg-rose-600 text-white cursor-pointer active:scale-90 transition-all shadow-2xs"
-                              title="Cancel"
-                            >
-                              <X class="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </div>
-                      </template>
-                      <template v-else>
-                        <span v-if="student.phone1" class="text-[13.5px] font-bold font-mono text-zinc-900 dark:text-zinc-100 tracking-tight">{{ formatPhoneValue(student.phone1) }}</span>
-                        <span v-else class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
-                      </template>
+                      <span v-if="student.phone1" class="text-[13.5px] font-bold font-mono text-zinc-900 dark:text-zinc-100 tracking-tight">{{ formatPhoneValue(student.phone1) }}</span>
+                      <span v-else class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
                     </div>
                   </div>
 
@@ -2072,105 +1927,43 @@ const handleRestoreStudent = () => {
                       </div>
                     </div>
                     <div class="mt-0.5">
-                      <template v-if="editingField === 'phone2'">
-                        <div class="relative w-full min-w-0" @click.stop @keydown.enter="saveInlineEdit('phone2')" @keydown.esc="cancelInlineEdit">
-                          <input
-                            :value="editValue"
-                            @input="onInlineInput('phone2', $event)"
-                            type="text"
-                            placeholder="88-083-56-83"
-                            class="w-full pl-2.5 pr-14 py-1 text-xs font-bold font-mono bg-zinc-50 dark:bg-zinc-800 border border-blue-500 rounded-lg outline-none"
-                            autoFocus
-                          />
-                          <div class="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                            <button
-                              type="button"
-                              @click="saveInlineEdit('phone2')"
-                              class="h-5 w-5 inline-flex items-center justify-center rounded bg-emerald-500 hover:bg-emerald-600 text-white cursor-pointer active:scale-90 transition-all shadow-2xs"
-                              title="Save"
-                            >
-                              <Check class="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              type="button"
-                              @click="cancelInlineEdit"
-                              class="h-5 w-5 inline-flex items-center justify-center rounded bg-rose-500 hover:bg-rose-600 text-white cursor-pointer active:scale-90 transition-all shadow-2xs"
-                              title="Cancel"
-                            >
-                              <X class="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </div>
-                      </template>
-                      <template v-else>
-                        <span v-if="student.phone2" class="text-[13.5px] font-bold font-mono text-zinc-900 dark:text-zinc-100 tracking-tight">{{ formatPhoneValue(student.phone2) }}</span>
-                        <span v-else class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
-                      </template>
+                      <span v-if="student.phone2" class="text-[13.5px] font-bold font-mono text-zinc-900 dark:text-zinc-100 tracking-tight">{{ formatPhoneValue(student.phone2) }}</span>
+                      <span v-else class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
                     </div>
                   </div>
 
-                  <!-- EMAIL (Always Visible) -->
-                  <div
-                    class="sm:col-span-2 relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
-                    :class="[copiedField === 'email' && 'animate-copy-press']"
-                    @click="handleCopy('email', student.email)"
-                    title="Single-click to copy Email"
-                  >
-                    <div class="flex items-center justify-between">
-                      <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 flex items-center gap-1.5">
-                        <Mail class="w-3.5 h-3.5 text-violet-500 dark:text-violet-400 shrink-0" />
-                        <span>EMAIL</span>
-                      </span>
-                      <div class="flex items-center gap-1">
-                        <button type="button" @click.stop="handleCopy('email', student.email)" class="w-6 h-6 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-all cursor-pointer active:scale-90" title="Copy Email">
-                          <Check v-if="copiedField === 'email'" class="w-3.5 h-3.5 text-emerald-500" />
-                          <Copy v-else class="w-3.5 h-3.5" />
-                        </button>
-                        <button type="button" @click.stop="startInlineEdit('email', student.email)" class="w-6 h-6 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-all cursor-pointer active:scale-90" title="Edit Email">
-                          <Pencil class="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
-                    <div class="mt-0.5">
-                      <template v-if="editingField === 'email'">
-                        <div class="relative w-full min-w-0" @click.stop @keydown.enter="saveInlineEdit('email')" @keydown.esc="cancelInlineEdit">
-                          <input
-                            v-model="editValue"
-                            type="email"
-                            class="w-full pl-2.5 pr-14 py-1 text-xs font-medium bg-zinc-50 dark:bg-zinc-800 border border-blue-500 rounded-lg outline-none"
-                            autoFocus
-                          />
-                          <div class="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                            <button
-                              type="button"
-                              @click="saveInlineEdit('email')"
-                              class="h-5 w-5 inline-flex items-center justify-center rounded bg-emerald-500 hover:bg-emerald-600 text-white cursor-pointer active:scale-90 transition-all shadow-2xs"
-                              title="Save"
-                            >
-                              <Check class="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              type="button"
-                              @click="cancelInlineEdit"
-                              class="h-5 w-5 inline-flex items-center justify-center rounded bg-rose-500 hover:bg-rose-600 text-white cursor-pointer active:scale-90 transition-all shadow-2xs"
-                              title="Cancel"
-                            >
-                              <X class="w-3.5 h-3.5" />
-                            </button>
-                          </div>
+                  <!-- EMAIL & ADDRESS (Expanded Only) -->
+                  <div class="sm:col-span-2 accordion-collapse" :class="{ 'is-open': contactExpanded }">
+                  <div class="accordion-collapse-inner flex flex-col gap-1.5">
+                    <div
+                      class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
+                      :class="[copiedField === 'email' && 'animate-copy-press']"
+                      @click="handleCopy('email', student.email)"
+                      title="Single-click to copy Email"
+                    >
+                      <div class="flex items-center justify-between">
+                        <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 flex items-center gap-1.5">
+                          <Mail class="w-3.5 h-3.5 text-violet-500 dark:text-violet-400 shrink-0" />
+                          <span>EMAIL</span>
+                        </span>
+                        <div class="flex items-center gap-1">
+                          <button type="button" @click.stop="handleCopy('email', student.email)" class="w-6 h-6 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-all cursor-pointer active:scale-90" title="Copy Email">
+                            <Check v-if="copiedField === 'email'" class="w-3.5 h-3.5 text-emerald-500" />
+                            <Copy v-else class="w-3.5 h-3.5" />
+                          </button>
+                          <button type="button" @click.stop="startInlineEdit('email', student.email)" class="w-6 h-6 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-all cursor-pointer active:scale-90" title="Edit Email">
+                            <Pencil class="w-3.5 h-3.5" />
+                          </button>
                         </div>
-                      </template>
-                      <template v-else>
+                      </div>
+                      <div class="mt-0.5">
                         <span v-if="student.email" class="text-[13px] font-semibold text-zinc-900 dark:text-zinc-100">{{ student.email }}</span>
                         <span v-else class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
-                      </template>
+                      </div>
                     </div>
-                  </div>
 
-                  <!-- ADDRESS (Expanded Only) -->
-                  <template v-if="contactExpanded">
                     <div
-                      class="sm:col-span-2 relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
+                      class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
                       :class="[copiedField === 'address' && 'animate-copy-press']"
                       @click="handleCopy('address', student.address)"
                       title="Single-click to copy Address"
@@ -2191,41 +1984,12 @@ const handleRestoreStudent = () => {
                         </div>
                       </div>
                       <div class="mt-0.5">
-                        <template v-if="editingField === 'address'">
-                          <div class="relative w-full min-w-0" @click.stop @keydown.esc="cancelInlineEdit">
-                            <textarea
-                              v-model="editValue"
-                              rows="2"
-                              class="w-full pl-2.5 pr-14 py-1 text-xs font-medium bg-zinc-50 dark:bg-zinc-800 border border-blue-500 rounded-lg outline-none"
-                              autoFocus
-                            />
-                            <div class="absolute right-1 top-2 flex items-center gap-1">
-                              <button
-                                type="button"
-                                @click="saveInlineEdit('address')"
-                                class="h-5 w-5 inline-flex items-center justify-center rounded bg-emerald-500 hover:bg-emerald-600 text-white cursor-pointer active:scale-90 transition-all shadow-2xs"
-                                title="Save"
-                              >
-                                <Check class="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                type="button"
-                                @click="cancelInlineEdit"
-                                class="h-5 w-5 inline-flex items-center justify-center rounded bg-rose-500 hover:bg-rose-600 text-white cursor-pointer active:scale-90 transition-all shadow-2xs"
-                                title="Cancel"
-                              >
-                                <X class="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </div>
-                        </template>
-                        <template v-else>
-                          <span v-if="student.address" class="text-[13px] font-bold uppercase text-zinc-900 dark:text-zinc-100 leading-snug tracking-tight">{{ student.address }}</span>
-                          <span v-else class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
-                        </template>
+                        <span v-if="student.address" class="text-[13px] font-bold uppercase text-zinc-900 dark:text-zinc-100 leading-snug tracking-tight">{{ student.address }}</span>
+                        <span v-else class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
                       </div>
                     </div>
-                  </template>
+                  </div>
+                  </div>
                 </div>
 
                 <!-- SHOW MORE / SHOW LESS TOGGLE -->
@@ -2277,7 +2041,8 @@ const handleRestoreStudent = () => {
                     <span class="text-[13px] font-bold text-zinc-900 dark:text-zinc-100 uppercase tracking-tight">{{ student.major || '—' }}</span>
                   </div>
 
-                  <template v-if="eduExpanded">
+                  <div class="accordion-collapse" :class="{ 'is-open': eduExpanded }">
+                  <div class="accordion-collapse-inner flex flex-col gap-1">
                     <div
                       class="flex items-baseline justify-between gap-3 pt-1.5 border-t border-zinc-100 dark:border-zinc-800/80 cursor-pointer hover:bg-zinc-50/80 dark:hover:bg-zinc-800/60 p-1.5 -m-1 rounded-lg transition-all duration-150"
                       :class="[copiedField === 'gpa' && 'animate-copy-press']"
@@ -2350,7 +2115,8 @@ const handleRestoreStudent = () => {
                       <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-400">SCHOOL E-MAIL</span>
                       <span class="text-xs font-medium text-zinc-900 dark:text-zinc-100">{{ student.school_email }}</span>
                     </div>
-                  </template>
+                  </div>
+                  </div>
 
                   <button
                     type="button"
@@ -2402,44 +2168,12 @@ const handleRestoreStudent = () => {
                     </div>
 
                     <div class="mt-0.5">
-                      <template v-if="editingField === 'tariff'">
-                        <div class="relative w-full min-w-0" @click.stop @keydown.esc="cancelInlineEdit">
-                          <select
-                            v-model="editValue"
-                            class="w-full pl-2.5 pr-14 py-1 text-xs font-bold uppercase bg-zinc-50 dark:bg-zinc-800 border border-blue-500 rounded-lg outline-none"
-                            autoFocus
-                          >
-                            <option value="">Select Tariff</option>
-                            <option v-for="t in tariffOptions" :key="t" :value="t">{{ t }}</option>
-                          </select>
-                          <div class="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                            <button
-                              type="button"
-                              @click="saveInlineEdit('tariff')"
-                              class="h-5 w-5 inline-flex items-center justify-center rounded bg-emerald-500 hover:bg-emerald-600 text-white cursor-pointer active:scale-90 transition-all shadow-2xs"
-                              title="Save"
-                            >
-                              <Check class="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              type="button"
-                              @click="cancelInlineEdit"
-                              class="h-5 w-5 inline-flex items-center justify-center rounded bg-rose-500 hover:bg-rose-600 text-white cursor-pointer active:scale-90 transition-all shadow-2xs"
-                              title="Cancel"
-                            >
-                              <X class="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </div>
-                      </template>
-                      <template v-else>
-                        <div class="flex flex-col gap-1">
-                          <span v-if="student.tariff" class="inline-flex self-start px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase bg-emerald-600 text-white shadow-2xs">
-                            {{ student.tariff }}
-                          </span>
-                          <span v-else class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
-                        </div>
-                      </template>
+                      <div class="flex flex-col gap-1">
+                        <span v-if="student.tariff" class="inline-flex self-start px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase bg-emerald-600 text-white shadow-2xs">
+                          {{ student.tariff }}
+                        </span>
+                        <span v-else class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
+                      </div>
                     </div>
                   </div>
 
@@ -2476,42 +2210,10 @@ const handleRestoreStudent = () => {
                     </div>
 
                     <div class="mt-0.5">
-                      <template v-if="editingField === 'level'">
-                        <div class="relative w-full min-w-0" @click.stop @keydown.esc="cancelInlineEdit">
-                          <select
-                            v-model="editValue"
-                            class="w-full pl-2.5 pr-14 py-1 text-xs font-bold uppercase bg-zinc-50 dark:bg-zinc-800 border border-blue-500 rounded-lg outline-none"
-                            autoFocus
-                          >
-                            <option value="">Select Level</option>
-                            <option v-for="l in levelOptions" :key="l" :value="l">{{ l }}</option>
-                          </select>
-                          <div class="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                            <button
-                              type="button"
-                              @click="saveInlineEdit('level')"
-                              class="h-5 w-5 inline-flex items-center justify-center rounded bg-emerald-500 hover:bg-emerald-600 text-white cursor-pointer active:scale-90 transition-all shadow-2xs"
-                              title="Save"
-                            >
-                              <Check class="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              type="button"
-                              @click="cancelInlineEdit"
-                              class="h-5 w-5 inline-flex items-center justify-center rounded bg-rose-500 hover:bg-rose-600 text-white cursor-pointer active:scale-90 transition-all shadow-2xs"
-                              title="Cancel"
-                            >
-                              <X class="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </div>
-                      </template>
-                      <template v-else>
-                        <span v-if="student.level" class="inline-flex px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase bg-blue-600 text-white shadow-2xs">
-                          {{ student.level }}
-                        </span>
-                        <span v-else class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
-                      </template>
+                      <span v-if="student.level" class="inline-flex px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase bg-blue-600 text-white shadow-2xs">
+                        {{ student.level }}
+                      </span>
+                      <span v-else class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
                     </div>
                   </div>
 
@@ -2543,42 +2245,10 @@ const handleRestoreStudent = () => {
                     </div>
 
                     <div class="mt-0.5">
-                      <template v-if="editingField === 'level2'">
-                        <div class="relative w-full min-w-0" @click.stop @keydown.esc="cancelInlineEdit">
-                          <select
-                            v-model="editValue"
-                            class="w-full pl-2.5 pr-14 py-1 text-xs font-bold uppercase bg-zinc-50 dark:bg-zinc-800 border border-blue-500 rounded-lg outline-none"
-                            autoFocus
-                          >
-                            <option value="">Select Level 2</option>
-                            <option v-for="l in levelOptions" :key="l" :value="l">{{ l }}</option>
-                          </select>
-                          <div class="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                            <button
-                              type="button"
-                              @click="saveInlineEdit('level2')"
-                              class="h-5 w-5 inline-flex items-center justify-center rounded bg-emerald-500 hover:bg-emerald-600 text-white cursor-pointer active:scale-90 transition-all shadow-2xs"
-                              title="Save"
-                            >
-                              <Check class="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              type="button"
-                              @click="cancelInlineEdit"
-                              class="h-5 w-5 inline-flex items-center justify-center rounded bg-rose-500 hover:bg-rose-600 text-white cursor-pointer active:scale-90 transition-all shadow-2xs"
-                              title="Cancel"
-                            >
-                              <X class="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </div>
-                      </template>
-                      <template v-else>
-                        <span v-if="student.level2" class="inline-flex px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase bg-amber-500 text-white shadow-2xs">
-                          {{ student.level2 }}
-                        </span>
-                        <span v-else class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
-                      </template>
+                      <span v-if="student.level2" class="inline-flex px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase bg-amber-500 text-white shadow-2xs">
+                        {{ student.level2 }}
+                      </span>
+                      <span v-else class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
                     </div>
                   </div>
 
@@ -2739,7 +2409,8 @@ const handleRestoreStudent = () => {
                   </button>
                 </div>
 
-                <div v-show="isUniversitiesOpen" class="flex flex-col gap-1.5">
+                <div class="accordion-collapse" :class="{ 'is-open': isUniversitiesOpen }">
+                <div class="accordion-collapse-inner flex flex-col gap-1.5">
                   <!-- Dynamic Loop for 5 University Slots -->
                   <template v-for="slot in 5" :key="slot">
                     <div
@@ -2900,6 +2571,7 @@ const handleRestoreStudent = () => {
                     </div>
                   </template>
                 </div>
+                </div>
               </div>
 
               <!-- 2.3 Family Info Header & Cards (Collapsible Accordion) -->
@@ -2917,7 +2589,8 @@ const handleRestoreStudent = () => {
                   </button>
                 </div>
 
-                <div v-show="isFamilyOpen" class="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                <div class="accordion-collapse" :class="{ 'is-open': isFamilyOpen }">
+                <div class="accordion-collapse-inner grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                   <!-- FATHER FULLNAME -->
                   <div
                     class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
@@ -2936,19 +2609,8 @@ const handleRestoreStudent = () => {
                       </div>
                     </div>
                     <div class="mt-0.5">
-                      <template v-if="editingField === 'father_name'">
-                        <div class="relative w-full min-w-0" @click.stop @keydown.enter="saveInlineEdit('father_name')" @keydown.esc="cancelInlineEdit">
-                          <input v-model="editValue" type="text" class="w-full pl-2.5 pr-14 py-1 text-xs font-bold uppercase bg-zinc-50 dark:bg-zinc-800 border border-blue-500 rounded-lg outline-none" autoFocus />
-                          <div class="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                            <button type="button" @click="saveInlineEdit('father_name')" class="h-5 w-5 inline-flex items-center justify-center rounded bg-emerald-500 hover:bg-emerald-600 text-white cursor-pointer active:scale-90 transition-all shadow-2xs" title="Save"><Check class="w-3.5 h-3.5" /></button>
-                            <button type="button" @click="cancelInlineEdit" class="h-5 w-5 inline-flex items-center justify-center rounded bg-rose-500 hover:bg-rose-600 text-white cursor-pointer active:scale-90 transition-all shadow-2xs" title="Cancel"><X class="w-3.5 h-3.5" /></button>
-                          </div>
-                        </div>
-                      </template>
-                      <template v-else>
-                        <span v-if="student.father_name" class="text-[13px] font-bold uppercase text-zinc-900 dark:text-zinc-100 tracking-tight">{{ student.father_name }}</span>
-                        <span v-else class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
-                      </template>
+                      <span v-if="student.father_name" class="text-[13px] font-bold uppercase text-zinc-900 dark:text-zinc-100 tracking-tight">{{ student.father_name }}</span>
+                      <span v-else class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
                     </div>
                   </div>
 
@@ -2970,19 +2632,8 @@ const handleRestoreStudent = () => {
                       </div>
                     </div>
                     <div class="mt-0.5">
-                      <template v-if="editingField === 'mother_name'">
-                        <div class="relative w-full min-w-0" @click.stop @keydown.enter="saveInlineEdit('mother_name')" @keydown.esc="cancelInlineEdit">
-                          <input v-model="editValue" type="text" class="w-full pl-2.5 pr-14 py-1 text-xs font-bold uppercase bg-zinc-50 dark:bg-zinc-800 border border-blue-500 rounded-lg outline-none" autoFocus />
-                          <div class="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                            <button type="button" @click="saveInlineEdit('mother_name')" class="h-5 w-5 inline-flex items-center justify-center rounded bg-emerald-500 hover:bg-emerald-600 text-white cursor-pointer active:scale-90 transition-all shadow-2xs" title="Save"><Check class="w-3.5 h-3.5" /></button>
-                            <button type="button" @click="cancelInlineEdit" class="h-5 w-5 inline-flex items-center justify-center rounded bg-rose-500 hover:bg-rose-600 text-white cursor-pointer active:scale-90 transition-all shadow-2xs" title="Cancel"><X class="w-3.5 h-3.5" /></button>
-                          </div>
-                        </div>
-                      </template>
-                      <template v-else>
-                        <span v-if="student.mother_name" class="text-[13px] font-bold uppercase text-zinc-900 dark:text-zinc-100 tracking-tight">{{ student.mother_name }}</span>
-                        <span v-else class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
-                      </template>
+                      <span v-if="student.mother_name" class="text-[13px] font-bold uppercase text-zinc-900 dark:text-zinc-100 tracking-tight">{{ student.mother_name }}</span>
+                      <span v-else class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
                     </div>
                   </div>
 
@@ -3004,25 +2655,8 @@ const handleRestoreStudent = () => {
                       </div>
                     </div>
                     <div class="mt-0.5">
-                      <template v-if="editingField === 'father_phone'">
-                        <div class="relative w-full min-w-0" @click.stop @keydown.enter="saveInlineEdit('father_phone')" @keydown.esc="cancelInlineEdit">
-                          <input
-                            :value="editValue"
-                            @input="onInlineInput('father_phone', $event)"
-                            type="text"
-                            class="w-full pl-2.5 pr-14 py-1 text-xs font-bold font-mono bg-zinc-50 dark:bg-zinc-800 border border-blue-500 rounded-lg outline-none"
-                            autoFocus
-                          />
-                          <div class="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                            <button type="button" @click="saveInlineEdit('father_phone')" class="h-5 w-5 inline-flex items-center justify-center rounded bg-emerald-500 hover:bg-emerald-600 text-white cursor-pointer active:scale-90 transition-all shadow-2xs" title="Save"><Check class="w-3.5 h-3.5" /></button>
-                            <button type="button" @click="cancelInlineEdit" class="h-5 w-5 inline-flex items-center justify-center rounded bg-rose-500 hover:bg-rose-600 text-white cursor-pointer active:scale-90 transition-all shadow-2xs" title="Cancel"><X class="w-3.5 h-3.5" /></button>
-                          </div>
-                        </div>
-                      </template>
-                      <template v-else>
-                        <span v-if="student.father_phone" class="text-[13px] font-bold font-mono text-zinc-900 dark:text-zinc-100 tracking-tight">{{ formatPhoneValue(student.father_phone) }}</span>
-                        <span v-else class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
-                      </template>
+                      <span v-if="student.father_phone" class="text-[13px] font-bold font-mono text-zinc-900 dark:text-zinc-100 tracking-tight">{{ formatPhoneValue(student.father_phone) }}</span>
+                      <span v-else class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
                     </div>
                   </div>
 
@@ -3044,25 +2678,8 @@ const handleRestoreStudent = () => {
                       </div>
                     </div>
                     <div class="mt-0.5">
-                      <template v-if="editingField === 'mother_phone'">
-                        <div class="relative w-full min-w-0" @click.stop @keydown.enter="saveInlineEdit('mother_phone')" @keydown.esc="cancelInlineEdit">
-                          <input
-                            :value="editValue"
-                            @input="onInlineInput('mother_phone', $event)"
-                            type="text"
-                            class="w-full pl-2.5 pr-14 py-1 text-xs font-bold font-mono bg-zinc-50 dark:bg-zinc-800 border border-blue-500 rounded-lg outline-none"
-                            autoFocus
-                          />
-                          <div class="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                            <button type="button" @click="saveInlineEdit('mother_phone')" class="h-5 w-5 inline-flex items-center justify-center rounded bg-emerald-500 hover:bg-emerald-600 text-white cursor-pointer active:scale-90 transition-all shadow-2xs" title="Save"><Check class="w-3.5 h-3.5" /></button>
-                            <button type="button" @click="cancelInlineEdit" class="h-5 w-5 inline-flex items-center justify-center rounded bg-rose-500 hover:bg-rose-600 text-white cursor-pointer active:scale-90 transition-all shadow-2xs" title="Cancel"><X class="w-3.5 h-3.5" /></button>
-                          </div>
-                        </div>
-                      </template>
-                      <template v-else>
-                        <span v-if="student.mother_phone" class="text-[13px] font-bold font-mono text-zinc-900 dark:text-zinc-100 tracking-tight">{{ formatPhoneValue(student.mother_phone) }}</span>
-                        <span v-else class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
-                      </template>
+                      <span v-if="student.mother_phone" class="text-[13px] font-bold font-mono text-zinc-900 dark:text-zinc-100 tracking-tight">{{ formatPhoneValue(student.mother_phone) }}</span>
+                      <span v-else class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
                     </div>
                   </div>
 
@@ -3084,19 +2701,8 @@ const handleRestoreStudent = () => {
                       </div>
                     </div>
                     <div class="mt-0.5">
-                      <template v-if="editingField === 'father_job'">
-                        <div class="relative w-full min-w-0" @click.stop @keydown.enter="saveInlineEdit('father_job')" @keydown.esc="cancelInlineEdit">
-                          <input v-model="editValue" type="text" class="w-full pl-2.5 pr-14 py-1 text-xs font-bold uppercase bg-zinc-50 dark:bg-zinc-800 border border-blue-500 rounded-lg outline-none" autoFocus />
-                          <div class="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                            <button type="button" @click="saveInlineEdit('father_job')" class="h-5 w-5 inline-flex items-center justify-center rounded bg-emerald-500 hover:bg-emerald-600 text-white cursor-pointer active:scale-90 transition-all shadow-2xs" title="Save"><Check class="w-3.5 h-3.5" /></button>
-                            <button type="button" @click="cancelInlineEdit" class="h-5 w-5 inline-flex items-center justify-center rounded bg-rose-500 hover:bg-rose-600 text-white cursor-pointer active:scale-90 transition-all shadow-2xs" title="Cancel"><X class="w-3.5 h-3.5" /></button>
-                          </div>
-                        </div>
-                      </template>
-                      <template v-else>
-                        <span v-if="student.father_job" class="text-[13px] font-bold uppercase text-zinc-900 dark:text-zinc-100 tracking-tight">{{ student.father_job }}</span>
-                        <span v-else class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
-                      </template>
+                      <span v-if="student.father_job" class="text-[13px] font-bold uppercase text-zinc-900 dark:text-zinc-100 tracking-tight">{{ student.father_job }}</span>
+                      <span v-else class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
                     </div>
                   </div>
 
@@ -3118,19 +2724,8 @@ const handleRestoreStudent = () => {
                       </div>
                     </div>
                     <div class="mt-0.5">
-                      <template v-if="editingField === 'mother_job'">
-                        <div class="relative w-full min-w-0" @click.stop @keydown.enter="saveInlineEdit('mother_job')" @keydown.esc="cancelInlineEdit">
-                          <input v-model="editValue" type="text" class="w-full pl-2.5 pr-14 py-1 text-xs font-bold uppercase bg-zinc-50 dark:bg-zinc-800 border border-blue-500 rounded-lg outline-none" autoFocus />
-                          <div class="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                            <button type="button" @click="saveInlineEdit('mother_job')" class="h-5 w-5 inline-flex items-center justify-center rounded bg-emerald-500 hover:bg-emerald-600 text-white cursor-pointer active:scale-90 transition-all shadow-2xs" title="Save"><Check class="w-3.5 h-3.5" /></button>
-                            <button type="button" @click="cancelInlineEdit" class="h-5 w-5 inline-flex items-center justify-center rounded bg-rose-500 hover:bg-rose-600 text-white cursor-pointer active:scale-90 transition-all shadow-2xs" title="Cancel"><X class="w-3.5 h-3.5" /></button>
-                          </div>
-                        </div>
-                      </template>
-                      <template v-else>
-                        <span v-if="student.mother_job" class="text-[13px] font-bold uppercase text-zinc-900 dark:text-zinc-100 tracking-tight">{{ student.mother_job }}</span>
-                        <span v-else class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
-                      </template>
+                      <span v-if="student.mother_job" class="text-[13px] font-bold uppercase text-zinc-900 dark:text-zinc-100 tracking-tight">{{ student.mother_job }}</span>
+                      <span v-else class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
                     </div>
                   </div>
 
@@ -3157,40 +2752,11 @@ const handleRestoreStudent = () => {
                       </div>
                     </div>
                     <div class="mt-0.5">
-                      <template v-if="editingField === 'notes'">
-                        <div class="relative w-full min-w-0" @click.stop @keydown.esc="cancelInlineEdit">
-                          <textarea
-                            v-model="editValue"
-                            rows="2"
-                            class="w-full pl-2.5 pr-14 py-1 text-xs font-medium bg-zinc-50 dark:bg-zinc-800 border border-blue-500 rounded-lg outline-none"
-                            autoFocus
-                          />
-                          <div class="absolute right-1 top-2 flex items-center gap-1">
-                            <button
-                              type="button"
-                              @click="saveInlineEdit('notes')"
-                              class="h-5 w-5 inline-flex items-center justify-center rounded bg-emerald-500 hover:bg-emerald-600 text-white cursor-pointer active:scale-90 transition-all shadow-2xs"
-                              title="Save"
-                            >
-                              <Check class="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              type="button"
-                              @click="cancelInlineEdit"
-                              class="h-5 w-5 inline-flex items-center justify-center rounded bg-rose-500 hover:bg-rose-600 text-white cursor-pointer active:scale-90 transition-all shadow-2xs"
-                              title="Cancel"
-                            >
-                              <X class="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </div>
-                      </template>
-                      <template v-else>
-                        <span v-if="student.notes" class="text-[13px] font-bold uppercase text-zinc-900 dark:text-zinc-100 leading-snug tracking-tight">{{ student.notes }}</span>
-                        <span v-else class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
-                      </template>
+                      <span v-if="student.notes" class="text-[13px] font-bold uppercase text-zinc-900 dark:text-zinc-100 leading-snug tracking-tight">{{ student.notes }}</span>
+                      <span v-else class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
                     </div>
                   </div>
+                </div>
                 </div>
               </div>
 
@@ -3230,38 +2796,7 @@ const handleRestoreStudent = () => {
                       </div>
                     </div>
                     <div class="mt-0.5">
-                      <template v-if="editingField === 'office'">
-                        <div class="relative w-full min-w-0" @click.stop @keydown.esc="cancelInlineEdit">
-                          <select
-                            v-model="editValue"
-                            class="bg-blue-900/90 text-white text-xs font-bold pl-2.5 pr-14 py-0.5 rounded-lg border border-white/30 outline-none w-full"
-                            autoFocus
-                          >
-                            <option v-for="opt in officeOptions" :key="opt" :value="opt">{{ opt }}</option>
-                          </select>
-                          <div class="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                            <button
-                              type="button"
-                              @click="saveInlineEdit('office')"
-                              class="h-5 w-5 inline-flex items-center justify-center rounded bg-emerald-500 hover:bg-emerald-600 text-white cursor-pointer active:scale-90 transition-all shadow-2xs"
-                              title="Save"
-                            >
-                              <Check class="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              type="button"
-                              @click="cancelInlineEdit"
-                              class="h-5 w-5 inline-flex items-center justify-center rounded bg-rose-500 hover:bg-rose-600 text-white cursor-pointer active:scale-90 transition-all shadow-2xs"
-                              title="Cancel"
-                            >
-                              <X class="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </div>
-                      </template>
-                      <template v-else>
-                        <span class="text-[13.5px] font-extrabold tracking-tight uppercase leading-tight">{{ student.office || 'Not provided' }}</span>
-                      </template>
+                      <span class="text-[13.5px] font-extrabold tracking-tight uppercase leading-tight">{{ student.office || 'Not provided' }}</span>
                     </div>
                   </div>
 
@@ -3386,18 +2921,7 @@ const handleRestoreStudent = () => {
                       </div>
                     </div>
                     <div class="mt-0.5">
-                      <template v-if="editingField === 'id'">
-                        <div class="relative w-full min-w-0" @click.stop @keydown.enter="saveInlineEdit('id')" @keydown.esc="cancelInlineEdit">
-                          <input v-model="editValue" type="text" class="w-full pl-2 pr-12 py-0.5 text-xs font-bold font-mono uppercase bg-zinc-50 dark:bg-zinc-800 border border-blue-500 rounded-lg outline-none" autoFocus />
-                          <div class="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                            <button type="button" @click="saveInlineEdit('id')" class="h-4.5 w-4.5 inline-flex items-center justify-center rounded bg-emerald-500 hover:bg-emerald-600 text-white cursor-pointer active:scale-90 transition-all shadow-2xs" title="Save"><Check class="w-3 h-3" /></button>
-                            <button type="button" @click="cancelInlineEdit" class="h-4.5 w-4.5 inline-flex items-center justify-center rounded bg-rose-500 hover:bg-rose-600 text-white cursor-pointer active:scale-90 transition-all shadow-2xs" title="Cancel"><X class="w-3 h-3" /></button>
-                          </div>
-                        </div>
-                      </template>
-                      <template v-else>
-                        <span class="font-bold font-mono text-[13px] text-zinc-900 dark:text-zinc-100 uppercase tracking-tight leading-tight">{{ student.id }}</span>
-                      </template>
+                      <span class="font-bold font-mono text-[13px] text-zinc-900 dark:text-zinc-100 uppercase tracking-tight leading-tight">{{ student.id }}</span>
                     </div>
                   </div>
 
@@ -3424,28 +2948,10 @@ const handleRestoreStudent = () => {
                       </div>
                     </div>
                     <div class="mt-0.5">
-                      <template v-if="editingField === 'student_group'">
-                        <div class="relative w-full min-w-0" @click.stop @keydown.esc="cancelInlineEdit">
-                          <select
-                            v-model="editValue"
-                            class="w-full pl-2 pr-12 py-0.5 text-xs font-bold uppercase bg-zinc-50 dark:bg-zinc-800 border border-blue-500 rounded-lg outline-none"
-                            autoFocus
-                          >
-                            <option value="">Select Group</option>
-                            <option v-for="g in groupOptions" :key="g" :value="g">{{ g }}</option>
-                          </select>
-                          <div class="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                            <button type="button" @click="saveInlineEdit('student_group')" class="h-4.5 w-4.5 inline-flex items-center justify-center rounded bg-emerald-500 hover:bg-emerald-600 text-white cursor-pointer active:scale-90 transition-all shadow-2xs" title="Save"><Check class="w-3 h-3" /></button>
-                            <button type="button" @click="cancelInlineEdit" class="h-4.5 w-4.5 inline-flex items-center justify-center rounded bg-rose-500 hover:bg-rose-600 text-white cursor-pointer active:scale-90 transition-all shadow-2xs" title="Cancel"><X class="w-3 h-3" /></button>
-                          </div>
-                        </div>
-                      </template>
-                      <template v-else>
-                        <span v-if="student.student_group" class="inline-flex px-2 py-0.2 rounded-full text-[10.5px] font-bold uppercase bg-indigo-600 text-white shadow-2xs">
-                          {{ student.student_group }}
-                        </span>
-                        <span v-else class="text-[11.5px] font-medium text-rose-500/80 italic">Not provided</span>
-                      </template>
+                      <span v-if="student.student_group" class="inline-flex px-2 py-0.2 rounded-full text-[10.5px] font-bold uppercase bg-indigo-600 text-white shadow-2xs">
+                        {{ student.student_group }}
+                      </span>
+                      <span v-else class="text-[11.5px] font-medium text-rose-500/80 italic">Not provided</span>
                     </div>
                   </div>
 
@@ -3472,28 +2978,10 @@ const handleRestoreStudent = () => {
                       </div>
                     </div>
                     <div class="mt-0.5">
-                      <template v-if="editingField === 'lead_by'">
-                        <div class="relative w-full min-w-0" @click.stop @keydown.esc="cancelInlineEdit">
-                          <select
-                            v-model="editValue"
-                            class="w-full pl-2 pr-12 py-0.5 text-xs font-bold uppercase bg-zinc-50 dark:bg-zinc-800 border border-blue-500 rounded-lg outline-none"
-                            autoFocus
-                          >
-                            <option value="">Select Lead Source</option>
-                            <option v-for="l in leadByOptions" :key="l" :value="l">{{ l }}</option>
-                          </select>
-                          <div class="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                            <button type="button" @click="saveInlineEdit('lead_by')" class="h-4.5 w-4.5 inline-flex items-center justify-center rounded bg-emerald-500 hover:bg-emerald-600 text-white cursor-pointer active:scale-90 transition-all shadow-2xs" title="Save"><Check class="w-3 h-3" /></button>
-                            <button type="button" @click="cancelInlineEdit" class="h-4.5 w-4.5 inline-flex items-center justify-center rounded bg-rose-500 hover:bg-rose-600 text-white cursor-pointer active:scale-90 transition-all shadow-2xs" title="Cancel"><X class="w-3 h-3" /></button>
-                          </div>
-                        </div>
-                      </template>
-                      <template v-else>
-                        <span v-if="student.lead_by" class="inline-flex px-2 py-0.2 rounded-full text-[10.5px] font-bold uppercase bg-cyan-600 text-white shadow-2xs">
-                          {{ student.lead_by }}
-                        </span>
-                        <span v-else class="text-[11.5px] font-medium text-rose-500/80 italic">Not provided</span>
-                      </template>
+                      <span v-if="student.lead_by" class="inline-flex px-2 py-0.2 rounded-full text-[10.5px] font-bold uppercase bg-cyan-600 text-white shadow-2xs">
+                        {{ student.lead_by }}
+                      </span>
+                      <span v-else class="text-[11.5px] font-medium text-rose-500/80 italic">Not provided</span>
                     </div>
                   </div>
 
@@ -3553,28 +3041,10 @@ const handleRestoreStudent = () => {
                       </div>
                     </div>
                     <div class="mt-0.5">
-                      <template v-if="editingField === 'coordinator'">
-                        <div class="relative w-full min-w-0" @click.stop @keydown.esc="cancelInlineEdit">
-                          <select
-                            v-model="editValue"
-                            class="w-full pl-2 pr-12 py-0.5 text-xs font-bold uppercase bg-zinc-50 dark:bg-zinc-800 border border-blue-500 rounded-lg outline-none"
-                            autoFocus
-                          >
-                            <option value="">Select Coordinator</option>
-                            <option v-for="c in coordinatorOptions" :key="c" :value="c">{{ c }}</option>
-                          </select>
-                          <div class="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                            <button type="button" @click="saveInlineEdit('coordinator')" class="h-4.5 w-4.5 inline-flex items-center justify-center rounded bg-emerald-500 hover:bg-emerald-600 text-white cursor-pointer active:scale-90 transition-all shadow-2xs" title="Save"><Check class="w-3 h-3" /></button>
-                            <button type="button" @click="cancelInlineEdit" class="h-4.5 w-4.5 inline-flex items-center justify-center rounded bg-rose-500 hover:bg-rose-600 text-white cursor-pointer active:scale-90 transition-all shadow-2xs" title="Cancel"><X class="w-3 h-3" /></button>
-                          </div>
-                        </div>
-                      </template>
-                      <template v-else>
-                        <span v-if="student.coordinator" class="inline-flex px-2 py-0.2 rounded-full text-[10.5px] font-bold uppercase bg-emerald-600 text-white shadow-2xs">
-                          {{ student.coordinator }}
-                        </span>
-                        <span v-else class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
-                      </template>
+                      <span v-if="student.coordinator" class="inline-flex px-2 py-0.2 rounded-full text-[10.5px] font-bold uppercase bg-emerald-600 text-white shadow-2xs">
+                        {{ student.coordinator }}
+                      </span>
+                      <span v-else class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
                     </div>
                   </div>
                 </div>
@@ -3584,6 +3054,132 @@ const handleRestoreStudent = () => {
           </div>
         </div>
 
+      </div>
+    </transition>
+
+    <!-- ═════════════════════════════════════════════════════════════
+         SHARED FIELD MODAL: single-field "Edit <Label>" popup used by
+         every simple text / select / date / phone / textarea field
+         ═════════════════════════════════════════════════════════════ -->
+    <transition
+      enter-active-class="transition duration-150 ease-out"
+      enter-from-class="opacity-0 scale-95"
+      enter-to-class="opacity-100 scale-100"
+      leave-active-class="transition duration-100 ease-in"
+      leave-from-class="opacity-100 scale-100"
+      leave-to-class="opacity-0 scale-95"
+    >
+      <div
+        v-if="isFieldModalOpen && activeFieldModalDef"
+        class="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs"
+        @click.self="cancelInlineEdit"
+        @keydown.esc="cancelInlineEdit"
+      >
+        <div class="relative w-full max-w-md overflow-visible rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-2xl p-6 z-[80]">
+          <button
+            type="button"
+            @click="cancelInlineEdit"
+            class="absolute right-4 top-4 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 p-1 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded transition-all cursor-pointer"
+          >
+            <X class="w-4 h-4" />
+          </button>
+
+          <h3 class="text-[17px] font-bold text-zinc-900 dark:text-zinc-100 mb-5 pr-6">
+            Edit {{ activeFieldModalDef.label }}
+          </h3>
+
+          <div>
+            <label class="block text-[12px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase mb-1.5">
+              {{ activeFieldModalDef.label }}
+            </label>
+
+            <select
+              v-if="activeFieldModalDef.type === 'select'"
+              v-model="editValue"
+              autoFocus
+              class="w-full bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 px-3 py-2 rounded-lg outline-none focus:border-blue-500 transition-colors text-[14px] font-semibold uppercase"
+            >
+              <option value="">Select {{ activeFieldModalDef.label }}</option>
+              <option v-for="opt in activeFieldModalDef.options?.()" :key="opt" :value="opt">{{ opt }}</option>
+            </select>
+
+            <template v-else-if="activeFieldModalDef.type === 'date'">
+              <input
+                :value="editValue"
+                @input="onInlineInput(editingField!, $event)"
+                type="text"
+                inputmode="numeric"
+                placeholder="YYYY-MM-DD"
+                maxlength="10"
+                autoFocus
+                class="w-full bg-zinc-50 dark:bg-zinc-800/80 border text-zinc-900 dark:text-zinc-100 px-3 py-2 rounded-lg outline-none transition-colors text-[14px] font-mono font-semibold"
+                :class="isFieldModalValueInvalid ? 'border-rose-500 focus:border-rose-500' : 'border-zinc-200 dark:border-zinc-700 focus:border-blue-500'"
+              />
+              <p v-if="isFieldModalValueInvalid" class="mt-1.5 text-[11.5px] font-medium text-rose-500">
+                Use YYYY-MM-DD format, e.g. 2008-07-24.
+              </p>
+            </template>
+
+            <textarea
+              v-else-if="activeFieldModalDef.type === 'textarea'"
+              :value="editValue"
+              @input="onInlineInput(editingField!, $event)"
+              rows="3"
+              autoFocus
+              class="w-full bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 px-3 py-2 rounded-lg outline-none focus:border-blue-500 transition-colors text-[14px]"
+              :class="activeFieldModalDef.uppercase ? 'uppercase font-bold' : ''"
+            />
+
+            <input
+              v-else-if="activeFieldModalDef.type === 'email'"
+              v-model="editValue"
+              type="email"
+              autoFocus
+              class="w-full bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 px-3 py-2 rounded-lg outline-none focus:border-blue-500 transition-colors text-[14px]"
+            />
+
+            <input
+              v-else-if="activeFieldModalDef.type === 'phone' || activeFieldModalDef.type === 'passport'"
+              :value="editValue"
+              @input="onInlineInput(editingField!, $event)"
+              type="text"
+              :placeholder="activeFieldModalDef.placeholder"
+              autoFocus
+              class="w-full bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 px-3 py-2 rounded-lg outline-none focus:border-blue-500 transition-colors text-[14px] font-mono font-semibold uppercase"
+            />
+
+            <input
+              v-else
+              :value="editValue"
+              @input="onInlineInput(editingField!, $event)"
+              type="text"
+              autoFocus
+              class="w-full bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 px-3 py-2 rounded-lg outline-none focus:border-blue-500 transition-colors text-[14px] font-semibold"
+              :class="activeFieldModalDef.uppercase ? 'uppercase' : ''"
+              @keydown.enter="saveInlineEdit(editingField!)"
+            />
+          </div>
+
+          <!-- Footer Buttons -->
+          <div class="flex justify-end gap-2 mt-6">
+            <button
+              type="button"
+              @click="cancelInlineEdit"
+              class="px-4 py-2 rounded-lg text-[13px] font-semibold text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              @click="saveInlineEdit(editingField!)"
+              :disabled="isFieldModalValueInvalid"
+              class="px-4 py-2 rounded-lg text-[13px] font-semibold bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white hover:opacity-90 transition-opacity flex items-center gap-2 shadow-xs cursor-pointer"
+            >
+              <Check class="w-4 h-4" />
+              <span>Save</span>
+            </button>
+          </div>
+        </div>
       </div>
     </transition>
 

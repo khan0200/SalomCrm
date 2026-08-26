@@ -171,6 +171,24 @@ button, input, select, textarea, optgroup, pre, code, kbd, samp, table, tr, th, 
   animation: sparkle-twinkle 0.9s ease-in-out infinite;
 }
 
+/* Accordion collapse: animates to/from height:auto via the grid-rows trick,
+   so sections like Contact/Education/Universities/Family expand and
+   collapse smoothly instead of snapping open/closed. */
+.accordion-collapse {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.accordion-collapse.is-open {
+  grid-template-rows: 1fr;
+}
+
+.accordion-collapse > .accordion-collapse-inner {
+  overflow: hidden;
+  min-height: 0;
+}
+
 /* Custom utility to strip input borders and outlines completely */
 .no-focus-outline,
 .no-focus-outline:focus,
