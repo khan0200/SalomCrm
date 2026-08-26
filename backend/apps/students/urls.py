@@ -8,7 +8,8 @@ from .views import (
     SchoolDirectoryViewSet, MajorOptionViewSet, ExtractDocumentView,
     VisaCheckView, VisaDownloadPdfView, VisaStudentQuickSearchView,
     VisaStudentLookupView, VisaStudentListCreateView, VisaStudentDetailView,
-    VisaStudentBulkDeleteView, VisaOptionsView
+    VisaStudentBulkDeleteView, VisaOptionsView,
+    ExcelFillAnalyzeView, ExcelFillGenerateView
 )
 
 router = DefaultRouter()
@@ -27,6 +28,8 @@ router.register(r'majors', MajorOptionViewSet, basename='major')
 
 urlpatterns = [
     path('students/export/excel/', StudentExportView.as_view(), name='student-export-excel'),
+    path('students/excel-fill/analyze/', ExcelFillAnalyzeView.as_view(), name='student-excel-fill-analyze'),
+    path('students/excel-fill/generate/', ExcelFillGenerateView.as_view(), name='student-excel-fill-generate'),
     path('students/extract-document/', ExtractDocumentView.as_view(), name='student-extract-document'),
     path('students/visa/check/', VisaCheckView.as_view(), name='student-visa-check'),
     path('students/visa/download-pdf/', VisaDownloadPdfView.as_view(), name='student-visa-download-pdf'),

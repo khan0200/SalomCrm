@@ -1,3 +1,6 @@
+import os
+import json
+from datetime import datetime
 import re
 import io
 import uuid
@@ -1498,6 +1501,150 @@ class VisaOptionsView(APIView):
             'coordinators': coordinators,
             'b2b': b2b
         })
+
+
+class ExcelFillAnalyzeView(APIView):
+    """
+    Analyzes an uploaded Excel (.xlsx) file, detects sheets, headers, columns,
+    and returns suggested semantic CRM field mappings.
+    """
+    permission_classes = [IsTenantUser]
+
+    def post(self, request: Request) -> Response:
+        file_obj = request.FILES.get('file')
+        if not file_obj:
+            return Response({'error': 'Excel fayl yuklanmadi (file is required)'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        if not file_obj.name.lower().endswith(('.xlsx', '.xlsm', '.xltx')):
+            return Response({'error': 'Faqat .xlsx formatidagi Excel fayllari qabul qilinadi'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            from .excel_fill_service import analyze_excel_file
+            file_bytes = file_obj.read()
+            result = analyze_excel_file(file_bytes)
+            return Response(result)
+        except Exception as e:
+            logger.exception("Error analyzing Excel file")
+            return Response({'error': f"Excel faylni tahlil qilishda xatolik yuz berdi: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ExcelFillGenerateView(APIView):
+    """
+    Generates and returns a filled Excel (.xlsx) file populated with selected CRM students
+    while strictly preserving styles, borders, fonts, colors, and formatting of original template.
+    """
+    permission_classes = [IsTenantUser]
+
+    def post(self, request: Request) -> HttpResponse:
+        import json
+        file_obj = request.FILES.get('file')
+        if not file_obj:
+            return HttpResponse(json.dumps({'error': 'Excel fayl yuklanmadi'}), content_type='application/json', status=400)
+
+        sheet_name = request.data.get('sheet_name', '')
+        fill_mode = request.data.get('fill_mode', 'append')
+        auto_increment_seq = str(request.data.get('auto_increment_sequence', 'true')).lower() == 'true'
+        
+        start_row_raw = request.data.get('start_row')
+        start_row = int(start_row_raw) if start_row_raw and str(start_row_raw).isdigit() else None
+
+        # Parse column mappings JSON
+        raw_mappings = request.data.get('column_mappings')
+        if isinstance(raw_mappings, str):
+            try:
+                column_mappings = json.loads(raw_mappings)
+            except Exception:
+                column_mappings = []
+        elif isinstance(raw_mappings, list):
+            column_mappings = raw_mappings
+        else:
+            column_mappings = []
+
+        # Parse student IDs JSON
+        raw_student_ids = request.data.get('student_ids')
+        if isinstance(raw_student_ids, str):
+            try:
+                student_ids = json.loads(raw_student_ids)
+            except Exception:
+                student_ids = []
+        elif isinstance(raw_student_ids, list):
+            student_ids = raw_student_ids
+        else:
+            student_ids = []
+
+        if not student_ids:
+            return HttpResponse(json.dumps({'error': 'Hech bo\'lmaganda bitta talaba tanlanishi kerak'}), content_type='application/json', status=400)
+
+        # Retrieve student records from tenant
+        tenant = getattr(request, 'tenant', None) or getattr(request.user, 'tenant', None)
+        qs = Student.objects.filter(id__in=student_ids)
+        if tenant:
+            qs = qs.filter(tenant=tenant)
+
+        # Preserve order of student_ids requested by user
+        student_map = {s.id: s for s in qs}
+        ordered_students = [student_map[sid] for sid in student_ids if sid in student_map]
+
+        students_data = [
+            {
+                "id": s.id,
+                "full_name": s.full_name,
+                "korean_name": s.korean_name,
+                "passport": s.passport,
+                "passport_issue_date": s.passport_issue_date,
+                "passport_expire_date": s.passport_expire_date,
+                "birthday": s.birthday,
+                "gender": s.gender,
+                "nationality": getattr(s, 'nationality', None) or 'UZBEKISTAN',
+                "phone1": s.phone1,
+                "phone2": s.phone2,
+                "email": s.email,
+                "address": s.address,
+                "father_name": s.father_name,
+                "father_phone": s.father_phone,
+                "father_job": s.father_job,
+                "mother_name": s.mother_name,
+                "mother_phone": s.mother_phone,
+                "mother_job": s.mother_job,
+                "level": s.level,
+                "major": s.major,
+                "final_school_name": s.final_school_name,
+                "gpa": s.gpa,
+                "language_certificate": s.language_certificate,
+                "certificate_score": s.certificate_score,
+                "certificate_valid_date": s.certificate_valid_date,
+                "university_1": s.university_1,
+            }
+            for s in ordered_students
+        ]
+
+        try:
+            from .excel_fill_service import generate_filled_excel
+            file_bytes = file_obj.read()
+            output_stream = generate_filled_excel(
+                file_bytes=file_bytes,
+                sheet_name=sheet_name,
+                column_mappings=column_mappings,
+                students_data=students_data,
+                fill_mode=fill_mode,
+                start_row=start_row,
+                auto_increment_sequence=auto_increment_seq
+            )
+
+            original_name = os.path.splitext(file_obj.name)[0]
+            export_filename = f"Filled_{original_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+            
+            response = HttpResponse(
+                output_stream.getvalue(),
+                content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            )
+            response['Content-Disposition'] = f'attachment; filename="{export_filename}"'
+            response['Access-Control-Expose-Headers'] = 'Content-Disposition'
+            return response
+        except Exception as e:
+            logger.exception("Error generating filled Excel file")
+            return HttpResponse(json.dumps({'error': f"Excel faylni to'ldirishda xatolik yuz berdi: {str(e)}"}), content_type='application/json', status=500)
+
 
 
 

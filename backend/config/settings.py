@@ -1,6 +1,7 @@
 """Django settings for Uniapp v3 CRM project."""
 
 import os
+import sys
 from pathlib import Path
 from datetime import timedelta
 from dotenv import load_dotenv
@@ -117,6 +118,7 @@ else:
             'NAME': BASE_DIR / 'db.sqlite3',
         }
     }
+
 
 
 # Cache configuration

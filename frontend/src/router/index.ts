@@ -63,6 +63,12 @@ const routes = [
         meta: { title: 'Visa Check' }
       },
       {
+        path: 'excel-fill',
+        name: 'excel-fill',
+        component: () => import('@/modules/excel_fill/ExcelFillPage.vue'),
+        meta: { title: 'Excel Fill' }
+      },
+      {
         path: 'tenants',
         name: 'tenants',
         component: TenantsPage,

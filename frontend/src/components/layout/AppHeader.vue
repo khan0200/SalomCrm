@@ -75,6 +75,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/status': 'Status Board',
   '/documents': 'Documents',
   '/visacheck': 'Visa Check',
+  '/excel-fill': 'Excel Fill',
   '/payments': 'Payments',
   '/settings': 'Settings',
   '/tenants': 'Tenants Management',
