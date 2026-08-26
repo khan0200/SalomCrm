@@ -205,7 +205,10 @@ const dynamicFolderCounts = computed(() => {
 })
 
 // ── Ultra-Fast Instant In-Memory Filter (0ms Latency on Folder Switch & Keystrokes) ──────────
-const filteredStudents = computed(() => {
+// Folder scope + search only — this is the base the filter modal's live
+// "Show N Students" preview must also start from, so its count matches the
+// table (which additionally applies the multi-criteria filters below).
+const folderScopedStudents = computed(() => {
   let list = allStudents.value
 
   // 1. Folder Scope (In-Memory Filter - 0 network delay)
@@ -246,6 +249,12 @@ const filteredStudents = computed(() => {
       })
     }
   }
+
+  return list
+})
+
+const filteredStudents = computed(() => {
+  let list = folderScopedStudents.value
 
   // 3. Multi-Criteria Filters (Tariffs, Levels, Groups, Certs, Scores, Tags, Leads)
   if (selectedTariffs.value.length > 0) {
@@ -750,7 +759,7 @@ dashboardStore.onExportExcel = handleExportExcel
     <StudentFilters
       :is-open="isFilterPanelOpen"
       :options="options"
-      :students="allStudents"
+      :students="folderScopedStudents"
       :selected-tariffs="selectedTariffs"
       :selected-levels="selectedLevels"
       :selected-groups="selectedGroups"
