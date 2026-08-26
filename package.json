@@ -7,6 +7,11 @@
     "dev:backend": "venv\\Scripts\\python backend/manage.py runserver 127.0.0.1:8000",
     "dev:frontend": "npm --prefix frontend run dev",
     "build": "npm --prefix frontend run build",
+    "site:assets": "venv\\Scripts\\python marketing/tools/build_assets.py",
+    "site:build": "node marketing/build.mjs --check",
+    "site:preview": "node marketing/build.mjs && node marketing/tools/preview.mjs",
+    "site:audit": "node marketing/tools/audit.mjs",
+    "site:indexnow": "node marketing/tools/indexnow.mjs",
     "migrate": "venv\\Scripts\\python backend/manage.py migrate",
     "seed": "venv\\Scripts\\python backend/manage.py seed_data",
     "test": "venv\\Scripts\\python backend/manage.py test apps.tenants.tests apps.payments.tests apps.students.tests"

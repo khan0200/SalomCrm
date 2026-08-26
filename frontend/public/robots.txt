@@ -1,0 +1,11 @@
+# crm.salomkorea.uz — the SalomCRM application.
+#
+# Everything here is behind authentication. There is nothing to index and
+# nothing that should be indexed, so this host is closed to all crawlers.
+#
+# The public SalomCRM site is https://salomkorea.uz
+
+User-agent: *
+Disallow: /
+
+Sitemap: https://salomkorea.uz/sitemap.xml

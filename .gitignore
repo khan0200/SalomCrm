@@ -21,6 +21,12 @@ dist-ssr/
 *.local
 *.tsbuildinfo
 
+# Generated data exports.
+# These contain real student and payment records — never commit them.
+Students_Export_*.xlsx
+Payments_Export_*.xlsx
+*_Export_*.xlsx
+
 # Logs
 npm-debug.log*
 yarn-debug.log*
