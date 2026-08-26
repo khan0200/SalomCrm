@@ -2,11 +2,42 @@ import logging
 from rest_framework import serializers
 from .models import (
     Student, Folder, TariffOption, EducationLevelOption,
-    StudentGroupOption, LeadSourceOption, CoordinatorOption
+    StudentGroupOption, LeadSourceOption, CoordinatorOption, StudentUserPreference
 )
 from .korean_translation_service import translate_name_to_korean
 
 logger = logging.getLogger(__name__)
+
+
+class MyPreferenceFieldsMixin:
+    """
+    Adds my_row_color/my_task_tags -- the current viewer's own "Only Me"
+    color/tags for a student, private and never shared with other users.
+
+    Resolved in bulk via context['my_prefs_by_student'] (populated by the
+    view for the exact page/row being serialized, avoiding N+1 queries on
+    the up-to-5000-row master roster fetch). Falls back to a single-row
+    query when that bulk context isn't present (e.g. serializer used
+    standalone outside the view's list()/retrieve() overrides).
+    """
+    def get_my_row_color(self, obj):
+        pref = self._get_my_pref(obj)
+        return pref.row_color if pref else None
+
+    def get_my_task_tags(self, obj):
+        pref = self._get_my_pref(obj)
+        return pref.task_tags if pref else []
+
+    def _get_my_pref(self, obj):
+        prefs_by_student = self.context.get('my_prefs_by_student')
+        if prefs_by_student is not None:
+            return prefs_by_student.get(obj.id)
+        request = self.context.get('request')
+        user = getattr(request, 'user', None)
+        if not user or not getattr(user, 'is_authenticated', False):
+            return None
+        return StudentUserPreference.objects.filter(student_id=obj.id, user=user).first()
+
 
 class FolderSerializer(serializers.ModelSerializer):
     student_count = serializers.SerializerMethodField()
@@ -24,12 +55,14 @@ class FolderSerializer(serializers.ModelSerializer):
         return qs.count()
 
 
-class StudentListSerializer(serializers.ModelSerializer):
+class StudentListSerializer(MyPreferenceFieldsMixin, serializers.ModelSerializer):
     """
     Complete serializer for main student roster table and memory cache.
     """
     creator_name = serializers.SerializerMethodField()
     created_by = serializers.SerializerMethodField()
+    my_row_color = serializers.SerializerMethodField()
+    my_task_tags = serializers.SerializerMethodField()
 
     class Meta:
         model = Student
@@ -47,12 +80,14 @@ class StudentListSerializer(serializers.ModelSerializer):
         return str(obj.created_by_id) if obj.created_by_id else None
 
 
-class StudentDetailSerializer(serializers.ModelSerializer):
+class StudentDetailSerializer(MyPreferenceFieldsMixin, serializers.ModelSerializer):
     """
     Full comprehensive serializer for Student Detail Drawer and standalone detail view.
     """
     creator_name = serializers.SerializerMethodField()
     created_by = serializers.SerializerMethodField()
+    my_row_color = serializers.SerializerMethodField()
+    my_task_tags = serializers.SerializerMethodField()
 
     class Meta:
         model = Student
@@ -156,6 +191,7 @@ class StudentCreateUpdateSerializer(serializers.ModelSerializer):
 class StudentSetColorSerializer(serializers.Serializer):
     row_color = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     status_row_color = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    scope = serializers.ChoiceField(choices=['mine', 'all'], required=False, default='all')
 
 
 class StudentSetFoldersSerializer(serializers.Serializer):

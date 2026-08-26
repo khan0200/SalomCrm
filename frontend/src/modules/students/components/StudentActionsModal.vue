@@ -19,9 +19,10 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'close'): void
-  (e: 'set-color', color: string | null): void
+  (e: 'set-color', color: string, scope: 'mine' | 'all'): void
+  (e: 'clear-color'): void
   (e: 'set-folders', folderIds: string[]): void
-  (e: 'toggle-tag', tagName: string): void
+  (e: 'toggle-tag', tagName: string, scope: 'mine' | 'all'): void
   (e: 'clear-all'): void
   (e: 'archive'): void
   (e: 'restore'): void
@@ -32,21 +33,35 @@ import { useCustomTags } from '@/composables/useCustomTags'
 
 const { tagsRegistry: customTagsRegistry, fetchTags } = useCustomTags()
 const isPermanentConfirmOpen = ref(false)
+const isVisibilityChoiceOpen = ref(false)
+const isClearAllConfirmOpen = ref(false)
+const visibilityChoiceLabel = ref('')
+
+type PendingAction =
+  | { kind: 'color'; color: string }   // always a real color -- clearing bypasses this entirely
+  | { kind: 'tag'; tagName: string }
+const pendingVisibilityAction = ref<PendingAction | null>(null)
 
 // Local optimistic state for instant UI reactivity
 const localColor = ref<string | null>(null)
+const localMyColor = ref<string | null>(null)
 const localFolderIds = ref<string[]>([])
 const localTags = ref<string[]>([])
+const localMyTags = ref<string[]>([])
 
 const syncFromStudent = (s: Student | null) => {
   if (s) {
     localColor.value = s.row_color ? String(s.row_color).toUpperCase() : null
+    localMyColor.value = s.my_row_color ? String(s.my_row_color).toUpperCase() : null
     localFolderIds.value = (s.folder_ids || []).map(String)
     localTags.value = [...(s.task_tags || [])]
+    localMyTags.value = [...(s.my_task_tags || [])]
   } else {
     localColor.value = null
+    localMyColor.value = null
     localFolderIds.value = []
     localTags.value = []
+    localMyTags.value = []
   }
 }
 
@@ -59,6 +74,9 @@ watch(() => props.isOpen, (newVal) => {
     fetchTags()
     syncFromStudent(props.student)
     isPermanentConfirmOpen.value = false
+    isVisibilityChoiceOpen.value = false
+    isClearAllConfirmOpen.value = false
+    pendingVisibilityAction.value = null
   }
 })
 
@@ -66,6 +84,11 @@ const handleKeyDown = (e: KeyboardEvent) => {
   if (e.key === 'Escape' && props.isOpen) {
     if (isPermanentConfirmOpen.value) {
       isPermanentConfirmOpen.value = false
+    } else if (isVisibilityChoiceOpen.value) {
+      isVisibilityChoiceOpen.value = false
+      pendingVisibilityAction.value = null
+    } else if (isClearAllConfirmOpen.value) {
+      isClearAllConfirmOpen.value = false
     } else {
       emit('close')
     }
@@ -82,9 +105,19 @@ onUnmounted(() => {
 })
 
 // Action handlers with immediate optimistic updates
-const handleColorSelect = (colorKey: string | null) => {
-  localColor.value = colorKey ? colorKey.toUpperCase() : null
-  emit('set-color', colorKey)
+const handleColorSelect = (colorKey: string) => {
+  pendingVisibilityAction.value = { kind: 'color', color: colorKey }
+  visibilityChoiceLabel.value = 'this color'
+  isVisibilityChoiceOpen.value = true
+}
+
+const handleColorClear = () => {
+  // Clearing is not a scope choice -- wipes both the shared and the
+  // caller's own personal color in one action, same as removing a
+  // dual-present tag.
+  localColor.value = null
+  localMyColor.value = null
+  emit('clear-color')
 }
 
 const handleClearFolders = () => {
@@ -106,20 +139,73 @@ const handleToggleFolder = (folderId: string) => {
 }
 
 const handleTagClick = (tagName: string) => {
-  const current = [...localTags.value]
-  const idx = current.indexOf(tagName)
-  if (idx > -1) {
-    current.splice(idx, 1)
-  } else {
-    current.push(tagName)
+  const inAll = localTags.value.includes(tagName)
+  const inMine = localMyTags.value.includes(tagName)
+  if (inAll && inMine) {
+    // Present in both scopes -- remove both copies in one action, no prompt.
+    localTags.value = localTags.value.filter(t => t !== tagName)
+    localMyTags.value = localMyTags.value.filter(t => t !== tagName)
+    emit('toggle-tag', tagName, 'all')
+    return
   }
-  localTags.value = current
-  emit('toggle-tag', tagName)
+  pendingVisibilityAction.value = { kind: 'tag', tagName }
+  visibilityChoiceLabel.value = 'this tag'
+  isVisibilityChoiceOpen.value = true
 }
 
+const resolveVisibilityChoice = (scope: 'mine' | 'all') => {
+  const action = pendingVisibilityAction.value
+  isVisibilityChoiceOpen.value = false
+  pendingVisibilityAction.value = null
+  if (!action) return
+  if (action.kind === 'color') {
+    if (scope === 'mine') {
+      localMyColor.value = action.color.toUpperCase()
+    } else {
+      localColor.value = action.color.toUpperCase()
+    }
+    emit('set-color', action.color, scope)
+  } else {
+    if (scope === 'mine') {
+      const current = [...localMyTags.value]
+      const idx = current.indexOf(action.tagName)
+      if (idx > -1) current.splice(idx, 1); else current.push(action.tagName)
+      localMyTags.value = current
+    } else {
+      const current = [...localTags.value]
+      const idx = current.indexOf(action.tagName)
+      if (idx > -1) current.splice(idx, 1); else current.push(action.tagName)
+      localTags.value = current
+    }
+    emit('toggle-tag', action.tagName, scope)
+  }
+}
+
+const cancelVisibilityChoice = () => {
+  isVisibilityChoiceOpen.value = false
+  pendingVisibilityAction.value = null
+}
+
+const hasSharedData = computed(() => {
+  const s = props.student
+  if (!s) return false
+  return !!s.row_color || (Array.isArray(s.task_tags) && s.task_tags.length > 0)
+})
+
 const handleClearAll = () => {
+  if (hasSharedData.value) {
+    isClearAllConfirmOpen.value = true
+    return
+  }
+  performClearAll()
+}
+
+const performClearAll = () => {
   localColor.value = null
+  localMyColor.value = null
   localTags.value = []
+  localMyTags.value = []
+  isClearAllConfirmOpen.value = false
   emit('clear-all')
 }
 
@@ -148,7 +234,7 @@ const handleRestoreStudent = () => {
       leave-to-class="opacity-0"
     >
       <div
-        v-if="isOpen && !isPermanentConfirmOpen"
+        v-if="isOpen && !isPermanentConfirmOpen && !isVisibilityChoiceOpen && !isClearAllConfirmOpen"
         class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto"
         @click.self="emit('close')"
       >
@@ -192,6 +278,16 @@ const handleRestoreStudent = () => {
                 <div class="font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider text-[10.5px] mb-3">
                   SELECT COLOR
                 </div>
+                <p v-if="localColor || localMyColor" class="text-[10.5px] text-zinc-400 dark:text-zinc-500 mb-2 flex items-center gap-3">
+                  <span v-if="localColor" class="inline-flex items-center gap-1">
+                    <span class="w-2 h-2 rounded-full" :style="{ backgroundColor: ROW_COLOR_MAP[localColor]?.ball }" />
+                    For All
+                  </span>
+                  <span v-if="localMyColor" class="inline-flex items-center gap-1">
+                    <span class="w-2 h-2 rounded-full ring-1 ring-offset-1 ring-zinc-400" :style="{ backgroundColor: ROW_COLOR_MAP[localMyColor]?.ball }" />
+                    Only Me
+                  </span>
+                </p>
                 <div class="flex items-center gap-3 flex-wrap">
                   <button
                     v-for="(data, name) in ROW_COLOR_MAP"
@@ -199,17 +295,17 @@ const handleRestoreStudent = () => {
                     type="button"
                     @click="handleColorSelect(String(name))"
                     class="relative w-8 h-8 rounded-full cursor-pointer transition-all duration-150 flex items-center justify-center shadow-xs"
-                    :class="localColor === name ? 'scale-110 ring-3 ring-offset-2 ring-zinc-700 dark:ring-zinc-200' : 'hover:scale-110 opacity-90 hover:opacity-100'"
+                    :class="(localColor === name || localMyColor === name) ? 'scale-110 ring-3 ring-offset-2 ring-zinc-700 dark:ring-zinc-200' : 'hover:scale-110 opacity-90 hover:opacity-100'"
                     :style="{ backgroundColor: data.ball }"
                     :title="data.name"
                   >
-                    <Check v-if="localColor === name" class="w-4 h-4 text-white stroke-[3.5]" />
+                    <Check v-if="localColor === name || localMyColor === name" class="w-4 h-4 text-white stroke-[3.5]" />
                   </button>
 
-                  <!-- Clear Color -->
+                  <!-- Clear Color: wipes both For All and Only Me colors at once -->
                   <button
                     type="button"
-                    @click="handleColorSelect(null)"
+                    @click="handleColorClear"
                     class="w-8 h-8 rounded-full border border-dashed border-zinc-300 dark:border-zinc-700 cursor-pointer flex items-center justify-center text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-700 dark:hover:text-zinc-200 transition-all"
                     title="Clear Color"
                   >
@@ -273,14 +369,15 @@ const handleRestoreStudent = () => {
                     type="button"
                     @click="handleTagClick(tag.name)"
                     class="flex items-center gap-2 pl-3 pr-3 py-2 rounded-xl border text-[12.5px] font-semibold transition-all text-left w-full cursor-pointer"
-                    :class="localTags.includes(tag.name)
+                    :class="(localTags.includes(tag.name) || localMyTags.includes(tag.name))
                       ? 'border-blue-600 bg-blue-100/90 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 shadow-xs font-bold ring-1 ring-blue-500/30'
                       : 'border-zinc-200 dark:border-zinc-700 bg-zinc-50/50 dark:bg-zinc-800/60 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-zinc-100'"
-                    :title="localTags.includes(tag.name) ? 'Click to remove tag' : 'Click to apply tag'"
+                    :title="(localTags.includes(tag.name) || localMyTags.includes(tag.name)) ? 'Click to remove tag' : 'Click to apply tag'"
                   >
                     <span class="leading-none text-base shrink-0">{{ tag.icon }}</span>
                     <span class="truncate flex-1">{{ tag.name }}</span>
-                    <CheckCircle2 v-if="localTags.includes(tag.name)" class="w-4 h-4 shrink-0 text-blue-600 dark:text-blue-400" />
+                    <span v-if="localMyTags.includes(tag.name) && !localTags.includes(tag.name)" class="text-[9px] font-bold uppercase text-zinc-400 shrink-0">only me</span>
+                    <CheckCircle2 v-if="localTags.includes(tag.name) || localMyTags.includes(tag.name)" class="w-4 h-4 shrink-0 text-blue-600 dark:text-blue-400" />
                   </button>
                 </div>
 
@@ -390,6 +487,111 @@ const handleRestoreStudent = () => {
               class="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold cursor-pointer shadow-md shadow-rose-600/20 transition-all"
             >
               Permanently Delete
+            </button>
+          </div>
+        </div>
+      </div>
+    </transition>
+
+    <!-- "Visible to" Choice Dialog: asked every time a NEW color is set or
+         a tag is toggled on -->
+    <transition
+      enter-active-class="transition duration-200 ease-out"
+      enter-from-class="opacity-0"
+      enter-to-class="opacity-100"
+      leave-active-class="transition duration-150 ease-in"
+      leave-from-class="opacity-100"
+      leave-to-class="opacity-0"
+    >
+      <div
+        v-if="isVisibilityChoiceOpen"
+        class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs"
+        @click.self="cancelVisibilityChoice"
+      >
+        <div class="relative w-full max-w-sm overflow-hidden rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-2xl p-6 space-y-4 text-xs">
+          <div class="flex items-start justify-between">
+            <div>
+              <h3 class="text-base font-bold text-zinc-900 dark:text-zinc-100">Visible to</h3>
+              <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Who should see {{ visibilityChoiceLabel }}?</p>
+            </div>
+            <button
+              @click="cancelVisibilityChoice"
+              class="rounded-lg p-1 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
+            >
+              <X class="w-4 h-4" />
+            </button>
+          </div>
+
+          <div class="flex flex-col gap-2.5 pt-1">
+            <button
+              type="button"
+              @click="resolveVisibilityChoice('mine')"
+              class="w-full py-3 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50/50 dark:bg-zinc-800/60 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-800 dark:text-zinc-200 font-bold cursor-pointer transition-all"
+            >
+              Only me
+            </button>
+            <button
+              type="button"
+              @click="resolveVisibilityChoice('all')"
+              class="w-full py-3 rounded-xl border border-blue-600 bg-blue-600 hover:bg-blue-700 text-white font-bold cursor-pointer transition-all shadow-md shadow-blue-600/20"
+            >
+              For all
+            </button>
+          </div>
+        </div>
+      </div>
+    </transition>
+
+    <!-- Clear All Confirmation: only shown when clearing would also wipe
+         shared (For All) color/tags visible to other users -->
+    <transition
+      enter-active-class="transition duration-200 ease-out"
+      enter-from-class="opacity-0"
+      enter-to-class="opacity-100"
+      leave-active-class="transition duration-150 ease-in"
+      leave-from-class="opacity-100"
+      leave-to-class="opacity-0"
+    >
+      <div
+        v-if="isClearAllConfirmOpen"
+        class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs"
+        @click.self="isClearAllConfirmOpen = false"
+      >
+        <div class="relative w-full max-w-md overflow-hidden rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-2xl p-6 space-y-4 text-xs">
+          <div class="flex items-start justify-between">
+            <div>
+              <h3 class="text-base font-bold text-zinc-900 dark:text-zinc-100">Clear Color & Tags?</h3>
+              <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">This also affects what other users see.</p>
+            </div>
+            <button
+              @click="isClearAllConfirmOpen = false"
+              class="rounded-lg p-1 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
+            >
+              <X class="w-4 h-4" />
+            </button>
+          </div>
+
+          <div class="p-3.5 rounded-xl bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200 flex items-start gap-2.5">
+            <AlertTriangle class="w-5 h-5 shrink-0 text-amber-600 mt-0.5" />
+            <p class="leading-relaxed">
+              This clears the shared color/tags that are visible to other users, along with your own personal ones. Continue?
+            </p>
+          </div>
+
+          <div class="flex items-center justify-end gap-2.5 pt-2">
+            <button
+              type="button"
+              @click="isClearAllConfirmOpen = false"
+              class="px-4 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 font-bold cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              @click="performClearAll"
+              class="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold cursor-pointer shadow-md shadow-red-600/20 transition-all"
+            >
+              Clear Everything
             </button>
           </div>
         </div>

@@ -17,7 +17,8 @@ from apps.core.permissions import IsTenantUser, IsTenantHeadManager, IsTenantMan
 from .models import (
     Student, Folder, TariffOption, EducationLevelOption,
     StudentGroupOption, LeadSourceOption, CoordinatorOption,
-    UniversityOption, UniversityStatusOption, TagOption, SchoolDirectory, MajorOption
+    UniversityOption, UniversityStatusOption, TagOption, SchoolDirectory, MajorOption,
+    StudentUserPreference
 )
 from .serializers import (
     StudentListSerializer, StudentDetailSerializer, StudentCreateUpdateSerializer,
@@ -219,6 +220,23 @@ class StudentViewSet(viewsets.ModelViewSet):
 
         return qs
 
+    def _serializer_for_prefs(self, page, many=True):
+        # Resolves the requesting user's "Only Me" preferences for exactly
+        # the ids being serialized in ONE bulk query, so
+        # StudentListSerializer/StudentDetailSerializer can expose
+        # my_row_color/my_task_tags without an N+1 query per row -- critical
+        # since the frontend master roster fetch pulls up to 5000 rows.
+        student_ids = [s.id for s in page] if many else [page.id]
+        my_prefs_by_student = {}
+        req: Any = self.request
+        user = req.user
+        if user and getattr(user, 'is_authenticated', False):
+            prefs = StudentUserPreference.objects.filter(student_id__in=student_ids, user=user)
+            my_prefs_by_student = {p.student_id: p for p in prefs}
+        serializer_class = self.get_serializer_class()
+        context = {**self.get_serializer_context(), 'my_prefs_by_student': my_prefs_by_student}
+        return serializer_class(page, many=many, context=context)
+
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
         params = getattr(request, 'query_params', getattr(request, 'GET', {}))
@@ -233,18 +251,23 @@ class StudentViewSet(viewsets.ModelViewSet):
             )
             page = self.paginate_queryset(student_list)
             if page is not None:
-                serializer = self.get_serializer(page, many=True)
+                serializer = self._serializer_for_prefs(page, many=True)
                 return self.get_paginated_response(serializer.data)
 
-            serializer = self.get_serializer(student_list, many=True)
+            serializer = self._serializer_for_prefs(student_list, many=True)
             return Response(serializer.data)
 
         page = self.paginate_queryset(queryset)
         if page is not None:
-            serializer = self.get_serializer(page, many=True)
+            serializer = self._serializer_for_prefs(page, many=True)
             return self.get_paginated_response(serializer.data)
 
-        serializer = self.get_serializer(queryset, many=True)
+        serializer = self._serializer_for_prefs(queryset, many=True)
+        return Response(serializer.data)
+
+    def retrieve(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self._serializer_for_prefs(instance, many=False)
         return Response(serializer.data)
 
     def perform_create(self, serializer):
@@ -286,15 +309,45 @@ class StudentViewSet(viewsets.ModelViewSet):
         student = self.get_object()
         serializer = StudentSetColorSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        if 'row_color' in serializer.validated_data:
-            student.row_color = serializer.validated_data['row_color']
-        if 'status_row_color' in serializer.validated_data:
-            student.status_row_color = serializer.validated_data['status_row_color']
-        student.save(update_fields=['row_color', 'status_row_color', 'updated_at'])
+        data = serializer.validated_data
+        scope = data.get('scope', 'all')
+
+        if 'status_row_color' in data:
+            student.status_row_color = data['status_row_color']
+            student.save(update_fields=['status_row_color', 'updated_at'])
+
+        my_row_color = None
+        if 'row_color' in data:
+            new_color = data['row_color']
+            if not new_color:
+                # Clearing (the X button): wipe both the shared color and
+                # the caller's own preference row in one action -- clearing
+                # is not a scope choice, it removes the color from the row.
+                student.row_color = None
+                student.save(update_fields=['row_color', 'updated_at'])
+                StudentUserPreference.objects.filter(
+                    student=student, user=request.user
+                ).update(row_color=None)
+                my_row_color = None
+            elif scope == 'mine':
+                pref, _ = StudentUserPreference.objects.get_or_create(
+                    tenant=student.tenant, student=student, user=request.user
+                )
+                pref.row_color = new_color
+                pref.save(update_fields=['row_color', 'updated_at'])
+                my_row_color = pref.row_color
+            else:
+                student.row_color = new_color
+                student.save(update_fields=['row_color', 'updated_at'])
+        else:
+            existing_pref = StudentUserPreference.objects.filter(student=student, user=request.user).first()
+            my_row_color = existing_pref.row_color if existing_pref else None
+
         return Response({
             'status': 'Color updated',
             'row_color': student.row_color,
-            'status_row_color': student.status_row_color
+            'status_row_color': student.status_row_color,
+            'my_row_color': my_row_color,
         })
 
     @action(detail=True, methods=['post'])
@@ -320,17 +373,50 @@ class StudentViewSet(viewsets.ModelViewSet):
     def toggle_tag(self, request, pk=None):
         student = self.get_object()
         tag_name = request.data.get('tag')
-        if tag_name:
-            current_tags = list(student.task_tags or [])
-            if tag_name in current_tags:
-                current_tags.remove(tag_name)
-            else:
-                current_tags.append(tag_name)
-            student.task_tags = current_tags
+        scope = request.data.get('scope', 'all')
+
+        if not tag_name:
+            return Response({'status': 'Tag toggled', 'task_tags': student.task_tags, 'my_task_tags': []})
+
+        pref = StudentUserPreference.objects.filter(student=student, user=request.user).first()
+        my_tags = list(pref.task_tags) if pref else []
+        all_tags = list(student.task_tags or [])
+
+        in_all = tag_name in all_tags
+        in_mine = tag_name in my_tags
+
+        if in_all and in_mine:
+            # Present in both scopes -- removing clears both copies at once,
+            # since visually it reads as one shared badge either way.
+            all_tags.remove(tag_name)
+            my_tags.remove(tag_name)
+            student.task_tags = all_tags
             student.save(update_fields=['task_tags', 'updated_at'])
+            if pref:
+                pref.task_tags = my_tags
+                pref.save(update_fields=['task_tags', 'updated_at'])
+        elif scope == 'mine':
+            if tag_name in my_tags:
+                my_tags.remove(tag_name)
+            else:
+                my_tags.append(tag_name)
+            pref, _ = StudentUserPreference.objects.get_or_create(
+                tenant=student.tenant, student=student, user=request.user
+            )
+            pref.task_tags = my_tags
+            pref.save(update_fields=['task_tags', 'updated_at'])
+        else:
+            if tag_name in all_tags:
+                all_tags.remove(tag_name)
+            else:
+                all_tags.append(tag_name)
+            student.task_tags = all_tags
+            student.save(update_fields=['task_tags', 'updated_at'])
+
         return Response({
             'status': 'Tag toggled',
-            'task_tags': student.task_tags
+            'task_tags': student.task_tags,
+            'my_task_tags': my_tags,
         })
 
     @action(detail=True, methods=['post'])
@@ -340,6 +426,16 @@ class StudentViewSet(viewsets.ModelViewSet):
         student.status_row_color = None
         student.task_tags = []
         student.save(update_fields=['row_color', 'status_row_color', 'task_tags', 'updated_at'])
+        StudentUserPreference.objects.filter(student=student, user=request.user).delete()
+        return Response({
+            'status': 'Cleared',
+            'row_color': student.row_color,
+            'status_row_color': student.status_row_color,
+            'task_tags': student.task_tags,
+            'my_row_color': None,
+            'my_task_tags': [],
+        })
+
     @action(detail=True, methods=['post'], url_path='translate-korean')
     def translate_korean(self, request, pk=None):
         """Translates/transliterates student's English Full Name to Korean using AI."""

@@ -44,20 +44,44 @@ import { useCustomTags } from '@/composables/useCustomTags'
 
 const { getTagIcon } = useCustomTags()
 
+// Text-contrast branches (below and throughout the template) key off this,
+// since either scope's color darkens the row background and needs the
+// higher-contrast text variant.
+const hasRowColor = computed(() => !!(props.student.row_color || props.student.my_row_color))
+
 const rowBgClass = computed(() => {
-  const colorKey = props.student.row_color?.toUpperCase()
-  if (!colorKey) return 'hover:bg-zinc-50/90 dark:hover:bg-zinc-800/40'
+  if (!hasRowColor.value) return 'hover:bg-zinc-50/90 dark:hover:bg-zinc-800/40'
   return 'hover:brightness-90 dark:hover:brightness-110 text-zinc-950 dark:text-white font-medium'
 })
 
 const rowBgStyle = computed(() => {
-  const colorKey = props.student.row_color?.toUpperCase()
-  if (!colorKey || !ROW_COLOR_MAP[colorKey]) return {}
-  const mapping = ROW_COLOR_MAP[colorKey]
-  return {
-    backgroundColor: mapping.bg,
-    borderLeft: `5px solid ${mapping.ball}`,
+  const allKey = props.student.row_color?.toUpperCase()
+  const mineKey = props.student.my_row_color?.toUpperCase()
+  const allMap = allKey ? ROW_COLOR_MAP[allKey] : null
+  const mineMap = mineKey ? ROW_COLOR_MAP[mineKey] : null
+
+  // Both a shared (For All) and the viewer's own (Only Me) color exist —
+  // blend them into a smooth gradient, visible only to this viewer.
+  if (allMap && mineMap) {
+    return {
+      backgroundImage: `linear-gradient(90deg, ${allMap.bg}, ${mineMap.bg})`,
+      borderLeft: `5px solid ${mineMap.ball}`,
+    }
   }
+  if (mineMap) {
+    return { backgroundColor: mineMap.bg, borderLeft: `5px solid ${mineMap.ball}` }
+  }
+  if (allMap) {
+    return { backgroundColor: allMap.bg, borderLeft: `5px solid ${allMap.ball}` }
+  }
+  return {}
+})
+
+// For-All tags + the viewer's own Only-Me tags, concatenated for display.
+const displayTags = computed(() => {
+  const all = (props.student.task_tags || []).map(t => ({ name: t, mine: false }))
+  const mine = (props.student.my_task_tags || []).map(t => ({ name: t, mine: true }))
+  return [...all, ...mine]
 })
 
 const isDocumentComplete = computed(() => {
@@ -148,7 +172,7 @@ const universities = computed(() => {
         <button
           @click.stop="copyName"
           class="p-1 rounded transition-colors cursor-pointer"
-          :class="student.row_color ? 'text-zinc-700 hover:text-zinc-950 dark:text-zinc-300 dark:hover:text-white' : 'text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200'"
+          :class="hasRowColor ? 'text-zinc-700 hover:text-zinc-950 dark:text-zinc-300 dark:hover:text-white' : 'text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200'"
           title="Copy full name"
         >
           <Check v-if="isNameCopied" class="w-3.5 h-3.5 text-emerald-600" />
@@ -159,7 +183,7 @@ const universities = computed(() => {
       <!-- Tariff subtext -->
       <div
         class="text-[10.5px] uppercase tracking-wider mt-0.5"
-        :class="student.row_color ? 'text-zinc-800/90 dark:text-zinc-200 font-bold' : 'text-zinc-400 dark:text-zinc-500 font-semibold'"
+        :class="hasRowColor ? 'text-zinc-800/90 dark:text-zinc-200 font-bold' : 'text-zinc-400 dark:text-zinc-500 font-semibold'"
       >
         {{ student.tariff || 'NO TARIFF' }}
       </div>
@@ -168,18 +192,18 @@ const universities = computed(() => {
     <!-- 3. Phone Numbers Column -->
     <td
       class="px-4 py-3 whitespace-nowrap font-mono text-xs"
-      :class="student.row_color ? 'text-zinc-950 dark:text-white font-semibold' : 'text-zinc-700 dark:text-zinc-300'"
+      :class="hasRowColor ? 'text-zinc-950 dark:text-white font-semibold' : 'text-zinc-700 dark:text-zinc-300'"
     >
       <div class="flex items-center justify-start gap-2">
         <div class="leading-tight space-y-0.5">
           <div>{{ student.phone1 || '—' }}</div>
-          <div v-if="student.phone2" :class="student.row_color ? 'text-zinc-800 dark:text-zinc-200 font-medium' : 'text-zinc-500 dark:text-zinc-400'">{{ student.phone2 }}</div>
+          <div v-if="student.phone2" :class="hasRowColor ? 'text-zinc-800 dark:text-zinc-200 font-medium' : 'text-zinc-500 dark:text-zinc-400'">{{ student.phone2 }}</div>
         </div>
 
         <button
           @click.stop="copyPhone"
           class="p-1 rounded transition-colors cursor-pointer shrink-0"
-          :class="student.row_color ? 'text-zinc-700 hover:text-zinc-950 dark:text-zinc-300 dark:hover:text-white' : 'text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200'"
+          :class="hasRowColor ? 'text-zinc-700 hover:text-zinc-950 dark:text-zinc-300 dark:hover:text-white' : 'text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200'"
           title="Copy ID, name, and phones"
         >
           <Check v-if="isPhoneCopied" class="w-3.5 h-3.5 text-emerald-600" />
@@ -231,10 +255,10 @@ const universities = computed(() => {
           :key="uniIdx"
           class="flex items-center gap-1.5 text-[11.5px]"
         >
-          <span :class="student.row_color ? 'text-zinc-700 dark:text-zinc-300 font-bold' : 'text-zinc-400'" class="shrink-0">•</span>
+          <span :class="hasRowColor ? 'text-zinc-700 dark:text-zinc-300 font-bold' : 'text-zinc-400'" class="shrink-0">•</span>
           <span
             class="truncate uppercase"
-            :class="student.row_color ? 'font-bold text-zinc-950 dark:text-white' : 'font-medium text-zinc-700 dark:text-zinc-300'"
+            :class="hasRowColor ? 'font-bold text-zinc-950 dark:text-white' : 'font-medium text-zinc-700 dark:text-zinc-300'"
             :title="String(uni)"
           >
             {{ uni }}
@@ -248,17 +272,22 @@ const universities = computed(() => {
     <td class="px-4 py-3 text-right whitespace-nowrap" @click.stop>
       <div class="flex items-center justify-end gap-2">
         <!-- Task Tags Container (Icon only with iOS-styled Solid Black Tooltip) -->
-        <div v-if="student.task_tags && student.task_tags.length > 0" class="flex items-center gap-1 flex-wrap justify-end shrink-0">
+        <div v-if="displayTags.length > 0" class="flex items-center gap-1 flex-wrap justify-end shrink-0">
           <div
-            v-for="(tag, tagIdx) in student.task_tags"
+            v-for="(tag, tagIdx) in displayTags"
             :key="tagIdx"
             class="group/tag relative inline-flex items-center justify-center"
           >
             <!-- Tag Icon Badge -->
             <div
-              class="inline-flex items-center justify-center w-6 h-6 text-sm bg-zinc-900/10 dark:bg-white/15 border border-zinc-900/20 dark:border-white/25 text-zinc-950 dark:text-zinc-50 rounded-lg shadow-2xs cursor-pointer select-none backdrop-blur-xs hover:scale-110 active:scale-95 transition-all"
+              class="relative inline-flex items-center justify-center w-6 h-6 text-sm bg-zinc-900/10 dark:bg-white/15 border border-zinc-900/20 dark:border-white/25 text-zinc-950 dark:text-zinc-50 rounded-lg shadow-2xs cursor-pointer select-none backdrop-blur-xs hover:scale-110 active:scale-95 transition-all"
             >
-              <span class="leading-none select-none">{{ getTagIcon(tag) }}</span>
+              <span class="leading-none select-none">{{ getTagIcon(tag.name) }}</span>
+              <!-- "Only visible to you" indicator -->
+              <span
+                v-if="tag.mine"
+                class="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-blue-500 ring-1 ring-white dark:ring-zinc-900"
+              />
             </div>
 
             <!-- iOS Styled Solid Black Tooltip -->
@@ -266,7 +295,8 @@ const universities = computed(() => {
               class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 opacity-0 scale-90 translate-y-1 group-hover/tag:opacity-100 group-hover/tag:scale-100 group-hover/tag:translate-y-0 transition-all duration-150 ease-out z-50 flex flex-col items-center select-none"
             >
               <div class="px-2.5 py-1 bg-black text-white text-[11px] font-semibold rounded-md shadow-xl shadow-black/50 whitespace-nowrap tracking-wide flex items-center gap-1">
-                <span>{{ tag }}</span>
+                <span>{{ tag.name }}</span>
+                <span v-if="tag.mine" class="text-zinc-400">(only you)</span>
               </div>
               <!-- Tooltip Arrow Tail -->
               <div class="w-0 h-0 border-x-4 border-x-transparent border-t-4 border-t-black -mt-[0.5px]"></div>

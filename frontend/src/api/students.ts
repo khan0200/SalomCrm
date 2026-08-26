@@ -75,7 +75,7 @@ export const studentsApi = {
     return response.data
   },
 
-  setColor: async (id: string, colors: { row_color?: string | null; status_row_color?: string | null }) => {
+  setColor: async (id: string, colors: { row_color?: string | null; status_row_color?: string | null; scope?: 'mine' | 'all' }) => {
     const response = await apiClient.post(`/students/${id}/set_color/`, colors)
     return response.data
   },
@@ -85,8 +85,8 @@ export const studentsApi = {
     return response.data
   },
 
-  toggleTag: async (id: string, tag: string) => {
-    const response = await apiClient.post(`/students/${id}/toggle_tag/`, { tag })
+  toggleTag: async (id: string, tag: string, scope: 'mine' | 'all' = 'all') => {
+    const response = await apiClient.post(`/students/${id}/toggle_tag/`, { tag, scope })
     return response.data
   },
 

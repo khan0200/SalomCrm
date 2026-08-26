@@ -189,6 +189,10 @@ button, input, select, textarea, optgroup, pre, code, kbd, samp, table, tr, th, 
   min-height: 0;
 }
 
+.accordion-collapse.is-open > .accordion-collapse-inner {
+  overflow: visible;
+}
+
 /* Custom utility to strip input borders and outlines completely */
 .no-focus-outline,
 .no-focus-outline:focus,

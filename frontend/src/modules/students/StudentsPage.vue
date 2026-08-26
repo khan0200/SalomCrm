@@ -455,14 +455,33 @@ const updateStudentMutation = useMutation({
 })
 
 const setColorMutation = useMutation({
-  mutationFn: ({ id, color }: { id: string; color: string | null }) => {
-    return studentsApi.setColor(id, { row_color: color })
+  mutationFn: ({ id, color, scope }: { id: string; color: string; scope: 'mine' | 'all' }) => {
+    return studentsApi.setColor(id, { row_color: color, scope })
   },
-  onMutate: async ({ id, color }) => {
+  onMutate: async ({ id, color, scope }) => {
     // 0ms instant UI update
-    updateMasterStudentOptimistically(id, s => ({ ...s, row_color: color }))
+    const patch = scope === 'mine' ? { my_row_color: color } : { row_color: color }
+    updateMasterStudentOptimistically(id, s => ({ ...s, ...patch }))
     if (selectedActionStudent.value && selectedActionStudent.value.id === id) {
-      selectedActionStudent.value = { ...selectedActionStudent.value, row_color: color }
+      selectedActionStudent.value = { ...selectedActionStudent.value, ...patch }
+    }
+  },
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: ['all-students-master'] })
+  }
+})
+
+// X (clear color) button — always wipes both the shared and the acting
+// user's own personal color in one action, no scope argument.
+const clearColorMutation = useMutation({
+  mutationFn: (id: string) => {
+    return studentsApi.setColor(id, { row_color: null })
+  },
+  onMutate: async (id) => {
+    const patch = { row_color: null, my_row_color: null }
+    updateMasterStudentOptimistically(id, s => ({ ...s, ...patch }))
+    if (selectedActionStudent.value && selectedActionStudent.value.id === id) {
+      selectedActionStudent.value = { ...selectedActionStudent.value, ...patch }
     }
   },
   onSuccess: () => {
@@ -488,37 +507,64 @@ const setFoldersMutation = useMutation({
   }
 })
 
+const toggleTagArray = (tags: string[] | undefined, tagName: string) => {
+  const current = Array.isArray(tags) ? [...tags] : []
+  const idx = current.indexOf(tagName)
+  if (idx > -1) {
+    current.splice(idx, 1)
+  } else {
+    current.push(tagName)
+  }
+  return current
+}
+
 const toggleTagMutation = useMutation({
-  mutationFn: ({ id, tagName }: { id: string; tagName: string }) => {
-    return studentsApi.toggleTag(id, tagName)
+  mutationFn: ({ id, tagName, scope }: { id: string; tagName: string; scope: 'mine' | 'all' }) => {
+    return studentsApi.toggleTag(id, tagName, scope)
   },
-  onMutate: async ({ id, tagName }) => {
+  onMutate: async ({ id, tagName, scope }) => {
     // 0ms instant UI update
     updateMasterStudentOptimistically(id, s => {
-      const currentTags = Array.isArray(s.task_tags) ? [...s.task_tags] : []
-      const idx = currentTags.indexOf(tagName)
-      if (idx > -1) {
-        currentTags.splice(idx, 1)
-      } else {
-        currentTags.push(tagName)
+      // Dual-presence (tag in both scopes) removes both copies at once,
+      // regardless of which scope was passed — mirror that optimistically.
+      const inAll = Array.isArray(s.task_tags) && s.task_tags.includes(tagName)
+      const inMine = Array.isArray(s.my_task_tags) && s.my_task_tags.includes(tagName)
+      if (inAll && inMine) {
+        return {
+          ...s,
+          task_tags: toggleTagArray(s.task_tags, tagName),
+          my_task_tags: toggleTagArray(s.my_task_tags, tagName),
+        }
       }
-      return { ...s, task_tags: currentTags }
+      return scope === 'mine'
+        ? { ...s, my_task_tags: toggleTagArray(s.my_task_tags, tagName) }
+        : { ...s, task_tags: toggleTagArray(s.task_tags, tagName) }
     })
     if (selectedActionStudent.value && selectedActionStudent.value.id === id) {
-      const currentTags = Array.isArray(selectedActionStudent.value.task_tags) ? [...selectedActionStudent.value.task_tags] : []
-      const idx = currentTags.indexOf(tagName)
-      if (idx > -1) {
-        currentTags.splice(idx, 1)
+      const s = selectedActionStudent.value
+      const inAll = Array.isArray(s.task_tags) && s.task_tags.includes(tagName)
+      const inMine = Array.isArray(s.my_task_tags) && s.my_task_tags.includes(tagName)
+      if (inAll && inMine) {
+        selectedActionStudent.value = {
+          ...s,
+          task_tags: toggleTagArray(s.task_tags, tagName),
+          my_task_tags: toggleTagArray(s.my_task_tags, tagName),
+        }
       } else {
-        currentTags.push(tagName)
+        selectedActionStudent.value = scope === 'mine'
+          ? { ...s, my_task_tags: toggleTagArray(s.my_task_tags, tagName) }
+          : { ...s, task_tags: toggleTagArray(s.task_tags, tagName) }
       }
-      selectedActionStudent.value = { ...selectedActionStudent.value, task_tags: currentTags }
     }
   },
   onSuccess: (data, variables) => {
-    if (data?.task_tags) {
-      updateMasterStudentOptimistically(variables.id, s => ({ ...s, task_tags: data.task_tags }))
-    }
+    // Server is the source of truth here — the dual-presence removal case
+    // changes both arrays server-side in one call.
+    updateMasterStudentOptimistically(variables.id, s => ({
+      ...s,
+      task_tags: data?.task_tags ?? s.task_tags,
+      my_task_tags: data?.my_task_tags ?? s.my_task_tags,
+    }))
   }
 })
 
@@ -528,9 +574,10 @@ const clearAllMutation = useMutation({
   },
   onMutate: async (id) => {
     // 0ms instant UI update
-    updateMasterStudentOptimistically(id, s => ({ ...s, row_color: null, task_tags: [] }))
+    const patch = { row_color: null, task_tags: [], my_row_color: null, my_task_tags: [] }
+    updateMasterStudentOptimistically(id, s => ({ ...s, ...patch }))
     if (selectedActionStudent.value && selectedActionStudent.value.id === id) {
-      selectedActionStudent.value = { ...selectedActionStudent.value, row_color: null, task_tags: [] }
+      selectedActionStudent.value = { ...selectedActionStudent.value, ...patch }
     }
   },
   onSuccess: () => {
@@ -933,9 +980,10 @@ dashboardStore.onExportExcel = handleExportExcel
       :student="selectedActionStudent"
       :folders="folders"
       @close="isActionsModalOpen = false"
-      @set-color="c => selectedActionStudent && setColorMutation.mutate({ id: selectedActionStudent.id, color: c })"
+      @set-color="(c, scope) => selectedActionStudent && setColorMutation.mutate({ id: selectedActionStudent.id, color: c, scope })"
+      @clear-color="() => selectedActionStudent && clearColorMutation.mutate(selectedActionStudent.id)"
       @set-folders="fIds => selectedActionStudent && setFoldersMutation.mutate({ id: selectedActionStudent.id, folderIds: fIds })"
-      @toggle-tag="t => selectedActionStudent && toggleTagMutation.mutate({ id: selectedActionStudent.id, tagName: t })"
+      @toggle-tag="(t, scope) => selectedActionStudent && toggleTagMutation.mutate({ id: selectedActionStudent.id, tagName: t, scope })"
       @clear-all="() => selectedActionStudent && clearAllMutation.mutate(selectedActionStudent.id)"
       @archive="() => selectedActionStudent && archiveMutation.mutate(selectedActionStudent.id)"
       @restore="() => selectedActionStudent && restoreMutation.mutate(selectedActionStudent.id)"

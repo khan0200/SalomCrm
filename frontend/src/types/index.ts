@@ -163,6 +163,8 @@ export interface Student {
   is_deleted?: boolean
   row_color?: string | null
   task_tags?: string[]
+  my_row_color?: string | null
+  my_task_tags?: string[]
   folder_ids?: string[]
   google_drive_url?: string | null
   google_drive_folder_id?: string | null

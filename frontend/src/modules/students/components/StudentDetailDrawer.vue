@@ -2416,7 +2416,10 @@ const handleRestoreStudent = () => {
                     <div
                       v-if="slot === 1 || (slot === 2 && showUni2) || (slot === 3 && showUni3) || (slot === 4 && showUni4) || (slot === 5 && showUni5)"
                       class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
-                      :class="[copiedField === `uni${slot}` && 'animate-copy-press']"
+                      :class="[
+                        copiedField === `uni${slot}` && 'animate-copy-press',
+                        activeStatusDropdown === slot ? 'z-50' : 'z-[1]'
+                      ]"
                       @click="handleCopy(`uni${slot}`, (student as any)[`university_${slot}`] ? `${(student as any)[`university_${slot}`]} (${(student as any)[`university_${slot}_status`] || 'Chosen'})` : '')"
                       :title="`Single-click to copy University ${slot}`"
                     >
@@ -2519,8 +2522,8 @@ const handleRestoreStudent = () => {
                           </div>
                           
                           <div class="mt-1.5 flex items-center relative flex-wrap gap-2">
-                            <!-- Clickable Status Badge Pill -->
-                            <div class="relative">
+                            <!-- Clickable Status Badge Pill & Dropdown -->
+                            <div class="relative" :class="{ 'z-50': activeStatusDropdown === slot }">
                               <button
                                 type="button"
                                 @click.stop="activeStatusDropdown = activeStatusDropdown === slot ? null : slot"
@@ -2531,10 +2534,17 @@ const handleRestoreStudent = () => {
                                 <span>{{ (student as any)[`university_${slot}_status`] || 'Chosen' }}</span>
                               </button>
 
+                              <!-- Backdrop to close dropdown on click outside -->
+                              <div
+                                v-if="activeStatusDropdown === slot"
+                                class="fixed inset-0 z-[9990]"
+                                @click.stop="activeStatusDropdown = null"
+                              />
+
                               <!-- Floating Status Dropdown Popover -->
                               <div
                                 v-if="activeStatusDropdown === slot"
-                                class="absolute left-0 top-full mt-1.5 w-36 bg-white dark:bg-[#1c1c1e] border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-xl z-50 py-1 flex flex-col gap-0.5 animate-in fade-in slide-in-from-top-1 duration-100"
+                                class="absolute left-0 top-full mt-1.5 w-36 bg-white dark:bg-[#1c1c1e] border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-2xl z-[9999] py-1 flex flex-col gap-0.5 animate-in fade-in slide-in-from-top-1 duration-100 ring-1 ring-black/5 dark:ring-white/10"
                                 @click.stop
                               >
                                 <div class="px-2.5 py-1 text-[10px] uppercase font-bold tracking-wider text-zinc-400 border-b border-zinc-100 dark:border-zinc-800 select-none">
@@ -2775,7 +2785,7 @@ const handleRestoreStudent = () => {
                 <div class="flex flex-col gap-1.5">
                   <!-- 3.1 OFFICE CARD (iOS Gradient Widget) -->
                   <div
-                    class="relative bg-gradient-to-br from-[#1d70f2] to-[#1456c2] text-white rounded-[13px] px-2.5 py-1.5 shadow-sm shadow-blue-500/15 border border-white/15 flex flex-col justify-between cursor-pointer hover:brightness-105 transition-all duration-150 group/card"
+                    class="relative bg-gradient-to-br from-[#1d70f2] to-[#1456c2] text-white rounded-[13px] px-2.5 py-2 shadow-sm shadow-blue-500/15 border border-white/15 flex flex-col justify-between cursor-pointer hover:brightness-105 transition-all duration-150 group/card"
                     :class="[copiedField === 'office' && 'animate-copy-press']"
                     @click="handleCopy('office', student.office)"
                     title="Single-click to copy Office"
@@ -2803,7 +2813,7 @@ const handleRestoreStudent = () => {
                   <!-- 3.2 BALANCE CARD (iOS Gradient Widget) -->
                   <div
                     v-if="authStore.canAccessPayments"
-                    class="relative rounded-[13px] px-2.5 py-1.5 text-white flex flex-col justify-between shadow-sm border border-white/15 cursor-pointer hover:brightness-105 transition-all duration-150 group/card"
+                    class="relative rounded-[13px] px-2.5 py-2 text-white flex flex-col justify-between shadow-sm border border-white/15 cursor-pointer hover:brightness-105 transition-all duration-150 group/card"
                     :class="[
                       computedBalance < 0 ? 'bg-gradient-to-br from-[#e11d48] to-[#be123c] shadow-rose-500/20' : 'bg-gradient-to-br from-[#059669] to-[#047857] shadow-emerald-500/20',
                       copiedField === 'balance' && 'animate-copy-press'
@@ -2830,7 +2840,7 @@ const handleRestoreStudent = () => {
                   <!-- 3.3 PAYMENTS DONE CARD (iOS Gradient Widget) -->
                   <div
                     v-if="authStore.canAccessPayments"
-                    class="relative bg-gradient-to-br from-[#10b981] to-[#059669] rounded-[13px] px-2.5 py-1.5 text-white flex flex-col justify-between shadow-sm shadow-emerald-500/20 border border-white/15 cursor-pointer hover:brightness-105 transition-all duration-150 group/card"
+                    class="relative bg-gradient-to-br from-[#10b981] to-[#059669] rounded-[13px] px-2.5 py-2 text-white flex flex-col justify-between shadow-sm shadow-emerald-500/20 border border-white/15 cursor-pointer hover:brightness-105 transition-all duration-150 group/card"
                     :class="[copiedField === 'payments_done' && 'animate-copy-press']"
                     @click="handleCopy('payments_done', String(computedPaymentsDone))"
                     title="Single-click to copy Payments Done"
@@ -2854,7 +2864,7 @@ const handleRestoreStudent = () => {
                   <!-- 3.4 DISCOUNT CARD (iOS Gradient Widget) -->
                   <div
                     v-if="authStore.canAccessPayments"
-                    class="relative bg-gradient-to-br from-[#f97316] to-[#ea580c] rounded-[13px] px-2.5 py-1.5 text-white flex flex-col justify-between shadow-sm shadow-orange-500/20 border border-white/15 cursor-pointer hover:brightness-105 transition-all duration-150 group/card"
+                    class="relative bg-gradient-to-br from-[#f97316] to-[#ea580c] rounded-[13px] px-2.5 py-2 text-white flex flex-col justify-between shadow-sm shadow-orange-500/20 border border-white/15 cursor-pointer hover:brightness-105 transition-all duration-150 group/card"
                     :class="[copiedField === 'discount' && 'animate-copy-press']"
                     @click="handleCopy('discount', String(computedDiscount))"
                     title="Single-click to copy Discount"
@@ -2878,7 +2888,7 @@ const handleRestoreStudent = () => {
                   <!-- 3.5 WITHDRAWN CARD (iOS Gradient Widget) -->
                   <div
                     v-if="authStore.canAccessPayments && computedWithdrawals > 0"
-                    class="relative bg-gradient-to-br from-[#e11d48] to-[#be123c] rounded-[13px] px-2.5 py-1.5 text-white flex flex-col justify-between shadow-sm shadow-rose-500/20 border border-white/15 cursor-pointer hover:brightness-105 transition-all duration-150 group/card"
+                    class="relative bg-gradient-to-br from-[#e11d48] to-[#be123c] rounded-[13px] px-2.5 py-2 text-white flex flex-col justify-between shadow-sm shadow-rose-500/20 border border-white/15 cursor-pointer hover:brightness-105 transition-all duration-150 group/card"
                     :class="[copiedField === 'withdrawn' && 'animate-copy-press']"
                     @click="handleCopy('withdrawn', String(computedWithdrawals))"
                     title="Single-click to copy Withdrawn"
@@ -2900,7 +2910,7 @@ const handleRestoreStudent = () => {
 
                   <!-- 3.6 STUDENT ID -->
                   <div
-                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[12px] px-2.5 py-1 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
+                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[12px] px-2.5 py-[5.5px] shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
                     :class="[copiedField === 'student_id' && 'animate-copy-press']"
                     @click="handleCopy('student_id', student.id)"
                     title="Single-click to copy Student ID"
@@ -2927,7 +2937,7 @@ const handleRestoreStudent = () => {
 
                   <!-- 3.7 GROUP -->
                   <div
-                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[12px] px-2.5 py-1 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
+                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[12px] px-2.5 py-[5.5px] shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
                     :class="[copiedField === 'student_group' && 'animate-copy-press']"
                     @click="handleCopy('student_group', student.student_group)"
                     title="Single-click to copy Group"
@@ -2957,7 +2967,7 @@ const handleRestoreStudent = () => {
 
                   <!-- 3.8 LEAD BY -->
                   <div
-                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[12px] px-2.5 py-1 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
+                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[12px] px-2.5 py-[5.5px] shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
                     :class="[copiedField === 'lead_by' && 'animate-copy-press']"
                     @click="handleCopy('lead_by', student.lead_by)"
                     title="Single-click to copy Lead Source"
@@ -2987,7 +2997,7 @@ const handleRestoreStudent = () => {
 
                   <!-- 3.9 MISSING DOCUMENTS -->
                   <div
-                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[12px] px-2.5 py-1 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
+                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[12px] px-2.5 py-[5.5px] shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
                     :class="[copiedField === 'missing_docs' && 'animate-copy-press']"
                     @click="handleCopy('missing_docs', student.pick_needed ? student.pick_needed.join(', ') : 'FULL OK')"
                     title="Single-click to copy Missing Documents"
@@ -3020,7 +3030,7 @@ const handleRestoreStudent = () => {
 
                   <!-- 3.10 KORDINATOR -->
                   <div
-                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[12px] px-2.5 py-1 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
+                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[12px] px-2.5 py-[5.5px] shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
                     :class="[copiedField === 'coordinator' && 'animate-copy-press']"
                     @click="handleCopy('coordinator', student.coordinator)"
                     title="Single-click to copy Coordinator"

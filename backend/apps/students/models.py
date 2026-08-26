@@ -1,5 +1,6 @@
 import uuid
 from decimal import Decimal
+from django.conf import settings
 from django.db import models
 from django.contrib.postgres.fields import ArrayField
 from apps.core.models import TenantAwareModel, TimeStampedModel, SimpleTenantModel
@@ -360,6 +361,45 @@ class TagOption(SimpleTenantModel):
 
     def __str__(self):
         return f"{self.icon} {self.name}"
+
+
+class StudentUserPreference(models.Model):
+    """
+    Per-user "Only Me" row color and tags for a student -- private data
+    visible only to the acting user, never shared tenant-wide. Deliberately
+    separate from Student.row_color/task_tags (which remain the "For All"
+    shared fields, unchanged).
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(
+        'tenants.Tenant', on_delete=models.CASCADE,
+        related_name='student_user_preferences', db_index=True,
+    )
+    student = models.ForeignKey(
+        Student, on_delete=models.CASCADE,
+        related_name='user_preferences', db_index=True,
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+        related_name='student_preferences', db_index=True,
+    )
+    row_color = models.CharField(max_length=50, blank=True, null=True)
+    task_tags = ArrayField(models.CharField(max_length=100), default=list, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'crm_student_user_preferences'
+        constraints = [
+            models.UniqueConstraint(fields=['student', 'user'], name='uniq_student_user_preference')
+        ]
+        indexes = [
+            models.Index(fields=['tenant', 'user']),
+            models.Index(fields=['student', 'user']),
+        ]
+
+    def __str__(self):
+        return f"{self.student_id} / {self.user_id} preference"
 
 
 class SchoolDirectory(TimeStampedModel):
