@@ -64,13 +64,35 @@ def _send_telegram_worker(bot_token: str, chat_ids: List[str], message: str) -> 
         except Exception as e:
             logger.error(f"Error sending Telegram notification to {cid}: {e}")
 
-def send_telegram_notification(message: str, chat_ids: Optional[Union[str, List[str]]] = None, sync: bool = False) -> bool:
+def _tenant_telegram_config(tenant: Any) -> tuple:
+    """Per-tenant bot token/chat id, stored in Tenant.settings (JSONField)."""
+    settings_dict = getattr(tenant, 'settings', None) or {}
+    bot_token = (settings_dict.get('telegram_bot_token') or '').strip()
+    chat_id = (settings_dict.get('telegram_chat_id') or '').strip()
+    return bot_token, chat_id
+
+def send_telegram_notification(message: str, chat_ids: Optional[Union[str, List[str]]] = None,
+                                sync: bool = False, tenant: Any = None) -> bool:
     """
     Sends an HTML formatted message to configured Telegram chats.
     By default runs asynchronously to never block API responses.
+
+    Tenant-scoped events (registrations, payments, ...) always pass `tenant`
+    and must use ONLY that tenant's own bot/chat (Tenant.settings). There is
+    no platform-wide fallback here: a tenant that hasn't configured its own
+    bot simply gets no notification, rather than one leaking into a shared
+    chat another tenant might be using. The env-configured DEFAULT_BOT_TOKEN/
+    DEFAULT_CHAT_ID only applies to the tenant-less admin/dev path (no
+    `tenant` argument at all).
     """
-    bot_token = os.environ.get("TELEGRAM_BOT_TOKEN") or DEFAULT_BOT_TOKEN
-    raw_chat_ids = chat_ids or os.environ.get("TELEGRAM_CHAT_ID") or DEFAULT_CHAT_ID
+    if tenant is not None:
+        bot_token, raw_chat_ids = _tenant_telegram_config(tenant)
+        if not bot_token or not raw_chat_ids:
+            logger.info(f"Telegram notification skipped: tenant {getattr(tenant, 'id', tenant)!r} has no bot configured.")
+            return False
+    else:
+        bot_token = os.environ.get("TELEGRAM_BOT_TOKEN") or DEFAULT_BOT_TOKEN
+        raw_chat_ids = chat_ids or os.environ.get("TELEGRAM_CHAT_ID") or DEFAULT_CHAT_ID
 
     if not bot_token or not raw_chat_ids:
         logger.info("Telegram notification skipped: bot token or chat ID not set.")
@@ -123,7 +145,7 @@ def notify_new_registration(student: Any) -> None:
 
         lines.append(f"\n📅 <b>Time:</b> {cur_datetime}")
         msg = "\n".join(lines)
-        send_telegram_notification(msg)
+        send_telegram_notification(msg, tenant=getattr(student, 'tenant', None))
     except Exception as e:
         logger.error(f"Failed to create new registration telegram message: {e}")
 
@@ -163,7 +185,7 @@ def notify_payment_received(payment: Any, student: Optional[Any] = None) -> None
             f"📝 <b>Note:</b> {notes}\n\n"
             f"📅 <b>Date:</b> {cur_date}"
         )
-        send_telegram_notification(msg)
+        send_telegram_notification(msg, tenant=getattr(payment, 'tenant', None) or getattr(student_obj, 'tenant', None))
     except Exception as e:
         logger.error(f"Failed to create payment received telegram message: {e}")
 
@@ -188,7 +210,7 @@ def notify_discount_added(payment: Any, student: Optional[Any] = None) -> None:
             f"📝 <b>Note:</b> {notes}\n\n"
             f"📅 <b>Date:</b> {cur_date}"
         )
-        send_telegram_notification(msg)
+        send_telegram_notification(msg, tenant=getattr(payment, 'tenant', None) or getattr(student_obj, 'tenant', None))
     except Exception as e:
         logger.error(f"Failed to create discount added telegram message: {e}")
 
@@ -213,7 +235,7 @@ def notify_withdrawal(payment: Any, student: Optional[Any] = None) -> None:
             f"📝 <b>Note:</b> {notes}\n\n"
             f"📅 <b>Date:</b> {cur_date}"
         )
-        send_telegram_notification(msg)
+        send_telegram_notification(msg, tenant=getattr(payment, 'tenant', None) or getattr(student_obj, 'tenant', None))
     except Exception as e:
         logger.error(f"Failed to create withdrawal telegram message: {e}")
 
@@ -234,6 +256,6 @@ def notify_payment_deleted(payment: Any, student: Optional[Any] = None) -> None:
             f"💰 <b>Amount:</b> -{amount_str} UZS\n"
             f"💼 <b>Balance:</b> {balance_str} UZS"
         )
-        send_telegram_notification(msg)
+        send_telegram_notification(msg, tenant=getattr(payment, 'tenant', None) or getattr(student_obj, 'tenant', None))
     except Exception as e:
         logger.error(f"Failed to create payment deleted telegram message: {e}")

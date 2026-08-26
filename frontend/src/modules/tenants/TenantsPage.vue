@@ -8,7 +8,8 @@ import type { Tenant } from '@/types'
 import {
   ShieldAlert, Building2, Plus, Users, GraduationCap,
   CheckCircle2, XCircle, ArrowRight, Loader2,
-  Pencil, Trash2, Power, PowerOff, Check, AlertTriangle, LogOut
+  Pencil, Trash2, Power, PowerOff, Check, AlertTriangle, LogOut,
+  Eye, EyeOff
 } from 'lucide-vue-next'
 
 import CreateTenantModal from './components/CreateTenantModal.vue'
@@ -67,7 +68,11 @@ const exitTenantContext = () => {
 
 // ── Edit ──────────────────────────────────────────────────────────────
 const editingTenant = ref<Tenant | null>(null)
-const editForm = ref({ name: '', description: '' })
+const editForm = ref({ name: '', description: '', telegram_bot_token: '', telegram_chat_id: '' })
+const showBotToken = ref(false)
+const showChatId = ref(false)
+const editBotToken = ref(false)
+const editChatId = ref(false)
 
 // Login credentials live on the tenant's Head Manager users, not on the
 // Tenant row. A tenant can have several, so the admin to edit is picked
@@ -162,7 +167,13 @@ const openEdit = (t: Tenant) => {
   editForm.value = {
     name: t.name || '',
     description: t.description || '',
+    telegram_bot_token: t.settings?.telegram_bot_token || '',
+    telegram_chat_id: t.settings?.telegram_chat_id || '',
   }
+  showBotToken.value = false
+  showChatId.value = false
+  editBotToken.value = false
+  editChatId.value = false
   loadAdmins(t.id)
 }
 
@@ -194,6 +205,10 @@ const submitEdit = () => {
   updateTenantMutation.mutate({
     name: editForm.value.name.trim(),
     description: editForm.value.description,
+    settings: {
+      telegram_bot_token: editForm.value.telegram_bot_token.trim(),
+      telegram_chat_id: editForm.value.telegram_chat_id.trim(),
+    },
   })
 }
 
@@ -431,7 +446,7 @@ const openDelete = (t: Tenant) => {
       :is-open="!!editingTenant"
       title="Edit Tenant"
       subtitle="Update this agency's name, branding, or description."
-      max-width="max-w-md"
+      max-width="max-w-xl"
       @close="editingTenant = null"
     >
       <form @submit.prevent="submitEdit" class="space-y-4 text-xs">
@@ -468,6 +483,96 @@ const openDelete = (t: Tenant) => {
             placeholder="Optional agency note..."
             class="w-full px-3 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800"
           />
+        </div>
+
+        <div class="pt-3 border-t border-zinc-100 dark:border-zinc-800 space-y-3">
+          <div class="flex items-center justify-between gap-2">
+            <div>
+              <h4 class="font-bold text-zinc-800 dark:text-zinc-200">Telegram Notifications</h4>
+              <p class="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">
+                This agency's own bot and chat. Registrations, payments, and withdrawals for this tenant only are sent here — never mixed with another agency's chat.
+              </p>
+            </div>
+            <button
+              v-if="editForm.telegram_bot_token || editForm.telegram_chat_id"
+              type="button"
+              @click="editForm.telegram_bot_token = ''; editForm.telegram_chat_id = ''"
+              class="shrink-0 px-2.5 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 font-bold text-[11px] transition-colors cursor-pointer"
+              title="Clear Telegram settings (Save to apply)"
+            >
+              Clear
+            </button>
+          </div>
+
+          <div>
+            <label class="block font-bold text-zinc-700 dark:text-zinc-300 mb-1">Bot Token</label>
+            <div class="relative">
+              <input
+                v-model="editForm.telegram_bot_token"
+                :type="showBotToken ? 'text' : 'password'"
+                :readonly="!editBotToken"
+                placeholder="123456789:AAExampleBotTokenHere"
+                autocomplete="off"
+                class="w-full px-3 py-2 pr-16 rounded-xl border border-zinc-300 dark:border-zinc-700 font-mono"
+                :class="editBotToken ? 'bg-white dark:bg-zinc-800' : 'bg-zinc-100 dark:bg-zinc-850 cursor-default'"
+              />
+              <div class="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                <button
+                  type="button"
+                  @click="showBotToken = !showBotToken"
+                  class="p-1 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 cursor-pointer"
+                  :title="showBotToken ? 'Hide' : 'Show'"
+                >
+                  <EyeOff v-if="showBotToken" class="w-4 h-4" />
+                  <Eye v-else class="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  @click="editBotToken = !editBotToken"
+                  class="p-1 cursor-pointer"
+                  :class="editBotToken ? 'text-brand-500' : 'text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300'"
+                  :title="editBotToken ? 'Editing' : 'Edit'"
+                >
+                  <Pencil class="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label class="block font-bold text-zinc-700 dark:text-zinc-300 mb-1">Chat ID</label>
+            <div class="relative">
+              <input
+                v-model="editForm.telegram_chat_id"
+                :type="showChatId ? 'text' : 'password'"
+                :readonly="!editChatId"
+                placeholder="-1001234567890 (or several, comma-separated)"
+                autocomplete="off"
+                class="w-full px-3 py-2 pr-16 rounded-xl border border-zinc-300 dark:border-zinc-700 font-mono"
+                :class="editChatId ? 'bg-white dark:bg-zinc-800' : 'bg-zinc-100 dark:bg-zinc-850 cursor-default'"
+              />
+              <div class="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                <button
+                  type="button"
+                  @click="showChatId = !showChatId"
+                  class="p-1 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 cursor-pointer"
+                  :title="showChatId ? 'Hide' : 'Show'"
+                >
+                  <EyeOff v-if="showChatId" class="w-4 h-4" />
+                  <Eye v-else class="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  @click="editChatId = !editChatId"
+                  class="p-1 cursor-pointer"
+                  :class="editChatId ? 'text-brand-500' : 'text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300'"
+                  :title="editChatId ? 'Editing' : 'Edit'"
+                >
+                  <Pencil class="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div class="pt-4 flex items-center justify-end gap-2.5 border-t border-zinc-100 dark:border-zinc-800">

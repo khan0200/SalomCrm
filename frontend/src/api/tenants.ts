@@ -29,6 +29,10 @@ export const tenantsApi = {
   updateTenant: async (id: string, data: {
     name?: string
     description?: string
+    settings?: {
+      telegram_bot_token?: string
+      telegram_chat_id?: string
+    }
   }): Promise<Tenant> => {
     const response = await apiClient.patch(`/tenants/${id}/`, data)
     return response.data

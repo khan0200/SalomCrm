@@ -14,6 +14,9 @@ class TelegramNotifyView(APIView):
         if not message or not str(message).strip():
             return Response({"error": "A non-empty message is required"}, status=status.HTTP_400_BAD_REQUEST)
 
-        chat_id = request.data.get("chat_id")
-        success = send_telegram_notification(message=str(message).strip(), chat_ids=chat_id)
+        # Always route through the caller's own tenant bot/chat — a plain
+        # chat_id in the request body must never let one tenant's user push
+        # a message into another tenant's (or the platform's) chat.
+        tenant = getattr(request, 'tenant', None) or getattr(request.user, 'tenant', None)
+        success = send_telegram_notification(message=str(message).strip(), tenant=tenant)
         return Response({"success": success})

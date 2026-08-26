@@ -7,6 +7,11 @@ export interface Tenant {
   is_active: boolean
   logo_url?: string | null
   description?: string | null
+  settings?: {
+    telegram_bot_token?: string
+    telegram_chat_id?: string
+    [key: string]: unknown
+  } | null
   user_count?: number
   student_count?: number
   created_at: string

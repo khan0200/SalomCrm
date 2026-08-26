@@ -28,6 +28,16 @@ class TenantSerializer(serializers.ModelSerializer):
         )
         read_only_fields = ('created_at', 'updated_at')
 
+    def update(self, instance, validated_data):
+        # `settings` is a single JSONField shared by unrelated features, so a
+        # PATCH that only means to change e.g. telegram_bot_token must not
+        # wipe out other keys already stored there — merge instead of replace.
+        if 'settings' in validated_data:
+            merged = dict(instance.settings or {})
+            merged.update(validated_data['settings'] or {})
+            validated_data['settings'] = merged
+        return super().update(instance, validated_data)
+
     def get_user_count(self, obj):
         return obj.users.count()
 
