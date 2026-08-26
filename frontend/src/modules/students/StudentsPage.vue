@@ -21,6 +21,7 @@ import { useStudentDashboardStore } from '@/stores/studentDashboard'
 import { useCustomTags } from '@/composables/useCustomTags'
 import { useDocumentHelpers } from '@/composables/useDocumentHelpers'
 import { getTariffPrice } from '@/utils/tariff'
+import { normalizeCertificateScore } from '@/utils/certificateScore'
 
 const queryClient = useQueryClient()
 const uiStore = useUiStore()
@@ -296,13 +297,12 @@ const filteredStudents = computed(() => {
   }
 
   if (selectedScores.value.length > 0) {
+    const normalizedSelected = selectedScores.value.map(normalizeCertificateScore)
     list = list.filter(s => {
-      return selectedScores.value.some(score => {
-        const sc = score.toLowerCase()
-        return (s.certificate_score || '').toLowerCase() === sc ||
-               (s.certificate_score_2 || '').toLowerCase() === sc ||
-               (s.certificate_score_3 || '').toLowerCase() === sc
-      })
+      const studentScores = [s.certificate_score, s.certificate_score_2, s.certificate_score_3]
+        .map(normalizeCertificateScore)
+        .filter(Boolean)
+      return normalizedSelected.some(sc => studentScores.includes(sc))
     })
   }
 
@@ -316,9 +316,13 @@ const filteredStudents = computed(() => {
   if (selectedLeads.value.length > 0) {
     const hasNoLead = selectedLeads.value.includes('NO_LEADBY') || selectedLeads.value.includes('No Lead by')
     const cleanLeads = selectedLeads.value.filter(l => l !== 'NO_LEADBY' && l !== 'No Lead by')
+    // lead_by is free-text, so the same source can be saved with different
+    // casing (e.g. "Ali Uncle" vs "ALI UNCLE") — compare case-insensitively
+    // or a student silently drops out of the filtered results.
+    const cleanLeadsLower = cleanLeads.map(l => l.toLowerCase())
     list = list.filter(s => {
-      if (hasNoLead && (!s.lead_by || cleanLeads.includes(s.lead_by))) return true
-      return s.lead_by && cleanLeads.includes(s.lead_by)
+      if (hasNoLead && (!s.lead_by || cleanLeadsLower.includes(s.lead_by.toLowerCase()))) return true
+      return !!s.lead_by && cleanLeadsLower.includes(s.lead_by.toLowerCase())
     })
   }
 

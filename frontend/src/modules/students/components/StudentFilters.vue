@@ -6,6 +6,7 @@ import {
 import type { Student } from '@/types'
 import { useCustomTags } from '@/composables/useCustomTags'
 import { PICK_NEEDED_LIST, useDocumentHelpers } from '@/composables/useDocumentHelpers'
+import { normalizeCertificateScore } from '@/utils/certificateScore'
 
 const props = withDefaults(defineProps<{
   isOpen: boolean
@@ -330,11 +331,12 @@ const matchingStudentsCount = computed(() => {
       const cert = draftCerts.value[0] || ''
       const scores = [student.certificate_score, student.certificate_score_2, student.certificate_score_3]
       const certs = [student.language_certificate, student.language_certificate_2, student.language_certificate_3]
+      const normalizedDraftScores = draftScores.value.map(normalizeCertificateScore)
       const matchesScore = certs.some((c, i) => {
         if (!c || c === 'NO CERTIFICATE') return false
         if (c.toUpperCase() !== cert.toUpperCase()) return false
-        const score = (scores[i] || '').trim().toUpperCase()
-        return draftScores.value.some(f => f.toUpperCase() === score)
+        const score = normalizeCertificateScore(scores[i])
+        return normalizedDraftScores.includes(score)
       })
       if (!matchesScore) return false
     }
@@ -351,10 +353,13 @@ const matchingStudentsCount = computed(() => {
       if (!matchesTag) return false
     }
 
-    // 7. Lead By filter
+    // 7. Lead By filter (case-insensitive -- lead_by is free-text and the
+    // same source can be saved with different casing, e.g. "Ali Uncle" vs
+    // "ALI UNCLE")
     if (draftLeads.value.length > 0) {
-      const matchNoLead = draftLeads.value.includes('NO_LEADBY') && !student.lead_by
-      const matchLead = student.lead_by && draftLeads.value.includes(student.lead_by)
+      const draftLeadsLower = draftLeads.value.map(l => l.toLowerCase())
+      const matchNoLead = draftLeadsLower.includes('no_leadby') && !student.lead_by
+      const matchLead = !!student.lead_by && draftLeadsLower.includes(student.lead_by.toLowerCase())
       if (!matchNoLead && !matchLead) return false
     }
 
@@ -394,11 +399,11 @@ const getOptionCount = (catId: string, opt: string): number => {
       const cert = activeCertForScore.value || ''
       const scores = [s.certificate_score, s.certificate_score_2, s.certificate_score_3]
       const certs = [s.language_certificate, s.language_certificate_2, s.language_certificate_3]
+      const normalizedOpt = normalizeCertificateScore(opt)
       return certs.some((c, i) => {
         if (!c || c === 'NO CERTIFICATE') return false
         if (c.toUpperCase() !== cert.toUpperCase()) return false
-        const score = (scores[i] || '').trim().toUpperCase()
-        return score === opt.toUpperCase()
+        return normalizeCertificateScore(scores[i]) === normalizedOpt
       })
     }
     if (catId === 'missing') {
@@ -414,7 +419,7 @@ const getOptionCount = (catId: string, opt: string): number => {
     }
     if (catId === 'lead') {
       if (opt === 'NO_LEADBY') return !s.lead_by
-      return s.lead_by === opt
+      return !!s.lead_by && s.lead_by.toLowerCase() === opt.toLowerCase()
     }
     return true
   }).length

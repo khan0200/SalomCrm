@@ -187,8 +187,23 @@ class StudentViewSet(viewsets.ModelViewSet):
 
         scores = (getlist('score') if getlist else None) or (params.get('score', '').split(',') if params.get('score') else [])
         if scores and scores[0]:
-            score_q = Q()
+            # Scores are free-text (e.g. "7" vs "7.0" for the same score), so
+            # also match the alternate numeric form -- not just the exact
+            # string the filter UI sent -- or students saved without the
+            # decimal silently drop out of the filtered results.
+            score_variants = set()
             for s in scores:
+                score_variants.add(s)
+                try:
+                    num = float(s)
+                    score_variants.add(str(num))
+                    if num == int(num):
+                        score_variants.add(str(int(num)))
+                        score_variants.add(f"{num:.1f}")
+                except (TypeError, ValueError):
+                    pass
+            score_q = Q()
+            for s in score_variants:
                 score_q |= Q(certificate_score__iexact=s) | Q(certificate_score_2__iexact=s) | Q(certificate_score_3__iexact=s)
             qs = qs.filter(score_q)
 
@@ -201,11 +216,20 @@ class StudentViewSet(viewsets.ModelViewSet):
 
         leads = (getlist('lead_by') if getlist else None) or (params.get('lead_by', '').split(',') if params.get('lead_by') else [])
         if leads and leads[0]:
+            # lead_by is free-text, so the same source can be saved with
+            # different casing (e.g. "Ali Uncle" vs "ALI UNCLE") -- match
+            # case-insensitively or a student silently drops out.
             if 'NO_LEADBY' in leads or 'No Lead by' in leads:
                 clean_leads = [l for l in leads if l not in ('NO_LEADBY', 'No Lead by')]
-                qs = qs.filter(Q(lead_by__in=clean_leads) | Q(lead_by__isnull=True) | Q(lead_by=''))
+                lead_q = Q(lead_by__isnull=True) | Q(lead_by='')
+                for l in clean_leads:
+                    lead_q |= Q(lead_by__iexact=l)
+                qs = qs.filter(lead_q)
             else:
-                qs = qs.filter(lead_by__in=leads)
+                lead_q = Q()
+                for l in leads:
+                    lead_q |= Q(lead_by__iexact=l)
+                qs = qs.filter(lead_q)
 
         office = params.get('office')
         if office:
