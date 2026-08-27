@@ -87,7 +87,29 @@ def connect():
             '    $env:DEPLOY_PASSWORD = "..."   (PowerShell)\n'
             '    export DEPLOY_PASSWORD="..."   (bash)'
         )
+    if client.get_transport():
+        client.get_transport().set_keepalive(10)
     return client
+
+
+def _ensure_session(client):
+    import time
+    transport = client.get_transport()
+    if transport is not None and transport.is_active():
+        try:
+            return transport.open_session()
+        except Exception:
+            pass
+    # Reconnect if transport died
+    try:
+        client.close()
+    except Exception:
+        pass
+    time.sleep(1)
+    new_client = connect()
+    # mutate client to new transport
+    client._transport = new_client._transport
+    return client.get_transport().open_session()
 
 
 def run(client, command, check=True, label=None, timeout=900, node=False):
@@ -99,8 +121,7 @@ def run(client, command, check=True, label=None, timeout=900, node=False):
     command = (ENV + command) if node else command
     print("$ %s" % shown, flush=True)
     
-    transport = client.get_transport()
-    channel = transport.open_session()
+    channel = _ensure_session(client)
     channel.set_combine_stderr(True)
     channel.exec_command(command)
     
