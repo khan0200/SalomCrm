@@ -44,8 +44,9 @@ const isAnalyzing = ref(false)
 const analysisError = ref<string | null>(null)
 const analysisData = ref<WordAnalysisResult | null>(null)
 const isDragging = ref(false)
-const useAi = ref(true)
-const aiProvider = ref<'openai' | 'gemini'>('openai')
+// AI mapping is always on; the backend falls back to its own dictionary when no
+// API key is configured, so there is nothing here for the user to decide.
+const AI_PROVIDER = 'openai'
 
 // ─── Mappings State ─────────────────────────────────────────────────────────
 const mappings = ref<WordMappingConfig[]>([])
@@ -268,8 +269,8 @@ const handleFileUpload = async (file: File) => {
   try {
     const res = await wordFillApi.analyzeTemplate({
       file,
-      use_ai: useAi.value,
-      provider: aiProvider.value,
+      use_ai: true,
+      provider: AI_PROVIDER,
     })
     analysisData.value = res
     initMappings(res)
@@ -584,44 +585,10 @@ const resetWizard = () => {
             </div>
           </div>
 
-          <!-- AI toggle -->
-          <div class="bg-white dark:bg-[#111315] border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 flex items-center justify-between">
-            <div class="flex items-center gap-3">
-              <div class="w-9 h-9 rounded-lg bg-violet-100 dark:bg-violet-950/60 flex items-center justify-center text-violet-600">
-                <Sparkles class="w-5 h-5" />
-              </div>
-              <div>
-                <span class="text-xs font-bold text-zinc-900 dark:text-zinc-100 block">
-                  AI yordamida avtomatik moslashtirish
-                </span>
-                <span class="text-[11px] text-zinc-500 dark:text-zinc-400">
-                  AI hujjatni o'qib, har bir bo'sh joyga qaysi CRM maydoni mos kelishini o'zi taklif qiladi.
-                  O'chirilsa, ichki lug'at ishlatiladi.
-                </span>
-              </div>
-            </div>
-            <div class="flex items-center gap-3">
-              <select
-                v-if="useAi"
-                v-model="aiProvider"
-                @click.stop
-                class="bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-xs font-bold rounded-lg px-3 py-1.5 text-zinc-800 dark:text-zinc-200 cursor-pointer"
-              >
-                <option value="openai">OpenAI (GPT-4o)</option>
-                <option value="gemini">Google Gemini</option>
-              </select>
-              <input
-                type="checkbox"
-                v-model="useAi"
-                class="rounded text-violet-600 focus:ring-violet-500 w-4 h-4 cursor-pointer"
-              />
-            </div>
-          </div>
-
           <div v-if="isAnalyzing" class="bg-white dark:bg-[#111315] border border-zinc-200 dark:border-zinc-800 rounded-2xl p-8 text-center space-y-3">
             <RefreshCw class="w-8 h-8 text-blue-500 animate-spin mx-auto" />
             <h4 class="text-sm font-bold text-zinc-800 dark:text-zinc-200">
-              {{ useAi ? 'AI hujjatni tahlil qilmoqda...' : 'Hujjat tahlil qilinmoqda...' }}
+              AI hujjatni tahlil qilmoqda...
             </h4>
             <p class="text-xs text-zinc-500 dark:text-zinc-400">
               To'ldiriladigan joylar, checkbox maydonlari va CRM mosliklari aniqlanmoqda

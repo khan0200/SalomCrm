@@ -74,8 +74,9 @@ const routes = [
         redirect: { name: 'app-form', query: { tab: 'excel' } }
       },
       {
+        // Word Fill is temporarily disabled; send old links to the page it lives on.
         path: 'word-fill',
-        redirect: { name: 'app-form', query: { tab: 'word' } }
+        redirect: { name: 'app-form' }
       },
       {
         path: 'tenants',
