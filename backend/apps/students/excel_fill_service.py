@@ -463,9 +463,22 @@ def format_cell_value(
     if field_key == 'gender':
         gender_format = format_rules.get('genderFormat', 'MALE/FEMALE')
         upper_val = val_str.upper()
-        is_male = 'M' in upper_val or 'ER' in upper_val or '남' in upper_val
-        is_female = 'F' in upper_val or 'AY' in upper_val or '여' in upper_val
-        
+        # Female is tested first and with whole-word matches: a substring test for
+        # 'M' would treat FEMALE (and AYOL's 'F') as male.
+        is_female = (
+            upper_val.startswith('F')
+            or upper_val.startswith('AYOL')
+            or upper_val.startswith('W')
+            or '여' in upper_val
+            or 'ЖЕН' in upper_val
+        )
+        is_male = not is_female and (
+            upper_val.startswith('M')
+            or upper_val.startswith('ER')
+            or '남' in upper_val
+            or 'МУЖ' in upper_val
+        )
+
         if is_male:
             if gender_format == '남/여':
                 return '남'

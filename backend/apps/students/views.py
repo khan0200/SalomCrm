@@ -1509,7 +1509,7 @@ class ExcelFillAnalyzeView(APIView):
     Analyzes an uploaded Excel (.xlsx) file, detects sheets, headers, columns,
     and returns suggested semantic CRM field mappings.
     """
-    permission_classes = [IsTenantUser]
+    permission_classes = [IsTenantHeadManager]
 
     def post(self, request: Request) -> Response:
         file_obj = request.FILES.get('file')
@@ -1534,7 +1534,7 @@ class ExcelFillGenerateView(APIView):
     Generates and returns a filled Excel (.xlsx) file populated with selected CRM students
     while strictly preserving styles, borders, fonts, colors, and formatting of original template.
     """
-    permission_classes = [IsTenantUser]
+    permission_classes = [IsTenantHeadManager]
 
     def post(self, request: Request) -> HttpResponse:
         import json
@@ -1645,6 +1645,183 @@ class ExcelFillGenerateView(APIView):
         except Exception as e:
             logger.exception("Error generating filled Excel file")
             return HttpResponse(json.dumps({'error': f"Excel faylni to'ldirishda xatolik yuz berdi: {str(e)}"}), content_type='application/json', status=500)
+
+
+def _serialize_students_for_fill(request, student_ids):
+    """
+    Loads the requested students inside the caller's tenant and returns them as
+    plain dicts in the exact order the client asked for. Shared by the Excel and
+    Word fill engines.
+    """
+    tenant = getattr(request, 'tenant', None) or getattr(request.user, 'tenant', None)
+    qs = Student.objects.filter(id__in=student_ids)
+    if tenant:
+        qs = qs.filter(tenant=tenant)
+
+    student_map = {s.id: s for s in qs}
+    ordered = [student_map[sid] for sid in student_ids if sid in student_map]
+
+    return [
+        {
+            "id": s.id,
+            "full_name": s.full_name,
+            "korean_name": s.korean_name,
+            "passport": s.passport,
+            "passport_issue_date": s.passport_issue_date,
+            "passport_expire_date": s.passport_expire_date,
+            "birthday": s.birthday,
+            "gender": s.gender,
+            "nationality": getattr(s, 'nationality', None) or 'UZBEKISTAN',
+            "phone1": s.phone1,
+            "phone2": s.phone2,
+            "email": s.email,
+            "address": s.address,
+            "father_name": s.father_name,
+            "father_phone": s.father_phone,
+            "father_job": s.father_job,
+            "mother_name": s.mother_name,
+            "mother_phone": s.mother_phone,
+            "mother_job": s.mother_job,
+            "level": s.level,
+            "major": s.major,
+            "final_school_name": s.final_school_name,
+            "gpa": s.gpa,
+            "language_certificate": s.language_certificate,
+            "certificate_score": s.certificate_score,
+            "certificate_valid_date": s.certificate_valid_date,
+            "university_1": s.university_1,
+        }
+        for s in ordered
+    ]
+
+
+def _parse_json_list(raw) -> list:
+    """Accepts either an already-parsed list or a JSON string from multipart form data."""
+    if isinstance(raw, str):
+        try:
+            parsed = json.loads(raw)
+        except Exception:
+            return []
+        return parsed if isinstance(parsed, list) else []
+    if isinstance(raw, list):
+        return raw
+    return []
+
+
+class WordFillAnalyzeView(APIView):
+    """
+    Analyzes an uploaded Word (.docx) application form: finds every fillable slot
+    (blank cells next to labels, checkbox groups, existing {{placeholders}}) and
+    asks the configured AI provider to map each slot to a CRM field. Falls back to
+    the semantic dictionary when no AI key is available.
+    """
+    permission_classes = [IsTenantHeadManager]
+
+    def post(self, request: Request) -> Response:
+        file_obj = request.FILES.get('file')
+        if not file_obj:
+            return Response({'error': 'Word fayl yuklanmadi (file is required)'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not file_obj.name.lower().endswith(('.docx', '.dotx')):
+            return Response(
+                {'error': 'Faqat .docx formatidagi Word fayllari qabul qilinadi (eski .doc qo\'llab-quvvatlanmaydi)'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        use_ai = str(request.data.get('use_ai', 'true')).lower() != 'false'
+        provider = request.data.get('provider') or 'openai'
+        api_key = request.data.get('api_key') or None
+        model = request.data.get('model') or None
+
+        try:
+            from .word_fill_service import analyze_docx_structure, ai_suggest_mapping, _fallback_mapping
+
+            file_bytes = file_obj.read()
+            structure = analyze_docx_structure(file_bytes)
+            slots = structure['slots']
+
+            if use_ai:
+                mappings, source = ai_suggest_mapping(slots, provider=provider, api_key=api_key, model=model)
+            else:
+                mappings, source = (_fallback_mapping(slots), 'fallback')
+
+            structure['suggested_mappings'] = mappings
+            structure['mapping_source'] = source
+            return Response(structure)
+        except Exception as e:
+            logger.exception("Error analyzing Word file")
+            return Response(
+                {'error': f"Word faylni tahlil qilishda xatolik yuz berdi: {str(e)}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+
+class WordFillGenerateView(APIView):
+    """
+    Fills the uploaded Word template for each selected student, preserving the
+    original layout, fonts and borders. Returns a single .docx for one student or
+    a .zip archive when several were selected.
+    """
+    permission_classes = [IsTenantHeadManager]
+
+    def post(self, request: Request) -> HttpResponse:
+        file_obj = request.FILES.get('file')
+        if not file_obj:
+            return HttpResponse(json.dumps({'error': 'Word fayl yuklanmadi'}), content_type='application/json', status=400)
+
+        mappings = _parse_json_list(request.data.get('mappings'))
+        student_ids = _parse_json_list(request.data.get('student_ids'))
+        filename_pattern = request.data.get('filename_pattern') or '{full_name}'
+        checkbox_mark = request.data.get('checkbox_mark') or 'V'
+
+        if not student_ids:
+            return HttpResponse(
+                json.dumps({'error': "Hech bo'lmaganda bitta talaba tanlanishi kerak"}),
+                content_type='application/json', status=400,
+            )
+
+        students_data = _serialize_students_for_fill(request, student_ids)
+        if not students_data:
+            return HttpResponse(
+                json.dumps({'error': "Tanlangan talabalar topilmadi"}),
+                content_type='application/json', status=404,
+            )
+
+        try:
+            from .word_fill_service import generate_filled_documents
+
+            file_bytes = file_obj.read()
+            output_stream, kind, count = generate_filled_documents(
+                file_bytes=file_bytes,
+                mappings=mappings,
+                students_data=students_data,
+                filename_pattern=filename_pattern,
+                checkbox_mark=checkbox_mark,
+            )
+
+            original_name = os.path.splitext(file_obj.name)[0]
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+
+            if kind == 'zip':
+                export_filename = f"Filled_{original_name}_{count}ta_{timestamp}.zip"
+                content_type = 'application/zip'
+            else:
+                from .word_fill_service import build_output_filename
+                export_filename = build_output_filename(filename_pattern, students_data[0], 1)
+                content_type = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+
+            response = HttpResponse(output_stream.getvalue(), content_type=content_type)
+            response['Content-Disposition'] = f'attachment; filename="{export_filename}"'
+            response['Access-Control-Expose-Headers'] = 'Content-Disposition'
+            return response
+        except ValueError as e:
+            return HttpResponse(json.dumps({'error': str(e)}), content_type='application/json', status=400)
+        except Exception as e:
+            logger.exception("Error generating filled Word documents")
+            return HttpResponse(
+                json.dumps({'error': f"Word faylni to'ldirishda xatolik yuz berdi: {str(e)}"}),
+                content_type='application/json', status=500,
+            )
 
 
 

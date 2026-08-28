@@ -63,10 +63,19 @@ const routes = [
         meta: { title: 'Visa Check' }
       },
       {
+        path: 'app-form',
+        name: 'app-form',
+        component: () => import('@/modules/app_form/AppFormPage.vue'),
+        meta: { title: 'App Form', headManagerOnly: true }
+      },
+      // Kept so older links and bookmarks land on the matching tab.
+      {
         path: 'excel-fill',
-        name: 'excel-fill',
-        component: () => import('@/modules/excel_fill/ExcelFillPage.vue'),
-        meta: { title: 'Excel Fill' }
+        redirect: { name: 'app-form', query: { tab: 'excel' } }
+      },
+      {
+        path: 'word-fill',
+        redirect: { name: 'app-form', query: { tab: 'word' } }
       },
       {
         path: 'tenants',

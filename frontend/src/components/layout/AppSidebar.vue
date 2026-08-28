@@ -10,7 +10,7 @@ import {
   ClipboardList,
   FileText,
   ShieldCheck,
-  FileSpreadsheet,
+  FilePenLine,
   Settings,
   LogOut,
   Sun,
@@ -42,7 +42,10 @@ const navItems = computed<NavItem[]>(() => {
   }
 
   items.push({ name: 'VISACHECK', path: '/visacheck', icon: ShieldCheck })
-  items.push({ name: 'EXCEL FILL', path: '/excel-fill', icon: FileSpreadsheet })
+
+  if (authStore.isHeadManager) {
+    items.push({ name: 'APP FORM', path: '/app-form', icon: FilePenLine })
+  }
 
   if (authStore.canAccessSettings) {
     items.push({ name: 'SETTINGS', path: '/settings', icon: Settings })

@@ -145,8 +145,9 @@ const { data: foldersData } = useQuery({
 const folders = computed(() => foldersData.value || [])
 
 // ─── Fetch Students from Master CRM ─────────────────────────────────────────
+// Shared key with the Word Fill tab so switching tabs reuses one fetch.
 const { data: allStudentsData, isLoading: isLoadingStudents } = useQuery({
-  queryKey: ['all-students-master-excel-fill'],
+  queryKey: ['all-students-app-form'],
   queryFn: () => studentsApi.getStudents({
     page: 1,
     page_size: 5000,
@@ -760,24 +761,11 @@ const resetWizard = () => {
 
 <template>
   <div class="h-full flex flex-col bg-zinc-50 dark:bg-[#0c0d0e] overflow-hidden" @click="closeAllDropdowns">
-    <!-- Top Header Banner -->
-    <header class="bg-white dark:bg-[#111315] border-b border-zinc-200 dark:border-zinc-800/80 px-6 py-4 flex items-center justify-between shrink-0">
-      <div class="flex items-center gap-3">
-        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-600 flex items-center justify-center text-white shadow-md shadow-emerald-500/20">
-          <FileSpreadsheet class="w-5 h-5" />
-        </div>
-        <div>
-          <h1 class="text-lg font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-            Excel Fill Engine
-            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
-              AI Powered
-            </span>
-          </h1>
-          <p class="text-xs text-zinc-500 dark:text-zinc-400">
-            Universitetlarning murakkab Excel shablonlarini asl formatini buzmasdan avtomatik to'ldirish
-          </p>
-        </div>
-      </div>
+    <!-- Sub header: the App Form tab bar above already names this engine -->
+    <header class="bg-white dark:bg-[#111315] border-b border-zinc-200 dark:border-zinc-800/80 px-6 py-3 flex items-center justify-between gap-4 shrink-0">
+      <p class="text-xs text-zinc-500 dark:text-zinc-400 truncate">
+        Universitetlarning murakkab Excel shablonlarini asl formatini buzmasdan avtomatik to'ldirish
+      </p>
 
       <!-- Step Stepper -->
       <div class="flex items-center gap-2 bg-zinc-100 dark:bg-zinc-800/60 p-1 rounded-xl border border-zinc-200/60 dark:border-zinc-700/60">
