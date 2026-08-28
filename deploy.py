@@ -237,7 +237,7 @@ def deploy(client, path):
     run(client, "cd %s/backend && ../venv/bin/python manage.py collectstatic --noinput" % path,
         label="Collecting static files")
 
-    run(client, "cd %s/frontend && npm ci --no-audit --no-fund" % path,
+    run(client, "cd %s/frontend && (npm ci --no-audit --no-fund || npm install --no-audit --no-fund)" % path,
         label="Frontend dependencies", node=True)
     run(client, "cd %s/frontend && npm run build" % path,
         label="Building frontend", node=True)
