@@ -232,6 +232,8 @@ def deploy(client, path):
         label="Backend dependencies")
     run(client, "cd %s/backend && ../venv/bin/python manage.py migrate --noinput" % path,
         label="Database migrations")
+    run(client, "cd %s/backend && ../venv/bin/python manage.py fix_sequences" % path,
+        label="Syncing database sequences", check=False)
     run(client, "cd %s/backend && ../venv/bin/python manage.py collectstatic --noinput" % path,
         label="Collecting static files")
 

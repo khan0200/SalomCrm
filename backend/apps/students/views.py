@@ -15,6 +15,7 @@ from rest_framework.views import APIView
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.request import Request
+from django.db import IntegrityError
 from django.db.models import Q
 from apps.core.permissions import IsTenantUser, IsTenantHeadManager, IsTenantManager, IsTenantManagerOrReadOnly
 from .models import (
@@ -1355,33 +1356,48 @@ class VisaStudentListCreateView(APIView):
         data = cast(dict[str, Any], request.data) if isinstance(request.data, dict) else {}
         s_id = str(data.get('student_id') or data.get('id') or '').strip().upper()
 
-        visa_student, created = VisaStudent.objects.get_or_create(
-            tenant=tenant,
-            passport=passport,
-            defaults={
-                'student_id': s_id,
-                'full_name': full_name,
-                'birthday': str(data.get('birthday', '')).strip(),
-                'visa_type': str(data.get('visa_type', 'Embassy')),
-                'application_no': str(data.get('application_no', '')).strip().upper(),
-                'tariff': str(data.get('tariff', '')),
-                'university': str(data.get('university', '')),
-                'coordinator': str(data.get('coordinator', '')),
-                'b2b': str(data.get('b2b', '')),
-                'flag': bool(data.get('flag', False)),
-                'refund_application': bool(data.get('refund_application', False)),
-            }
-        )
+        try:
+            visa_student, created = VisaStudent.objects.get_or_create(
+                tenant=tenant,
+                passport=passport,
+                defaults={
+                    'student_id': s_id,
+                    'full_name': full_name,
+                    'birthday': str(data.get('birthday', '')).strip(),
+                    'visa_type': str(data.get('visa_type', 'Embassy')),
+                    'application_no': str(data.get('application_no', '')).strip().upper(),
+                    'tariff': str(data.get('tariff', '')),
+                    'university': str(data.get('university', '')),
+                    'coordinator': str(data.get('coordinator', '')),
+                    'b2b': str(data.get('b2b', '')),
+                    'flag': bool(data.get('flag', False)),
+                    'refund_application': bool(data.get('refund_application', False)),
+                }
+            )
 
-        if not created:
-            # Update existing
-            for field in ('full_name', 'birthday', 'visa_type', 'application_no', 'tariff', 'university', 'coordinator', 'b2b', 'flag', 'refund_application'):
-                if field in data:
-                    setattr(visa_student, field, data[field])
-            if s_id:
-                visa_student.student_id = s_id
-            visa_student.is_deleted = False
-            visa_student.save()
+            if not created:
+                # Update existing
+                for field in ('full_name', 'birthday', 'visa_type', 'application_no', 'tariff', 'university', 'coordinator', 'b2b', 'flag', 'refund_application'):
+                    if field in data:
+                        setattr(visa_student, field, data[field])
+                if s_id:
+                    visa_student.student_id = s_id
+                visa_student.is_deleted = False
+                visa_student.save()
+        except IntegrityError as e:
+            # A duplicate id here means the table's sequence fell behind its data
+            # (rows imported with explicit ids). `manage.py fix_sequences` repairs it.
+            logger.exception("Integrity error creating visa student %s", passport)
+            if 'pkey' in str(e).lower():
+                return Response(
+                    {'error': "Bazadagi ID hisoblagichi mos kelmayapti. Administrator "
+                              "'python manage.py fix_sequences' buyrug'ini ishga tushirishi kerak."},
+                    status=status.HTTP_409_CONFLICT,
+                )
+            return Response(
+                {'error': f"Talabani saqlashda baza xatoligi: {e}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         serializer = VisaStudentSerializer(visa_student)
         return Response(serializer.data, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)

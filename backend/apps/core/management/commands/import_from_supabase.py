@@ -1,6 +1,7 @@
 import json
 import urllib.request
 from decimal import Decimal
+from django.core.management import call_command
 from django.core.management.base import BaseCommand
 from django.contrib.auth import get_user_model
 from apps.tenants.models import Tenant, Branch
@@ -330,4 +331,11 @@ class Command(BaseCommand):
             PaymentReceiverTemplate.objects.get_or_create(tenant=tenant_ub, name=r)
 
         self.stdout.write(self.style.SUCCESS(f"Successfully imported {imported_payments_count} payments!"))
+
+        # Rows above were written with explicit ids, which leaves each table's
+        # sequence behind: the next ordinary INSERT would reuse a taken id and
+        # fail with a duplicate-key IntegrityError. Realign them before finishing.
+        self.stdout.write("Realigning id sequences...")
+        call_command('fix_sequences')
+
         self.stdout.write(self.style.SUCCESS("ALL SUPABASE DATA SUCCESSFULLY IMPORTED INTO SALOM CRM!"))
