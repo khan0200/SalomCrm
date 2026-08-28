@@ -540,7 +540,7 @@ class FolderViewSet(viewsets.ModelViewSet):
         req: Any = self.request
         user = req.user
         tenant = getattr(req, 'tenant', None) or getattr(user, 'tenant', None)
-        serializer.save(tenant=tenant, created_by=user)
+        serializer.save(tenant=tenant)
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
