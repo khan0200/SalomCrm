@@ -57,12 +57,16 @@ const closeModal = () => {
   editingMember.value = null
 }
 
-// A head manager manages managers and staff, not other head managers or
-// themselves; the backend enforces this too.
-const canManage = (member: UserProfile) =>
-  member.id !== authStore.user?.id &&
-  member.role !== 'SUPER_ADMIN' &&
-  member.role !== 'HEAD_MANAGER'
+const canEdit = (member: UserProfile) => {
+  if (member.role === 'SUPER_ADMIN' && !isSuperAdmin.value) return false
+  return true
+}
+
+const canDelete = (member: UserProfile) => {
+  if (member.id === authStore.user?.id) return false
+  if (member.role === 'SUPER_ADMIN' && !isSuperAdmin.value) return false
+  return true
+}
 
 const { data: staffData, isLoading } = useQuery({
   queryKey: ['staff'],
@@ -105,6 +109,9 @@ const saveStaffMutation = useMutation({
       : staffApi.createStaff(data),
   onSuccess: (saved) => {
     const wasEditing = !!editingMember.value
+    if (editingMember.value && editingMember.value.id === authStore.user?.id) {
+      authStore.fetchUser()
+    }
     queryClient.invalidateQueries({ queryKey: ['staff'] })
     closeModal()
     uiStore.addToast({
@@ -221,7 +228,15 @@ const deleteStaffMutation = useMutation({
                   >
                     {{ initials(member.full_name) }}
                   </div>
-                  <span class="font-bold text-zinc-900 dark:text-zinc-100">{{ member.full_name }}</span>
+                  <div class="flex items-center gap-1.5">
+                    <span class="font-bold text-zinc-900 dark:text-zinc-100">{{ member.full_name }}</span>
+                    <span
+                      v-if="member.id === authStore.user?.id"
+                      class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-brand-50 text-brand-600 dark:bg-brand-950/50 dark:text-brand-400 border border-brand-200 dark:border-brand-800"
+                    >
+                      You
+                    </span>
+                  </div>
                 </div>
               </td>
               <td class="px-4 py-3">
@@ -251,24 +266,24 @@ const deleteStaffMutation = useMutation({
               </td>
               <td class="px-4 py-3">
                 <div class="flex items-center justify-end gap-1.5">
-                  <template v-if="canManage(member)">
-                    <button
-                      @click="openEdit(member)"
-                      title="Edit staff member"
-                      class="p-1.5 rounded-lg text-zinc-500 hover:text-brand-600 hover:bg-brand-50 dark:hover:bg-brand-950/30 transition-colors cursor-pointer"
-                    >
-                      <Pencil class="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      @click="deletingMember = member"
-                      title="Delete staff member"
-                      class="p-1.5 rounded-lg text-zinc-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors cursor-pointer"
-                    >
-                      <Trash2 class="w-3.5 h-3.5" />
-                    </button>
-                  </template>
-                  <span v-else class="text-[10px] text-zinc-400 italic pr-1">
-                    {{ member.id === authStore.user?.id ? 'You' : 'Protected' }}
+                  <button
+                    v-if="canEdit(member)"
+                    @click="openEdit(member)"
+                    :title="member.id === authStore.user?.id ? 'Edit your profile & password' : 'Edit staff member & password'"
+                    class="p-1.5 rounded-lg text-zinc-500 hover:text-brand-600 hover:bg-brand-50 dark:hover:bg-brand-950/30 transition-colors cursor-pointer"
+                  >
+                    <Pencil class="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    v-if="canDelete(member)"
+                    @click="deletingMember = member"
+                    title="Delete staff member"
+                    class="p-1.5 rounded-lg text-zinc-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors cursor-pointer"
+                  >
+                    <Trash2 class="w-3.5 h-3.5" />
+                  </button>
+                  <span v-if="!canEdit(member) && !canDelete(member)" class="text-[10px] text-zinc-400 italic pr-1">
+                    Protected
                   </span>
                 </div>
               </td>
