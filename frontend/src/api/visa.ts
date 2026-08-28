@@ -71,6 +71,8 @@ export interface VisaStudent {
 
 export interface LookupStudentResult {
   found: boolean
+  /** True when several students share the typed prefix, so none was chosen. */
+  ambiguous?: boolean
   student?: {
     id: string
     full_name: string

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, reactive, computed, watch } from 'vue'
-import { X, RefreshCw, AlertTriangle, Fingerprint, User2, Cake, Hash, ShieldCheck, Database, CheckCircle2 } from 'lucide-vue-next'
+import { X, RefreshCw, AlertTriangle, Fingerprint, User2, Cake, Hash, Database, CheckCircle2 } from 'lucide-vue-next'
 import { visaApi, type VisaType, type VisaStudent } from '@/api/visa'
 import { useUiStore } from '@/stores/ui'
 
@@ -18,13 +18,14 @@ const emit = defineEmits<{
 
 const isEdit = computed(() => Boolean(props.editingStudent))
 const submitting = ref(false)
-const checkingVisa = ref(false)
 const isLookingUp = ref(false)
 const autofilledFromMain = ref(false)
 const errorMessage = ref('')
 const spaceWarning = ref(false)
 let spaceWarningTimer: any = null
 let lookupTimer: any = null
+/** Incremented per lookup so late responses from earlier keystrokes are ignored. */
+let lookupSeq = 0
 
 const form = reactive({
   fullName: '',
@@ -79,25 +80,52 @@ function handleFullNameInput(e: Event) {
   if (input.value !== formatted) input.value = formatted
 }
 
+/** Autofill kicks in once this many passport characters have been typed. */
+const MIN_LOOKUP_LENGTH = 4
+
 function handlePassportInput(e: Event) {
   const input = e.target as HTMLInputElement
   const val = formatPassportInput(input.value)
   form.passport = val
 
-  // Auto-lookup in main database when creating a new student
-  if (!isEdit.value && val.length >= 5) {
-    if (lookupTimer) clearTimeout(lookupTimer)
-    lookupTimer = setTimeout(triggerMainDbLookup, 400)
+  if (isEdit.value) return
+
+  if (lookupTimer) clearTimeout(lookupTimer)
+
+  if (val.length < MIN_LOOKUP_LENGTH) {
+    // Typed back below the threshold: drop anything a previous lookup filled in
+    // so a stale name can never be submitted with a different passport.
+    lookupSeq++
+    isLookingUp.value = false
+    if (autofilledFromMain.value) clearAutofilledFields()
+    return
   }
+
+  lookupTimer = setTimeout(triggerMainDbLookup, 400)
+}
+
+/** Wipes only the values autofill put there, leaving anything typed by hand. */
+function clearAutofilledFields() {
+  form.fullName = ''
+  form.birthday = ''
+  form.studentId = ''
+  form.tariff = ''
+  form.university = ''
+  autofilledFromMain.value = false
 }
 
 async function triggerMainDbLookup() {
   const pp = form.passport.trim().toUpperCase()
-  if (pp.length < 5 || isEdit.value) return
+  if (pp.length < MIN_LOOKUP_LENGTH || isEdit.value) return
 
+  // Responses can arrive out of order while typing; only the newest one applies.
+  const seq = ++lookupSeq
   isLookingUp.value = true
+
   try {
     const res = await visaApi.lookupMainDatabase(pp)
+    if (seq !== lookupSeq) return
+
     if (res.found && res.student) {
       if (!form.fullName || autofilledFromMain.value) form.fullName = res.student.full_name || ''
       if (!form.birthday || autofilledFromMain.value) form.birthday = res.student.birthday || ''
@@ -105,13 +133,15 @@ async function triggerMainDbLookup() {
       if (res.student.tariff) form.tariff = res.student.tariff
       if (res.student.university) form.university = res.student.university
       autofilledFromMain.value = true
-    } else {
-      autofilledFromMain.value = false
+    } else if (autofilledFromMain.value) {
+      // The passport changed to one that matches nobody (or several people):
+      // clear the previous student rather than leaving their details behind.
+      clearAutofilledFields()
     }
   } catch {
-    autofilledFromMain.value = false
+    if (seq === lookupSeq) autofilledFromMain.value = false
   } finally {
-    isLookingUp.value = false
+    if (seq === lookupSeq) isLookingUp.value = false
   }
 }
 
@@ -140,6 +170,9 @@ function resetForm() {
   spaceWarning.value = false
   autofilledFromMain.value = false
   isLookingUp.value = false
+  // Cancel any in-flight lookup so it cannot repopulate the reopened form.
+  if (lookupTimer) clearTimeout(lookupTimer)
+  lookupSeq++
 }
 
 watch(() => props.isOpen, (open) => {
@@ -196,23 +229,12 @@ async function handleSubmit() {
     }
 
     submitting.value = false
-    checkingVisa.value = true
 
-    // Check visa status on visa.go.kr and auto-persist to Visa database
-    try {
-      await visaApi.checkVisa({
-        passport,
-        full_name: fullName,
-        birth_date: birthday,
-        visa_type: form.visaType,
-        application_no: form.applicationNo ? form.applicationNo.trim().toUpperCase() : undefined
-      })
-    } catch { /* non-blocking */ }
-    finally { checkingVisa.value = false }
-
+    // The visa status is checked from the Visa Check page, not here -- this
+    // modal only records the student.
     uiStore.addToast({
       type: 'success',
-      message: isEdit.value ? 'Talaba yangilandi ✓' : 'Talaba qo\'shildi va viza tekshirildi ✓'
+      message: isEdit.value ? 'Talaba yangilandi ✓' : 'Talaba qo\'shildi ✓'
     })
 
     emit('saved')
@@ -220,7 +242,6 @@ async function handleSubmit() {
   } catch (err: any) {
     errorMessage.value = err.response?.data?.error || err.message || 'Xatolik yuz berdi.'
     submitting.value = false
-    checkingVisa.value = false
   }
 }
 </script>
@@ -348,7 +369,9 @@ async function handleSubmit() {
                   <span class="text-rose-400 ml-0.5">*</span>
                   <span class="ml-auto text-[10px] font-normal text-zinc-400">Pasportdagi kabi</span>
                 </label>
+                <div v-if="isLookingUp" class="h-10 rounded-md bg-zinc-100 dark:bg-zinc-800 animate-pulse" />
                 <input
+                  v-else
                   type="text"
                   :value="form.fullName"
                   @input="handleFullNameInput"
@@ -374,7 +397,9 @@ async function handleSubmit() {
                   <span class="text-rose-400 ml-0.5">*</span>
                   <span class="ml-auto text-[10px] font-mono text-zinc-400">YYYY-MM-DD</span>
                 </label>
+                <div v-if="isLookingUp" class="h-10 rounded-md bg-zinc-100 dark:bg-zinc-800 animate-pulse" />
                 <input
+                  v-else
                   type="text"
                   :value="form.birthday"
                   @input="handleBirthdayInput"
@@ -417,13 +442,33 @@ async function handleSubmit() {
                   Student ID
                   <span class="ml-auto text-[10px] font-normal text-zinc-400">Ixtiyoriy</span>
                 </label>
+                <div v-if="isLookingUp" class="h-10 rounded-md bg-zinc-100 dark:bg-zinc-800 animate-pulse" />
                 <input
+                  v-else
                   type="text"
                   v-model="form.studentId"
                   placeholder="M445"
                   autocomplete="off"
                   class="w-full h-10 px-3.5 rounded-md border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 text-zinc-900 dark:text-white font-mono uppercase text-sm placeholder-zinc-400 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-500 focus:bg-white dark:focus:bg-zinc-800 transition-all"
                 />
+              </div>
+
+              <!-- Tariff / university pulled from the main CRM (read-only context) -->
+              <div v-if="isLookingUp || form.tariff || form.university" class="space-y-1">
+                <label class="flex items-center gap-1.5 text-[11px] font-semibold text-zinc-600 dark:text-zinc-400">
+                  <Database class="size-3 text-zinc-400" />
+                  Tariff / Universitet
+                  <span class="ml-auto text-[10px] font-normal text-zinc-400">CRM bazasidan</span>
+                </label>
+                <div v-if="isLookingUp" class="h-8 rounded-md bg-zinc-100 dark:bg-zinc-800 animate-pulse" />
+                <div v-else class="flex flex-wrap gap-1.5">
+                  <span v-if="form.tariff" class="px-2 py-1 rounded-md bg-zinc-100 dark:bg-zinc-800 text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">
+                    {{ form.tariff }}
+                  </span>
+                  <span v-if="form.university" class="px-2 py-1 rounded-md bg-zinc-100 dark:bg-zinc-800 text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 truncate max-w-full">
+                    {{ form.university }}
+                  </span>
+                </div>
               </div>
 
               <!-- Error -->
@@ -441,7 +486,7 @@ async function handleSubmit() {
               <button
                 type="button"
                 @click="emit('close')"
-                :disabled="submitting || checkingVisa"
+                :disabled="submitting"
                 class="h-10 px-4 rounded-md text-sm font-semibold text-zinc-600 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all disabled:opacity-40 select-none shrink-0"
               >
                 Bekor
@@ -451,22 +496,15 @@ async function handleSubmit() {
               <button
                 type="button"
                 @click="handleSubmit"
-                :disabled="submitting || checkingVisa"
-                class="flex-1 h-10 rounded-md text-sm font-bold transition-all flex items-center justify-center gap-2 disabled:opacity-60 select-none active:scale-[0.98]"
-                :class="checkingVisa
-                  ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30'
-                  : 'bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-500/30'"
+                :disabled="submitting"
+                class="flex-1 h-10 rounded-md text-sm font-bold transition-all flex items-center justify-center gap-2 disabled:opacity-60 select-none active:scale-[0.98] bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-500/30"
               >
-                <template v-if="checkingVisa">
-                  <ShieldCheck class="size-4 animate-pulse" />
-                  <span>Tekshirilmoqda...</span>
-                </template>
-                <template v-else-if="submitting">
+                <template v-if="submitting">
                   <RefreshCw class="size-4 animate-spin" />
                   <span>Saqlanmoqda...</span>
                 </template>
                 <template v-else>
-                  <span>{{ isEdit ? 'Saqlash' : 'Qo\'shish va Tekshirish' }}</span>
+                  <span>{{ isEdit ? 'Saqlash' : 'Qo\'shish' }}</span>
                 </template>
               </button>
             </div>

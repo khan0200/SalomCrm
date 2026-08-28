@@ -1241,9 +1241,12 @@ class VisaStudentLookupView(APIView):
     """
     permission_classes = [IsTenantUser]
 
+    # Autofill starts once the user has typed this much of a passport.
+    MIN_PREFIX_LENGTH = 4
+
     def get(self, request: Request) -> Response:
         passport = request.query_params.get('passport', '').strip()
-        if not passport:
+        if len(passport) < self.MIN_PREFIX_LENGTH:
             return Response({'found': False})
 
         tenant = getattr(request.user, 'tenant', None)
@@ -1251,9 +1254,20 @@ class VisaStudentLookupView(APIView):
         if tenant:
             qs = qs.filter(tenant=tenant)
 
+        # An exact passport wins outright. Otherwise treat the input as a prefix,
+        # which is what makes autofill work while the number is still being typed.
         student = qs.filter(passport__iexact=passport).first()
-        if not student:
-            return Response({'found': False})
+
+        if student is None:
+            matches = list(qs.filter(passport__istartswith=passport)[:2])
+            if len(matches) != 1:
+                # No match, or several students share the prefix -- filling the
+                # form from an ambiguous guess would put the wrong data in.
+                return Response({
+                    'found': False,
+                    'ambiguous': len(matches) > 1,
+                })
+            student = matches[0]
 
         return Response({
             'found': True,
