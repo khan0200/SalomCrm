@@ -157,29 +157,54 @@ const universities = computed(() => {
         </span>
 
         <!-- Document Status Indicator -->
-        <span
-          v-if="isDocumentComplete"
-          title="Apostille not missing"
-          class="inline-flex items-center justify-center w-4 h-4 rounded-full bg-emerald-500 text-white text-[9px] font-bold shadow-xs shrink-0"
-        >
-          ✓
-        </span>
-        <span
-          v-else
-          title="Apostille missing"
-          class="inline-flex items-center justify-center w-4 h-4 rounded-full bg-amber-500 text-white text-[9px] font-black shadow-xs shrink-0"
-        >
-          !
-        </span>
+        <div class="group/doc relative inline-flex items-center justify-center">
+          <span
+            v-if="isDocumentComplete"
+            class="inline-flex items-center justify-center w-4 h-4 rounded-full bg-emerald-500 text-white text-[9px] font-bold shadow-xs shrink-0 cursor-help"
+          >
+            ✓
+          </span>
+          <span
+            v-else
+            class="inline-flex items-center justify-center w-4 h-4 rounded-full bg-amber-500 text-white text-[9px] font-black shadow-xs shrink-0 cursor-help"
+          >
+            !
+          </span>
+
+          <!-- iOS Styled Solid Black Tooltip -->
+          <div
+            class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 opacity-0 scale-90 translate-y-1 group-hover/doc:opacity-100 group-hover/doc:scale-100 group-hover/doc:translate-y-0 transition-all duration-150 ease-out z-50 flex flex-col items-center select-none"
+          >
+            <div class="px-2 py-0.5 bg-black text-white text-[10.5px] font-semibold rounded-md shadow-xl shadow-black/50 whitespace-nowrap tracking-wide flex items-center gap-1">
+              <span>{{ isDocumentComplete ? 'Apostille complete' : 'Apostille missing' }}</span>
+            </div>
+            <div class="w-0 h-0 border-x-4 border-x-transparent border-t-4 border-t-black -mt-[0.5px]"></div>
+          </div>
+        </div>
 
         <!-- Office / Branch Icon Badge -->
-        <span
+        <div
           v-if="student.office"
-          :title="student.office"
-          class="inline-flex items-center justify-center w-4 h-4 rounded-full bg-blue-500/15 dark:bg-blue-500/25 text-blue-600 dark:text-blue-400 shrink-0 transition-transform hover:scale-110 cursor-help"
+          class="group/office relative inline-flex items-center justify-center"
         >
-          <component :is="getOfficeIcon(student.office)" class="w-2.5 h-2.5 stroke-[2.4]" />
-        </span>
+          <span
+            class="inline-flex items-center justify-center w-4.5 h-4.5 rounded-full bg-blue-500/15 dark:bg-blue-500/25 text-blue-600 dark:text-blue-400 shrink-0 transition-transform hover:scale-110 cursor-help"
+          >
+            <component :is="getOfficeIcon(student.office)" class="w-2.5 h-2.5 stroke-[2.4]" />
+          </span>
+
+          <!-- iOS Styled Solid Black Tooltip -->
+          <div
+            class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 opacity-0 scale-90 translate-y-1 group-hover/office:opacity-100 group-hover/office:scale-100 group-hover/office:translate-y-0 transition-all duration-150 ease-out z-50 flex flex-col items-center select-none"
+          >
+            <div class="px-2.5 py-1 bg-black text-white text-[11px] font-semibold rounded-md shadow-xl shadow-black/50 whitespace-nowrap tracking-wide flex items-center gap-1.5">
+              <component :is="getOfficeIcon(student.office)" class="w-3 h-3 text-sky-400 stroke-[2.2]" />
+              <span class="uppercase font-bold tracking-wide">{{ student.office }}</span>
+            </div>
+            <div class="w-0 h-0 border-x-4 border-x-transparent border-t-4 border-t-black -mt-[0.5px]"></div>
+          </div>
+        </div>
+
 
         <!-- Copy Full Name Button -->
 
