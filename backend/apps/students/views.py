@@ -658,11 +658,6 @@ class StudentOptionsViewSet(viewsets.ViewSet):
         ]
 
         tags_qs = TagOption.objects.filter(tenant=tenant).order_by('name') if tenant else TagOption.objects.all().order_by('name')
-        if tenant and not tags_qs.exists():
-            for t_name, t_icon in DEFAULT_TAGS_DATA:
-                TagOption.objects.get_or_create(tenant=tenant, name=t_name, defaults={'icon': t_icon})
-            tags_qs = TagOption.objects.filter(tenant=tenant).order_by('name')
-
         tags = [
             {
                 'id': str(t.id),
@@ -675,9 +670,6 @@ class StudentOptionsViewSet(viewsets.ViewSet):
         from apps.tenants.models import Branch
         offices_qs = Branch.objects.filter(tenant=tenant).values_list('name', flat=True).order_by('name') if tenant else Branch.objects.values_list('name', flat=True).distinct().order_by('name')
         offices = list(offices_qs)
-        if not offices and tenant:
-            Branch.objects.create(name='TOSHKENT OFFIS', tenant=tenant)
-            offices = ['TOSHKENT OFFIS']
 
         return Response({
             'tariffs': tariffs,
@@ -905,16 +897,6 @@ class UniversityStatusOptionViewSet(BaseOptionViewSet):
 class TagOptionViewSet(BaseOptionViewSet):
     model_class = TagOption
     serializer_class = TagOptionSerializer
-
-    def get_queryset(self):
-        qs = super().get_queryset()
-        req: Any = self.request
-        tenant = getattr(req, 'tenant', None) or getattr(req.user, 'tenant', None)
-        if tenant and not qs.exists():
-            for t_name, t_icon in DEFAULT_TAGS_DATA:
-                TagOption.objects.get_or_create(tenant=tenant, name=t_name, defaults={'icon': t_icon})
-            qs = TagOption.objects.filter(tenant=tenant).order_by('name')
-        return qs
 
 
 class SchoolDirectoryViewSet(viewsets.ModelViewSet):

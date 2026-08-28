@@ -126,10 +126,7 @@ const categories = computed<CategoryItem[]>(() => {
   const levelOpts = ['NO_LEVEL', ...(props.options.levels || [])]
   const groupOpts = ['NO_GROUP', ...(props.options.groups || [])]
   const leadOpts = ['NO_LEADBY', ...(props.options.leads || [])]
-  const dynamicTagOpts = Array.from(new Set([
-    'Call', 'Apply', 'Documents', 'Payment',
-    ...tagsRegistry.value.map(t => t.name)
-  ]))
+  const dynamicTagOpts = tagsRegistry.value.map(t => t.name)
 
   const list: CategoryItem[] = [
     {

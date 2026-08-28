@@ -866,6 +866,13 @@ const activeConfig = computed(() => TABS_CONFIG[activeTab.value])
         <!-- 1. Tariff Options -->
         <div v-else-if="activeTab === 'tariff'" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div
+            v-if="filteredTariffs.length === 0"
+            class="col-span-full py-16 text-center text-xs text-zinc-400 italic flex flex-col items-center justify-center gap-2"
+          >
+            <CreditCard class="w-8 h-8 text-zinc-300 dark:text-zinc-700 stroke-[1.5]" />
+            <span>No tariff plans found</span>
+          </div>
+          <div
             v-for="item in filteredTariffs"
             :key="item.id"
             class="group flex items-center justify-between gap-3 p-3 bg-zinc-50/70 dark:bg-zinc-850 border border-zinc-200 dark:border-zinc-700/80 hover:border-blue-400 dark:hover:border-blue-500 rounded-xl shadow-2xs transition-all"
@@ -897,6 +904,13 @@ const activeConfig = computed(() => TABS_CONFIG[activeTab.value])
 
         <!-- 2. Education Levels -->
         <div v-else-if="activeTab === 'level'" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div
+            v-if="filteredLevels.length === 0"
+            class="col-span-full py-16 text-center text-xs text-zinc-400 italic flex flex-col items-center justify-center gap-2"
+          >
+            <GraduationCap class="w-8 h-8 text-zinc-300 dark:text-zinc-700 stroke-[1.5]" />
+            <span>No education levels found</span>
+          </div>
           <div
             v-for="item in filteredLevels"
             :key="item.id"
@@ -930,6 +944,13 @@ const activeConfig = computed(() => TABS_CONFIG[activeTab.value])
         <!-- 3. Student Groups -->
         <div v-else-if="activeTab === 'group'" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div
+            v-if="filteredGroups.length === 0"
+            class="col-span-full py-16 text-center text-xs text-zinc-400 italic flex flex-col items-center justify-center gap-2"
+          >
+            <Users class="w-8 h-8 text-zinc-300 dark:text-zinc-700 stroke-[1.5]" />
+            <span>No student groups found</span>
+          </div>
+          <div
             v-for="item in filteredGroups"
             :key="item.id"
             class="group flex items-center justify-between gap-3 p-3 bg-zinc-50/70 dark:bg-zinc-850 border border-zinc-200 dark:border-zinc-700/80 hover:border-emerald-400 rounded-xl shadow-2xs transition-all"
@@ -961,6 +982,13 @@ const activeConfig = computed(() => TABS_CONFIG[activeTab.value])
 
         <!-- 4. Lead Sources -->
         <div v-else-if="activeTab === 'lead'" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div
+            v-if="filteredLeads.length === 0"
+            class="col-span-full py-16 text-center text-xs text-zinc-400 italic flex flex-col items-center justify-center gap-2"
+          >
+            <Contact class="w-8 h-8 text-zinc-300 dark:text-zinc-700 stroke-[1.5]" />
+            <span>No lead sources found</span>
+          </div>
           <div
             v-for="item in filteredLeads"
             :key="item.id"
@@ -994,6 +1022,13 @@ const activeConfig = computed(() => TABS_CONFIG[activeTab.value])
         <!-- 5. Coordinators -->
         <div v-else-if="activeTab === 'coordinator'" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div
+            v-if="filteredCoordinators.length === 0"
+            class="col-span-full py-16 text-center text-xs text-zinc-400 italic flex flex-col items-center justify-center gap-2"
+          >
+            <Users class="w-8 h-8 text-zinc-300 dark:text-zinc-700 stroke-[1.5]" />
+            <span>No coordinators found</span>
+          </div>
+          <div
             v-for="item in filteredCoordinators"
             :key="item.id"
             class="group flex items-center justify-between gap-3 p-3 bg-zinc-50/70 dark:bg-zinc-850 border border-zinc-200 dark:border-zinc-700/80 hover:border-rose-400 rounded-xl shadow-2xs transition-all"
@@ -1026,6 +1061,13 @@ const activeConfig = computed(() => TABS_CONFIG[activeTab.value])
         <!-- 6. Custom Tags -->
         <div v-else-if="activeTab === 'tag'" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div
+            v-if="filteredTags.length === 0"
+            class="col-span-full py-16 text-center text-xs text-zinc-400 italic flex flex-col items-center justify-center gap-2"
+          >
+            <Bookmark class="w-8 h-8 text-zinc-300 dark:text-zinc-700 stroke-[1.5]" />
+            <span>No custom tags found</span>
+          </div>
+          <div
             v-for="tag in filteredTags"
             :key="tag.name"
             class="group flex items-center justify-between gap-3 p-3 bg-zinc-50/70 dark:bg-zinc-850 border border-zinc-200 dark:border-zinc-700/80 hover:border-indigo-400 rounded-xl shadow-2xs transition-all"
@@ -1057,6 +1099,13 @@ const activeConfig = computed(() => TABS_CONFIG[activeTab.value])
 
         <!-- 7. Universities -->
         <div v-else-if="activeTab === 'university'" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div
+            v-if="filteredUniversities.length === 0"
+            class="col-span-full py-16 text-center text-xs text-zinc-400 italic flex flex-col items-center justify-center gap-2"
+          >
+            <School class="w-8 h-8 text-zinc-300 dark:text-zinc-700 stroke-[1.5]" />
+            <span>No universities found</span>
+          </div>
           <div
             v-for="item in filteredUniversities"
             :key="item.id"
@@ -1365,6 +1414,13 @@ const activeConfig = computed(() => TABS_CONFIG[activeTab.value])
 
         <!-- 11. University Statuses -->
         <div v-else-if="activeTab === 'university_status'" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div
+            v-if="filteredUniversityStatuses.length === 0"
+            class="col-span-full py-16 text-center text-xs text-zinc-400 italic flex flex-col items-center justify-center gap-2"
+          >
+            <Bookmark class="w-8 h-8 text-zinc-300 dark:text-zinc-700 stroke-[1.5]" />
+            <span>No university statuses found</span>
+          </div>
           <div
             v-for="item in filteredUniversityStatuses"
             :key="item.id"
