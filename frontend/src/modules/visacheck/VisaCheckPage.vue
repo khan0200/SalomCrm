@@ -293,8 +293,14 @@ const filteredStudents = computed(() => {
       if (dateA !== dateB) return dateB.localeCompare(dateA)
     }
 
-    if (sortBy.value === 'university') return (a.university || '').localeCompare(b.university || '')
-    if (sortBy.value === 'tariff') return (a.tariff || '').localeCompare(b.tariff || '')
+    // Compare case-insensitively so differently-cased spellings of one name stay
+    // adjacent instead of being split by uppercase sorting ahead of lowercase.
+    if (sortBy.value === 'university') {
+      return (a.university || '').localeCompare(b.university || '', undefined, { sensitivity: 'base' })
+    }
+    if (sortBy.value === 'tariff') {
+      return (a.tariff || '').localeCompare(b.tariff || '', undefined, { sensitivity: 'base' })
+    }
 
     const dateA = a.application_date || a.created_at || '9999-99-99'
     const dateB = b.application_date || b.created_at || '9999-99-99'
@@ -313,25 +319,58 @@ const hasAnyGroup = computed(() => {
   return false
 })
 
+/**
+ * Collapses the spelling differences that would otherwise split one university
+ * (or tariff) across several groups: casing, stray inner spaces, and the
+ * punctuation people type inconsistently -- "Gumi University", "GUMI UNIVERSITY"
+ * and "Gumi  university." all land in the same bucket.
+ */
+function groupingKey(value: string): string {
+  return value
+    .trim()
+    .toUpperCase()
+    .replace(/[.,]/g, '')
+    .replace(/\s+/g, ' ')
+}
+
+/** Of several spellings, prefer "Gumi University" over "GUMI UNIVERSITY" over "gumi university". */
+function preferredLabel(a: string, b: string): string {
+  const score = (v: string) => {
+    if (v !== v.toUpperCase() && v !== v.toLowerCase()) return 2  // Mixed Case
+    if (v === v.toUpperCase() && v !== v.toLowerCase()) return 1  // ALL CAPS
+    return 0                                                      // all lowercase
+  }
+  return score(b) > score(a) ? b : a
+}
+
 const groupedStudents = computed((): { groupName: string; students: VisaStudent[] }[] => {
-  const map = new Map<string, VisaStudent[]>()
+  const map = new Map<string, { label: string; students: VisaStudent[] }>()
   const sort = sortBy.value
 
   for (const s of filteredStudents.value) {
-    let key = ''
-    if (sort === 'university') key = s.university?.trim() || ''
-    else if (sort === 'tariff') key = s.tariff?.trim() || ''
-    else if (sort === 'date') key = s.application_date?.trim() || ''
-    else if (sort === 'statusDate') key = s.status_date?.trim() || ''
+    let raw = ''
+    if (sort === 'university') raw = s.university?.trim() || ''
+    else if (sort === 'tariff') raw = s.tariff?.trim() || ''
+    else if (sort === 'date') raw = s.application_date?.trim() || ''
+    else if (sort === 'statusDate') raw = s.status_date?.trim() || ''
     else if (sort === 'underReview') {
       const st = (s.status || '').toUpperCase()
-      if (st.includes('SUPPLEM') && st.includes('SUBMIT')) key = 'Supplement Submitted'
-      else if (st.includes('SUPPLEM')) key = 'Supplement Needed'
-      else if (st.includes('REVIEW')) key = 'Under Review'
+      if (st.includes('SUPPLEM') && st.includes('SUBMIT')) raw = 'Supplement Submitted'
+      else if (st.includes('SUPPLEM')) raw = 'Supplement Needed'
+      else if (st.includes('REVIEW')) raw = 'Under Review'
     }
 
-    if (!map.has(key)) map.set(key, [])
-    map.get(key)!.push(s)
+    // Names are matched case-insensitively; dates and fixed status labels are
+    // already canonical and group by their exact value.
+    const key = (sort === 'university' || sort === 'tariff') ? groupingKey(raw) : raw
+
+    const existing = map.get(key)
+    if (existing) {
+      existing.students.push(s)
+      if (raw) existing.label = preferredLabel(existing.label, raw)
+    } else {
+      map.set(key, { label: raw, students: [s] })
+    }
   }
 
   return [...map.entries()]
@@ -348,7 +387,7 @@ const groupedStudents = computed((): { groupName: string; students: VisaStudent[
       if (b === '') return -1
       return a.localeCompare(b)
     })
-    .map(([groupName, groupStudents]) => ({ groupName, students: groupStudents }))
+    .map(([, group]) => ({ groupName: group.label, students: group.students }))
 })
 
 // ─── Show/Hide Columns ────────────────────────────────────────────────────────
