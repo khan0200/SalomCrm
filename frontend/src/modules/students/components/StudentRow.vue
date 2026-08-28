@@ -207,16 +207,26 @@ const universities = computed(() => {
 
 
         <!-- Copy Full Name Button -->
+        <div class="group/copyname relative inline-flex items-center justify-center">
+          <button
+            @click.stop="copyName"
+            class="p-1 rounded transition-colors cursor-pointer"
+            :class="hasRowColor ? 'text-zinc-700 hover:text-zinc-950 dark:text-zinc-300 dark:hover:text-white' : 'text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200'"
+          >
+            <Check v-if="isNameCopied" class="w-3.5 h-3.5 text-emerald-600" />
+            <Copy v-else class="w-3.5 h-3.5" />
+          </button>
 
-        <button
-          @click.stop="copyName"
-          class="p-1 rounded transition-colors cursor-pointer"
-          :class="hasRowColor ? 'text-zinc-700 hover:text-zinc-950 dark:text-zinc-300 dark:hover:text-white' : 'text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200'"
-          title="Copy full name"
-        >
-          <Check v-if="isNameCopied" class="w-3.5 h-3.5 text-emerald-600" />
-          <Copy v-else class="w-3.5 h-3.5" />
-        </button>
+          <!-- iOS Styled Solid Black Tooltip -->
+          <div
+            class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 opacity-0 scale-90 translate-y-1 group-hover/copyname:opacity-100 group-hover/copyname:scale-100 group-hover/copyname:translate-y-0 transition-all duration-150 ease-out z-50 flex flex-col items-center select-none"
+          >
+            <div class="px-2.5 py-1 bg-black text-white text-[11px] font-semibold rounded-md shadow-xl shadow-black/50 whitespace-nowrap tracking-wide flex items-center gap-1">
+              <span>{{ isNameCopied ? 'Copied!' : 'Copy full name' }}</span>
+            </div>
+            <div class="w-0 h-0 border-x-4 border-x-transparent border-t-4 border-t-black -mt-[0.5px]"></div>
+          </div>
+        </div>
       </div>
 
       <!-- Tariff subtext -->
@@ -239,15 +249,26 @@ const universities = computed(() => {
           <div v-if="student.phone2" :class="hasRowColor ? 'text-zinc-800 dark:text-zinc-200 font-medium' : 'text-zinc-500 dark:text-zinc-400'">{{ student.phone2 }}</div>
         </div>
 
-        <button
-          @click.stop="copyPhone"
-          class="p-1 rounded transition-colors cursor-pointer shrink-0"
-          :class="hasRowColor ? 'text-zinc-700 hover:text-zinc-950 dark:text-zinc-300 dark:hover:text-white' : 'text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200'"
-          title="Copy ID, name, and phones"
-        >
-          <Check v-if="isPhoneCopied" class="w-3.5 h-3.5 text-emerald-600" />
-          <Copy v-else class="w-3.5 h-3.5" />
-        </button>
+        <div class="group/copyphone relative inline-flex items-center justify-center">
+          <button
+            @click.stop="copyPhone"
+            class="p-1 rounded transition-colors cursor-pointer shrink-0"
+            :class="hasRowColor ? 'text-zinc-700 hover:text-zinc-950 dark:text-zinc-300 dark:hover:text-white' : 'text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200'"
+          >
+            <Check v-if="isPhoneCopied" class="w-3.5 h-3.5 text-emerald-600" />
+            <Copy v-else class="w-3.5 h-3.5" />
+          </button>
+
+          <!-- iOS Styled Solid Black Tooltip -->
+          <div
+            class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 opacity-0 scale-90 translate-y-1 group-hover/copyphone:opacity-100 group-hover/copyphone:scale-100 group-hover/copyphone:translate-y-0 transition-all duration-150 ease-out z-50 flex flex-col items-center select-none"
+          >
+            <div class="px-2.5 py-1 bg-black text-white text-[11px] font-semibold rounded-md shadow-xl shadow-black/50 whitespace-nowrap tracking-wide flex items-center gap-1">
+              <span>{{ isPhoneCopied ? 'Copied!' : 'Copy ID, name & phones' }}</span>
+            </div>
+            <div class="w-0 h-0 border-x-4 border-x-transparent border-t-4 border-t-black -mt-[0.5px]"></div>
+          </div>
+        </div>
       </div>
     </td>
 
@@ -292,16 +313,25 @@ const universities = computed(() => {
         <li
           v-for="(uni, uniIdx) in universities"
           :key="uniIdx"
-          class="flex items-center gap-1.5 text-[11.5px]"
+          class="group/uni relative flex items-center gap-1.5 text-[11.5px]"
         >
           <span :class="hasRowColor ? 'text-zinc-700 dark:text-zinc-300 font-bold' : 'text-zinc-400'" class="shrink-0">•</span>
           <span
-            class="truncate uppercase"
+            class="truncate uppercase cursor-default"
             :class="hasRowColor ? 'font-bold text-zinc-950 dark:text-white' : 'font-medium text-zinc-700 dark:text-zinc-300'"
-            :title="String(uni)"
           >
             {{ uni }}
           </span>
+
+          <!-- iOS Styled Solid Black Tooltip -->
+          <div
+            class="pointer-events-none absolute bottom-full left-0 mb-1.5 opacity-0 scale-90 translate-y-1 group-hover/uni:opacity-100 group-hover/uni:scale-100 group-hover/uni:translate-y-0 transition-all duration-150 ease-out z-50 flex flex-col items-start select-none"
+          >
+            <div class="px-2.5 py-1 bg-black text-white text-[11px] font-semibold rounded-md shadow-xl shadow-black/50 whitespace-nowrap tracking-wide flex items-center gap-1">
+              <span>{{ uni }}</span>
+            </div>
+            <div class="w-0 h-0 border-x-4 border-x-transparent border-t-4 border-t-black -mt-[0.5px] ml-3"></div>
+          </div>
         </li>
       </ul>
       <span v-else class="text-zinc-400">—</span>
@@ -344,14 +374,24 @@ const universities = computed(() => {
         </div>
 
         <!-- Actions Menu Trigger (Hidden for Tenant Staff) -->
-        <button
-          v-if="authStore.canEdit"
-          @click="emit('open-actions', student)"
-          class="p-1.5 rounded-lg text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200 transition-colors cursor-pointer"
-          title="Student Actions"
-        >
-          <MoreVertical class="w-4 h-4" />
-        </button>
+        <div v-if="authStore.canEdit" class="group/actions relative inline-flex items-center justify-center">
+          <button
+            @click="emit('open-actions', student)"
+            class="p-1.5 rounded-lg text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200 transition-colors cursor-pointer"
+          >
+            <MoreVertical class="w-4 h-4" />
+          </button>
+
+          <!-- iOS Styled Solid Black Tooltip -->
+          <div
+            class="pointer-events-none absolute bottom-full right-0 mb-1.5 opacity-0 scale-90 translate-y-1 group-hover/actions:opacity-100 group-hover/actions:scale-100 group-hover/actions:translate-y-0 transition-all duration-150 ease-out z-50 flex flex-col items-end select-none"
+          >
+            <div class="px-2.5 py-1 bg-black text-white text-[11px] font-semibold rounded-md shadow-xl shadow-black/50 whitespace-nowrap tracking-wide flex items-center gap-1">
+              <span>Quick Actions</span>
+            </div>
+            <div class="w-0 h-0 border-x-4 border-x-transparent border-t-4 border-t-black -mt-[0.5px] mr-2"></div>
+          </div>
+        </div>
       </div>
     </td>
   </tr>
