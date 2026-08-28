@@ -122,7 +122,7 @@ const handleLogin = async () => {
             <input
               v-model="email"
               type="email"
-              placeholder="example@unibridge.uz"
+              placeholder="name@example.com"
               required
               autocomplete="email"
               class="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-zinc-700/80 bg-slate-50/60 dark:bg-zinc-900/60 text-xs font-semibold text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-zinc-500 focus:bg-white dark:focus:bg-zinc-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 dark:focus:border-blue-500 outline-none transition-all shadow-2xs"

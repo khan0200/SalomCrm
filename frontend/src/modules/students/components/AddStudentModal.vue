@@ -58,16 +58,27 @@ const { data: settingsUniversitiesData } = useQuery({
   staleTime: 1000 * 60 * 5, // 5 minutes cache
 })
 
+import { getTariffPrice } from '@/utils/tariff'
+import { useCurrency } from '@/composables/useCurrency'
+
+const { formatCurrency } = useCurrency()
+
 const officeOptions = computed(() => {
-  const list = props.options?.offices && props.options.offices.length > 0
-    ? props.options.offices
-    : ['ANDIJON OFFIS', 'TOSHKENT OFFIS']
-  return list
+  return props.options?.offices || []
 })
 
 const tariffOptions = computed(() => {
   return (props.options?.tariffs || []).map(t => (typeof t === 'string' ? t : t.name))
 })
+
+const getTariffOptionLabel = (t: string) => {
+  if (!t) return ''
+  const price = getTariffPrice(t, null, props.options?.tariffs || [])
+  if (price > 0) {
+    return `${t} — ${formatCurrency(price)}`
+  }
+  return t
+}
 
 const levelOptions = computed(() => {
   return props.options?.levels || ['COLLEGE', 'BACHELOR', 'MASTERS', 'MASTER NO CERTIFICATE', 'LANGUAGE COURSE']
@@ -469,7 +480,7 @@ const handleSubmit = () => {
                           class="w-full h-9 pl-3 pr-8 rounded-[11px] border border-zinc-300/90 dark:border-zinc-700/80 bg-white dark:bg-zinc-850 text-zinc-900 dark:text-zinc-100 text-xs font-medium focus:outline-none focus:border-blue-500 focus:ring-3 focus:ring-blue-500/15 cursor-pointer appearance-none shadow-2xs transition-all"
                         >
                           <option value="">Select Tariff</option>
-                          <option v-for="t in tariffOptions" :key="t" :value="t">{{ t }}</option>
+                          <option v-for="t in tariffOptions" :key="t" :value="t">{{ getTariffOptionLabel(t) }}</option>
                         </select>
                         <ChevronDown class="w-3.5 h-3.5 text-zinc-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                       </div>

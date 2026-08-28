@@ -135,6 +135,7 @@ class BranchViewSet(viewsets.ModelViewSet):
     """Branch / Office ViewSet for tenant-specific locations."""
     serializer_class = BranchSerializer
     permission_classes = [IsTenantUser]
+    pagination_class = None
 
     def get_queryset(self):
         user = self.request.user
@@ -144,15 +145,27 @@ class BranchViewSet(viewsets.ModelViewSet):
         if user.is_superuser or getattr(user, 'role', '') == 'SUPER_ADMIN':
             tenant_id = self.request.query_params.get('tenant_id')
             if tenant_id:
-                return Branch.objects.filter(tenant_id=tenant_id)
+                return Branch.objects.filter(tenant_id=tenant_id).order_by('name')
             if tenant:
-                return Branch.objects.filter(tenant=tenant)
-            return Branch.objects.all()
-        return Branch.objects.filter(tenant=tenant)
+                return Branch.objects.filter(tenant=tenant).order_by('name')
+            return Branch.objects.all().order_by('name')
+        if not tenant:
+            from .models import Tenant
+            tenant = Tenant.objects.first()
+        return Branch.objects.filter(tenant=tenant).order_by('name')
 
     def perform_create(self, serializer):
         user = self.request.user
-        if not (user.is_superuser or user.role == 'SUPER_ADMIN'):
-            serializer.save(tenant=user.tenant)
-        else:
-            serializer.save()
+        tenant = getattr(self.request, 'tenant', None) or getattr(user, 'tenant', None)
+        if not tenant and (user.is_superuser or getattr(user, 'role', '') == 'SUPER_ADMIN'):
+            tenant_id = self.request.data.get('tenant_id') or self.request.query_params.get('tenant_id')
+            if tenant_id:
+                from .models import Tenant
+                tenant = Tenant.objects.filter(id=tenant_id).first()
+            if not tenant:
+                from .models import Tenant
+                tenant = Tenant.objects.first()
+        elif not tenant:
+            from .models import Tenant
+            tenant = Tenant.objects.first()
+        serializer.save(tenant=tenant)

@@ -172,8 +172,29 @@ export const settingsApi = {
     const res = await apiClient.post('/folders/', { name })
     return res.data
   },
+  updateFolder: async (id: string, name: string): Promise<GeneralOption> => {
+    const res = await apiClient.patch(`/folders/${id}/`, { name })
+    return res.data
+  },
   deleteFolder: async (id: string) => {
     await apiClient.delete(`/folders/${id}/`)
+  },
+
+  // Office Branches / Locations
+  getOffices: async (): Promise<GeneralOption[]> => {
+    const res = await apiClient.get('/branches/')
+    return Array.isArray(res.data) ? res.data : (res.data?.results || [])
+  },
+  createOffice: async (data: { name: string }): Promise<GeneralOption> => {
+    const res = await apiClient.post('/branches/', data)
+    return res.data
+  },
+  updateOffice: async (id: string, data: { name: string }): Promise<GeneralOption> => {
+    const res = await apiClient.patch(`/branches/${id}/`, data)
+    return res.data
+  },
+  deleteOffice: async (id: string) => {
+    await apiClient.delete(`/branches/${id}/`)
   },
 
   // Payment Methods
@@ -183,6 +204,10 @@ export const settingsApi = {
   },
   createPaymentMethod: async (data: { name: string }): Promise<GeneralOption> => {
     const res = await apiClient.post('/payment-methods/', data)
+    return res.data
+  },
+  updatePaymentMethod: async (id: string, data: { name: string }): Promise<GeneralOption> => {
+    const res = await apiClient.patch(`/payment-methods/${id}/`, data)
     return res.data
   },
   deletePaymentMethod: async (id: string) => {
@@ -198,6 +223,10 @@ export const settingsApi = {
     const res = await apiClient.post('/payment-receivers/', data)
     return res.data
   },
+  updatePaymentReceiver: async (id: string, data: { name: string }): Promise<GeneralOption> => {
+    const res = await apiClient.patch(`/payment-receivers/${id}/`, data)
+    return res.data
+  },
   deletePaymentReceiver: async (id: string) => {
     await apiClient.delete(`/payment-receivers/${id}/`)
   },
@@ -209,6 +238,10 @@ export const settingsApi = {
   },
   createPaymentNote: async (data: { name: string }): Promise<GeneralOption> => {
     const res = await apiClient.post('/payment-notes/', data)
+    return res.data
+  },
+  updatePaymentNote: async (id: string, data: { name: string }): Promise<GeneralOption> => {
+    const res = await apiClient.patch(`/payment-notes/${id}/`, data)
     return res.data
   },
   deletePaymentNote: async (id: string) => {

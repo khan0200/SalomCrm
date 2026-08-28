@@ -26,6 +26,7 @@ import {
 import { settingsApi, type TariffOption, type GeneralOption, type UniversityStatusOption, type CustomTag } from '@/api/settings'
 import { useCustomTags } from '@/composables/useCustomTags'
 import { useUniversityStatuses, STATUS_COLOR_OPTIONS } from '@/composables/useUniversityStatuses'
+import { useCurrency } from '@/composables/useCurrency'
 import { useUiStore } from '@/stores/ui'
 import { useQueryClient } from '@tanstack/vue-query'
 
@@ -38,6 +39,7 @@ const {
   getStatusDotClass,
   getStatusBadgeClass
 } = useUniversityStatuses()
+const { formatAmountInput, parseAmount, formatCurrency } = useCurrency()
 
 const uiStore = useUiStore()
 const queryClient = useQueryClient()
@@ -45,6 +47,8 @@ const queryClient = useQueryClient()
 const invalidateGlobalCaches = async () => {
   await Promise.all([
     queryClient.invalidateQueries({ queryKey: ['folders'] }),
+    queryClient.invalidateQueries({ queryKey: ['branches'] }),
+    queryClient.invalidateQueries({ queryKey: ['offices'] }),
     queryClient.invalidateQueries({ queryKey: ['student-options'] }),
     queryClient.invalidateQueries({ queryKey: ['settings-universities'] }),
     queryClient.invalidateQueries({ queryKey: ['students'] }),
@@ -221,10 +225,7 @@ const leads = ref<GeneralOption[]>([])
 const coordinators = ref<GeneralOption[]>([])
 const universities = ref<GeneralOption[]>([])
 const folders = ref<GeneralOption[]>([])
-const offices = ref<GeneralOption[]>([
-  { id: '1', name: 'ANDIJON OFFIS' },
-  { id: '2', name: 'TOSHKENT OFFIS' }
-])
+const offices = ref<GeneralOption[]>([])
 const paymentMethods = ref<GeneralOption[]>([])
 const paymentReceivers = ref<GeneralOption[]>([])
 const paymentNoteTemplates = ref<GeneralOption[]>([])
@@ -249,10 +250,6 @@ const tagFormName = ref('')
 const tagFormEmoji = ref('🏷️')
 const isTagEmojiPickerOpen = ref(false)
 
-const formatCurrency = (val: number) => {
-  return String(Math.round(val)).replace(/\B(?=(\d{3})+(?!\d))/g, '.') + ' UZS'
-}
-
 const fetchAllOptions = async (silent = false) => {
   try {
     if (!silent) {
@@ -266,6 +263,7 @@ const fetchAllOptions = async (silent = false) => {
       coordinatorsRes,
       universitiesRes,
       foldersRes,
+      officesRes,
       methodsRes,
       receiversRes,
       notesRes,
@@ -278,6 +276,7 @@ const fetchAllOptions = async (silent = false) => {
       settingsApi.getCoordinators(),
       settingsApi.getUniversities(),
       settingsApi.getFolders(),
+      settingsApi.getOffices(),
       settingsApi.getPaymentMethods(),
       settingsApi.getPaymentReceivers(),
       settingsApi.getPaymentNotes(),
@@ -291,6 +290,7 @@ const fetchAllOptions = async (silent = false) => {
     if (coordinatorsRes.status === 'fulfilled') coordinators.value = coordinatorsRes.value || []
     if (universitiesRes.status === 'fulfilled') universities.value = universitiesRes.value || []
     if (foldersRes.status === 'fulfilled') folders.value = foldersRes.value || []
+    if (officesRes.status === 'fulfilled') offices.value = officesRes.value || []
     if (methodsRes.status === 'fulfilled') paymentMethods.value = methodsRes.value || []
     if (receiversRes.status === 'fulfilled') paymentReceivers.value = receiversRes.value || []
     if (notesRes.status === 'fulfilled') paymentNoteTemplates.value = notesRes.value || []
@@ -330,6 +330,11 @@ const filteredUniversityStatuses = computed(() => universityStatuses.value.filte
 const filteredTags = computed(() => customTagsRegistry.value.filter(t => t.name.toLowerCase().includes(query.value)))
 
 // Action Handlers
+const handlePriceInput = (e: Event) => {
+  const target = e.target as HTMLInputElement
+  formPrice.value = formatAmountInput(target.value)
+}
+
 const handleOpenAdd = (type: string) => {
   modalType.value = type
   modalMode.value = 'add'
@@ -346,7 +351,7 @@ const handleOpenEdit = (type: string, item: any) => {
   modalMode.value = 'edit'
   editingId.value = item.id
   formName.value = item.name
-  formPrice.value = item.price ? String(item.price) : ''
+  formPrice.value = item.price != null ? formatAmountInput(String(item.price)) : ''
   formColorClass.value = item.color_class || 'text-blue-500'
   modalError.value = null
   isModalOpen.value = true
@@ -450,23 +455,25 @@ const handleDelete = async (type: string, id: string, name: string) => {
   const prevCoordinators = [...coordinators.value]
   const prevUniversities = [...universities.value]
   const prevFolders = [...folders.value]
+  const prevOffices = [...offices.value]
   const prevMethods = [...paymentMethods.value]
   const prevReceivers = [...paymentReceivers.value]
   const prevNotes = [...paymentNoteTemplates.value]
   const prevStatuses = [...universityStatuses.value]
 
   // 2. Instantaneous optimistic removal from local state (NO loading spinner / delay!)
-  if (type === 'tariff') tariffs.value = tariffs.value.filter(item => item.id !== id)
-  else if (type === 'level') levels.value = levels.value.filter(item => item.id !== id)
-  else if (type === 'group') groups.value = groups.value.filter(item => item.id !== id)
-  else if (type === 'lead') leads.value = leads.value.filter(item => item.id !== id)
-  else if (type === 'coordinator') coordinators.value = coordinators.value.filter(item => item.id !== id)
-  else if (type === 'university') universities.value = universities.value.filter(item => item.id !== id)
-  else if (type === 'folder') folders.value = folders.value.filter(item => item.id !== id)
-  else if (type === 'payment_method') paymentMethods.value = paymentMethods.value.filter(item => item.id !== id)
-  else if (type === 'payment_receiver') paymentReceivers.value = paymentReceivers.value.filter(item => item.id !== id)
-  else if (type === 'payment_note_template') paymentNoteTemplates.value = paymentNoteTemplates.value.filter(item => item.id !== id)
-  else if (type === 'university_status') universityStatuses.value = universityStatuses.value.filter(item => item.id !== id)
+  if (type === 'tariff') tariffs.value = tariffs.value.filter(item => String(item.id) !== String(id))
+  else if (type === 'level') levels.value = levels.value.filter(item => String(item.id) !== String(id))
+  else if (type === 'group') groups.value = groups.value.filter(item => String(item.id) !== String(id))
+  else if (type === 'lead') leads.value = leads.value.filter(item => String(item.id) !== String(id))
+  else if (type === 'coordinator') coordinators.value = coordinators.value.filter(item => String(item.id) !== String(id))
+  else if (type === 'university') universities.value = universities.value.filter(item => String(item.id) !== String(id))
+  else if (type === 'folder') folders.value = folders.value.filter(item => String(item.id) !== String(id))
+  else if (type === 'office') offices.value = offices.value.filter(item => String(item.id) !== String(id))
+  else if (type === 'payment_method') paymentMethods.value = paymentMethods.value.filter(item => String(item.id) !== String(id))
+  else if (type === 'payment_receiver') paymentReceivers.value = paymentReceivers.value.filter(item => String(item.id) !== String(id))
+  else if (type === 'payment_note_template') paymentNoteTemplates.value = paymentNoteTemplates.value.filter(item => String(item.id) !== String(id))
+  else if (type === 'university_status') universityStatuses.value = universityStatuses.value.filter(item => String(item.id) !== String(id))
 
   uiStore.addToast({ type: 'success', title: 'Deleted', message: `"${name}" removed.` })
 
@@ -479,6 +486,7 @@ const handleDelete = async (type: string, id: string, name: string) => {
     else if (type === 'coordinator') await settingsApi.deleteCoordinator(id)
     else if (type === 'university') await settingsApi.deleteUniversity(id)
     else if (type === 'folder') await settingsApi.deleteFolder(id)
+    else if (type === 'office') await settingsApi.deleteOffice(id)
     else if (type === 'payment_method') await settingsApi.deletePaymentMethod(id)
     else if (type === 'payment_receiver') await settingsApi.deletePaymentReceiver(id)
     else if (type === 'payment_note_template') await settingsApi.deletePaymentNote(id)
@@ -494,6 +502,7 @@ const handleDelete = async (type: string, id: string, name: string) => {
     coordinators.value = prevCoordinators
     universities.value = prevUniversities
     folders.value = prevFolders
+    offices.value = prevOffices
     paymentMethods.value = prevMethods
     paymentReceivers.value = prevReceivers
     paymentNoteTemplates.value = prevNotes
@@ -519,10 +528,10 @@ const handleSubmit = async (e: Event) => {
 
   try {
     if (type === 'tariff') {
-      const price = Number(formPrice.value.replace(/[^0-9.-]+/g, ''))
+      const price = parseAmount(formPrice.value)
       if (isNaN(price) || price < 0) throw new Error('Price must be a valid positive number.')
       if (isEdit && id) {
-        const idx = tariffs.value.findIndex(t => t.id === id)
+        const idx = tariffs.value.findIndex(t => String(t.id) === String(id))
         if (idx !== -1) tariffs.value[idx] = { ...tariffs.value[idx], name, price }
         await settingsApi.updateTariff(id, { name, price })
       } else {
@@ -531,7 +540,7 @@ const handleSubmit = async (e: Event) => {
       }
     } else if (type === 'level') {
       if (isEdit && id) {
-        const idx = levels.value.findIndex(l => l.id === id)
+        const idx = levels.value.findIndex(l => String(l.id) === String(id))
         if (idx !== -1) levels.value[idx] = { ...levels.value[idx], name }
         await settingsApi.updateLevel(id, { name })
       } else {
@@ -540,7 +549,7 @@ const handleSubmit = async (e: Event) => {
       }
     } else if (type === 'group') {
       if (isEdit && id) {
-        const idx = groups.value.findIndex(g => g.id === id)
+        const idx = groups.value.findIndex(g => String(g.id) === String(id))
         if (idx !== -1) groups.value[idx] = { ...groups.value[idx], name }
         await settingsApi.updateGroup(id, { name })
       } else {
@@ -549,7 +558,7 @@ const handleSubmit = async (e: Event) => {
       }
     } else if (type === 'lead') {
       if (isEdit && id) {
-        const idx = leads.value.findIndex(l => l.id === id)
+        const idx = leads.value.findIndex(l => String(l.id) === String(id))
         if (idx !== -1) leads.value[idx] = { ...leads.value[idx], name }
         await settingsApi.updateLead(id, { name })
       } else {
@@ -558,7 +567,7 @@ const handleSubmit = async (e: Event) => {
       }
     } else if (type === 'coordinator') {
       if (isEdit && id) {
-        const idx = coordinators.value.findIndex(c => c.id === id)
+        const idx = coordinators.value.findIndex(c => String(c.id) === String(id))
         if (idx !== -1) coordinators.value[idx] = { ...coordinators.value[idx], name }
         await settingsApi.updateCoordinator(id, { name })
       } else {
@@ -567,7 +576,7 @@ const handleSubmit = async (e: Event) => {
       }
     } else if (type === 'university') {
       if (isEdit && id) {
-        const idx = universities.value.findIndex(u => u.id === id)
+        const idx = universities.value.findIndex(u => String(u.id) === String(id))
         if (idx !== -1) universities.value[idx] = { ...universities.value[idx], name }
         await settingsApi.updateUniversity(id, { name })
       } else {
@@ -575,23 +584,56 @@ const handleSubmit = async (e: Event) => {
         universities.value.push(created)
       }
     } else if (type === 'folder') {
-      const created = await settingsApi.createFolder(name)
-      folders.value.push(created)
+      if (isEdit && id) {
+        const idx = folders.value.findIndex(f => String(f.id) === String(id))
+        if (idx !== -1) folders.value[idx] = { ...folders.value[idx], name }
+        await settingsApi.updateFolder(id, name)
+      } else {
+        const created = await settingsApi.createFolder(name)
+        folders.value.push(created)
+      }
+    } else if (type === 'office') {
+      if (isEdit && id) {
+        const idx = offices.value.findIndex(o => String(o.id) === String(id))
+        if (idx !== -1) offices.value[idx] = { ...offices.value[idx], name }
+        await settingsApi.updateOffice(id, { name })
+      } else {
+        const created = await settingsApi.createOffice({ name })
+        offices.value.push(created)
+      }
     } else if (type === 'payment_method') {
-      const created = await settingsApi.createPaymentMethod({ name })
-      paymentMethods.value.push(created)
+      if (isEdit && id) {
+        const idx = paymentMethods.value.findIndex(p => String(p.id) === String(id))
+        if (idx !== -1) paymentMethods.value[idx] = { ...paymentMethods.value[idx], name }
+        await settingsApi.updatePaymentMethod(id, { name })
+      } else {
+        const created = await settingsApi.createPaymentMethod({ name })
+        paymentMethods.value.push(created)
+      }
     } else if (type === 'payment_receiver') {
-      const created = await settingsApi.createPaymentReceiver({ name })
-      paymentReceivers.value.push(created)
+      if (isEdit && id) {
+        const idx = paymentReceivers.value.findIndex(p => String(p.id) === String(id))
+        if (idx !== -1) paymentReceivers.value[idx] = { ...paymentReceivers.value[idx], name }
+        await settingsApi.updatePaymentReceiver(id, { name })
+      } else {
+        const created = await settingsApi.createPaymentReceiver({ name })
+        paymentReceivers.value.push(created)
+      }
     } else if (type === 'payment_note_template') {
-      const created = await settingsApi.createPaymentNote({ name })
-      paymentNoteTemplates.value.push(created)
+      if (isEdit && id) {
+        const idx = paymentNoteTemplates.value.findIndex(p => String(p.id) === String(id))
+        if (idx !== -1) paymentNoteTemplates.value[idx] = { ...paymentNoteTemplates.value[idx], name }
+        await settingsApi.updatePaymentNote(id, { name })
+      } else {
+        const created = await settingsApi.createPaymentNote({ name })
+        paymentNoteTemplates.value.push(created)
+      }
     } else if (type === 'university_status') {
       const color_class = formColorClass.value
       if (isEdit && id) {
-        const idx = universityStatuses.value.findIndex(s => s.id === id)
+        const idx = universityStatuses.value.findIndex(s => String(s.id) === String(id))
         if (idx !== -1) universityStatuses.value[idx] = { ...universityStatuses.value[idx], name, color_class }
-        const regIdx = statusesRegistry.value.findIndex(s => s.id === id || s.name.toUpperCase() === name.toUpperCase())
+        const regIdx = statusesRegistry.value.findIndex(s => String(s.id) === String(id) || s.name.toUpperCase() === name.toUpperCase())
         if (regIdx !== -1) {
           statusesRegistry.value[regIdx] = { ...statusesRegistry.value[regIdx], name, color_class }
         } else {
@@ -951,6 +993,13 @@ const activeConfig = computed(() => TABS_CONFIG[activeTab.value])
         <!-- 8. Student Folders -->
         <div v-else-if="activeTab === 'folder'" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div
+            v-if="filteredFolders.length === 0"
+            class="col-span-full py-16 text-center text-xs text-zinc-400 italic flex flex-col items-center justify-center gap-2"
+          >
+            <FolderIcon class="w-8 h-8 text-zinc-300 dark:text-zinc-700" />
+            <span>No student folders found</span>
+          </div>
+          <div
             v-for="item in filteredFolders"
             :key="item.id"
             class="group flex items-center justify-between gap-3 p-3 bg-zinc-50/70 dark:bg-zinc-850 border border-zinc-200 dark:border-zinc-700/80 hover:border-rose-400 rounded-xl shadow-2xs transition-all"
@@ -963,8 +1012,16 @@ const activeConfig = computed(() => TABS_CONFIG[activeTab.value])
             </div>
             <div class="flex items-center gap-1 shrink-0 opacity-80 sm:opacity-0 group-hover:opacity-100 transition-opacity">
               <button
+                @click="handleOpenEdit('folder', item)"
+                class="w-7 h-7 flex items-center justify-center border border-zinc-200 dark:border-zinc-700 hover:bg-white dark:hover:bg-zinc-750 rounded-lg text-blue-600 transition-all cursor-pointer"
+                title="Edit"
+              >
+                <Pencil class="w-3.5 h-3.5" />
+              </button>
+              <button
                 @click="handleDelete('folder', item.id, item.name)"
-                class="w-7 h-7 flex items-center justify-center border border-zinc-200 dark:border-zinc-700 hover:bg-white rounded-lg text-rose-600 transition-all cursor-pointer"
+                class="w-7 h-7 flex items-center justify-center border border-zinc-200 dark:border-zinc-700 hover:bg-white dark:hover:bg-zinc-750 rounded-lg text-rose-600 transition-all cursor-pointer"
+                title="Delete"
               >
                 <Trash2 class="w-3.5 h-3.5" />
               </button>
@@ -975,6 +1032,13 @@ const activeConfig = computed(() => TABS_CONFIG[activeTab.value])
         <!-- 9. Office Branches -->
         <div v-else-if="activeTab === 'office'" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div
+            v-if="filteredOffices.length === 0"
+            class="col-span-full py-16 text-center text-xs text-zinc-400 italic flex flex-col items-center justify-center gap-2"
+          >
+            <Building2 class="w-8 h-8 text-zinc-300 dark:text-zinc-700" />
+            <span>No office branches found</span>
+          </div>
+          <div
             v-for="item in filteredOffices"
             :key="item.id"
             class="group flex items-center justify-between gap-3 p-3 bg-zinc-50/70 dark:bg-zinc-850 border border-zinc-200 dark:border-zinc-700/80 hover:border-cyan-400 rounded-xl shadow-2xs transition-all"
@@ -984,6 +1048,22 @@ const activeConfig = computed(() => TABS_CONFIG[activeTab.value])
                 <Building2 class="w-3.5 h-3.5" />
               </div>
               <div class="text-xs font-bold text-zinc-900 dark:text-zinc-100 uppercase tracking-wide truncate">{{ item.name }}</div>
+            </div>
+            <div class="flex items-center gap-1 shrink-0 opacity-80 sm:opacity-0 group-hover:opacity-100 transition-opacity">
+              <button
+                @click="handleOpenEdit('office', item)"
+                class="w-7 h-7 flex items-center justify-center border border-zinc-200 dark:border-zinc-700 hover:bg-white dark:hover:bg-zinc-750 rounded-lg text-blue-600 transition-all cursor-pointer"
+                title="Edit"
+              >
+                <Pencil class="w-3.5 h-3.5" />
+              </button>
+              <button
+                @click="handleDelete('office', item.id, item.name)"
+                class="w-7 h-7 flex items-center justify-center border border-zinc-200 dark:border-zinc-700 hover:bg-white dark:hover:bg-zinc-750 rounded-lg text-rose-600 transition-all cursor-pointer"
+                title="Delete"
+              >
+                <Trash2 class="w-3.5 h-3.5" />
+              </button>
             </div>
           </div>
         </div>
@@ -1227,7 +1307,7 @@ const activeConfig = computed(() => TABS_CONFIG[activeTab.value])
       <div class="bg-white dark:bg-[#181a1d] border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-page-in">
         <div class="px-5 py-4 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
           <h3 class="text-sm font-bold text-zinc-900 dark:text-zinc-100">
-            {{ modalMode === 'add' ? 'Add New' : 'Edit' }} {{ modalType.replace('_', ' ') }}
+            {{ modalMode === 'add' ? 'Add New' : 'Edit' }} {{ String(modalType || '').replace(/_/g, ' ') }}
           </h3>
           <button @click="isModalOpen = false" class="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 cursor-pointer">
             <X class="w-4 h-4" />
@@ -1252,13 +1332,20 @@ const activeConfig = computed(() => TABS_CONFIG[activeTab.value])
 
           <div v-if="modalType === 'tariff'" class="space-y-1.5">
             <label class="block font-bold text-zinc-700 dark:text-zinc-300">Price (UZS)</label>
-            <input
-              v-model="formPrice"
-              type="number"
-              required
-              placeholder="e.g. 13000000"
-              class="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-850 border border-zinc-200 dark:border-zinc-700 rounded-xl text-zinc-800 dark:text-zinc-200 focus:outline-none focus:border-blue-500"
-            />
+            <div class="relative">
+              <input
+                :value="formPrice"
+                @input="handlePriceInput"
+                type="text"
+                inputmode="numeric"
+                required
+                placeholder="e.g. 13,000,000"
+                class="w-full pl-3 pr-12 py-2 bg-zinc-50 dark:bg-zinc-850 border border-zinc-200 dark:border-zinc-700 rounded-xl text-zinc-800 dark:text-zinc-200 focus:outline-none focus:border-blue-500 font-mono text-xs font-semibold"
+              />
+              <span class="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-bold text-zinc-400 pointer-events-none">
+                UZS
+              </span>
+            </div>
           </div>
 
           <!-- Color Options with Live Preview for University Status -->

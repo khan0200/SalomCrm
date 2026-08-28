@@ -161,7 +161,7 @@ const options = computed(() => optionsData.value || {
   coordinators: [],
   universities: [],
   folders: [],
-  offices: ['ANDIJON OFFIS', 'TOSHKENT OFFIS']
+  offices: []
 })
 
 // Query: Folders

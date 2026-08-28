@@ -649,6 +649,13 @@ class StudentOptionsViewSet(viewsets.ViewSet):
             for t in tags_qs
         ]
 
+        from apps.tenants.models import Branch
+        offices_qs = Branch.objects.filter(tenant=tenant).values_list('name', flat=True).order_by('name') if tenant else Branch.objects.values_list('name', flat=True).distinct().order_by('name')
+        offices = list(offices_qs)
+        if not offices and tenant:
+            Branch.objects.create(name='TOSHKENT OFFIS', tenant=tenant)
+            offices = ['TOSHKENT OFFIS']
+
         return Response({
             'tariffs': tariffs,
             'levels': levels,
@@ -658,7 +665,7 @@ class StudentOptionsViewSet(viewsets.ViewSet):
             'universities': universities,
             'folders': folders,
             'folder_counts': folder_counts,
-            'offices': ['ANDIJON OFFIS', 'TOSHKENT OFFIS'],
+            'offices': offices,
             'tags': tags
         })
 
@@ -1512,19 +1519,17 @@ class VisaOptionsView(APIView):
 
         tenant = getattr(request.user, 'tenant', None)
 
-        def get_names(model_cls, defaults=None):
+        def get_names(model_cls):
             qs = model_cls.objects.all()
             if tenant and hasattr(model_cls, 'tenant'):
                 qs = qs.filter(tenant=tenant)
             names = list(qs.values_list('name', flat=True))
-            if not names and defaults:
-                names = defaults
             return [{'name': n} for n in names if n]
 
-        tariffs = get_names(TariffOption, ['STANDART', 'PREMIUM', 'VISA PLUS', 'E-VISA TIL SERTIFIKATSIZ', 'E-VISA TIL SERTIFIKATLI', 'REGIONAL', 'ZERO RISK'])
-        universities = get_names(UniversityOption, ['Baekseok University', 'Jeonju University', 'Anyang University', 'Hoseo University', 'Seoul National University'])
-        coordinators = get_names(CoordinatorOption, ['Coordinator 1', 'Coordinator 2'])
-        b2b = get_names(B2BOption, ['iTOP EDU', 'Global Edu', 'Direct Partner'])
+        tariffs = get_names(TariffOption)
+        universities = get_names(UniversityOption)
+        coordinators = get_names(CoordinatorOption)
+        b2b = get_names(B2BOption)
 
         return Response({
             'tariffs': tariffs,

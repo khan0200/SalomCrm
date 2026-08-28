@@ -16,7 +16,7 @@ export const DEFAULT_TARIFF_PRICES: Record<string, number> = {
 export function getTariffPrice(
   tariff: string | null | undefined,
   languageCertificate?: string | null | undefined,
-  prices: Record<string, number> | Array<{ name: string; price: number | string }> = DEFAULT_TARIFF_PRICES
+  prices?: Record<string, number> | Array<{ name: string; price?: number | string } | string | any>
 ): number {
   if (!tariff || tariff === 'Select') return 0
   const cleanTariff = tariff.trim().toUpperCase()

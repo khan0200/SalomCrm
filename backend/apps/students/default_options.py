@@ -241,3 +241,29 @@ def seed_default_options(tenant):
 
     if to_create:
         UniversityOption.objects.bulk_create(to_create)
+
+    # ── Branches / Offices ────────────────────────────────────────────
+    from apps.tenants.models import Branch
+    if not Branch.objects.filter(tenant=tenant).exists():
+        Branch.objects.create(name='TOSHKENT OFFIS', tenant=tenant)
+
+    # ── Payment Methods ───────────────────────────────────────────────
+    from apps.payments.models import PaymentMethodTemplate, PaymentNotePill
+    DEFAULT_PAYMENT_METHODS = ['CARD', 'CASH', 'BANK']
+    existing_methods = {
+        (n or '').strip().lower()
+        for n in PaymentMethodTemplate.objects.filter(tenant=tenant).values_list('name', flat=True)
+    }
+    for m in DEFAULT_PAYMENT_METHODS:
+        if m.lower() not in existing_methods:
+            PaymentMethodTemplate.objects.create(name=m, tenant=tenant)
+
+    # ── Quick Note Templates ──────────────────────────────────────────
+    DEFAULT_NOTE_PILLS = ['DISCOUNT', 'SHARTNOMA UCHUN', 'QARZ', 'ELCHIXONA UCHUN']
+    existing_notes = {
+        (n or '').strip().lower()
+        for n in PaymentNotePill.objects.filter(tenant=tenant).values_list('name', flat=True)
+    }
+    for n in DEFAULT_NOTE_PILLS:
+        if n.lower() not in existing_notes:
+            PaymentNotePill.objects.create(name=n, tenant=tenant)

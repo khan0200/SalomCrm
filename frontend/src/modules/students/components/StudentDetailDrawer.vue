@@ -677,7 +677,18 @@ const groupOptions = computed(() => props.options?.groups || [])
 const leadByOptions = computed(() => props.options?.leads || [])
 const coordinatorOptions = computed(() => props.options?.coordinators || [])
 const universityOptions = computed(() => allUniversities.value)
-const officeOptions = computed(() => props.options?.offices || ['ANDIJON OFFIS', 'TOSHKENT OFFIS'])
+const officeOptions = computed(() => props.options?.offices || [])
+
+const getSelectOptionLabel = (field: string | null, opt: string) => {
+  if (!opt) return ''
+  if (field === 'tariff') {
+    const price = getTariffPrice(opt, props.student?.language_certificate, props.options?.tariffs || [])
+    if (price > 0) {
+      return `${opt} — ${formatCurrency(price)}`
+    }
+  }
+  return opt
+}
 
 // Major Modal Handlers
 const openMajorModal = (slot: number) => {
@@ -2168,11 +2179,14 @@ const handleRestoreStudent = () => {
                     </div>
 
                     <div class="mt-0.5">
-                      <div class="flex flex-col gap-1">
+                      <div class="flex items-center gap-2 flex-wrap">
                         <span v-if="student.tariff" class="inline-flex self-start px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase bg-emerald-600 text-white shadow-2xs">
                           {{ student.tariff }}
                         </span>
-                        <span v-else class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
+                        <span v-if="computedTariffPrice > 0" class="text-[11px] font-bold font-mono text-zinc-600 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded-md border border-zinc-200/60 dark:border-zinc-700/60">
+                          {{ formatCurrency(computedTariffPrice) }}
+                        </span>
+                        <span v-else-if="!student.tariff" class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
                       </div>
                     </div>
                   </div>
@@ -3110,8 +3124,24 @@ const handleRestoreStudent = () => {
               class="w-full bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 px-3 py-2 rounded-lg outline-none focus:border-blue-500 transition-colors text-[14px] font-semibold uppercase"
             >
               <option value="">Select {{ activeFieldModalDef.label }}</option>
-              <option v-for="opt in activeFieldModalDef.options?.()" :key="opt" :value="opt">{{ opt }}</option>
+              <option v-for="opt in activeFieldModalDef.options?.()" :key="opt" :value="opt">
+                {{ getSelectOptionLabel(editingField, opt) }}
+              </option>
             </select>
+
+            <!-- Live Price Preview Card for Tariff -->
+            <div
+              v-if="editingField === 'tariff' && editValue"
+              class="mt-3 p-3 rounded-xl bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200/70 dark:border-blue-900/40 flex items-center justify-between"
+            >
+              <div class="flex items-center gap-2">
+                <Sparkles class="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
+                <span class="text-xs font-bold text-zinc-700 dark:text-zinc-300">Tariff Price:</span>
+              </div>
+              <span class="text-xs font-extrabold font-mono text-blue-600 dark:text-blue-400">
+                {{ formatCurrency(getTariffPrice(editValue, student?.language_certificate, options?.tariffs || [])) }}
+              </span>
+            </div>
 
             <template v-else-if="activeFieldModalDef.type === 'date'">
               <input

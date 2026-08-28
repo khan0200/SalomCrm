@@ -11,6 +11,7 @@ const props = defineProps<{
   totalFilteredCount: number
   isLoading: boolean
   options?: any
+  tariffOptions?: string[]
   searchQuery: string
   selectedStatuses: string[]
   selectedTariffs: string[]
@@ -47,16 +48,16 @@ const groupRef = ref<HTMLElement | null>(null)
 
 const STATUS_FILTER_OPTIONS = ['Active', 'Archive']
 
-const TARIFF_FILTER_OPTIONS = [
-  'E-VISA (TIL SERTIFIKATISIZ)',
-  'E-VISA (TIL SERTIFIKATLI)',
-  'PREMIUM',
-  'REGIONAL VISA',
-  'STANDART',
-  'VISA PLUS',
-  'ZERO RISK',
-  'No Tariff'
-]
+const availableTariffs = computed<string[]>(() => {
+  if (props.tariffOptions && props.tariffOptions.length > 0) {
+    return props.tariffOptions
+  }
+  const custom = (props.options?.tariffs || []).map((t: any) => typeof t === 'string' ? t : (t?.name || '')).filter(Boolean)
+  const set = new Set<string>(custom)
+  props.students.forEach(s => { if (s.tariff) set.add(s.tariff) })
+  const list = Array.from(set).filter(t => t !== 'No Tariff' && t !== 'NO_TARIFF').sort()
+  return [...list, 'No Tariff']
+})
 
 const BALANCE_FILTER_OPTIONS = [
   'Balance < 0 (Debt)',
@@ -69,9 +70,10 @@ const BALANCE_FILTER_OPTIONS = [
 ]
 
 const ALL_GROUP_OPTIONS = computed(() => {
-  const custom = (props.options?.groups || []).map((g: any) => typeof g === 'string' ? g : g.name)
-  const defaults = ['2026 BAHOR', '2026 KUZ', '2027 BAHOR']
-  const unique = Array.from(new Set([...custom, ...defaults])).filter(Boolean).sort()
+  const custom = (props.options?.groups || []).map((g: any) => typeof g === 'string' ? g : (g?.name || '')).filter(Boolean)
+  const set = new Set<string>(custom)
+  props.students.forEach(s => { if (s.student_group) set.add(s.student_group) })
+  const unique = Array.from(set).filter(Boolean).sort()
   return ['No Group', ...unique]
 })
 
@@ -178,7 +180,7 @@ onUnmounted(() => {
             : 'border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-850 hover:border-blue-400'"
         >
           <span class="truncate max-w-[140px]">
-            {{ selectedTariffs.length === 0 || selectedTariffs.length === TARIFF_FILTER_OPTIONS.length
+            {{ selectedTariffs.length === 0 || selectedTariffs.length === availableTariffs.length
               ? 'All Tariffs'
               : selectedTariffs.join(', ') }}
           </span>
@@ -198,14 +200,14 @@ onUnmounted(() => {
           >
             <input
               type="checkbox"
-              :checked="selectedTariffs.length === TARIFF_FILTER_OPTIONS.length"
+              :checked="selectedTariffs.length === availableTariffs.length"
               class="h-3.5 w-3.5 rounded border-zinc-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
             />
             <span>Select All</span>
           </div>
           <div class="h-px bg-zinc-100 dark:bg-zinc-800 my-1" />
           <div
-            v-for="opt in TARIFF_FILTER_OPTIONS"
+            v-for="opt in availableTariffs"
             :key="opt"
             @click="emit('toggle-tariff', opt)"
             class="px-3.5 py-1.5 flex items-center gap-2.5 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors text-xs font-medium text-zinc-700 dark:text-zinc-300"

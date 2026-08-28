@@ -21,21 +21,11 @@ const uiStore = useUiStore()
 
 const ITEMS_PER_PAGE = 30
 
-const PAYMENT_METHODS_DEFAULT = ['Karta J.A', 'Karta Abdulaziz', 'Naqd', 'Karta M.A', 'Bank', 'Discount']
-const RECEIVED_BY_DEFAULT = ['ABDULAZIZ', 'MUSLIHIDDIN', 'BAXTIYOR', 'MUHAMMADALI', 'JASUR', 'ADMIN', 'Discount']
-const NOTE_PILLS_DEFAULT = ['Shartnoma uchun', 'Qarz', 'Elchixona uchun', 'Appfee', 'DISCOUNT']
+const PAYMENT_METHODS_DEFAULT = ['CARD', 'CASH', 'BANK']
+const RECEIVED_BY_DEFAULT = ['ADMIN']
+const NOTE_PILLS_DEFAULT = ['DISCOUNT', 'SHARTNOMA UCHUN', 'QARZ', 'ELCHIXONA UCHUN']
 
 const STATUS_FILTER_OPTIONS = ['Active', 'Archive']
-const TARIFF_FILTER_OPTIONS = [
-  'E-VISA (TIL SERTIFIKATISIZ)',
-  'E-VISA (TIL SERTIFIKATLI)',
-  'PREMIUM',
-  'REGIONAL VISA',
-  'STANDART',
-  'VISA PLUS',
-  'ZERO RISK',
-  'No Tariff'
-]
 const BALANCE_FILTER_OPTIONS = [
   'Balance < 0 (Debt)',
   'Balance = 0 (Fully Paid)',
@@ -149,7 +139,26 @@ onMounted(async () => {
       paymentReceivers.value = receiversRes.value.map(r => r.name)
     }
     if (notesRes.status === 'fulfilled' && notesRes.value.length > 0) {
-      notePills.value = notesRes.value.map(n => n.name)
+      const raw = notesRes.value.map(n => n.name.trim().toUpperCase())
+      const unique = Array.from(new Set(raw))
+      const base = ['DISCOUNT', 'SHARTNOMA UCHUN', 'QARZ', 'ELCHIXONA UCHUN', 'APPFEE']
+      for (const b of base) {
+        if (!unique.some(u => u === b || u.replace(/\s+/g, '') === b.replace(/\s+/g, ''))) {
+          unique.push(b)
+        }
+      }
+      unique.sort((a, b) => {
+        const getWeight = (val: string) => {
+          if (val === 'DISCOUNT') return 1
+          if (val.includes('SHARTNOMA')) return 2
+          if (val.includes('QARZ')) return 3
+          if (val.includes('ELCHIXONA')) return 4
+          if (val.includes('APPFEE') || val.includes('APPLICATION')) return 5
+          return 10
+        }
+        return getWeight(a) - getWeight(b)
+      })
+      notePills.value = unique
     }
   } catch (err) {
     console.error('Error loading settings options:', err)
@@ -200,6 +209,18 @@ const toggleAllStatuses = () => {
   }
 }
 
+const tariffFilterOptions = computed<string[]>(() => {
+  const fromApi: string[] = (optionsData.value?.tariffs || []).map((t: any) =>
+    typeof t === 'string' ? t : (t?.name || '')
+  ).filter(Boolean)
+  const set = new Set<string>(fromApi)
+  allStudents.value.forEach(s => {
+    if (s.tariff) set.add(s.tariff)
+  })
+  const list = Array.from(set).filter(t => t !== 'No Tariff' && t !== 'NO_TARIFF').sort()
+  return [...list, 'No Tariff']
+})
+
 const toggleTariff = (val: string) => {
   if (selectedTariffs.value.includes(val)) {
     selectedTariffs.value = selectedTariffs.value.filter(t => t !== val)
@@ -208,10 +229,10 @@ const toggleTariff = (val: string) => {
   }
 }
 const toggleAllTariffs = () => {
-  if (selectedTariffs.value.length === TARIFF_FILTER_OPTIONS.length) {
+  if (selectedTariffs.value.length === tariffFilterOptions.value.length) {
     selectedTariffs.value = []
   } else {
-    selectedTariffs.value = [...TARIFF_FILTER_OPTIONS]
+    selectedTariffs.value = [...tariffFilterOptions.value]
   }
 }
 
@@ -231,13 +252,11 @@ const toggleAllBalances = () => {
 }
 
 const ALL_GROUP_OPTIONS = computed(() => {
-  const set = new Set<string>()
+  const custom = (optionsData.value?.groups || []).map((g: any) => typeof g === 'string' ? g : (g?.name || ''))
+  const set = new Set<string>(custom)
   allStudents.value.forEach(s => { if (s.student_group) set.add(s.student_group) })
-  const list = Array.from(set)
-  if (!list.includes('2026 BAHOR')) list.push('2026 BAHOR')
-  if (!list.includes('2026 KUZ')) list.push('2026 KUZ')
-  if (!list.includes('2027 BAHOR')) list.push('2027 BAHOR')
-  return ['No Group', ...list.sort()]
+  const list = Array.from(set).filter(Boolean).sort()
+  return ['No Group', ...list]
 })
 
 const toggleGroup = (val: string) => {
@@ -767,6 +786,7 @@ const exportPaymentHistoryToExcel = async () => {
         :total-filtered-count="sortedStudents.length"
         :is-loading="isOverviewLoading"
         :options="options"
+        :tariff-options="tariffFilterOptions"
         :search-query="studentSearch"
         :selected-statuses="selectedStatuses"
         :selected-tariffs="selectedTariffs"
@@ -882,6 +902,7 @@ const exportPaymentHistoryToExcel = async () => {
       :students="allStudents"
       :payment-methods="paymentMethods"
       :payment-receivers="paymentReceivers"
+      :note-pills="notePills"
       @close="isEditModalOpen = false"
       @submit="editPaymentMutation.mutate($event)"
     />

@@ -6,6 +6,9 @@ import {
   Receipt, X, User, LayoutGrid, Table as TableIcon,
   Copy, Check, Clock, ArrowDownLeft, ArrowUpRight, Tag
 } from 'lucide-vue-next'
+import { useAuthStore } from '@/stores/auth'
+
+const authStore = useAuthStore()
 
 const props = defineProps<{
   payments: Payment[]
@@ -167,6 +170,7 @@ const printReceipt = (payment: Payment) => {
   const notesLine = payment.notes || ''
   const methodLine = payment.method || '—'
   const receiverLine = payment.received_by || '—'
+  const companyName = authStore.currentTenant?.name?.toUpperCase() || 'SALOM CRM'
 
   const receiptHTML = `<!DOCTYPE html>
 <html lang="en">
@@ -195,8 +199,8 @@ const printReceipt = (payment: Payment) => {
 </head>
 <body>
 <div class="receipt">
-  <div class="company-name">SALOM CRM</div>
-  <div class="company-sub">UNIBRIDGE EDUCATIONAL SERVICES</div>
+  <div class="company-name">${companyName}</div>
+  <div class="company-sub">PAYMENT RECEIPT</div>
   <hr class="divider-solid">
   <div class="receipt-no">Receipt #${receiptNo}</div>
   <div class="row"><span class="label">Date:</span><span class="value bold">${dateStr}</span></div>
@@ -213,7 +217,7 @@ const printReceipt = (payment: Payment) => {
   <div class="row"><span class="label">Received by:</span><span class="value">${receiverLine}</span></div>
   ${notesLine ? `<div class="notes-row"><span style="font-size:9px; letter-spacing:1px; color:#444;">NOTE: </span>${notesLine}</div>` : ''}
   <hr class="divider-solid">
-  <div class="footer">★ RAHMAT! THANK YOU! ★<br><span style="font-size:8px; color:#555;">unibridge.uz</span></div>
+  <div class="footer">★ RAHMAT! THANK YOU! ★</div>
 </div>
 </body>
 </html>`

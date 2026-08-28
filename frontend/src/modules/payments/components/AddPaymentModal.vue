@@ -149,13 +149,67 @@ const onAmountChange = (e: Event) => {
 }
 
 const addNotePill = (pill: string) => {
+  const upper = pill.trim().toUpperCase()
   const current = notes.value.trim()
-  if (pill === 'DISCOUNT') {
+  if (upper === 'DISCOUNT') {
     method.value = 'Discount'
     receivedBy.value = 'Discount'
   }
-  notes.value = current ? `${current}, ${pill}` : pill
+  notes.value = current ? `${current}, ${upper}` : upper
 }
+
+const getPillStyle = (pill: string, idx: number) => {
+  const upper = pill.trim().toUpperCase()
+  if (upper === 'DISCOUNT') {
+    return 'bg-amber-500 hover:bg-amber-600 active:bg-amber-700'
+  }
+  if (upper.includes('SHARTNOMA')) {
+    return 'bg-blue-600 hover:bg-blue-700 active:bg-blue-800'
+  }
+  if (upper.includes('QARZ')) {
+    return 'bg-rose-600 hover:bg-rose-700 active:bg-rose-800'
+  }
+  if (upper.includes('ELCHIXONA')) {
+    return 'bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800'
+  }
+  if (upper.includes('APPFEE') || upper.includes('APPLICATION')) {
+    return 'bg-purple-600 hover:bg-purple-700 active:bg-purple-800'
+  }
+
+  const fallbacks = [
+    'bg-cyan-600 hover:bg-cyan-700 active:bg-cyan-800',
+    'bg-orange-600 hover:bg-orange-700 active:bg-orange-800',
+    'bg-violet-600 hover:bg-violet-700 active:bg-violet-800',
+    'bg-teal-600 hover:bg-teal-700 active:bg-teal-800',
+    'bg-fuchsia-600 hover:bg-fuchsia-700 active:bg-fuchsia-800',
+  ]
+  return fallbacks[idx % fallbacks.length]
+}
+
+const sortedNotePills = computed(() => {
+  const raw = (props.notePills || []).map(p => p.trim().toUpperCase())
+  const unique = Array.from(new Set(raw))
+
+  // Ensure standard defaults exist
+  const base = ['DISCOUNT', 'SHARTNOMA UCHUN', 'QARZ', 'ELCHIXONA UCHUN', 'APPFEE']
+  for (const b of base) {
+    if (!unique.some(u => u === b || u.replace(/\s+/g, '') === b.replace(/\s+/g, ''))) {
+      unique.push(b)
+    }
+  }
+
+  return unique.sort((a, b) => {
+    const getWeight = (val: string) => {
+      if (val === 'DISCOUNT') return 1
+      if (val.includes('SHARTNOMA')) return 2
+      if (val.includes('QARZ')) return 3
+      if (val.includes('ELCHIXONA')) return 4
+      if (val.includes('APPFEE') || val.includes('APPLICATION')) return 5
+      return 10
+    }
+    return getWeight(a) - getWeight(b)
+  })
+})
 
 const handleSubmit = () => {
   if (props.isSubmitting) return
@@ -361,15 +415,16 @@ const handleSubmit = () => {
             placeholder="Add note / description (required)..."
             class="w-full px-3 py-2 text-xs border border-zinc-200 dark:border-zinc-700 rounded-xl bg-zinc-50 dark:bg-zinc-850 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-blue-500 resize-none"
           />
-          <div class="flex flex-wrap gap-1.5 mt-1.5">
+          <div class="flex flex-wrap items-center gap-1.5 mt-2">
             <button
-              v-for="pill in notePills"
+              v-for="(pill, idx) in sortedNotePills"
               :key="pill"
               type="button"
               @click="addNotePill(pill)"
-              class="text-[10px] font-semibold px-2 py-0.5 rounded-full border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-750 cursor-pointer text-zinc-600 dark:text-zinc-400 transition-colors"
+              class="text-[10.5px] font-extrabold px-3 py-1 rounded-full cursor-pointer uppercase transition-all duration-150 active:scale-95 flex items-center justify-center text-center select-none shadow-xs text-white"
+              :class="getPillStyle(pill, idx)"
             >
-              {{ pill }}
+              <span>{{ pill }}</span>
             </button>
           </div>
         </div>

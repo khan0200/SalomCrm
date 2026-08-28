@@ -1,21 +1,24 @@
 export function useCurrency() {
   const formatAmount = (val: number | string | null | undefined): string => {
-    if (val === null || val === undefined || isNaN(Number(val))) return '0'
-    return new Intl.NumberFormat('en-US').format(Math.round(Number(val)))
+    if (val === null || val === undefined || val === '') return '0'
+    const num = typeof val === 'number' ? val : parseFloat(String(val).replace(/[^\d.-]/g, ''))
+    if (isNaN(num)) return '0'
+    return new Intl.NumberFormat('en-US').format(Math.round(num))
   }
 
   const formatCurrency = (val: number | string | null | undefined): string => {
     return `${formatAmount(val)} UZS`
   }
 
-  const parseAmount = (val: string): number => {
-    if (!val) return 0
-    const cleaned = val.replace(/[^\d.-]/g, '')
+  const parseAmount = (val: number | string | null | undefined): number => {
+    if (val === null || val === undefined || val === '') return 0
+    const cleaned = String(val).replace(/[^\d.-]/g, '')
     return parseFloat(cleaned) || 0
   }
 
-  const formatAmountInput = (val: string): string => {
-    const cleaned = val.replace(/[^\d.]/g, '')
+  const formatAmountInput = (val: number | string | null | undefined): string => {
+    if (val === null || val === undefined || val === '') return ''
+    const cleaned = String(val).replace(/[^\d.]/g, '')
     if (!cleaned) return ''
     const [intPart, ...rest] = cleaned.split('.')
     const formattedInt = intPart === '' ? '' : new Intl.NumberFormat('en-US').format(Number(intPart))

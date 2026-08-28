@@ -7,6 +7,10 @@ import type { Student } from '@/types'
 import { useCustomTags } from '@/composables/useCustomTags'
 import { PICK_NEEDED_LIST, useDocumentHelpers } from '@/composables/useDocumentHelpers'
 import { normalizeCertificateScore } from '@/utils/certificateScore'
+import { getTariffPrice } from '@/utils/tariff'
+import { useCurrency } from '@/composables/useCurrency'
+
+const { formatCurrency } = useCurrency()
 
 const props = withDefaults(defineProps<{
   isOpen: boolean
@@ -28,6 +32,7 @@ const props = withDefaults(defineProps<{
   selectedMissingDocs?: string[]
   matchingCount?: number
 }>(), {
+  students: () => [],
   selectedMissingDocs: () => []
 })
 
@@ -46,7 +51,7 @@ const emit = defineEmits<{
 }>()
 
 const { getEffectiveMissingDocs } = useDocumentHelpers()
-const { tagsRegistry, getTagIcon } = useCustomTags()
+const { tagsRegistry, getTagIcon, fetchTags } = useCustomTags()
 
 // Draft local states
 const draftTariffs = ref<string[]>([])
@@ -64,6 +69,7 @@ const activeCategory = ref<string>('tariff')
 // Sync drafts with applied props when opened
 watch(() => props.isOpen, (newVal) => {
   if (newVal) {
+    fetchTags()
     draftTariffs.value = [...props.selectedTariffs]
     draftLevels.value = [...props.selectedLevels]
     draftGroups.value = [...props.selectedGroups]
@@ -132,7 +138,11 @@ const categories = computed<CategoryItem[]>(() => {
       icon: Tag,
       drafts: draftTariffs.value,
       fullOpts: tariffOpts,
-      labelMapping: (opt) => opt === 'NO_TARIFF' ? 'No Tariff' : opt
+      labelMapping: (opt) => {
+        if (opt === 'NO_TARIFF') return 'No Tariff'
+        const price = getTariffPrice(opt, null, props.options.tariffs || [])
+        return price > 0 ? `${opt} — ${formatCurrency(price)}` : opt
+      }
     },
     {
       id: 'level',

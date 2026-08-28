@@ -326,8 +326,18 @@ class BasePaymentOptionViewSet(viewsets.ModelViewSet):
             from apps.tenants.models import Tenant
             tenant = Tenant.objects.first()
         if not tenant or self.model_class is None:
-            return Payment.objects.none()
-        return self.model_class.objects.filter(tenant=tenant)
+            return self.model_class.objects.none() if self.model_class else Payment.objects.none()
+
+        # Auto-seed defaults if empty for this tenant
+        if self.model_class == PaymentMethodTemplate and not PaymentMethodTemplate.objects.filter(tenant=tenant).exists():
+            for m in ['CARD', 'CASH', 'BANK']:
+                PaymentMethodTemplate.objects.get_or_create(tenant=tenant, name=m)
+
+        if self.model_class == PaymentNotePill and not PaymentNotePill.objects.filter(tenant=tenant).exists():
+            for n in ['DISCOUNT', 'SHARTNOMA UCHUN', 'QARZ', 'ELCHIXONA UCHUN']:
+                PaymentNotePill.objects.get_or_create(tenant=tenant, name=n)
+
+        return self.model_class.objects.filter(tenant=tenant).order_by('id')
 
     def perform_create(self, serializer):
         user = self.request.user
