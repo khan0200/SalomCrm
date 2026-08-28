@@ -73,18 +73,14 @@ const isFetched = ref(false)
 const isLoading = ref(false)
 
 export function useOffices() {
-  const loadFromCache = () => {
-    const saved = localStorage.getItem('officesRegistry')
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved)
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          officesRegistry.value = parsed
-        }
-      } catch (e) {
-        console.error('Failed to parse cached officesRegistry', e)
-      }
-    }
+  const setOffices = (data: GeneralOption[]) => {
+    officesRegistry.value = Array.isArray(data) ? data : []
+    isFetched.value = true
+  }
+
+  const clearOffices = () => {
+    officesRegistry.value = []
+    isFetched.value = false
   }
 
   const fetchOffices = async (force = false) => {
@@ -92,14 +88,10 @@ export function useOffices() {
     try {
       isLoading.value = true
       const data = await settingsApi.getOffices()
-      if (Array.isArray(data) && data.length > 0) {
-        officesRegistry.value = data
-        localStorage.setItem('officesRegistry', JSON.stringify(data))
-      }
+      setOffices(Array.isArray(data) ? data : [])
       isFetched.value = true
     } catch (e) {
-      console.warn('Could not fetch offices from server, using cached registry', e)
-      loadFromCache()
+      console.warn('Could not fetch offices from server', e)
     } finally {
       isLoading.value = false
     }
@@ -128,16 +120,13 @@ export function useOffices() {
     return resolveOfficeIcon(office?.icon)
   }
 
-  // Initial cached load if registry is empty
-  if (officesRegistry.value.length === 0) {
-    loadFromCache()
-  }
-
   return {
     officesRegistry,
     isFetched,
     isLoading,
     fetchOffices,
+    setOffices,
+    clearOffices,
     getOfficeByName,
     getOfficeIcon,
     resolveOfficeIcon,

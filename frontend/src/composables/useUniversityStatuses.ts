@@ -30,24 +30,18 @@ export interface UniversityStatusItem {
   color_class?: string
 }
 
-const statusesRegistry = ref<UniversityStatusItem[]>([
-  { id: '1', name: 'Chosen', color_class: 'blue' },
-  { id: '2', name: 'Applying', color_class: 'amber' },
-  { id: '3', name: 'Applied', color_class: 'orange' },
-  { id: '4', name: 'Accepted', color_class: 'emerald' },
-  { id: '5', name: 'Failed', color_class: 'rose' },
-])
-
+const statusesRegistry = ref<UniversityStatusItem[]>([])
 let isFetched = false
 
 export function useUniversityStatuses() {
   const setStatuses = (data: any[]) => {
-    if (!Array.isArray(data)) return
-    statusesRegistry.value = data.map((item: any) => ({
-      id: String(item.id),
-      name: item.name,
-      color_class: item.color_class || 'blue'
-    }))
+    statusesRegistry.value = Array.isArray(data)
+      ? data.map((item: any) => ({
+          id: String(item.id),
+          name: item.name,
+          color_class: item.color_class || 'blue'
+        }))
+      : []
     isFetched = true
   }
 
@@ -55,9 +49,7 @@ export function useUniversityStatuses() {
     if (isFetched && !force) return
     try {
       const data = await settingsApi.getUniversityStatuses()
-      if (Array.isArray(data) && data.length > 0) {
-        setStatuses(data)
-      }
+      setStatuses(Array.isArray(data) ? data : [])
       isFetched = true
     } catch (err) {
       console.error('Failed to fetch university statuses:', err)
