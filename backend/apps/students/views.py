@@ -148,7 +148,9 @@ class StudentViewSet(viewsets.ModelViewSet):
                     Q(passport__icontains=search_query) |
                     Q(phone1__icontains=search_query) |
                     Q(phone2__icontains=search_query) |
+                    Q(telegram_username__icontains=search_query) |
                     Q(father_name__icontains=search_query) |
+
                     Q(mother_name__icontains=search_query) |
                     Q(university_1__icontains=search_query)
                 )
@@ -546,7 +548,22 @@ class FolderViewSet(viewsets.ModelViewSet):
         instance = self.get_object()
         if (instance.name or '').strip().upper() == 'KDB':
             return Response({'error': 'Cannot delete default KDB folder'}, status=status.HTTP_400_BAD_REQUEST)
+
+        folder_uuid = instance.id
+        folder_str = str(folder_uuid)
+        tenant = instance.tenant
+
+        # Clean up this folder from any students that have it in folder_ids
+        students = Student.objects.filter(tenant=tenant, folder_ids__contains=[folder_uuid])
+        for s in students:
+            curr = list(s.folder_ids or [])
+            updated_ids = [fid for fid in curr if str(fid) != folder_str]
+            if len(updated_ids) != len(curr):
+                s.folder_ids = updated_ids
+                s.save(update_fields=['folder_ids', 'updated_at'])
+
         return super().destroy(request, *args, **kwargs)
+
 
     @action(detail=True, methods=['post'], url_path='add-students')
     def add_students(self, request, pk=None):

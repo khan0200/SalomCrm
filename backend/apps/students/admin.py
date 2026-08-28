@@ -8,8 +8,9 @@ from .models import (
 class StudentAdmin(admin.ModelAdmin):
     list_display = ('id', 'full_name', 'tenant', 'tariff', 'balance', 'level', 'office', 'student_group', 'is_deleted', 'status_hidden', 'created_at')
     list_filter = ('tenant', 'tariff', 'level', 'office', 'student_group', 'is_deleted', 'status_hidden')
-    search_fields = ('id', 'full_name', 'passport', 'phone1', 'phone2', 'tenant__name')
+    search_fields = ('id', 'full_name', 'passport', 'phone1', 'phone2', 'telegram_username', 'tenant__name')
     readonly_fields = ('created_at', 'updated_at')
+
 
 
 @admin.register(Folder)

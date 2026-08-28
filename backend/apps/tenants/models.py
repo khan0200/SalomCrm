@@ -34,6 +34,7 @@ class Branch(SimpleTenantModel):
     """
     id = models.BigAutoField(primary_key=True)
     name = models.CharField(max_length=255)
+    icon = models.CharField(max_length=100, blank=True, default='Building2')
 
     class Meta:
         db_table = 'offices'
@@ -43,3 +44,4 @@ class Branch(SimpleTenantModel):
 
     def __str__(self):
         return f"{self.name}"
+

@@ -157,8 +157,11 @@ const FIELD_GROUPS: FieldGroup[] = [
     fields: [
       { key: 'phone1', label: 'Phone 1', checked: true, get: (s) => s.phone1 || '' },
       { key: 'phone2', label: 'Phone 2', checked: true, get: (s) => s.phone2 || '' },
+      { key: 'telegram_username', label: 'TG Username', checked: true, get: (s) => s.telegram_username || '' },
       { key: 'email', label: 'Email', checked: true, get: (s) => s.email || '' },
+
       { key: 'address', label: 'Address', checked: true, get: (s) => s.address || '' },
+
     ]
   },
   {

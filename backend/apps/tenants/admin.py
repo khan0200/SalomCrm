@@ -12,7 +12,8 @@ class TenantAdmin(admin.ModelAdmin):
 
 @admin.register(Branch)
 class BranchAdmin(admin.ModelAdmin):
-    list_display = ('name', 'tenant', 'created_at')
+    list_display = ('name', 'icon', 'tenant', 'created_at')
     list_filter = ('tenant',)
     search_fields = ('name', 'tenant__name')
+
     readonly_fields = ('created_at',)

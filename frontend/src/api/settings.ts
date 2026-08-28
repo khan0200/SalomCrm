@@ -10,8 +10,11 @@ export interface TariffOption {
 export interface GeneralOption {
   id: string
   name: string
+  icon?: string
+  color_class?: string
   created_at?: string
 }
+
 
 export interface UniversityStatusOption {
   id: string
@@ -185,17 +188,18 @@ export const settingsApi = {
     const res = await apiClient.get('/branches/')
     return Array.isArray(res.data) ? res.data : (res.data?.results || [])
   },
-  createOffice: async (data: { name: string }): Promise<GeneralOption> => {
+  createOffice: async (data: { name: string; icon?: string }): Promise<GeneralOption> => {
     const res = await apiClient.post('/branches/', data)
     return res.data
   },
-  updateOffice: async (id: string, data: { name: string }): Promise<GeneralOption> => {
+  updateOffice: async (id: string, data: { name: string; icon?: string }): Promise<GeneralOption> => {
     const res = await apiClient.patch(`/branches/${id}/`, data)
     return res.data
   },
   deleteOffice: async (id: string) => {
     await apiClient.delete(`/branches/${id}/`)
   },
+
 
   // Payment Methods
   getPaymentMethods: async (): Promise<GeneralOption[]> => {

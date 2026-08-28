@@ -65,7 +65,9 @@ class Student(TenantAwareModel):
     birthday = models.CharField(max_length=50, blank=True, null=True)
     phone1 = models.CharField(max_length=50, blank=True, null=True)
     phone2 = models.CharField(max_length=50, blank=True, null=True)
+    telegram_username = models.CharField(max_length=100, blank=True, null=True)
     father_name = models.CharField(max_length=255, blank=True, null=True)
+
     father_phone = models.CharField(max_length=50, blank=True, null=True)
     father_job = models.CharField(max_length=255, blank=True, null=True)
     mother_name = models.CharField(max_length=255, blank=True, null=True)

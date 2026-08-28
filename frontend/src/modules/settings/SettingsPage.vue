@@ -15,6 +15,28 @@ import {
   Search,
   Folder as FolderIcon,
   Building2,
+  Building,
+  Landmark,
+  Store,
+  MapPin,
+  Globe,
+  Briefcase,
+  Warehouse,
+  Home,
+  Hotel,
+  Compass,
+  Navigation,
+  Shield,
+  Award,
+  Sparkles,
+  Star,
+  Layers,
+  Flag,
+  Factory,
+  Castle,
+  Pin,
+  Signpost,
+  Laptop,
   CreditCard,
   Check,
   Wallet,
@@ -85,6 +107,39 @@ const CUSTOM_TAG_ICONS = [
   { emoji: '🛡️', label: 'Security' },
   { emoji: '🇰🇷', label: 'South Korea' },
 ]
+
+const OFFICE_ICON_OPTIONS = [
+  { key: 'Building2', label: 'Office Tower', icon: Building2 },
+
+  { key: 'Building', label: 'Corporate', icon: Building },
+  { key: 'Landmark', label: 'Headquarters', icon: Landmark },
+  { key: 'Store', label: 'Branch / Store', icon: Store },
+  { key: 'MapPin', label: 'Location Pin', icon: MapPin },
+  { key: 'Globe', label: 'International', icon: Globe },
+  { key: 'Briefcase', label: 'Business Suite', icon: Briefcase },
+  { key: 'Warehouse', label: 'Regional Hub', icon: Warehouse },
+  { key: 'Home', label: 'Main Base', icon: Home },
+  { key: 'Hotel', label: 'Liaison Center', icon: Hotel },
+  { key: 'School', label: 'Academy / Campus', icon: School },
+  { key: 'Compass', label: 'District Office', icon: Compass },
+  { key: 'Navigation', label: 'Outpost', icon: Navigation },
+  { key: 'Factory', label: 'Operations Unit', icon: Factory },
+  { key: 'Castle', label: 'Central Center', icon: Castle },
+  { key: 'Shield', label: 'Verified Office', icon: Shield },
+  { key: 'Award', label: 'Premier Branch', icon: Award },
+  { key: 'Sparkles', label: 'Flagship Center', icon: Sparkles },
+  { key: 'Star', label: 'Priority Branch', icon: Star },
+  { key: 'Layers', label: 'Multi-Floor', icon: Layers },
+  { key: 'Flag', label: 'Representative', icon: Flag },
+  { key: 'Signpost', label: 'City Office', icon: Signpost },
+  { key: 'Pin', label: 'Station', icon: Pin },
+  { key: 'Laptop', label: 'Remote / Virtual', icon: Laptop },
+]
+
+const resolveOfficeIcon = (iconKey?: string) => {
+  const found = OFFICE_ICON_OPTIONS.find(o => o.key === iconKey)
+  return found ? found.icon : Building2
+}
 
 // ── Tab Configurations (1-to-1 UniApp2) ──────────────────────────────
 const TABS_CONFIG = {
@@ -239,6 +294,7 @@ const editingId = ref<string | null>(null)
 const formName = ref('')
 const formPrice = ref('')
 const formColorClass = ref('text-blue-500')
+const formIcon = ref('Building2')
 const submitting = ref(false)
 const modalError = ref<string | null>(null)
 
@@ -249,6 +305,10 @@ const editingTag = ref<CustomTag | null>(null)
 const tagFormName = ref('')
 const tagFormEmoji = ref('🏷️')
 const isTagEmojiPickerOpen = ref(false)
+
+// Delete Confirmation Modal State
+const itemToDelete = ref<{ type: string; id: string; name: string; typeName: string } | null>(null)
+const isDeleting = ref(false)
 
 const fetchAllOptions = async (silent = false) => {
   try {
@@ -342,6 +402,7 @@ const handleOpenAdd = (type: string) => {
   formName.value = ''
   formPrice.value = ''
   formColorClass.value = 'text-blue-500'
+  formIcon.value = 'Building2'
   modalError.value = null
   isModalOpen.value = true
 }
@@ -353,6 +414,7 @@ const handleOpenEdit = (type: string, item: any) => {
   formName.value = item.name
   formPrice.value = item.price != null ? formatAmountInput(String(item.price)) : ''
   formColorClass.value = item.color_class || 'text-blue-500'
+  formIcon.value = item.icon || 'Building2'
   modalError.value = null
   isModalOpen.value = true
 }
@@ -421,31 +483,50 @@ const handleSaveTag = async () => {
   }
 }
 
-const handleDeleteTag = async (tagOrName: CustomTag | string) => {
+const handleDeleteTag = (tagOrName: CustomTag | string) => {
   const tagName = typeof tagOrName === 'string' ? tagOrName : tagOrName.name
   const tagItem = typeof tagOrName === 'object' ? tagOrName : customTagsRegistry.value.find(t => t.name === tagName)
-  if (!confirm(`Are you sure you want to delete custom tag "${tagName}"?`)) return
-
-  // Instant optimistic removal
-  const prevTags = [...customTagsRegistry.value]
-  customTagsRegistry.value = customTagsRegistry.value.filter(t => t.name !== tagName)
-  uiStore.addToast({ type: 'success', message: `Tag "${tagName}" deleted` })
-
-  try {
-    if (tagItem?.id) {
-      await settingsApi.deleteTag(tagItem.id)
-    }
-    fetchTags(true)
-    invalidateGlobalCaches()
-  } catch (err: any) {
-    customTagsRegistry.value = prevTags
-    console.error('Error deleting tag:', err)
-    uiStore.addToast({ type: 'error', message: 'Failed to delete tag' })
+  itemToDelete.value = {
+    type: 'tag',
+    id: tagItem?.id || tagName,
+    name: tagName,
+    typeName: 'Custom Tag',
   }
 }
 
-const handleDelete = async (type: string, id: string, name: string) => {
-  if (!confirm(`Are you sure you want to delete "${name}"?`)) return
+const handleDelete = (type: string, id: string, name: string) => {
+  const typeName = TABS_CONFIG[type as TabType]?.label || type
+  itemToDelete.value = { type, id, name, typeName }
+}
+
+const confirmDeleteAction = async () => {
+  if (!itemToDelete.value) return
+  const { type, id, name } = itemToDelete.value
+  itemToDelete.value = null
+  await executeDelete(type, id, name)
+}
+
+const executeDelete = async (type: string, id: string, name: string) => {
+  if (type === 'tag') {
+    const prevTags = [...customTagsRegistry.value]
+    customTagsRegistry.value = customTagsRegistry.value.filter(t => t.name !== name)
+    uiStore.addToast({ type: 'success', title: 'Deleted', message: `Tag "${name}" removed.` })
+    try {
+      isDeleting.value = true
+      const tagItem = customTagsRegistry.value.find(t => t.name === name || t.id === id)
+      if (tagItem?.id || (id && id !== name)) {
+        await settingsApi.deleteTag(tagItem?.id || id)
+      }
+      fetchTags(true)
+      invalidateGlobalCaches()
+    } catch (err: any) {
+      customTagsRegistry.value = prevTags
+      uiStore.addToast({ type: 'error', title: 'Delete Failed', message: err.message || 'Failed to delete tag.' })
+    } finally {
+      isDeleting.value = false
+    }
+    return
+  }
 
   // 1. Snapshot previous state for rollback if network fails
   const prevTariffs = [...tariffs.value]
@@ -461,7 +542,7 @@ const handleDelete = async (type: string, id: string, name: string) => {
   const prevNotes = [...paymentNoteTemplates.value]
   const prevStatuses = [...universityStatuses.value]
 
-  // 2. Instantaneous optimistic removal from local state (NO loading spinner / delay!)
+  // 2. Instantaneous optimistic removal from local state
   if (type === 'tariff') tariffs.value = tariffs.value.filter(item => String(item.id) !== String(id))
   else if (type === 'level') levels.value = levels.value.filter(item => String(item.id) !== String(id))
   else if (type === 'group') groups.value = groups.value.filter(item => String(item.id) !== String(id))
@@ -479,6 +560,7 @@ const handleDelete = async (type: string, id: string, name: string) => {
 
   // 3. Asynchronous background server delete
   try {
+    isDeleting.value = true
     if (type === 'tariff') await settingsApi.deleteTariff(id)
     else if (type === 'level') await settingsApi.deleteLevel(id)
     else if (type === 'group') await settingsApi.deleteGroup(id)
@@ -508,6 +590,8 @@ const handleDelete = async (type: string, id: string, name: string) => {
     paymentNoteTemplates.value = prevNotes
     universityStatuses.value = prevStatuses
     uiStore.addToast({ type: 'error', title: 'Delete Failed', message: err.message || 'Failed to delete item.' })
+  } finally {
+    isDeleting.value = false
   }
 }
 
@@ -593,12 +677,13 @@ const handleSubmit = async (e: Event) => {
         folders.value.push(created)
       }
     } else if (type === 'office') {
+      const icon = formIcon.value || 'Building2'
       if (isEdit && id) {
         const idx = offices.value.findIndex(o => String(o.id) === String(id))
-        if (idx !== -1) offices.value[idx] = { ...offices.value[idx], name }
-        await settingsApi.updateOffice(id, { name })
+        if (idx !== -1) offices.value[idx] = { ...offices.value[idx], name, icon }
+        await settingsApi.updateOffice(id, { name, icon })
       } else {
-        const created = await settingsApi.createOffice({ name })
+        const created = await settingsApi.createOffice({ name, icon })
         offices.value.push(created)
       }
     } else if (type === 'payment_method') {
@@ -791,17 +876,17 @@ const activeConfig = computed(() => TABS_CONFIG[activeTab.value])
                 {{ formatCurrency(item.price) }}
               </div>
             </div>
-            <div class="flex items-center gap-1 shrink-0 opacity-80 sm:opacity-0 group-hover:opacity-100 transition-opacity">
+            <div class="flex items-center gap-1 shrink-0">
               <button
                 @click="handleOpenEdit('tariff', item)"
-                class="w-7 h-7 flex items-center justify-center border border-zinc-200 dark:border-zinc-700 hover:bg-white dark:hover:bg-zinc-750 rounded-lg text-blue-600 transition-all cursor-pointer"
+                class="w-7 h-7 flex items-center justify-center border border-zinc-200 dark:border-zinc-700 hover:bg-white dark:hover:bg-zinc-750 rounded-lg text-blue-600 transition-all cursor-pointer shadow-2xs"
                 title="Edit"
               >
                 <Pencil class="w-3.5 h-3.5" />
               </button>
               <button
                 @click="handleDelete('tariff', item.id, item.name)"
-                class="w-7 h-7 flex items-center justify-center border border-zinc-200 dark:border-zinc-700 hover:bg-white dark:hover:bg-zinc-750 rounded-lg text-rose-600 transition-all cursor-pointer"
+                class="w-7 h-7 flex items-center justify-center border border-zinc-200 dark:border-zinc-700 hover:bg-white dark:hover:bg-zinc-750 rounded-lg text-rose-600 transition-all cursor-pointer shadow-2xs"
                 title="Delete"
               >
                 <Trash2 class="w-3.5 h-3.5" />
@@ -823,16 +908,18 @@ const activeConfig = computed(() => TABS_CONFIG[activeTab.value])
               </div>
               <div class="text-xs font-bold text-zinc-900 dark:text-zinc-100 uppercase tracking-wide truncate">{{ item.name }}</div>
             </div>
-            <div class="flex items-center gap-1 shrink-0 opacity-80 sm:opacity-0 group-hover:opacity-100 transition-opacity">
+            <div class="flex items-center gap-1 shrink-0">
               <button
                 @click="handleOpenEdit('level', item)"
-                class="w-7 h-7 flex items-center justify-center border border-zinc-200 dark:border-zinc-700 hover:bg-white rounded-lg text-blue-600 transition-all cursor-pointer"
+                class="w-7 h-7 flex items-center justify-center border border-zinc-200 dark:border-zinc-700 hover:bg-white dark:hover:bg-zinc-750 rounded-lg text-blue-600 transition-all cursor-pointer shadow-2xs"
+                title="Edit"
               >
                 <Pencil class="w-3.5 h-3.5" />
               </button>
               <button
                 @click="handleDelete('level', item.id, item.name)"
-                class="w-7 h-7 flex items-center justify-center border border-zinc-200 dark:border-zinc-700 hover:bg-white rounded-lg text-rose-600 transition-all cursor-pointer"
+                class="w-7 h-7 flex items-center justify-center border border-zinc-200 dark:border-zinc-700 hover:bg-white dark:hover:bg-zinc-750 rounded-lg text-rose-600 transition-all cursor-pointer shadow-2xs"
+                title="Delete"
               >
                 <Trash2 class="w-3.5 h-3.5" />
               </button>
@@ -853,16 +940,18 @@ const activeConfig = computed(() => TABS_CONFIG[activeTab.value])
               </div>
               <div class="text-xs font-bold text-zinc-900 dark:text-zinc-100 uppercase tracking-wide truncate">{{ item.name }}</div>
             </div>
-            <div class="flex items-center gap-1 shrink-0 opacity-80 sm:opacity-0 group-hover:opacity-100 transition-opacity">
+            <div class="flex items-center gap-1 shrink-0">
               <button
                 @click="handleOpenEdit('group', item)"
-                class="w-7 h-7 flex items-center justify-center border border-zinc-200 dark:border-zinc-700 hover:bg-white rounded-lg text-blue-600 transition-all cursor-pointer"
+                class="w-7 h-7 flex items-center justify-center border border-zinc-200 dark:border-zinc-700 hover:bg-white dark:hover:bg-zinc-750 rounded-lg text-blue-600 transition-all cursor-pointer shadow-2xs"
+                title="Edit"
               >
                 <Pencil class="w-3.5 h-3.5" />
               </button>
               <button
                 @click="handleDelete('group', item.id, item.name)"
-                class="w-7 h-7 flex items-center justify-center border border-zinc-200 dark:border-zinc-700 hover:bg-white rounded-lg text-rose-600 transition-all cursor-pointer"
+                class="w-7 h-7 flex items-center justify-center border border-zinc-200 dark:border-zinc-700 hover:bg-white dark:hover:bg-zinc-750 rounded-lg text-rose-600 transition-all cursor-pointer shadow-2xs"
+                title="Delete"
               >
                 <Trash2 class="w-3.5 h-3.5" />
               </button>
@@ -883,16 +972,18 @@ const activeConfig = computed(() => TABS_CONFIG[activeTab.value])
               </div>
               <div class="text-xs font-bold text-zinc-900 dark:text-zinc-100 truncate">{{ item.name }}</div>
             </div>
-            <div class="flex items-center gap-1 shrink-0 opacity-80 sm:opacity-0 group-hover:opacity-100 transition-opacity">
+            <div class="flex items-center gap-1 shrink-0">
               <button
                 @click="handleOpenEdit('lead', item)"
-                class="w-7 h-7 flex items-center justify-center border border-zinc-200 dark:border-zinc-700 hover:bg-white rounded-lg text-blue-600 transition-all cursor-pointer"
+                class="w-7 h-7 flex items-center justify-center border border-zinc-200 dark:border-zinc-700 hover:bg-white dark:hover:bg-zinc-750 rounded-lg text-blue-600 transition-all cursor-pointer shadow-2xs"
+                title="Edit"
               >
                 <Pencil class="w-3.5 h-3.5" />
               </button>
               <button
                 @click="handleDelete('lead', item.id, item.name)"
-                class="w-7 h-7 flex items-center justify-center border border-zinc-200 dark:border-zinc-700 hover:bg-white rounded-lg text-rose-600 transition-all cursor-pointer"
+                class="w-7 h-7 flex items-center justify-center border border-zinc-200 dark:border-zinc-700 hover:bg-white dark:hover:bg-zinc-750 rounded-lg text-rose-600 transition-all cursor-pointer shadow-2xs"
+                title="Delete"
               >
                 <Trash2 class="w-3.5 h-3.5" />
               </button>
@@ -913,16 +1004,18 @@ const activeConfig = computed(() => TABS_CONFIG[activeTab.value])
               </div>
               <div class="text-xs font-bold text-zinc-900 dark:text-zinc-100 truncate">{{ item.name }}</div>
             </div>
-            <div class="flex items-center gap-1 shrink-0 opacity-80 sm:opacity-0 group-hover:opacity-100 transition-opacity">
+            <div class="flex items-center gap-1 shrink-0">
               <button
                 @click="handleOpenEdit('coordinator', item)"
-                class="w-7 h-7 flex items-center justify-center border border-zinc-200 dark:border-zinc-700 hover:bg-white rounded-lg text-blue-600 transition-all cursor-pointer"
+                class="w-7 h-7 flex items-center justify-center border border-zinc-200 dark:border-zinc-700 hover:bg-white dark:hover:bg-zinc-750 rounded-lg text-blue-600 transition-all cursor-pointer shadow-2xs"
+                title="Edit"
               >
                 <Pencil class="w-3.5 h-3.5" />
               </button>
               <button
                 @click="handleDelete('coordinator', item.id, item.name)"
-                class="w-7 h-7 flex items-center justify-center border border-zinc-200 dark:border-zinc-700 hover:bg-white rounded-lg text-rose-600 transition-all cursor-pointer"
+                class="w-7 h-7 flex items-center justify-center border border-zinc-200 dark:border-zinc-700 hover:bg-white dark:hover:bg-zinc-750 rounded-lg text-rose-600 transition-all cursor-pointer shadow-2xs"
+                title="Delete"
               >
                 <Trash2 class="w-3.5 h-3.5" />
               </button>
@@ -943,16 +1036,18 @@ const activeConfig = computed(() => TABS_CONFIG[activeTab.value])
               </div>
               <span class="text-xs font-bold text-zinc-900 dark:text-zinc-100 truncate">{{ tag.name }}</span>
             </div>
-            <div class="flex items-center gap-1 shrink-0 opacity-80 sm:opacity-0 group-hover:opacity-100 transition-opacity">
+            <div class="flex items-center gap-1 shrink-0">
               <button
                 @click="handleOpenEditTag(tag)"
-                class="w-7 h-7 flex items-center justify-center border border-zinc-200 dark:border-zinc-700 hover:bg-white rounded-lg text-blue-600 transition-all cursor-pointer"
+                class="w-7 h-7 flex items-center justify-center border border-zinc-200 dark:border-zinc-700 hover:bg-white dark:hover:bg-zinc-750 rounded-lg text-blue-600 transition-all cursor-pointer shadow-2xs"
+                title="Edit"
               >
                 <Pencil class="w-3.5 h-3.5" />
               </button>
               <button
                 @click="handleDeleteTag(tag)"
-                class="w-7 h-7 flex items-center justify-center border border-zinc-200 dark:border-zinc-700 hover:bg-white rounded-lg text-rose-600 transition-all cursor-pointer"
+                class="w-7 h-7 flex items-center justify-center border border-zinc-200 dark:border-zinc-700 hover:bg-white dark:hover:bg-zinc-750 rounded-lg text-rose-600 transition-all cursor-pointer shadow-2xs"
+                title="Delete"
               >
                 <Trash2 class="w-3.5 h-3.5" />
               </button>
@@ -973,16 +1068,18 @@ const activeConfig = computed(() => TABS_CONFIG[activeTab.value])
               </div>
               <div class="text-xs font-bold text-zinc-900 dark:text-zinc-100 truncate">{{ item.name }}</div>
             </div>
-            <div class="flex items-center gap-1 shrink-0 opacity-80 sm:opacity-0 group-hover:opacity-100 transition-opacity">
+            <div class="flex items-center gap-1 shrink-0">
               <button
                 @click="handleOpenEdit('university', item)"
-                class="w-7 h-7 flex items-center justify-center border border-zinc-200 dark:border-zinc-700 hover:bg-white rounded-lg text-blue-600 transition-all cursor-pointer"
+                class="w-7 h-7 flex items-center justify-center border border-zinc-200 dark:border-zinc-700 hover:bg-white dark:hover:bg-zinc-750 rounded-lg text-blue-600 transition-all cursor-pointer shadow-2xs"
+                title="Edit"
               >
                 <Pencil class="w-3.5 h-3.5" />
               </button>
               <button
                 @click="handleDelete('university', item.id, item.name)"
-                class="w-7 h-7 flex items-center justify-center border border-zinc-200 dark:border-zinc-700 hover:bg-white rounded-lg text-rose-600 transition-all cursor-pointer"
+                class="w-7 h-7 flex items-center justify-center border border-zinc-200 dark:border-zinc-700 hover:bg-white dark:hover:bg-zinc-750 rounded-lg text-rose-600 transition-all cursor-pointer shadow-2xs"
+                title="Delete"
               >
                 <Trash2 class="w-3.5 h-3.5" />
               </button>
@@ -1010,17 +1107,17 @@ const activeConfig = computed(() => TABS_CONFIG[activeTab.value])
               </div>
               <div class="text-xs font-bold text-zinc-900 dark:text-zinc-100 truncate">{{ item.name }}</div>
             </div>
-            <div class="flex items-center gap-1 shrink-0 opacity-80 sm:opacity-0 group-hover:opacity-100 transition-opacity">
+            <div class="flex items-center gap-1 shrink-0">
               <button
                 @click="handleOpenEdit('folder', item)"
-                class="w-7 h-7 flex items-center justify-center border border-zinc-200 dark:border-zinc-700 hover:bg-white dark:hover:bg-zinc-750 rounded-lg text-blue-600 transition-all cursor-pointer"
+                class="w-7 h-7 flex items-center justify-center border border-zinc-200 dark:border-zinc-700 hover:bg-white dark:hover:bg-zinc-750 rounded-lg text-blue-600 transition-all cursor-pointer shadow-2xs"
                 title="Edit"
               >
                 <Pencil class="w-3.5 h-3.5" />
               </button>
               <button
                 @click="handleDelete('folder', item.id, item.name)"
-                class="w-7 h-7 flex items-center justify-center border border-zinc-200 dark:border-zinc-700 hover:bg-white dark:hover:bg-zinc-750 rounded-lg text-rose-600 transition-all cursor-pointer"
+                class="w-7 h-7 flex items-center justify-center border border-zinc-200 dark:border-zinc-700 hover:bg-white dark:hover:bg-zinc-750 rounded-lg text-rose-600 transition-all cursor-pointer shadow-2xs"
                 title="Delete"
               >
                 <Trash2 class="w-3.5 h-3.5" />
@@ -1041,25 +1138,25 @@ const activeConfig = computed(() => TABS_CONFIG[activeTab.value])
           <div
             v-for="item in filteredOffices"
             :key="item.id"
-            class="group flex items-center justify-between gap-3 p-3 bg-zinc-50/70 dark:bg-zinc-850 border border-zinc-200 dark:border-zinc-700/80 hover:border-cyan-400 rounded-xl shadow-2xs transition-all"
+            class="group flex items-center justify-between gap-3 p-3 bg-zinc-50/70 dark:bg-zinc-850 border border-zinc-200 dark:border-zinc-700/80 hover:border-cyan-400 dark:hover:border-cyan-500 rounded-xl shadow-2xs transition-all"
           >
-            <div class="flex items-center gap-2.5 min-w-0">
-              <div class="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 bg-cyan-50 dark:bg-cyan-950/30 text-cyan-600">
-                <Building2 class="w-3.5 h-3.5" />
+            <div class="flex items-center gap-3 min-w-0">
+              <div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-cyan-50 dark:bg-cyan-950/40 text-cyan-600 dark:text-cyan-400 border border-cyan-200/70 dark:border-cyan-900/50 shadow-2xs">
+                <component :is="resolveOfficeIcon(item.icon)" class="w-4 h-4 stroke-[2.2]" />
               </div>
               <div class="text-xs font-bold text-zinc-900 dark:text-zinc-100 uppercase tracking-wide truncate">{{ item.name }}</div>
             </div>
-            <div class="flex items-center gap-1 shrink-0 opacity-80 sm:opacity-0 group-hover:opacity-100 transition-opacity">
+            <div class="flex items-center gap-1 shrink-0">
               <button
                 @click="handleOpenEdit('office', item)"
-                class="w-7 h-7 flex items-center justify-center border border-zinc-200 dark:border-zinc-700 hover:bg-white dark:hover:bg-zinc-750 rounded-lg text-blue-600 transition-all cursor-pointer"
+                class="w-7 h-7 flex items-center justify-center border border-zinc-200 dark:border-zinc-700 hover:bg-white dark:hover:bg-zinc-750 rounded-lg text-blue-600 transition-all cursor-pointer shadow-2xs"
                 title="Edit"
               >
                 <Pencil class="w-3.5 h-3.5" />
               </button>
               <button
                 @click="handleDelete('office', item.id, item.name)"
-                class="w-7 h-7 flex items-center justify-center border border-zinc-200 dark:border-zinc-700 hover:bg-white dark:hover:bg-zinc-750 rounded-lg text-rose-600 transition-all cursor-pointer"
+                class="w-7 h-7 flex items-center justify-center border border-zinc-200 dark:border-zinc-700 hover:bg-white dark:hover:bg-zinc-750 rounded-lg text-rose-600 transition-all cursor-pointer shadow-2xs"
                 title="Delete"
               >
                 <Trash2 class="w-3.5 h-3.5" />
@@ -1113,7 +1210,7 @@ const activeConfig = computed(() => TABS_CONFIG[activeTab.value])
                   <span class="truncate font-bold tracking-tight">{{ pm.name }}</span>
                 </div>
 
-                <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                <div class="flex items-center gap-1 shrink-0">
                   <button
                     type="button"
                     @click="handleOpenEdit('payment_method', pm)"
@@ -1178,7 +1275,7 @@ const activeConfig = computed(() => TABS_CONFIG[activeTab.value])
                   <span class="truncate font-bold uppercase tracking-tight">{{ pr.name }}</span>
                 </div>
 
-                <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                <div class="flex items-center gap-1 shrink-0">
                   <button
                     type="button"
                     @click="handleOpenEdit('payment_receiver', pr)"
@@ -1243,7 +1340,7 @@ const activeConfig = computed(() => TABS_CONFIG[activeTab.value])
                   <span class="truncate font-bold tracking-tight">{{ pnt.name }}</span>
                 </div>
 
-                <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                <div class="flex items-center gap-1 shrink-0">
                   <button
                     type="button"
                     @click="handleOpenEdit('payment_note_template', pnt)"
@@ -1280,16 +1377,18 @@ const activeConfig = computed(() => TABS_CONFIG[activeTab.value])
                 {{ item.name }}
               </span>
             </div>
-            <div class="flex items-center gap-1 shrink-0 opacity-80 sm:opacity-0 group-hover:opacity-100 transition-opacity">
+            <div class="flex items-center gap-1 shrink-0">
               <button
                 @click="handleOpenEdit('university_status', item)"
-                class="w-7 h-7 flex items-center justify-center border border-zinc-200 dark:border-zinc-700 hover:bg-white rounded-lg text-blue-600 transition-all cursor-pointer"
+                class="w-7 h-7 flex items-center justify-center border border-zinc-200 dark:border-zinc-700 hover:bg-white dark:hover:bg-zinc-750 rounded-lg text-blue-600 transition-all cursor-pointer shadow-2xs"
+                title="Edit"
               >
                 <Pencil class="w-3.5 h-3.5" />
               </button>
               <button
                 @click="handleDelete('university_status', item.id, item.name)"
-                class="w-7 h-7 flex items-center justify-center border border-zinc-200 dark:border-zinc-700 hover:bg-white rounded-lg text-rose-600 transition-all cursor-pointer"
+                class="w-7 h-7 flex items-center justify-center border border-zinc-200 dark:border-zinc-700 hover:bg-white dark:hover:bg-zinc-750 rounded-lg text-rose-600 transition-all cursor-pointer shadow-2xs"
+                title="Delete"
               >
                 <Trash2 class="w-3.5 h-3.5" />
               </button>
@@ -1345,6 +1444,50 @@ const activeConfig = computed(() => TABS_CONFIG[activeTab.value])
               <span class="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-bold text-zinc-400 pointer-events-none">
                 UZS
               </span>
+            </div>
+          </div>
+
+          <!-- Office Icon Selector with Live Preview for Office Branches -->
+          <div v-if="modalType === 'office'" class="space-y-3">
+            <!-- Live Preview -->
+            <div class="p-3 bg-zinc-100 dark:bg-zinc-850 rounded-xl border border-zinc-200 dark:border-zinc-700/80 flex items-center justify-between">
+              <div class="flex items-center gap-2.5 min-w-0">
+                <div class="w-8 h-8 rounded-lg bg-cyan-50 dark:bg-cyan-950/40 text-cyan-600 dark:text-cyan-400 border border-cyan-200/80 dark:border-cyan-800 flex items-center justify-center shrink-0 shadow-2xs">
+                  <component :is="resolveOfficeIcon(formIcon)" class="w-4 h-4 stroke-[2.2]" />
+                </div>
+                <div class="min-w-0">
+                  <div class="text-xs font-bold text-zinc-900 dark:text-zinc-100 uppercase tracking-wide truncate">
+                    {{ formName || 'OFFICE NAME' }}
+                  </div>
+                  <div class="text-[10.5px] text-zinc-400 font-medium">
+                    {{ OFFICE_ICON_OPTIONS.find(o => o.key === formIcon)?.label || 'Office Tower' }}
+                  </div>
+                </div>
+              </div>
+              <span class="text-[10px] font-bold px-2 py-0.5 rounded-md bg-cyan-50 dark:bg-cyan-950/40 text-cyan-600 dark:text-cyan-400 border border-cyan-200/60 dark:border-cyan-800/60">
+                Selected
+              </span>
+            </div>
+
+            <label class="block font-bold text-zinc-700 dark:text-zinc-300">Choose Office Icon</label>
+            <div class="grid grid-cols-4 sm:grid-cols-6 gap-2 p-2 bg-zinc-50 dark:bg-zinc-850/60 rounded-xl border border-zinc-200 dark:border-zinc-700/80 max-h-48 overflow-y-auto">
+              <button
+                v-for="item in OFFICE_ICON_OPTIONS"
+                :key="item.key"
+                type="button"
+                @click="formIcon = item.key"
+                class="flex flex-col items-center gap-1 p-2 rounded-xl border transition-all cursor-pointer relative"
+                :class="formIcon === item.key ? 'border-cyan-500 bg-white dark:bg-zinc-800 shadow-xs ring-2 ring-cyan-500/20 text-cyan-600 dark:text-cyan-400' : 'border-transparent text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200/50 dark:hover:bg-zinc-750 hover:text-zinc-900 dark:hover:text-zinc-100'"
+                :title="item.label"
+              >
+                <div class="w-7 h-7 rounded-lg flex items-center justify-center bg-zinc-100 dark:bg-zinc-750 border border-zinc-200/70 dark:border-zinc-700 shadow-2xs">
+                  <component :is="item.icon" class="w-4 h-4 stroke-[2.2]" />
+                </div>
+                <span class="text-[9.5px] font-bold truncate w-full text-center leading-tight">{{ item.label }}</span>
+                <div v-if="formIcon === item.key" class="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-cyan-600 text-white flex items-center justify-center shadow-xs">
+                  <Check class="w-2.5 h-2.5 stroke-[3]" />
+                </div>
+              </button>
             </div>
           </div>
 
@@ -1456,6 +1599,46 @@ const activeConfig = computed(() => TABS_CONFIG[activeTab.value])
               Save Tag
             </button>
           </div>
+        </div>
+      </div>
+    </div>
+    <!-- Delete Confirmation Modal Dialog -->
+    <div
+      v-if="itemToDelete"
+      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs select-none"
+      @click.self="itemToDelete = null"
+    >
+      <div class="bg-white dark:bg-[#181a1d] border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden p-5 space-y-4 animate-page-in">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/60 flex items-center justify-center shrink-0">
+            <Trash2 class="w-5 h-5" />
+          </div>
+          <div>
+            <h3 class="text-sm font-bold text-zinc-900 dark:text-zinc-100">Delete {{ itemToDelete.typeName }}</h3>
+            <p class="text-xs text-zinc-500">This action cannot be undone.</p>
+          </div>
+        </div>
+
+        <p class="text-xs text-zinc-700 dark:text-zinc-300">
+          Are you sure you want to delete <strong class="text-zinc-900 dark:text-zinc-100 font-bold">"{{ itemToDelete.name }}"</strong>?
+        </p>
+
+        <div class="flex items-center justify-end gap-2 pt-2">
+          <button
+            type="button"
+            @click="itemToDelete = null"
+            class="px-4 py-2 rounded-xl text-xs font-bold border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-all cursor-pointer"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            @click="confirmDeleteAction"
+            class="px-4 py-2 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white shadow-md shadow-rose-600/20 transition-all cursor-pointer flex items-center gap-1.5"
+          >
+            <Trash2 class="w-3.5 h-3.5" />
+            <span>Delete</span>
+          </button>
         </div>
       </div>
     </div>

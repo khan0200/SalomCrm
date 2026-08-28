@@ -16,7 +16,8 @@ import {
   Trash2, RefreshCw, X, Maximize2, Minimize2, Copy,
   Check, ChevronDown, ChevronUp, Folder, FolderPlus, ExternalLink, AlertTriangle, AlertCircle,
   BookOpen, ArrowLeft, FileText, Eraser, Loader2, ArrowDownCircle,
-  Phone, MapPin, Briefcase, Award, Users, UserCheck, ShieldCheck, Sparkles, UserPlus
+  Phone, MapPin, Briefcase, Award, Users, UserCheck, ShieldCheck, Sparkles, UserPlus,
+  Send
 } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
 
@@ -174,6 +175,22 @@ const formatPassportValue = (value?: string | null) => {
   const letters = clean.replace(/[^A-Z]/g, '').slice(0, 2)
   const digits = clean.replace(/\D/g, '').slice(0, 7)
   return `${letters}${digits}`
+}
+
+const formatTelegramDisplay = (val?: string | null) => {
+  if (!val) return ''
+  const trimmed = val.trim()
+  if (!trimmed) return ''
+  const clean = trimmed.replace(/^https?:\/\/t\.me\//i, '').replace(/^@/, '')
+  return `@${clean}`
+}
+
+const formatTelegramUrl = (val?: string | null) => {
+  if (!val) return '#'
+  const trimmed = val.trim()
+  if (!trimmed) return '#'
+  const clean = trimmed.replace(/^https?:\/\/t\.me\//i, '').replace(/^@/, '')
+  return `https://t.me/${clean}`
 }
 
 const dateFields = new Set(['birthday', 'passport_issue_date', 'passport_expire_date'])
@@ -392,7 +409,9 @@ const fieldModalConfig: Record<string, FieldModalDef> = {
   passport_expire_date: { label: 'Date of Expiration', type: 'date' },
   phone1: { label: 'Phone 1', type: 'phone', placeholder: '88-146-47-07' },
   phone2: { label: 'Phone 2', type: 'phone', placeholder: '88-083-56-83' },
+  telegram_username: { label: 'TG Username', type: 'text', placeholder: '@username or username' },
   email: { label: 'Email', type: 'email' },
+
   address: { label: 'Address', type: 'textarea', uppercase: true },
   tariff: { label: 'Tariff', type: 'select', options: () => tariffOptions.value },
   level: { label: 'Level to Study', type: 'select', options: () => levelOptions.value },
@@ -1886,7 +1905,7 @@ const handleRestoreStudent = () => {
                   </div>
                 </div>
 
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-1.5">
                   <!-- PHONE 1 (Formatted) -->
                   <div
                     class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
@@ -1943,8 +1962,53 @@ const handleRestoreStudent = () => {
                     </div>
                   </div>
 
+                  <!-- TG USERNAME -->
+                  <div
+                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
+                    :class="[copiedField === 'telegram_username' && 'animate-copy-press']"
+                    @click="handleCopy('telegram_username', student.telegram_username ? formatTelegramDisplay(student.telegram_username) : null)"
+                    title="Single-click to copy TG username"
+                  >
+                    <div class="flex items-center justify-between">
+                      <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 flex items-center gap-1.5">
+                        <svg class="w-3.5 h-3.5 text-[#24A1DE] dark:text-[#28A8EA] shrink-0 fill-current" viewBox="0 0 24 24">
+                          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/>
+                        </svg>
+                        <span>TG USERNAME</span>
+                      </span>
+                      <div class="flex items-center gap-1">
+                        <a
+                          v-if="student.telegram_username"
+                          :href="formatTelegramUrl(student.telegram_username)"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          @click.stop
+                          class="w-6 h-6 rounded-md hover:bg-sky-50 dark:hover:bg-sky-950/40 text-[#24A1DE] hover:text-[#1d82b4] dark:text-[#28A8EA] flex items-center justify-center transition-all cursor-pointer active:scale-90"
+                          title="Open Telegram Chat"
+                        >
+                          <ExternalLink class="w-3.5 h-3.5" />
+                        </a>
+                        <button type="button" @click.stop="handleCopy('telegram_username', formatTelegramDisplay(student.telegram_username))" class="w-6 h-6 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-all cursor-pointer active:scale-90" title="Copy TG username">
+                          <Check v-if="copiedField === 'telegram_username'" class="w-3.5 h-3.5 text-emerald-500" />
+                          <Copy v-else class="w-3.5 h-3.5" />
+                        </button>
+                        <button type="button" @click.stop="startInlineEdit('telegram_username', student.telegram_username)" class="w-6 h-6 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-all cursor-pointer active:scale-90" title="Edit TG username">
+                          <Pencil class="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                    <div class="mt-0.5 flex items-center gap-1.5">
+                      <span v-if="student.telegram_username" class="text-[13.5px] font-bold font-mono text-[#24A1DE] dark:text-[#28A8EA] tracking-tight truncate">
+                        {{ formatTelegramDisplay(student.telegram_username) }}
+                      </span>
+                      <span v-else class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
+                    </div>
+                  </div>
+
+
                   <!-- EMAIL & ADDRESS (Expanded Only) -->
-                  <div class="sm:col-span-2 accordion-collapse" :class="{ 'is-open': contactExpanded }">
+                  <div class="sm:col-span-3 accordion-collapse" :class="{ 'is-open': contactExpanded }">
+
                   <div class="accordion-collapse-inner flex flex-col gap-1.5">
                     <div
                       class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
@@ -2183,10 +2247,7 @@ const handleRestoreStudent = () => {
                         <span v-if="student.tariff" class="inline-flex self-start px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase bg-emerald-600 text-white shadow-2xs">
                           {{ student.tariff }}
                         </span>
-                        <span v-if="computedTariffPrice > 0" class="text-[11px] font-bold font-mono text-zinc-600 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded-md border border-zinc-200/60 dark:border-zinc-700/60">
-                          {{ formatCurrency(computedTariffPrice) }}
-                        </span>
-                        <span v-else-if="!student.tariff" class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
+                        <span v-else class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
                       </div>
                     </div>
                   </div>
@@ -3117,31 +3178,18 @@ const handleRestoreStudent = () => {
               {{ activeFieldModalDef.label }}
             </label>
 
-            <select
-              v-if="activeFieldModalDef.type === 'select'"
-              v-model="editValue"
-              autoFocus
-              class="w-full bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 px-3 py-2 rounded-lg outline-none focus:border-blue-500 transition-colors text-[14px] font-semibold uppercase"
-            >
-              <option value="">Select {{ activeFieldModalDef.label }}</option>
-              <option v-for="opt in activeFieldModalDef.options?.()" :key="opt" :value="opt">
-                {{ getSelectOptionLabel(editingField, opt) }}
-              </option>
-            </select>
-
-            <!-- Live Price Preview Card for Tariff -->
-            <div
-              v-if="editingField === 'tariff' && editValue"
-              class="mt-3 p-3 rounded-xl bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200/70 dark:border-blue-900/40 flex items-center justify-between"
-            >
-              <div class="flex items-center gap-2">
-                <Sparkles class="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
-                <span class="text-xs font-bold text-zinc-700 dark:text-zinc-300">Tariff Price:</span>
-              </div>
-              <span class="text-xs font-extrabold font-mono text-blue-600 dark:text-blue-400">
-                {{ formatCurrency(getTariffPrice(editValue, student?.language_certificate, options?.tariffs || [])) }}
-              </span>
-            </div>
+            <template v-if="activeFieldModalDef.type === 'select'">
+              <select
+                v-model="editValue"
+                autoFocus
+                class="w-full bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 px-3 py-2 rounded-lg outline-none focus:border-blue-500 transition-colors text-[14px] font-semibold uppercase cursor-pointer"
+              >
+                <option value="">Select {{ activeFieldModalDef.label }}</option>
+                <option v-for="opt in activeFieldModalDef.options?.()" :key="opt" :value="opt">
+                  {{ getSelectOptionLabel(editingField, opt) }}
+                </option>
+              </select>
+            </template>
 
             <template v-else-if="activeFieldModalDef.type === 'date'">
               <input
@@ -3198,6 +3246,7 @@ const handleRestoreStudent = () => {
               :class="activeFieldModalDef.uppercase ? 'uppercase' : ''"
               @keydown.enter="saveInlineEdit(editingField!)"
             />
+
           </div>
 
           <!-- Footer Buttons -->

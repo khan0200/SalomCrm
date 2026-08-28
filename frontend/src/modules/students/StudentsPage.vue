@@ -243,10 +243,12 @@ const folderScopedStudents = computed(() => {
         const passportMatch = (s.passport || '').toLowerCase().includes(q)
         const phone1Match = (s.phone1 || '').toLowerCase().includes(q)
         const phone2Match = (s.phone2 || '').toLowerCase().includes(q)
+        const telegramMatch = (s.telegram_username || '').toLowerCase().includes(q)
         const fatherMatch = (s.father_name || '').toLowerCase().includes(q)
         const motherMatch = (s.mother_name || '').toLowerCase().includes(q)
         const uniMatch = (s.university_1 || '').toLowerCase().includes(q)
-        return idMatch || nameMatch || koreanNameMatch || passportMatch || phone1Match || phone2Match || fatherMatch || motherMatch || uniMatch
+        return idMatch || nameMatch || koreanNameMatch || passportMatch || phone1Match || phone2Match || telegramMatch || fatherMatch || motherMatch || uniMatch
+
       })
     }
   }

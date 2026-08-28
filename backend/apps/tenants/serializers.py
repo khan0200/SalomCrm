@@ -8,10 +8,9 @@ User = get_user_model()
 class BranchSerializer(serializers.ModelSerializer):
     class Meta:
         model = Branch
-        # Branch only defines id/name (+ tenant, created_at); listing fields the
-        # model does not have raises ImproperlyConfigured at serializer build time.
-        fields = ('id', 'name', 'created_at')
+        fields = ('id', 'name', 'icon', 'created_at')
         read_only_fields = ('id', 'created_at')
+
 
 
 class TenantSerializer(serializers.ModelSerializer):

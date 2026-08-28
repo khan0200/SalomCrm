@@ -20,11 +20,13 @@ export interface Tenant {
 export interface Branch {
   id: string
   name: string
+  icon?: string | null
   code?: string | null
   address?: string | null
   phone?: string | null
   is_active: boolean
 }
+
 
 export interface UserProfile {
   id: string
@@ -62,7 +64,9 @@ export interface Student {
   birthday?: string | null
   phone1?: string | null
   phone2?: string | null
+  telegram_username?: string | null
   father_name?: string | null
+
   father_phone?: string | null
   father_job?: string | null
   mother_name?: string | null

@@ -41,8 +41,12 @@ const copyPhone = () => {
 }
 
 import { useCustomTags } from '@/composables/useCustomTags'
+import { useOffices } from '@/composables/useOffices'
 
 const { getTagIcon } = useCustomTags()
+const { getOfficeIcon, fetchOffices } = useOffices()
+fetchOffices()
+
 
 // Text-contrast branches (below and throughout the template) key off this,
 // since either scope's color darkens the row background and needs the
@@ -168,7 +172,17 @@ const universities = computed(() => {
           !
         </span>
 
+        <!-- Office / Branch Icon Badge -->
+        <span
+          v-if="student.office"
+          :title="student.office"
+          class="inline-flex items-center justify-center w-4 h-4 rounded-full bg-blue-500/15 dark:bg-blue-500/25 text-blue-600 dark:text-blue-400 shrink-0 transition-transform hover:scale-110 cursor-help"
+        >
+          <component :is="getOfficeIcon(student.office)" class="w-2.5 h-2.5 stroke-[2.4]" />
+        </span>
+
         <!-- Copy Full Name Button -->
+
         <button
           @click.stop="copyName"
           class="p-1 rounded transition-colors cursor-pointer"
