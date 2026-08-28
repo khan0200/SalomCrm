@@ -99,7 +99,6 @@ const selectTab = (key: TabKey) => {
     <div class="flex-1 min-h-0">
       <KeepAlive>
         <ExcelFillPage v-if="activeTab === 'excel'" />
-        <!-- <WordFillPage v-else-if="activeTab === 'word'" /> -->
       </KeepAlive>
     </div>
   </div>
