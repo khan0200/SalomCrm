@@ -967,6 +967,7 @@ dashboardStore.onExportExcel = handleExportExcel
       :folder-name="activeFolderName"
       :folders="folders"
       :all-students="allStudents"
+      :options="options"
       @close="isFolderAddModalOpen = false"
       @save="handleSaveFolderAdd"
     />
