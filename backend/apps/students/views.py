@@ -1122,7 +1122,7 @@ class VisaCheckView(APIView):
             )
 
             # Persist check results to VisaStudent database if student exists
-            tenant = getattr(request.user, 'tenant', None)
+            tenant = getattr(request, 'tenant', None) or getattr(request.user, 'tenant', None)
             vs = VisaStudent.objects.filter(is_deleted=False)
             if tenant:
                 vs = vs.filter(tenant=tenant)
@@ -1220,7 +1220,7 @@ class VisaStudentQuickSearchView(APIView):
         if not q or len(q) < 2:
             return Response([])
 
-        tenant = getattr(request.user, 'tenant', None)
+        tenant = getattr(request, 'tenant', None) or getattr(request.user, 'tenant', None)
         qs = Student.objects.filter(is_deleted=False)
         if tenant:
             qs = qs.filter(tenant=tenant)
@@ -1262,7 +1262,7 @@ class VisaStudentLookupView(APIView):
         if len(passport) < self.MIN_PREFIX_LENGTH:
             return Response({'found': False})
 
-        tenant = getattr(request.user, 'tenant', None)
+        tenant = getattr(request, 'tenant', None) or getattr(request.user, 'tenant', None)
         qs = Student.objects.filter(is_deleted=False)
         if tenant:
             qs = qs.filter(tenant=tenant)
@@ -1308,7 +1308,7 @@ class VisaStudentListCreateView(APIView):
         from .models import VisaStudent
         from .serializers import VisaStudentSerializer
 
-        tenant = getattr(request.user, 'tenant', None)
+        tenant = getattr(request, 'tenant', None) or getattr(request.user, 'tenant', None)
         qs = VisaStudent.objects.filter(is_deleted=False)
         if tenant:
             qs = qs.filter(tenant=tenant)
@@ -1371,7 +1371,7 @@ class VisaStudentListCreateView(APIView):
         from .models import VisaStudent
         from .serializers import VisaStudentSerializer
 
-        tenant = getattr(request.user, 'tenant', None)
+        tenant = getattr(request, 'tenant', None) or getattr(request.user, 'tenant', None)
         passport = request.data.get('passport', '').strip().upper()
         if not passport:
             return Response({'error': 'Passport is required.'}, status=status.HTTP_400_BAD_REQUEST)
@@ -1439,7 +1439,7 @@ class VisaStudentDetailView(APIView):
 
     def _get_student(self, request: Request, passport: str):
         from .models import VisaStudent
-        tenant = getattr(request.user, 'tenant', None)
+        tenant = getattr(request, 'tenant', None) or getattr(request.user, 'tenant', None)
         qs = VisaStudent.objects.filter(is_deleted=False)
         if tenant:
             qs = qs.filter(tenant=tenant)
@@ -1500,7 +1500,7 @@ class VisaStudentBulkDeleteView(APIView):
 
     def post(self, request: Request) -> Response:
         from .models import VisaStudent
-        tenant = getattr(request.user, 'tenant', None)
+        tenant = getattr(request, 'tenant', None) or getattr(request.user, 'tenant', None)
         passports = request.data.get('passports', [])
         if not passports or not isinstance(passports, list):
             return Response({'error': 'Passports list is required.'}, status=status.HTTP_400_BAD_REQUEST)
@@ -1523,7 +1523,7 @@ class VisaOptionsView(APIView):
     def get(self, request: Request) -> Response:
         from .models import TariffOption, UniversityOption, CoordinatorOption, B2BOption
 
-        tenant = getattr(request.user, 'tenant', None)
+        tenant = getattr(request, 'tenant', None) or getattr(request.user, 'tenant', None)
 
         def get_names(model_cls):
             qs = model_cls.objects.all()
