@@ -999,9 +999,11 @@ class ExtractDocumentView(APIView):
         # Debug mode enabled for staff/superusers with ?debug=true
         is_debug = request.user.is_staff and (request.query_params.get('debug') in ('1', 'true'))
 
-        provider = request.data.get('provider') or request.query_params.get('provider') or 'openai'
-        model = request.data.get('model') or request.query_params.get('model') or 'gpt-4o'
-        api_key = request.data.get('api_key') or request.query_params.get('api_key') or None
+        data = cast(dict[str, Any], request.data) if isinstance(request.data, dict) else {}
+        provider = str(data.get('provider') or request.query_params.get('provider') or 'openai')
+        model = str(data.get('model') or request.query_params.get('model') or 'gpt-4o')
+        api_key_val = data.get('api_key') or request.query_params.get('api_key') or None
+        api_key: str | None = str(api_key_val) if api_key_val else None
 
         try:
             extracted_data = process_document_ephemeral(
@@ -1014,12 +1016,13 @@ class ExtractDocumentView(APIView):
             )
 
             # Check student ID for parent passport intelligence (15+ years older than student)
-            student_id = request.data.get('student_id') or request.query_params.get('student_id')
+            student_id = str(data.get('student_id') or request.query_params.get('student_id') or '').strip()
             if student_id:
                 try:
+                    tenant = getattr(request, 'tenant', None) or getattr(request.user, 'tenant', None)
                     student_qs = Student.objects.filter(id=student_id)
-                    if request.user and hasattr(request.user, 'tenant') and request.user.tenant:
-                        student_qs = student_qs.filter(tenant=request.user.tenant)
+                    if tenant:
+                        student_qs = student_qs.filter(tenant=tenant)
                     student = student_qs.first()
 
                     if student and student.birthday and extracted_data.get('document_type') in ('PASSPORT', 'ID_CARD'):
