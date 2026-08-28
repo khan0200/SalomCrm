@@ -21,11 +21,16 @@ dist-ssr/
 *.local
 *.tsbuildinfo
 
-# Generated data exports.
-# These contain real student and payment records — never commit them.
-Students_Export_*.xlsx
-Payments_Export_*.xlsx
-*_Export_*.xlsx
+# Generated data exports & document folders
+# These contain templates, real student, and payment records — never commit them.
+Excel/
+excel/
+word/
+Word/
+*.xlsx
+*.xls
+*.docx
+*.doc
 
 # Logs
 npm-debug.log*
