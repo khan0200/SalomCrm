@@ -4,8 +4,8 @@ from rest_framework.test import APIClient
 from rest_framework import status
 from apps.authentication.models import User
 from apps.tenants.models import Tenant
-from apps.students.models import Student
-from apps.payments.models import Payment
+from apps.students.models import Student, Folder, LeadSourceOption
+from apps.payments.models import Payment, PaymentMethodTemplate, PaymentReceiverTemplate
 from apps.payments.services import record_payment
 
 class TenantIsolationTestCase(TestCase):
@@ -151,3 +151,122 @@ class TenantIsolationTestCase(TestCase):
         emails = [u['email'] for u in response.data['results']]
         self.assertIn('user_a@unibridge.com', emails)
         self.assertIn('user_b@apex.com', emails)
+
+    def test_tenant_a_cannot_add_tenant_b_student_to_own_folder(self):
+        """
+        Regression: FolderViewSet.add_students fetched students by
+        `id__in=student_ids` with no tenant filter, so Tenant A could add
+        Tenant B's student (guessed/known ID) into Tenant A's own folder,
+        silently writing Tenant A's folder UUID into Tenant B's record.
+        """
+        folder_a = Folder.objects.create(tenant=self.tenant_a, name='VIP')
+        self.client.force_authenticate(user=self.user_a)
+
+        response = self.client.post(
+            f'/api/folders/{folder_a.id}/add-students/',
+            {'student_ids': [self.student_b.id]},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['added_count'], 0)
+
+        self.student_b.refresh_from_db()
+        curr_strs = [str(x) for x in (self.student_b.folder_ids or [])]
+        self.assertNotIn(str(folder_a.id), curr_strs)
+
+    def test_tenant_a_can_add_own_student_to_own_folder(self):
+        """Sanity check: the tenant filter must not block legitimate same-tenant adds."""
+        folder_a = Folder.objects.create(tenant=self.tenant_a, name='VIP')
+        self.client.force_authenticate(user=self.user_a)
+
+        response = self.client.post(
+            f'/api/folders/{folder_a.id}/add-students/',
+            {'student_ids': [self.student_a.id]},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['added_count'], 1)
+
+        self.student_a.refresh_from_db()
+        curr_strs = [str(x) for x in (self.student_a.folder_ids or [])]
+        self.assertIn(str(folder_a.id), curr_strs)
+
+    def test_tenant_a_cannot_see_tenant_b_lead_sources(self):
+        """
+        Lead sources are per-tenant with no shared defaults: what one tenant
+        adds must never appear in another tenant's list.
+        """
+        LeadSourceOption.objects.create(tenant=self.tenant_a, name='Ali Uncle')
+        lead_b = LeadSourceOption.objects.create(tenant=self.tenant_b, name='Apex Referral')
+
+        self.client.force_authenticate(user=self.user_a)
+        response = self.client.get('/api/lead-sources/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        names = [item['name'] for item in response.data]
+        self.assertIn('Ali Uncle', names)
+        self.assertNotIn('Apex Referral', names)
+
+        # Tenant A must not be able to read, modify, or delete Tenant B's row by id.
+        detail_url = f'/api/lead-sources/{lead_b.id}/'
+        self.assertEqual(self.client.get(detail_url).status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(
+            self.client.patch(detail_url, {'name': 'HACKED'}).status_code,
+            status.HTTP_404_NOT_FOUND,
+        )
+        self.assertEqual(self.client.delete(detail_url).status_code, status.HTTP_404_NOT_FOUND)
+        lead_b.refresh_from_db()
+        self.assertEqual(lead_b.name, 'Apex Referral')
+
+    def test_tenant_a_cannot_see_tenant_b_payment_methods(self):
+        """Payment method templates are per-tenant with no shared defaults."""
+        PaymentMethodTemplate.objects.create(tenant=self.tenant_a, name='Naqd')
+        method_b = PaymentMethodTemplate.objects.create(tenant=self.tenant_b, name='Apex Card')
+
+        self.client.force_authenticate(user=self.user_a)
+        response = self.client.get('/api/payment-methods/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        names = [item['name'] for item in response.data]
+        self.assertIn('Naqd', names)
+        self.assertNotIn('Apex Card', names)
+
+        detail_url = f'/api/payment-methods/{method_b.id}/'
+        self.assertEqual(self.client.get(detail_url).status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(
+            self.client.patch(detail_url, {'name': 'HACKED'}).status_code,
+            status.HTTP_404_NOT_FOUND,
+        )
+        self.assertEqual(self.client.delete(detail_url).status_code, status.HTTP_404_NOT_FOUND)
+        method_b.refresh_from_db()
+        self.assertEqual(method_b.name, 'Apex Card')
+
+    def test_tenant_a_cannot_see_tenant_b_payment_receivers(self):
+        """Payment receiver templates are per-tenant with no shared defaults."""
+        PaymentReceiverTemplate.objects.create(tenant=self.tenant_a, name='ADMIN')
+        receiver_b = PaymentReceiverTemplate.objects.create(tenant=self.tenant_b, name='APEX ADMIN')
+
+        self.client.force_authenticate(user=self.user_a)
+        response = self.client.get('/api/payment-receivers/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        names = [item['name'] for item in response.data]
+        self.assertIn('ADMIN', names)
+        self.assertNotIn('APEX ADMIN', names)
+
+        detail_url = f'/api/payment-receivers/{receiver_b.id}/'
+        self.assertEqual(self.client.get(detail_url).status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(
+            self.client.patch(detail_url, {'name': 'HACKED'}).status_code,
+            status.HTTP_404_NOT_FOUND,
+        )
+        self.assertEqual(self.client.delete(detail_url).status_code, status.HTTP_404_NOT_FOUND)
+        receiver_b.refresh_from_db()
+        self.assertEqual(receiver_b.name, 'APEX ADMIN')
+
+    def test_new_tenant_starts_with_empty_lead_sources_and_payment_templates(self):
+        """
+        These catalogs intentionally have no seeded defaults (unlike
+        universities): a brand new tenant must start completely empty so it
+        never inherits another tenant's lead sources or payment templates.
+        """
+        self.assertEqual(LeadSourceOption.objects.filter(tenant=self.tenant_b).count(), 0)
+        self.assertEqual(PaymentMethodTemplate.objects.filter(tenant=self.tenant_b).count(), 0)
+        self.assertEqual(PaymentReceiverTemplate.objects.filter(tenant=self.tenant_b).count(), 0)

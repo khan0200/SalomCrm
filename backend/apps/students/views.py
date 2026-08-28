@@ -550,7 +550,7 @@ class FolderViewSet(viewsets.ModelViewSet):
 
         folder_uuid = folder.id
         folder_str = str(folder_uuid)
-        students = Student.objects.filter(id__in=student_ids)
+        students = Student.objects.filter(id__in=student_ids, tenant=folder.tenant)
         updated = 0
         for s in students:
             curr = list(s.folder_ids or [])
@@ -560,7 +560,8 @@ class FolderViewSet(viewsets.ModelViewSet):
                 s.folder_ids = curr
                 s.save(update_fields=['folder_ids', 'updated_at'])
                 updated += 1
-        return Response({'status': 'Students added', 'added_count': updated})
+        skipped = len(set(str(sid) for sid in student_ids)) - students.count()
+        return Response({'status': 'Students added', 'added_count': updated, 'skipped_count': max(skipped, 0)})
 
     @action(detail=True, methods=['post'], url_path='sync-students')
     def sync_students(self, request, pk=None):
