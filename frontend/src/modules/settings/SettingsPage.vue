@@ -321,7 +321,7 @@ const filteredGroups = computed(() => groups.value.filter(g => g.name.toLowerCas
 const filteredLeads = computed(() => leads.value.filter(l => l.name.toLowerCase().includes(query.value)))
 const filteredCoordinators = computed(() => coordinators.value.filter(c => c.name.toLowerCase().includes(query.value)))
 const filteredUniversities = computed(() => universities.value.filter(u => u.name.toLowerCase().includes(query.value)))
-const filteredFolders = computed(() => folders.value.filter(f => f.name.toLowerCase().includes(query.value)))
+const filteredFolders = computed(() => folders.value.filter(f => f.name.toLowerCase() !== 'kdb' && f.name.toLowerCase().includes(query.value)))
 const filteredOffices = computed(() => offices.value.filter(o => o.name.toLowerCase().includes(query.value)))
 const filteredPaymentMethods = computed(() => paymentMethods.value.filter(p => p.name.toLowerCase().includes(query.value)))
 const filteredPaymentReceivers = computed(() => paymentReceivers.value.filter(p => p.name.toLowerCase().includes(query.value)))
@@ -666,7 +666,7 @@ const getTabCount = (tabId: string) => {
   if (tabId === 'coordinator') return coordinators.value.length
   if (tabId === 'tag') return customTagsRegistry.value.length
   if (tabId === 'university') return universities.value.length
-  if (tabId === 'folder') return folders.value.length
+  if (tabId === 'folder') return folders.value.filter(f => f.name.toLowerCase() !== 'kdb').length
   if (tabId === 'office') return offices.value.length
   if (tabId === 'payment_setting') return paymentMethods.value.length + paymentReceivers.value.length + paymentNoteTemplates.value.length
   if (tabId === 'university_status') return universityStatuses.value.length

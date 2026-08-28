@@ -542,6 +542,12 @@ class FolderViewSet(viewsets.ModelViewSet):
         tenant = getattr(req, 'tenant', None) or getattr(user, 'tenant', None)
         serializer.save(tenant=tenant, created_by=user)
 
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if (instance.name or '').strip().upper() == 'KDB':
+            return Response({'error': 'Cannot delete default KDB folder'}, status=status.HTTP_400_BAD_REQUEST)
+        return super().destroy(request, *args, **kwargs)
+
     @action(detail=True, methods=['post'], url_path='add-students')
     def add_students(self, request, pk=None):
         folder = self.get_object()

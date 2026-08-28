@@ -267,3 +267,8 @@ def seed_default_options(tenant):
     for n in DEFAULT_NOTE_PILLS:
         if n.lower() not in existing_notes:
             PaymentNotePill.objects.create(name=n, tenant=tenant)
+
+    # ── Default Folders ───────────────────────────────────────────────
+    from apps.students.models import Folder
+    if not Folder.objects.filter(tenant=tenant, name__iexact='KDB').exists():
+        Folder.objects.create(name='KDB', tenant=tenant)
