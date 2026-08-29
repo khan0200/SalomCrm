@@ -7,7 +7,8 @@ import {
   ArrowDownRight, Percent, Wallet, CreditCard, Lock,
   ChevronDown, ChevronUp, Printer, Copy, Check, X,
   Clock, Tag, RefreshCw, UserCheck, GraduationCap, Hash, RotateCcw,
-  ExternalLink, Download, Phone, ArrowRight
+  ExternalLink, Download, Phone, ArrowRight, ChevronLeft, ChevronRight,
+  ChevronsLeft, ChevronsRight, Award, Contact, Folder, Bookmark
 } from 'lucide-vue-next'
 
 const props = defineProps<{
@@ -900,127 +901,550 @@ const exportFinanceReportToExcel = async () => {
 
 // ── KPI Details Modal State ──────────────────────────────────────────
 const activeKpiModal = ref<'collected' | 'debt' | 'discount' | 'withdraw' | null>(null)
-const kpiModalSearch = ref('')
-const kpiModalPage = ref(1)
-const KPI_PAGE_SIZE = 15
+const kpiSearchType = ref<'all' | 'id' | 'name' | 'phone' | 'method' | 'coordinator' | 'receiver' | 'notes'>('all')
+const kpiSearchQuery = ref('')
+const kpiDatePreset = ref<DatePreset>('this_month')
+const kpiCustomStartDate = ref('')
+const kpiCustomEndDate = ref('')
+const kpiSelectedStatuses = ref<string[]>([]) // ['ACTIVE'], ['ARCHIVE']
+const kpiSelectedTariffs = ref<string[]>([])
+const kpiSelectedGroups = ref<string[]>([])
+const kpiSelectedCoordinators = ref<string[]>([])
+const kpiSelectedLevels = ref<string[]>([])
+const kpiSelectedIds = ref<string[]>([])
+const kpiSelectedMethods = ref<string[]>([])
+const kpiSelectedReceivers = ref<string[]>([])
+
+// Dropdowns in modal
+const isKpiDateDropdownOpen = ref(false)
+const isKpiStatusDropdownOpen = ref(false)
+const isKpiTariffDropdownOpen = ref(false)
+const isKpiGroupDropdownOpen = ref(false)
+const isKpiCoordinatorDropdownOpen = ref(false)
+const isKpiLevelDropdownOpen = ref(false)
+const isKpiIdDropdownOpen = ref(false)
+const isKpiMethodDropdownOpen = ref(false)
+const isKpiReceiverDropdownOpen = ref(false)
+
+const closeAllKpiDropdowns = () => {
+  isKpiDateDropdownOpen.value = false
+  isKpiStatusDropdownOpen.value = false
+  isKpiTariffDropdownOpen.value = false
+  isKpiGroupDropdownOpen.value = false
+  isKpiCoordinatorDropdownOpen.value = false
+  isKpiLevelDropdownOpen.value = false
+  isKpiIdDropdownOpen.value = false
+  isKpiMethodDropdownOpen.value = false
+  isKpiReceiverDropdownOpen.value = false
+}
+
+type KpiDropdownKey = 'date' | 'status' | 'tariff' | 'group' | 'coordinator' | 'level' | 'id' | 'method' | 'receiver'
+const kpiDropdownRefs: Record<KpiDropdownKey, typeof isKpiDateDropdownOpen> = {
+  date: isKpiDateDropdownOpen,
+  status: isKpiStatusDropdownOpen,
+  tariff: isKpiTariffDropdownOpen,
+  group: isKpiGroupDropdownOpen,
+  coordinator: isKpiCoordinatorDropdownOpen,
+  level: isKpiLevelDropdownOpen,
+  id: isKpiIdDropdownOpen,
+  method: isKpiMethodDropdownOpen,
+  receiver: isKpiReceiverDropdownOpen,
+}
+const toggleKpiDropdown = (key: KpiDropdownKey) => {
+  const target = kpiDropdownRefs[key]
+  const wasOpen = target.value
+  closeAllKpiDropdowns()
+  target.value = !wasOpen
+}
+
+const toggleKpiList = (list: string[], value: string) => {
+  const idx = list.indexOf(value)
+  if (idx === -1) list.push(value)
+  else list.splice(idx, 1)
+}
+
+const kpiPage = ref(1)
+const kpiPageSize = ref(15)
 
 const openKpiModal = (type: 'collected' | 'debt' | 'discount' | 'withdraw') => {
   activeKpiModal.value = type
-  kpiModalSearch.value = ''
-  kpiModalPage.value = 1
+  kpiSearchQuery.value = ''
+  kpiSearchType.value = 'all'
+  kpiPage.value = 1
+  kpiPageSize.value = 15
+
+  // Default to 'this_month' so "Total Collected" immediately matches the card (367,500,000 UZS)
+  kpiDatePreset.value = 'this_month'
+  kpiCustomStartDate.value = ''
+  kpiCustomEndDate.value = ''
+
+  kpiSelectedStatuses.value = type === 'debt' ? ['ACTIVE'] : []
+  kpiSelectedTariffs.value = []
+  kpiSelectedGroups.value = []
+  kpiSelectedCoordinators.value = []
+  kpiSelectedLevels.value = []
+  kpiSelectedIds.value = []
+  kpiSelectedMethods.value = []
+  kpiSelectedReceivers.value = []
+  closeAllKpiDropdowns()
 }
 
 const closeKpiModal = () => {
   activeKpiModal.value = null
-  kpiModalSearch.value = ''
-  kpiModalPage.value = 1
+  closeAllKpiDropdowns()
 }
 
-// 1. Collected Data
-const collectedTransactions = computed(() => {
-  return sortedFilteredPayments.value.filter(p => !p.is_withdrawal && !p.is_discount)
-})
+const getKpiDateRange = (preset: DatePreset, customStart?: string, customEnd?: string) => {
+  const now = new Date()
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0)
+  const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999)
+
+  switch (preset) {
+    case 'today':
+      return { start: todayStart, end: todayEnd }
+    case 'yesterday': {
+      const yestStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 0, 0, 0, 0)
+      const yestEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 23, 59, 59, 999)
+      return { start: yestStart, end: yestEnd }
+    }
+    case 'this_week': {
+      const day = now.getDay()
+      const diffToMon = day === 0 ? -6 : 1 - day
+      const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() + diffToMon, 0, 0, 0, 0)
+      return { start: weekStart, end: todayEnd }
+    }
+    case 'this_month': {
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0)
+      return { start: monthStart, end: todayEnd }
+    }
+    case 'last_month': {
+      const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1, 0, 0, 0, 0)
+      const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999)
+      return { start: lastMonthStart, end: lastMonthEnd }
+    }
+    case 'this_year': {
+      const yearStart = new Date(now.getFullYear(), 0, 1, 0, 0, 0, 0)
+      return { start: yearStart, end: todayEnd }
+    }
+    case 'custom': {
+      const start = customStart ? new Date(`${customStart}T00:00:00`) : null
+      const end = customEnd ? new Date(`${customEnd}T23:59:59.999`) : null
+      return { start, end }
+    }
+    case 'all':
+    default:
+      return { start: null, end: null }
+  }
+}
+
+const matchesKpiStudentCriteria = (studentId?: string | null, studentObj?: Student) => {
+  const s = studentObj || getStudent(studentId)
+
+  // Status Filter: Active vs Archive
+  if (kpiSelectedStatuses.value.length > 0) {
+    const isArchived = s?.is_deleted === true
+    const wantsActive = kpiSelectedStatuses.value.includes('ACTIVE')
+    const wantsArchive = kpiSelectedStatuses.value.includes('ARCHIVE')
+    if (wantsActive && !wantsArchive && isArchived) return false
+    if (wantsArchive && !wantsActive && !isArchived) return false
+  }
+
+  // Tariff Filter
+  if (kpiSelectedTariffs.value.length > 0) {
+    const t = s?.tariff || 'No Tariff'
+    if (!kpiSelectedTariffs.value.includes(t)) return false
+  }
+
+  // Group Filter
+  if (kpiSelectedGroups.value.length > 0) {
+    const g = s?.student_group || 'No Group'
+    if (!kpiSelectedGroups.value.includes(g)) return false
+  }
+
+  // Coordinator Filter
+  if (kpiSelectedCoordinators.value.length > 0) {
+    const c = s?.coordinator || 'No Coordinator'
+    if (!kpiSelectedCoordinators.value.includes(c)) return false
+  }
+
+  // Level Filter
+  if (kpiSelectedLevels.value.length > 0) {
+    const l1 = s?.level || 'No Level'
+    const l2 = s?.level2 || ''
+    const match = kpiSelectedLevels.value.includes(l1) || (l2 && kpiSelectedLevels.value.includes(l2))
+    if (!match) return false
+  }
+
+  // ID Prefix Filter
+  if (kpiSelectedIds.value.length > 0) {
+    const prefix = extractIdPrefix(s?.id || studentId)
+    if (!kpiSelectedIds.value.includes(prefix)) return false
+  }
+
+  return true
+}
+
+// 1. Collected Filtered List
 const filteredCollectedModalList = computed(() => {
-  const q = kpiModalSearch.value.trim().toLowerCase()
-  if (!q) return collectedTransactions.value
-  return collectedTransactions.value.filter(p => {
-    return (
-      (p.student_full_name || p.student_name || '').toLowerCase().includes(q) ||
-      (p.student_id || '').toLowerCase().includes(q) ||
-      (p.method || '').toLowerCase().includes(q) ||
-      (p.received_by || '').toLowerCase().includes(q) ||
-      (p.notes || '').toLowerCase().includes(q)
-    )
+  const { start, end } = getKpiDateRange(kpiDatePreset.value, kpiCustomStartDate.value, kpiCustomEndDate.value)
+  const q = kpiSearchQuery.value.trim().toLowerCase()
+
+  return props.payments.filter(p => {
+    if (p.is_withdrawal || p.is_discount || Number(p.amount) <= 0) return false
+
+    // Date Range
+    if (p.created_at) {
+      const d = new Date(p.created_at)
+      if (start && d < start) return false
+      if (end && d > end) return false
+    }
+
+    // Method Filter
+    if (kpiSelectedMethods.value.length > 0 && !kpiSelectedMethods.value.includes(p.method || '')) {
+      return false
+    }
+
+    // Receiver Filter
+    if (kpiSelectedReceivers.value.length > 0 && !kpiSelectedReceivers.value.includes(p.received_by || '')) {
+      return false
+    }
+
+    // Student & Status Filters
+    const s = getStudent(p.student_id)
+    if (!matchesKpiStudentCriteria(p.student_id, s)) return false
+
+    // Search Query
+    if (q) {
+      if (kpiSearchType.value === 'id' && !(p.student_id || '').toLowerCase().includes(q)) return false
+      if (kpiSearchType.value === 'name' && !(p.student_full_name || p.student_name || '').toLowerCase().includes(q)) return false
+      if (kpiSearchType.value === 'phone' && !(s?.phone1 || '').includes(q) && !(s?.phone2 || '').includes(q)) return false
+      if (kpiSearchType.value === 'method' && !(p.method || '').toLowerCase().includes(q)) return false
+      if (kpiSearchType.value === 'coordinator' && !(s?.coordinator || '').toLowerCase().includes(q)) return false
+      if (kpiSearchType.value === 'receiver' && !(p.received_by || '').toLowerCase().includes(q)) return false
+      if (kpiSearchType.value === 'notes' && !(p.notes || '').toLowerCase().includes(q)) return false
+      if (kpiSearchType.value === 'all') {
+        const match =
+          (p.student_id || '').toLowerCase().includes(q) ||
+          (p.student_full_name || p.student_name || '').toLowerCase().includes(q) ||
+          (s?.phone1 || '').includes(q) ||
+          (p.method || '').toLowerCase().includes(q) ||
+          (p.received_by || '').toLowerCase().includes(q) ||
+          (s?.coordinator || '').toLowerCase().includes(q) ||
+          (p.notes || '').toLowerCase().includes(q)
+        if (!match) return false
+      }
+    }
+
+    return true
+  }).sort((a, b) => {
+    const timeA = a.created_at ? new Date(a.created_at).getTime() : 0
+    const timeB = b.created_at ? new Date(b.created_at).getTime() : 0
+    return timeB - timeA
   })
-})
-const paginatedCollectedModalList = computed(() => {
-  const start = (kpiModalPage.value - 1) * KPI_PAGE_SIZE
-  return filteredCollectedModalList.value.slice(start, start + KPI_PAGE_SIZE)
 })
 const totalCollectedModalAmount = computed(() => {
   return filteredCollectedModalList.value.reduce((sum, p) => sum + (Number(p.amount) || 0), 0)
 })
 
-// 2. Debt Data (Debtor students)
-const debtorStudentsList = computed(() => {
-  return props.students
-    .filter(s => {
-      const bal = Number(s.balance) || 0
-      if (bal >= 0) return false
-      return matchesStudentCriteria(s.id)
-    })
-    .sort((a, b) => (Number(a.balance) || 0) - (Number(b.balance) || 0))
-})
+// 2. Debtor Students Filtered List
 const filteredDebtModalList = computed(() => {
-  const q = kpiModalSearch.value.trim().toLowerCase()
-  if (!q) return debtorStudentsList.value
-  return debtorStudentsList.value.filter(s => {
-    return (
-      (s.full_name || '').toLowerCase().includes(q) ||
-      (s.id || '').toLowerCase().includes(q) ||
-      (s.phone1 || '').toLowerCase().includes(q) ||
-      (s.tariff || '').toLowerCase().includes(q) ||
-      (s.student_group || '').toLowerCase().includes(q) ||
-      (s.coordinator || '').toLowerCase().includes(q)
-    )
-  })
-})
-const paginatedDebtModalList = computed(() => {
-  const start = (kpiModalPage.value - 1) * KPI_PAGE_SIZE
-  return filteredDebtModalList.value.slice(start, start + KPI_PAGE_SIZE)
+  const q = kpiSearchQuery.value.trim().toLowerCase()
+
+  return props.students.filter(s => {
+    const bal = Number(s.balance) || 0
+    if (bal >= 0) return false
+
+    // Status & Student Criteria
+    if (!matchesKpiStudentCriteria(s.id, s)) return false
+
+    // Search Query
+    if (q) {
+      if (kpiSearchType.value === 'id' && !(s.id || '').toLowerCase().includes(q)) return false
+      if (kpiSearchType.value === 'name' && !(s.full_name || '').toLowerCase().includes(q)) return false
+      if (kpiSearchType.value === 'phone' && !(s.phone1 || '').includes(q) && !(s.phone2 || '').includes(q)) return false
+      if (kpiSearchType.value === 'coordinator' && !(s.coordinator || '').toLowerCase().includes(q)) return false
+      if (kpiSearchType.value === 'all') {
+        const match =
+          (s.id || '').toLowerCase().includes(q) ||
+          (s.full_name || '').toLowerCase().includes(q) ||
+          (s.phone1 || '').includes(q) ||
+          (s.phone2 || '').includes(q) ||
+          (s.coordinator || '').toLowerCase().includes(q) ||
+          (s.tariff || '').toLowerCase().includes(q) ||
+          (s.student_group || '').toLowerCase().includes(q)
+        if (!match) return false
+      }
+    }
+
+    return true
+  }).sort((a, b) => (Number(a.balance) || 0) - (Number(b.balance) || 0))
 })
 const totalDebtModalAmount = computed(() => {
   return filteredDebtModalList.value.reduce((sum, s) => sum + Math.abs(Number(s.balance) || 0), 0)
 })
 
-// 3. Discount Data
-const discountTransactions = computed(() => {
-  return sortedFilteredPayments.value.filter(p => p.is_discount)
-})
+// 3. Discount Filtered List
 const filteredDiscountModalList = computed(() => {
-  const q = kpiModalSearch.value.trim().toLowerCase()
-  if (!q) return discountTransactions.value
-  return discountTransactions.value.filter(p => {
-    return (
-      (p.student_full_name || p.student_name || '').toLowerCase().includes(q) ||
-      (p.student_id || '').toLowerCase().includes(q) ||
-      (p.received_by || '').toLowerCase().includes(q) ||
-      (p.notes || '').toLowerCase().includes(q)
-    )
+  const { start, end } = getKpiDateRange(kpiDatePreset.value, kpiCustomStartDate.value, kpiCustomEndDate.value)
+  const q = kpiSearchQuery.value.trim().toLowerCase()
+
+  return props.payments.filter(p => {
+    if (!p.is_discount) return false
+
+    // Date Range
+    if (p.created_at) {
+      const d = new Date(p.created_at)
+      if (start && d < start) return false
+      if (end && d > end) return false
+    }
+
+    // Receiver Filter
+    if (kpiSelectedReceivers.value.length > 0 && !kpiSelectedReceivers.value.includes(p.received_by || '')) {
+      return false
+    }
+
+    // Student & Status Filters
+    const s = getStudent(p.student_id)
+    if (!matchesKpiStudentCriteria(p.student_id, s)) return false
+
+    // Search Query
+    if (q) {
+      if (kpiSearchType.value === 'id' && !(p.student_id || '').toLowerCase().includes(q)) return false
+      if (kpiSearchType.value === 'name' && !(p.student_full_name || p.student_name || '').toLowerCase().includes(q)) return false
+      if (kpiSearchType.value === 'phone' && !(s?.phone1 || '').includes(q) && !(s?.phone2 || '').includes(q)) return false
+      if (kpiSearchType.value === 'coordinator' && !(s?.coordinator || '').toLowerCase().includes(q)) return false
+      if (kpiSearchType.value === 'receiver' && !(p.received_by || '').toLowerCase().includes(q)) return false
+      if (kpiSearchType.value === 'notes' && !(p.notes || '').toLowerCase().includes(q)) return false
+      if (kpiSearchType.value === 'all') {
+        const match =
+          (p.student_id || '').toLowerCase().includes(q) ||
+          (p.student_full_name || p.student_name || '').toLowerCase().includes(q) ||
+          (s?.phone1 || '').includes(q) ||
+          (p.received_by || '').toLowerCase().includes(q) ||
+          (s?.coordinator || '').toLowerCase().includes(q) ||
+          (p.notes || '').toLowerCase().includes(q)
+        if (!match) return false
+      }
+    }
+
+    return true
+  }).sort((a, b) => {
+    const timeA = a.created_at ? new Date(a.created_at).getTime() : 0
+    const timeB = b.created_at ? new Date(b.created_at).getTime() : 0
+    return timeB - timeA
   })
-})
-const paginatedDiscountModalList = computed(() => {
-  const start = (kpiModalPage.value - 1) * KPI_PAGE_SIZE
-  return filteredDiscountModalList.value.slice(start, start + KPI_PAGE_SIZE)
 })
 const totalDiscountModalAmount = computed(() => {
   return filteredDiscountModalList.value.reduce((sum, p) => sum + Math.abs(Number(p.amount) || 0), 0)
 })
 
-// 4. Withdrawal Data
-const withdrawalTransactions = computed(() => {
-  return sortedFilteredPayments.value.filter(p => p.is_withdrawal)
-})
+// 4. Withdrawal Filtered List
 const filteredWithdrawalModalList = computed(() => {
-  const q = kpiModalSearch.value.trim().toLowerCase()
-  if (!q) return withdrawalTransactions.value
-  return withdrawalTransactions.value.filter(p => {
-    return (
-      (p.student_full_name || p.student_name || '').toLowerCase().includes(q) ||
-      (p.student_id || '').toLowerCase().includes(q) ||
-      (p.method || '').toLowerCase().includes(q) ||
-      (p.received_by || '').toLowerCase().includes(q) ||
-      (p.notes || '').toLowerCase().includes(q)
-    )
+  const { start, end } = getKpiDateRange(kpiDatePreset.value, kpiCustomStartDate.value, kpiCustomEndDate.value)
+  const q = kpiSearchQuery.value.trim().toLowerCase()
+
+  return props.payments.filter(p => {
+    if (!p.is_withdrawal && Number(p.amount) >= 0) return false
+
+    // Date Range
+    if (p.created_at) {
+      const d = new Date(p.created_at)
+      if (start && d < start) return false
+      if (end && d > end) return false
+    }
+
+    // Method Filter
+    if (kpiSelectedMethods.value.length > 0 && !kpiSelectedMethods.value.includes(p.method || '')) {
+      return false
+    }
+
+    // Receiver Filter
+    if (kpiSelectedReceivers.value.length > 0 && !kpiSelectedReceivers.value.includes(p.received_by || '')) {
+      return false
+    }
+
+    // Student & Status Filters
+    const s = getStudent(p.student_id)
+    if (!matchesKpiStudentCriteria(p.student_id, s)) return false
+
+    // Search Query
+    if (q) {
+      if (kpiSearchType.value === 'id' && !(p.student_id || '').toLowerCase().includes(q)) return false
+      if (kpiSearchType.value === 'name' && !(p.student_full_name || p.student_name || '').toLowerCase().includes(q)) return false
+      if (kpiSearchType.value === 'phone' && !(s?.phone1 || '').includes(q) && !(s?.phone2 || '').includes(q)) return false
+      if (kpiSearchType.value === 'method' && !(p.method || '').toLowerCase().includes(q)) return false
+      if (kpiSearchType.value === 'coordinator' && !(s?.coordinator || '').toLowerCase().includes(q)) return false
+      if (kpiSearchType.value === 'receiver' && !(p.received_by || '').toLowerCase().includes(q)) return false
+      if (kpiSearchType.value === 'notes' && !(p.notes || '').toLowerCase().includes(q)) return false
+      if (kpiSearchType.value === 'all') {
+        const match =
+          (p.student_id || '').toLowerCase().includes(q) ||
+          (p.student_full_name || p.student_name || '').toLowerCase().includes(q) ||
+          (s?.phone1 || '').includes(q) ||
+          (p.method || '').toLowerCase().includes(q) ||
+          (p.received_by || '').toLowerCase().includes(q) ||
+          (s?.coordinator || '').toLowerCase().includes(q) ||
+          (p.notes || '').toLowerCase().includes(q)
+        if (!match) return false
+      }
+    }
+
+    return true
+  }).sort((a, b) => {
+    const timeA = a.created_at ? new Date(a.created_at).getTime() : 0
+    const timeB = b.created_at ? new Date(b.created_at).getTime() : 0
+    return timeB - timeA
   })
-})
-const paginatedWithdrawalModalList = computed(() => {
-  const start = (kpiModalPage.value - 1) * KPI_PAGE_SIZE
-  return filteredWithdrawalModalList.value.slice(start, start + KPI_PAGE_SIZE)
 })
 const totalWithdrawalModalAmount = computed(() => {
   return filteredWithdrawalModalList.value.reduce((sum, p) => sum + Math.abs(Number(p.amount) || 0), 0)
 })
+
+// Pagination
+const currentModalTotalRecords = computed(() => {
+  if (activeKpiModal.value === 'collected') return filteredCollectedModalList.value.length
+  if (activeKpiModal.value === 'debt') return filteredDebtModalList.value.length
+  if (activeKpiModal.value === 'discount') return filteredDiscountModalList.value.length
+  if (activeKpiModal.value === 'withdraw') return filteredWithdrawalModalList.value.length
+  return 0
+})
+
+const kpiTotalPages = computed(() => {
+  if (kpiPageSize.value === -1) return 1
+  return Math.max(1, Math.ceil(currentModalTotalRecords.value / kpiPageSize.value))
+})
+
+const paginatedCollectedModalList = computed(() => {
+  if (kpiPageSize.value === -1) return filteredCollectedModalList.value
+  const start = (kpiPage.value - 1) * kpiPageSize.value
+  return filteredCollectedModalList.value.slice(start, start + kpiPageSize.value)
+})
+
+const paginatedDebtModalList = computed(() => {
+  if (kpiPageSize.value === -1) return filteredDebtModalList.value
+  const start = (kpiPage.value - 1) * kpiPageSize.value
+  return filteredDebtModalList.value.slice(start, start + kpiPageSize.value)
+})
+
+const paginatedDiscountModalList = computed(() => {
+  if (kpiPageSize.value === -1) return filteredDiscountModalList.value
+  const start = (kpiPage.value - 1) * kpiPageSize.value
+  return filteredDiscountModalList.value.slice(start, start + kpiPageSize.value)
+})
+
+const paginatedWithdrawalModalList = computed(() => {
+  if (kpiPageSize.value === -1) return filteredWithdrawalModalList.value
+  const start = (kpiPage.value - 1) * kpiPageSize.value
+  return filteredWithdrawalModalList.value.slice(start, start + kpiPageSize.value)
+})
+
+// Active Filter Chips
+const hasActiveKpiFilters = computed(() => {
+  return (
+    kpiDatePreset.value !== 'this_month' ||
+    kpiSelectedStatuses.value.length > 0 ||
+    kpiSelectedTariffs.value.length > 0 ||
+    kpiSelectedGroups.value.length > 0 ||
+    kpiSelectedCoordinators.value.length > 0 ||
+    kpiSelectedLevels.value.length > 0 ||
+    kpiSelectedIds.value.length > 0 ||
+    kpiSelectedMethods.value.length > 0 ||
+    kpiSelectedReceivers.value.length > 0 ||
+    kpiSearchQuery.value.trim() !== ''
+  )
+})
+
+const activeKpiFilterChips = computed(() => {
+  const chips: { key: string; label: string; clear: () => void }[] = []
+  if (kpiDatePreset.value !== 'this_month') {
+    chips.push({
+      key: 'date',
+      label: `Date: ${kpiDatePreset.value.replace('_', ' ').toUpperCase()}`,
+      clear: () => { kpiDatePreset.value = 'this_month'; kpiCustomStartDate.value = ''; kpiCustomEndDate.value = '' }
+    })
+  }
+  if (kpiSelectedStatuses.value.length > 0) {
+    chips.push({
+      key: 'status',
+      label: `Status: ${kpiSelectedStatuses.value.join(', ')}`,
+      clear: () => { kpiSelectedStatuses.value = [] }
+    })
+  }
+  if (kpiSelectedTariffs.value.length > 0) {
+    chips.push({
+      key: 'tariff',
+      label: `Tariff: ${kpiSelectedTariffs.value.length}`,
+      clear: () => { kpiSelectedTariffs.value = [] }
+    })
+  }
+  if (kpiSelectedGroups.value.length > 0) {
+    chips.push({
+      key: 'group',
+      label: `Group: ${kpiSelectedGroups.value.length}`,
+      clear: () => { kpiSelectedGroups.value = [] }
+    })
+  }
+  if (kpiSelectedCoordinators.value.length > 0) {
+    chips.push({
+      key: 'coordinator',
+      label: `Coordinator: ${kpiSelectedCoordinators.value.length}`,
+      clear: () => { kpiSelectedCoordinators.value = [] }
+    })
+  }
+  if (kpiSelectedLevels.value.length > 0) {
+    chips.push({
+      key: 'level',
+      label: `Level: ${kpiSelectedLevels.value.length}`,
+      clear: () => { kpiSelectedLevels.value = [] }
+    })
+  }
+  if (kpiSelectedIds.value.length > 0) {
+    chips.push({
+      key: 'id',
+      label: `ID: ${kpiSelectedIds.value.join(', ')}`,
+      clear: () => { kpiSelectedIds.value = [] }
+    })
+  }
+  if (kpiSelectedMethods.value.length > 0) {
+    chips.push({
+      key: 'method',
+      label: `Method: ${kpiSelectedMethods.value.length}`,
+      clear: () => { kpiSelectedMethods.value = [] }
+    })
+  }
+  if (kpiSelectedReceivers.value.length > 0) {
+    chips.push({
+      key: 'receiver',
+      label: `Receiver: ${kpiSelectedReceivers.value.length}`,
+      clear: () => { kpiSelectedReceivers.value = [] }
+    })
+  }
+  if (kpiSearchQuery.value.trim() !== '') {
+    chips.push({
+      key: 'search',
+      label: `Search: "${kpiSearchQuery.value.trim()}"`,
+      clear: () => { kpiSearchQuery.value = '' }
+    })
+  }
+  return chips
+})
+
+const clearAllKpiFilters = () => {
+  kpiDatePreset.value = 'this_month'
+  kpiCustomStartDate.value = ''
+  kpiCustomEndDate.value = ''
+  kpiSelectedStatuses.value = []
+  kpiSelectedTariffs.value = []
+  kpiSelectedGroups.value = []
+  kpiSelectedCoordinators.value = []
+  kpiSelectedLevels.value = []
+  kpiSelectedIds.value = []
+  kpiSelectedMethods.value = []
+  kpiSelectedReceivers.value = []
+  kpiSearchQuery.value = ''
+  kpiSearchType.value = 'all'
+  kpiPage.value = 1
+}
 
 // ── Export Modal-Specific Excel Files ────────────────────────────────
 const exportCollectedExcel = async () => {
@@ -1044,10 +1468,12 @@ const exportCollectedExcel = async () => {
       'Receipt ID': p.id ? String(p.id).toUpperCase() : '',
       'Student ID': p.student_id || '—',
       'Student Full Name': p.student_full_name || p.student_name || 'General',
+      'Phone Number': s?.phone1 || '—',
       'Tariff': s?.tariff || '—',
       'Group': s?.student_group || '—',
       'Coordinator': s?.coordinator || '—',
       'Level': s?.level || '—',
+      'Status': s?.is_deleted ? 'Archive' : 'Active',
       'Payment Method': p.method || '—',
       'Received By': p.received_by || '—',
       'Amount (UZS)': Number(p.amount) || 0,
@@ -1059,13 +1485,13 @@ const exportCollectedExcel = async () => {
   const wb = XLSX.utils.book_new()
   const ws = XLSX.utils.json_to_sheet(data)
   ws['!cols'] = [
-    { wch: 6 }, { wch: 20 }, { wch: 14 }, { wch: 30 },
-    { wch: 18 }, { wch: 16 }, { wch: 18 }, { wch: 16 },
+    { wch: 6 }, { wch: 20 }, { wch: 14 }, { wch: 30 }, { wch: 18 },
+    { wch: 18 }, { wch: 16 }, { wch: 18 }, { wch: 16 }, { wch: 12 },
     { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 20 }, { wch: 30 }
   ]
   XLSX.utils.book_append_sheet(wb, ws, 'Total Collected')
   const dateStr = new Date().toISOString().split('T')[0]
-  XLSX.writeFile(wb, `Collected_Payments_${selectedDatePreset.value}_${dateStr}.xlsx`)
+  XLSX.writeFile(wb, `Collected_Payments_${kpiDatePreset.value}_${dateStr}.xlsx`)
 }
 
 const exportDebtExcel = async () => {
@@ -1123,9 +1549,11 @@ const exportDiscountExcel = async () => {
       'Record ID': p.id ? String(p.id).toUpperCase() : '',
       'Student ID': p.student_id || '—',
       'Student Full Name': p.student_full_name || p.student_name || 'General',
+      'Phone Number': s?.phone1 || '—',
       'Tariff': s?.tariff || '—',
       'Group': s?.student_group || '—',
       'Coordinator': s?.coordinator || '—',
+      'Status': s?.is_deleted ? 'Archive' : 'Active',
       'Discount Amount (UZS)': Math.abs(Number(p.amount) || 0),
       'Granted By': p.received_by || '—',
       'Date & Time': formatDateTime(p.created_at),
@@ -1136,13 +1564,13 @@ const exportDiscountExcel = async () => {
   const wb = XLSX.utils.book_new()
   const ws = XLSX.utils.json_to_sheet(data)
   ws['!cols'] = [
-    { wch: 6 }, { wch: 20 }, { wch: 14 }, { wch: 30 },
-    { wch: 18 }, { wch: 16 }, { wch: 18 }, { wch: 22 },
+    { wch: 6 }, { wch: 20 }, { wch: 14 }, { wch: 30 }, { wch: 18 },
+    { wch: 18 }, { wch: 16 }, { wch: 18 }, { wch: 12 }, { wch: 22 },
     { wch: 18 }, { wch: 20 }, { wch: 30 }
   ]
   XLSX.utils.book_append_sheet(wb, ws, 'Discounts Given')
   const dateStr = new Date().toISOString().split('T')[0]
-  XLSX.writeFile(wb, `Discounts_Report_${selectedDatePreset.value}_${dateStr}.xlsx`)
+  XLSX.writeFile(wb, `Discounts_Report_${kpiDatePreset.value}_${dateStr}.xlsx`)
 }
 
 const exportWithdrawalExcel = async () => {
@@ -1166,9 +1594,11 @@ const exportWithdrawalExcel = async () => {
       'Withdrawal ID': p.id ? String(p.id).toUpperCase() : '',
       'Student ID': p.student_id || '—',
       'Student Full Name': p.student_full_name || p.student_name || 'General',
+      'Phone Number': s?.phone1 || '—',
       'Tariff': s?.tariff || '—',
       'Group': s?.student_group || '—',
       'Coordinator': s?.coordinator || '—',
+      'Status': s?.is_deleted ? 'Archive' : 'Active',
       'Payment Method': p.method || '—',
       'Authorized / Processed By': p.received_by || '—',
       'Withdrawal Amount (UZS)': Math.abs(Number(p.amount) || 0),
@@ -1180,13 +1610,13 @@ const exportWithdrawalExcel = async () => {
   const wb = XLSX.utils.book_new()
   const ws = XLSX.utils.json_to_sheet(data)
   ws['!cols'] = [
-    { wch: 6 }, { wch: 20 }, { wch: 14 }, { wch: 30 },
-    { wch: 18 }, { wch: 16 }, { wch: 18 }, { wch: 18 },
+    { wch: 6 }, { wch: 20 }, { wch: 14 }, { wch: 30 }, { wch: 18 },
+    { wch: 18 }, { wch: 16 }, { wch: 18 }, { wch: 12 }, { wch: 18 },
     { wch: 22 }, { wch: 22 }, { wch: 20 }, { wch: 30 }
   ]
   XLSX.utils.book_append_sheet(wb, ws, 'Withdrawals')
   const dateStr = new Date().toISOString().split('T')[0]
-  XLSX.writeFile(wb, `Withdrawals_Report_${selectedDatePreset.value}_${dateStr}.xlsx`)
+  XLSX.writeFile(wb, `Withdrawals_Report_${kpiDatePreset.value}_${dateStr}.xlsx`)
 }
 </script>
 
@@ -2285,12 +2715,15 @@ const exportWithdrawalExcel = async () => {
     <Teleport to="body">
       <div
         v-if="activeKpiModal"
-        class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/65 backdrop-blur-xs select-none"
+        class="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/65 backdrop-blur-xs select-none"
+        @click.self="closeKpiModal"
       >
-        <div class="relative w-full max-w-5xl max-h-[90vh] rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121417] shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-          
-          <!-- Modal Header -->
-          <div class="px-5 py-4 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between gap-4 bg-zinc-50/50 dark:bg-zinc-900/30">
+        <div
+          class="relative w-full max-w-6xl h-[90vh] max-h-[90vh] rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#111315] shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150"
+          @click="closeAllKpiDropdowns"
+        >
+          <!-- 1. Modal Header (shrink-0) -->
+          <div class="px-5 py-3.5 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between gap-4 bg-zinc-50/70 dark:bg-zinc-900/40 shrink-0">
             <div class="flex items-center gap-3">
               <div
                 class="h-10 w-10 rounded-xl flex items-center justify-center shadow-xs shrink-0"
@@ -2311,7 +2744,7 @@ const exportWithdrawalExcel = async () => {
                 <div class="flex items-center gap-2">
                   <h3 class="text-sm font-bold text-zinc-900 dark:text-zinc-100">
                     {{
-                      activeKpiModal === 'collected' ? 'Total Collected Payments' :
+                      activeKpiModal === 'collected' ? 'Total Collected Payments Breakdown' :
                       activeKpiModal === 'debt' ? 'Outstanding Debtors Register' :
                       activeKpiModal === 'discount' ? 'Discounts Given Breakdown' :
                       'Total Withdrawals & Refunds'
@@ -2326,21 +2759,40 @@ const exportWithdrawalExcel = async () => {
                       'bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400'
                     ]"
                   >
-                    {{
-                      activeKpiModal === 'collected' ? `${filteredCollectedModalList.length} payments` :
-                      activeKpiModal === 'debt' ? `${filteredDebtModalList.length} debtor students` :
-                      activeKpiModal === 'discount' ? `${filteredDiscountModalList.length} discounts` :
-                      `${filteredWithdrawalModalList.length} withdrawals`
-                    }}
+                    {{ currentModalTotalRecords }} records
                   </span>
                 </div>
                 <p class="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">
-                  Filtered by active date range ({{ selectedDatePreset.replace('_', ' ') }}) and student criteria.
+                  <span v-if="activeKpiModal !== 'debt'">
+                    Date Range: <strong class="capitalize text-zinc-700 dark:text-zinc-300">{{ kpiDatePreset.replace('_', ' ') }}</strong> ·
+                  </span>
+                  Use filters and search to drill down and export to Excel.
                 </p>
               </div>
             </div>
 
-            <div class="flex items-center gap-2">
+            <!-- Header Actions: Total Sum Badge, Download Excel, Close -->
+            <div class="flex items-center gap-3">
+              <div class="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-850 shadow-2xs">
+                <span class="text-zinc-500 text-[11px] font-medium">Total:</span>
+                <span
+                  class="font-mono font-extrabold text-xs"
+                  :class="[
+                    activeKpiModal === 'collected' ? 'text-emerald-600 dark:text-emerald-400' :
+                    activeKpiModal === 'debt' ? 'text-red-600 dark:text-red-400' :
+                    activeKpiModal === 'discount' ? 'text-pink-600 dark:text-pink-400' :
+                    'text-amber-600 dark:text-amber-400'
+                  ]"
+                >
+                  {{
+                    activeKpiModal === 'collected' ? `+${formatUZS(totalCollectedModalAmount)} UZS` :
+                    activeKpiModal === 'debt' ? `-${formatUZS(totalDebtModalAmount)} UZS` :
+                    activeKpiModal === 'discount' ? `${formatUZS(totalDiscountModalAmount)} UZS` :
+                    `-${formatUZS(totalWithdrawalModalAmount)} UZS`
+                  }}
+                </span>
+              </div>
+
               <button
                 type="button"
                 @click="
@@ -2349,8 +2801,8 @@ const exportWithdrawalExcel = async () => {
                   activeKpiModal === 'discount' ? exportDiscountExcel() :
                   exportWithdrawalExcel()
                 "
-                class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl border border-emerald-300 dark:border-emerald-700/60 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-all cursor-pointer shadow-2xs"
-                title="Download Itemized Excel Report"
+                class="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold rounded-xl border border-emerald-300 dark:border-emerald-700/60 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-all cursor-pointer shadow-2xs"
+                title="Download Filtered Excel Workbook"
               >
                 <Download class="h-3.5 w-3.5" />
                 <span>Download Excel</span>
@@ -2361,54 +2813,405 @@ const exportWithdrawalExcel = async () => {
                 @click="closeKpiModal"
                 class="p-1.5 rounded-xl text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
               >
-                <X class="h-4.5 w-4.5" />
+                <X class="h-5 w-5" />
               </button>
             </div>
           </div>
 
-          <!-- Search & Summary Bar -->
-          <div class="px-5 py-3 border-b border-zinc-100 dark:border-zinc-800 flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-[#121417]">
-            <div class="relative flex-1 min-w-[240px]">
-              <Search class="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-400 pointer-events-none" />
-              <input
-                type="text"
-                v-model="kpiModalSearch"
-                placeholder="Search by student name, ID, phone, method, notes..."
-                class="w-full pl-8 pr-3 py-1.5 text-xs border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-850 rounded-lg text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:border-blue-500"
-              />
+          <!-- 2. Search & Filter Controls Bar (shrink-0, exactly matching /students Download Excel Modal) -->
+          <div class="p-3.5 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-850/40 space-y-2.5 shrink-0" @click.stop>
+            
+            <!-- Search Row with Type Selector -->
+            <div class="flex items-stretch gap-0 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 overflow-hidden focus-within:border-blue-500 transition-colors shadow-2xs">
+              <div class="relative shrink-0 border-r border-zinc-200 dark:border-zinc-700">
+                <select
+                  v-model="kpiSearchType"
+                  class="h-9 pl-3 pr-7 bg-transparent text-xs font-bold text-zinc-600 dark:text-zinc-300 focus:outline-none cursor-pointer appearance-none"
+                >
+                  <option value="all">All Fields</option>
+                  <option value="id">Student ID</option>
+                  <option value="name">Student Name</option>
+                  <option value="phone">Phone Number</option>
+                  <option v-if="activeKpiModal === 'collected' || activeKpiModal === 'withdraw'" value="method">Payment Method</option>
+                  <option value="coordinator">Coordinator</option>
+                  <option v-if="activeKpiModal !== 'debt'" value="receiver">Receiver / Staff</option>
+                  <option value="notes">Notes / Reason</option>
+                </select>
+                <ChevronDown class="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-zinc-400 pointer-events-none" />
+              </div>
+              <div class="relative flex-1">
+                <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-400 pointer-events-none" />
+                <input
+                  v-model="kpiSearchQuery"
+                  type="text"
+                  placeholder="Search by student name, ID, phone, method, receiver, notes..."
+                  class="w-full h-9 pl-9 pr-3 bg-transparent text-xs text-zinc-800 dark:text-zinc-200 focus:outline-none placeholder:text-zinc-400"
+                />
+              </div>
             </div>
 
-            <!-- Metric Sum Badge -->
-            <div class="flex items-center gap-2">
-              <span class="text-zinc-500 dark:text-zinc-400 text-xs">Total Amount:</span>
+            <!-- Multi-Select Filters Grid -->
+            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-2 text-xs">
+              
+              <!-- 1. Date Preset Filter (for collected, discount, withdraw) -->
+              <div v-if="activeKpiModal !== 'debt'" class="relative">
+                <button
+                  type="button"
+                  @click="toggleKpiDropdown('date')"
+                  class="w-full h-8 px-2 rounded-lg font-semibold flex items-center justify-between cursor-pointer border transition-colors"
+                  :class="kpiDatePreset !== 'this_month'
+                    ? 'bg-blue-50 dark:bg-blue-950/40 border-blue-300 dark:border-blue-800 text-blue-700 dark:text-blue-300 font-bold'
+                    : 'bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:border-zinc-300'"
+                >
+                  <div class="flex items-center gap-1.5 truncate">
+                    <Calendar class="w-3.5 h-3.5 shrink-0 opacity-70" />
+                    <span class="truncate capitalize">{{ kpiDatePreset.replace('_', ' ') }}</span>
+                  </div>
+                  <ChevronDown class="w-3 h-3 shrink-0 ml-0.5 opacity-60" />
+                </button>
+
+                <div
+                  v-if="isKpiDateDropdownOpen"
+                  class="absolute left-0 mt-1 w-52 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 shadow-xl py-1.5 z-40 text-xs"
+                  @click.stop
+                >
+                  <button
+                    v-for="p in [
+                      { key: 'this_month', label: 'This Month' },
+                      { key: 'today', label: 'Today' },
+                      { key: 'yesterday', label: 'Yesterday' },
+                      { key: 'this_week', label: 'This Week' },
+                      { key: 'last_month', label: 'Last Month' },
+                      { key: 'this_year', label: 'This Year' },
+                      { key: 'all', label: 'All Time' },
+                      { key: 'custom', label: 'Custom Range...' }
+                    ]"
+                    :key="p.key"
+                    type="button"
+                    @click="kpiDatePreset = p.key as DatePreset; if (p.key !== 'custom') isKpiDateDropdownOpen = false"
+                    class="w-full px-3 py-1.5 flex items-center justify-between text-left hover:bg-zinc-50 dark:hover:bg-zinc-700 cursor-pointer"
+                    :class="kpiDatePreset === p.key ? 'font-bold text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-950/30' : 'text-zinc-700 dark:text-zinc-300'"
+                  >
+                    <span>{{ p.label }}</span>
+                    <Check v-if="kpiDatePreset === p.key" class="w-3.5 h-3.5 text-blue-600" />
+                  </button>
+
+                  <div v-if="kpiDatePreset === 'custom'" class="p-2 border-t border-zinc-100 dark:border-zinc-700 mt-1 space-y-1.5">
+                    <label class="text-[10px] text-zinc-400 font-bold block">Start Date</label>
+                    <input type="date" v-model="kpiCustomStartDate" class="w-full px-2 py-1 text-xs border border-zinc-200 dark:border-zinc-700 rounded-lg bg-zinc-50 dark:bg-zinc-850" />
+                    <label class="text-[10px] text-zinc-400 font-bold block">End Date</label>
+                    <input type="date" v-model="kpiCustomEndDate" class="w-full px-2 py-1 text-xs border border-zinc-200 dark:border-zinc-700 rounded-lg bg-zinc-50 dark:bg-zinc-850" />
+                  </div>
+                </div>
+              </div>
+
+              <!-- 2. Status Filter (Active / Archive) -->
+              <div class="relative">
+                <button
+                  type="button"
+                  @click="toggleKpiDropdown('status')"
+                  class="w-full h-8 px-2 rounded-lg font-semibold flex items-center justify-between cursor-pointer border transition-colors"
+                  :class="kpiSelectedStatuses.length > 0
+                    ? 'bg-blue-50 dark:bg-blue-950/40 border-blue-300 dark:border-blue-800 text-blue-700 dark:text-blue-300 font-bold'
+                    : 'bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:border-zinc-300'"
+                >
+                  <div class="flex items-center gap-1.5 truncate">
+                    <UserCheck class="w-3.5 h-3.5 shrink-0 opacity-70" />
+                    <span class="truncate">{{ kpiSelectedStatuses.length === 0 ? 'Status' : `Status (${kpiSelectedStatuses.join(', ')})` }}</span>
+                  </div>
+                  <ChevronDown class="w-3 h-3 shrink-0 ml-0.5 opacity-60" />
+                </button>
+
+                <div
+                  v-if="isKpiStatusDropdownOpen"
+                  class="absolute left-0 mt-1 w-44 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 shadow-xl py-1 z-40 text-xs"
+                  @click.stop
+                >
+                  <label class="px-3 py-1.5 flex items-center gap-2 hover:bg-zinc-50 dark:hover:bg-zinc-700 cursor-pointer font-bold">
+                    <input type="checkbox" :checked="kpiSelectedStatuses.length === 0" @change="kpiSelectedStatuses = []" class="rounded text-blue-600" />
+                    <span>All Statuses</span>
+                  </label>
+                  <div class="h-px bg-zinc-100 dark:bg-zinc-700 my-1" />
+                  <label class="px-3 py-1.5 flex items-center gap-2 hover:bg-zinc-50 dark:hover:bg-zinc-700 cursor-pointer">
+                    <input type="checkbox" :checked="kpiSelectedStatuses.includes('ACTIVE')" @change="toggleKpiList(kpiSelectedStatuses, 'ACTIVE')" class="rounded text-blue-600" />
+                    <span>Active</span>
+                  </label>
+                  <label class="px-3 py-1.5 flex items-center gap-2 hover:bg-zinc-50 dark:hover:bg-zinc-700 cursor-pointer">
+                    <input type="checkbox" :checked="kpiSelectedStatuses.includes('ARCHIVE')" @change="toggleKpiList(kpiSelectedStatuses, 'ARCHIVE')" class="rounded text-blue-600" />
+                    <span>Archive</span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- 3. Tariff Filter Dropdown -->
+              <div class="relative">
+                <button
+                  type="button"
+                  @click="toggleKpiDropdown('tariff')"
+                  class="w-full h-8 px-2 rounded-lg font-semibold flex items-center justify-between cursor-pointer border transition-colors"
+                  :class="kpiSelectedTariffs.length > 0
+                    ? 'bg-blue-50 dark:bg-blue-950/40 border-blue-300 dark:border-blue-800 text-blue-700 dark:text-blue-300 font-bold'
+                    : 'bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:border-zinc-300'"
+                >
+                  <div class="flex items-center gap-1.5 truncate">
+                    <Award class="w-3.5 h-3.5 shrink-0 opacity-70" />
+                    <span class="truncate">{{ kpiSelectedTariffs.length === 0 ? 'Tariff' : `Tariff · ${kpiSelectedTariffs.length}` }}</span>
+                  </div>
+                  <ChevronDown class="w-3 h-3 shrink-0 ml-0.5 opacity-60" />
+                </button>
+
+                <div
+                  v-if="isKpiTariffDropdownOpen"
+                  class="absolute left-0 mt-1 w-48 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 shadow-xl py-1 z-40 max-h-60 overflow-y-auto text-xs"
+                  @click.stop
+                >
+                  <label class="px-3 py-1.5 flex items-center gap-2 hover:bg-zinc-50 dark:hover:bg-zinc-700 cursor-pointer font-bold">
+                    <input type="checkbox" :checked="kpiSelectedTariffs.length === 0" @change="kpiSelectedTariffs = []" class="rounded text-blue-600" />
+                    <span>All Tariffs</span>
+                  </label>
+                  <div class="h-px bg-zinc-100 dark:bg-zinc-700 my-1" />
+                  <label v-for="t in availableTariffs" :key="t" class="px-3 py-1.5 flex items-center gap-2 hover:bg-zinc-50 dark:hover:bg-zinc-700 cursor-pointer">
+                    <input type="checkbox" :checked="kpiSelectedTariffs.includes(t)" @change="toggleKpiList(kpiSelectedTariffs, t)" class="rounded text-blue-600" />
+                    <span class="truncate">{{ t }}</span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- 4. Group Filter Dropdown -->
+              <div class="relative">
+                <button
+                  type="button"
+                  @click="toggleKpiDropdown('group')"
+                  class="w-full h-8 px-2 rounded-lg font-semibold flex items-center justify-between cursor-pointer border transition-colors"
+                  :class="kpiSelectedGroups.length > 0
+                    ? 'bg-blue-50 dark:bg-blue-950/40 border-blue-300 dark:border-blue-800 text-blue-700 dark:text-blue-300 font-bold'
+                    : 'bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:border-zinc-300'"
+                >
+                  <div class="flex items-center gap-1.5 truncate">
+                    <Users class="w-3.5 h-3.5 shrink-0 opacity-70" />
+                    <span class="truncate">{{ kpiSelectedGroups.length === 0 ? 'Group' : `Group · ${kpiSelectedGroups.length}` }}</span>
+                  </div>
+                  <ChevronDown class="w-3 h-3 shrink-0 ml-0.5 opacity-60" />
+                </button>
+
+                <div
+                  v-if="isKpiGroupDropdownOpen"
+                  class="absolute left-0 mt-1 w-48 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 shadow-xl py-1 z-40 max-h-60 overflow-y-auto text-xs"
+                  @click.stop
+                >
+                  <label class="px-3 py-1.5 flex items-center gap-2 hover:bg-zinc-50 dark:hover:bg-zinc-700 cursor-pointer font-bold">
+                    <input type="checkbox" :checked="kpiSelectedGroups.length === 0" @change="kpiSelectedGroups = []" class="rounded text-blue-600" />
+                    <span>All Groups</span>
+                  </label>
+                  <div class="h-px bg-zinc-100 dark:bg-zinc-700 my-1" />
+                  <label v-for="g in availableGroups" :key="g" class="px-3 py-1.5 flex items-center gap-2 hover:bg-zinc-50 dark:hover:bg-zinc-700 cursor-pointer">
+                    <input type="checkbox" :checked="kpiSelectedGroups.includes(g)" @change="toggleKpiList(kpiSelectedGroups, g)" class="rounded text-blue-600" />
+                    <span class="truncate">{{ g }}</span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- 5. Coordinator Filter Dropdown -->
+              <div class="relative">
+                <button
+                  type="button"
+                  @click="toggleKpiDropdown('coordinator')"
+                  class="w-full h-8 px-2 rounded-lg font-semibold flex items-center justify-between cursor-pointer border transition-colors"
+                  :class="kpiSelectedCoordinators.length > 0
+                    ? 'bg-blue-50 dark:bg-blue-950/40 border-blue-300 dark:border-blue-800 text-blue-700 dark:text-blue-300 font-bold'
+                    : 'bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:border-zinc-300'"
+                >
+                  <div class="flex items-center gap-1.5 truncate">
+                    <Contact class="w-3.5 h-3.5 shrink-0 opacity-70" />
+                    <span class="truncate">{{ kpiSelectedCoordinators.length === 0 ? 'Coordinator' : `Coord · ${kpiSelectedCoordinators.length}` }}</span>
+                  </div>
+                  <ChevronDown class="w-3 h-3 shrink-0 ml-0.5 opacity-60" />
+                </button>
+
+                <div
+                  v-if="isKpiCoordinatorDropdownOpen"
+                  class="absolute left-0 mt-1 w-48 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 shadow-xl py-1 z-40 max-h-60 overflow-y-auto text-xs"
+                  @click.stop
+                >
+                  <label class="px-3 py-1.5 flex items-center gap-2 hover:bg-zinc-50 dark:hover:bg-zinc-700 cursor-pointer font-bold">
+                    <input type="checkbox" :checked="kpiSelectedCoordinators.length === 0" @change="kpiSelectedCoordinators = []" class="rounded text-blue-600" />
+                    <span>All Coordinators</span>
+                  </label>
+                  <div class="h-px bg-zinc-100 dark:bg-zinc-700 my-1" />
+                  <label v-for="c in availableCoordinators" :key="c" class="px-3 py-1.5 flex items-center gap-2 hover:bg-zinc-50 dark:hover:bg-zinc-700 cursor-pointer">
+                    <input type="checkbox" :checked="kpiSelectedCoordinators.includes(c)" @change="toggleKpiList(kpiSelectedCoordinators, c)" class="rounded text-blue-600" />
+                    <span class="truncate">{{ c }}</span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- 6. Level Filter Dropdown -->
+              <div class="relative">
+                <button
+                  type="button"
+                  @click="toggleKpiDropdown('level')"
+                  class="w-full h-8 px-2 rounded-lg font-semibold flex items-center justify-between cursor-pointer border transition-colors"
+                  :class="kpiSelectedLevels.length > 0
+                    ? 'bg-blue-50 dark:bg-blue-950/40 border-blue-300 dark:border-blue-800 text-blue-700 dark:text-blue-300 font-bold'
+                    : 'bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:border-zinc-300'"
+                >
+                  <div class="flex items-center gap-1.5 truncate">
+                    <GraduationCap class="w-3.5 h-3.5 shrink-0 opacity-70" />
+                    <span class="truncate">{{ kpiSelectedLevels.length === 0 ? 'Level' : `Level · ${kpiSelectedLevels.length}` }}</span>
+                  </div>
+                  <ChevronDown class="w-3 h-3 shrink-0 ml-0.5 opacity-60" />
+                </button>
+
+                <div
+                  v-if="isKpiLevelDropdownOpen"
+                  class="absolute left-0 mt-1 w-48 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 shadow-xl py-1 z-40 max-h-60 overflow-y-auto text-xs"
+                  @click.stop
+                >
+                  <label class="px-3 py-1.5 flex items-center gap-2 hover:bg-zinc-50 dark:hover:bg-zinc-700 cursor-pointer font-bold">
+                    <input type="checkbox" :checked="kpiSelectedLevels.length === 0" @change="kpiSelectedLevels = []" class="rounded text-blue-600" />
+                    <span>All Levels</span>
+                  </label>
+                  <div class="h-px bg-zinc-100 dark:bg-zinc-700 my-1" />
+                  <label v-for="l in availableLevels" :key="l" class="px-3 py-1.5 flex items-center gap-2 hover:bg-zinc-50 dark:hover:bg-zinc-700 cursor-pointer">
+                    <input type="checkbox" :checked="kpiSelectedLevels.includes(l)" @change="toggleKpiList(kpiSelectedLevels, l)" class="rounded text-blue-600" />
+                    <span class="truncate">{{ l }}</span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- 7. ID Prefix Filter Dropdown -->
+              <div class="relative">
+                <button
+                  type="button"
+                  @click="toggleKpiDropdown('id')"
+                  class="w-full h-8 px-2 rounded-lg font-semibold flex items-center justify-between cursor-pointer border transition-colors"
+                  :class="kpiSelectedIds.length > 0
+                    ? 'bg-blue-50 dark:bg-blue-950/40 border-blue-300 dark:border-blue-800 text-blue-700 dark:text-blue-300 font-bold'
+                    : 'bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:border-zinc-300'"
+                >
+                  <div class="flex items-center gap-1.5 truncate">
+                    <Hash class="w-3.5 h-3.5 shrink-0 opacity-70" />
+                    <span class="truncate">{{ kpiSelectedIds.length === 0 ? 'ID Prefix' : `ID (${kpiSelectedIds.join(', ')})` }}</span>
+                  </div>
+                  <ChevronDown class="w-3 h-3 shrink-0 ml-0.5 opacity-60" />
+                </button>
+
+                <div
+                  v-if="isKpiIdDropdownOpen"
+                  class="absolute left-0 mt-1 w-48 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 shadow-xl py-1 z-40 max-h-60 overflow-y-auto text-xs"
+                  @click.stop
+                >
+                  <label class="px-3 py-1.5 flex items-center gap-2 hover:bg-zinc-50 dark:hover:bg-zinc-700 cursor-pointer font-bold">
+                    <input type="checkbox" :checked="kpiSelectedIds.length === 0" @change="kpiSelectedIds = []" class="rounded text-blue-600" />
+                    <span>All ID Prefixes</span>
+                  </label>
+                  <div class="h-px bg-zinc-100 dark:bg-zinc-700 my-1" />
+                  <label v-for="idOpt in availableIds" :key="idOpt" class="px-3 py-1.5 flex items-center gap-2 hover:bg-zinc-50 dark:hover:bg-zinc-700 cursor-pointer">
+                    <input type="checkbox" :checked="kpiSelectedIds.includes(idOpt)" @change="toggleKpiList(kpiSelectedIds, idOpt)" class="rounded text-blue-600" />
+                    <span class="truncate font-mono font-bold">{{ idOpt }}</span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- 8. Payment Method Filter (for collected & withdraw) -->
+              <div v-if="activeKpiModal === 'collected' || activeKpiModal === 'withdraw'" class="relative">
+                <button
+                  type="button"
+                  @click="toggleKpiDropdown('method')"
+                  class="w-full h-8 px-2 rounded-lg font-semibold flex items-center justify-between cursor-pointer border transition-colors"
+                  :class="kpiSelectedMethods.length > 0
+                    ? 'bg-blue-50 dark:bg-blue-950/40 border-blue-300 dark:border-blue-800 text-blue-700 dark:text-blue-300 font-bold'
+                    : 'bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:border-zinc-300'"
+                >
+                  <div class="flex items-center gap-1.5 truncate">
+                    <CreditCard class="w-3.5 h-3.5 shrink-0 opacity-70" />
+                    <span class="truncate">{{ kpiSelectedMethods.length === 0 ? 'Method' : `Method · ${kpiSelectedMethods.length}` }}</span>
+                  </div>
+                  <ChevronDown class="w-3 h-3 shrink-0 ml-0.5 opacity-60" />
+                </button>
+
+                <div
+                  v-if="isKpiMethodDropdownOpen"
+                  class="absolute left-0 mt-1 w-48 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 shadow-xl py-1 z-40 max-h-60 overflow-y-auto text-xs"
+                  @click.stop
+                >
+                  <label class="px-3 py-1.5 flex items-center gap-2 hover:bg-zinc-50 dark:hover:bg-zinc-700 cursor-pointer font-bold">
+                    <input type="checkbox" :checked="kpiSelectedMethods.length === 0" @change="kpiSelectedMethods = []" class="rounded text-blue-600" />
+                    <span>All Methods</span>
+                  </label>
+                  <div class="h-px bg-zinc-100 dark:bg-zinc-700 my-1" />
+                  <label v-for="m in paymentMethods" :key="m" class="px-3 py-1.5 flex items-center gap-2 hover:bg-zinc-50 dark:hover:bg-zinc-700 cursor-pointer">
+                    <input type="checkbox" :checked="kpiSelectedMethods.includes(m)" @change="toggleKpiList(kpiSelectedMethods, m)" class="rounded text-blue-600" />
+                    <span class="truncate uppercase">{{ m }}</span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- 9. Receiver / Staff Filter (for collected, discount, withdraw) -->
+              <div v-if="activeKpiModal !== 'debt'" class="relative">
+                <button
+                  type="button"
+                  @click="toggleKpiDropdown('receiver')"
+                  class="w-full h-8 px-2 rounded-lg font-semibold flex items-center justify-between cursor-pointer border transition-colors"
+                  :class="kpiSelectedReceivers.length > 0
+                    ? 'bg-blue-50 dark:bg-blue-950/40 border-blue-300 dark:border-blue-800 text-blue-700 dark:text-blue-300 font-bold'
+                    : 'bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:border-zinc-300'"
+                >
+                  <div class="flex items-center gap-1.5 truncate">
+                    <Contact class="w-3.5 h-3.5 shrink-0 opacity-70" />
+                    <span class="truncate">{{ kpiSelectedReceivers.length === 0 ? 'Receiver' : `Rec · ${kpiSelectedReceivers.length}` }}</span>
+                  </div>
+                  <ChevronDown class="w-3 h-3 shrink-0 ml-0.5 opacity-60" />
+                </button>
+
+                <div
+                  v-if="isKpiReceiverDropdownOpen"
+                  class="absolute left-0 mt-1 w-48 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 shadow-xl py-1 z-40 max-h-60 overflow-y-auto text-xs"
+                  @click.stop
+                >
+                  <label class="px-3 py-1.5 flex items-center gap-2 hover:bg-zinc-50 dark:hover:bg-zinc-700 cursor-pointer font-bold">
+                    <input type="checkbox" :checked="kpiSelectedReceivers.length === 0" @change="kpiSelectedReceivers = []" class="rounded text-blue-600" />
+                    <span>All Receivers</span>
+                  </label>
+                  <div class="h-px bg-zinc-100 dark:bg-zinc-700 my-1" />
+                  <label v-for="r in paymentReceivers" :key="r" class="px-3 py-1.5 flex items-center gap-2 hover:bg-zinc-50 dark:hover:bg-zinc-700 cursor-pointer">
+                    <input type="checkbox" :checked="kpiSelectedReceivers.includes(r)" @change="toggleKpiList(kpiSelectedReceivers, r)" class="rounded text-blue-600" />
+                    <span class="truncate uppercase">{{ r }}</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <!-- Active Filter Chips Bar -->
+            <div v-if="hasActiveKpiFilters" class="flex items-center gap-1.5 flex-wrap pt-0.5">
               <span
-                class="px-2.5 py-1 rounded-lg text-xs font-mono font-extrabold"
-                :class="[
-                  activeKpiModal === 'collected' ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400' :
-                  activeKpiModal === 'debt' ? 'bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400' :
-                  activeKpiModal === 'discount' ? 'bg-pink-50 dark:bg-pink-950/40 text-pink-600 dark:text-pink-400' :
-                  'bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400'
-                ]"
+                v-for="chip in activeKpiFilterChips"
+                :key="chip.key"
+                class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-bold bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800"
               >
-                {{
-                  activeKpiModal === 'collected' ? `+${formatUZS(totalCollectedModalAmount)} UZS` :
-                  activeKpiModal === 'debt' ? `-${formatUZS(totalDebtModalAmount)} UZS` :
-                  activeKpiModal === 'discount' ? `${formatUZS(totalDiscountModalAmount)} UZS` :
-                  `-${formatUZS(totalWithdrawalModalAmount)} UZS`
-                }}
+                {{ chip.label }}
+                <X class="w-2.5 h-2.5 cursor-pointer hover:text-rose-500" @click="chip.clear()" />
               </span>
+              <button
+                type="button"
+                @click="clearAllKpiFilters"
+                class="text-[10.5px] font-bold text-rose-600 dark:text-rose-400 hover:underline cursor-pointer ml-1"
+              >
+                Clear All Filters
+              </button>
             </div>
           </div>
 
-          <!-- Modal Table Area -->
-          <div class="flex-1 overflow-y-auto max-h-[58vh]">
+          <!-- 3. Modal Table Body (flex-1 min-h-0 overflow-y-auto) -->
+          <div class="flex-1 min-h-0 overflow-y-auto overflow-x-auto text-xs">
             
             <!-- 1. Collected Table -->
-            <table v-if="activeKpiModal === 'collected'" class="w-full border-collapse text-left text-xs">
-              <thead class="sticky top-0 z-10 bg-zinc-50 dark:bg-zinc-850/90 backdrop-blur-xs border-b border-zinc-200 dark:border-zinc-800 text-[11px] font-bold uppercase text-zinc-500 dark:text-zinc-400">
+            <table v-if="activeKpiModal === 'collected'" class="w-full border-collapse text-left">
+              <thead class="sticky top-0 z-10 bg-zinc-50 dark:bg-zinc-850/95 backdrop-blur-xs border-b border-zinc-200 dark:border-zinc-800 text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 select-none">
                 <tr>
                   <th class="px-4 py-2.5 w-12 text-center">No</th>
-                  <th class="px-4 py-2.5">Student / ID</th>
+                  <th class="px-4 py-2.5">Student / Full Name</th>
+                  <th class="px-4 py-2.5">Phone Number</th>
                   <th class="px-4 py-2.5">Method</th>
                   <th class="px-4 py-2.5">Received By</th>
                   <th class="px-4 py-2.5 text-right">Amount</th>
@@ -2423,14 +3226,19 @@ const exportWithdrawalExcel = async () => {
                   class="hover:bg-zinc-50/80 dark:hover:bg-zinc-850/60 transition-colors"
                 >
                   <td class="px-4 py-2.5 text-center font-mono text-zinc-400 text-[11px]">
-                    {{ (kpiModalPage - 1) * KPI_PAGE_SIZE + idx + 1 }}
+                    {{ kpiPageSize === -1 ? idx + 1 : (kpiPage - 1) * kpiPageSize + idx + 1 }}
                   </td>
                   <td class="px-4 py-2.5">
                     <div class="flex flex-col gap-0.5">
-                      <span class="font-bold uppercase text-zinc-900 dark:text-zinc-100 truncate">
-                        {{ p.student_full_name || p.student_name || 'General' }}
-                      </span>
                       <div class="flex items-center gap-1.5">
+                        <span class="font-bold uppercase text-zinc-900 dark:text-zinc-100 truncate">
+                          {{ p.student_full_name || p.student_name || 'General' }}
+                        </span>
+                        <span v-if="getStudent(p.student_id)?.is_deleted" class="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20">
+                          Archive
+                        </span>
+                      </div>
+                      <div class="flex flex-wrap items-center gap-1.5">
                         <span class="font-mono font-bold text-[#0066cc] dark:text-blue-400 text-[11px]">
                           {{ p.student_id || '—' }}
                         </span>
@@ -2446,13 +3254,16 @@ const exportWithdrawalExcel = async () => {
                       </div>
                     </div>
                   </td>
+                  <td class="px-4 py-2.5 font-mono text-zinc-600 dark:text-zinc-400 text-[11.5px]">
+                    {{ getStudent(p.student_id)?.phone1 || '—' }}
+                  </td>
                   <td class="px-4 py-2.5 font-semibold uppercase text-zinc-700 dark:text-zinc-300">
                     {{ p.method || '—' }}
                   </td>
                   <td class="px-4 py-2.5 font-medium uppercase text-zinc-500 dark:text-zinc-400">
                     {{ p.received_by || '—' }}
                   </td>
-                  <td class="px-4 py-2.5 text-right font-mono font-extrabold text-emerald-600 dark:text-emerald-400">
+                  <td class="px-4 py-2.5 text-right font-mono font-extrabold text-emerald-600 dark:text-emerald-400 text-[13px]">
                     +{{ formatUZS(Number(p.amount)) }} UZS
                   </td>
                   <td class="px-4 py-2.5 font-mono text-[11px] text-zinc-500 dark:text-zinc-400">
@@ -2462,7 +3273,7 @@ const exportWithdrawalExcel = async () => {
                     <button
                       type="button"
                       @click="viewingPayment = p"
-                      class="p-1 rounded-lg text-zinc-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 cursor-pointer"
+                      class="p-1.5 rounded-lg text-zinc-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 cursor-pointer"
                       title="View Receipt"
                     >
                       <Printer class="h-4 w-4" />
@@ -2470,20 +3281,20 @@ const exportWithdrawalExcel = async () => {
                   </td>
                 </tr>
                 <tr v-if="filteredCollectedModalList.length === 0">
-                  <td colspan="7" class="px-4 py-8 text-center text-zinc-400">
-                    No collected payments found.
+                  <td colspan="8" class="px-4 py-12 text-center text-zinc-400">
+                    No collected payments found matching the selected filter criteria.
                   </td>
                 </tr>
               </tbody>
             </table>
 
             <!-- 2. Debt Table -->
-            <table v-else-if="activeKpiModal === 'debt'" class="w-full border-collapse text-left text-xs">
-              <thead class="sticky top-0 z-10 bg-zinc-50 dark:bg-zinc-850/90 backdrop-blur-xs border-b border-zinc-200 dark:border-zinc-800 text-[11px] font-bold uppercase text-zinc-500 dark:text-zinc-400">
+            <table v-else-if="activeKpiModal === 'debt'" class="w-full border-collapse text-left">
+              <thead class="sticky top-0 z-10 bg-zinc-50 dark:bg-zinc-850/95 backdrop-blur-xs border-b border-zinc-200 dark:border-zinc-800 text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 select-none">
                 <tr>
                   <th class="px-4 py-2.5 w-12 text-center">No</th>
-                  <th class="px-4 py-2.5">Student / ID</th>
-                  <th class="px-4 py-2.5">Phone</th>
+                  <th class="px-4 py-2.5">Student / Full Name</th>
+                  <th class="px-4 py-2.5">Phone Number</th>
                   <th class="px-4 py-2.5">Coordinator</th>
                   <th class="px-4 py-2.5 text-right">Outstanding Debt</th>
                   <th class="px-4 py-2.5 text-right">Discounts</th>
@@ -2497,14 +3308,19 @@ const exportWithdrawalExcel = async () => {
                   class="hover:bg-zinc-50/80 dark:hover:bg-zinc-850/60 transition-colors"
                 >
                   <td class="px-4 py-2.5 text-center font-mono text-zinc-400 text-[11px]">
-                    {{ (kpiModalPage - 1) * KPI_PAGE_SIZE + idx + 1 }}
+                    {{ kpiPageSize === -1 ? idx + 1 : (kpiPage - 1) * kpiPageSize + idx + 1 }}
                   </td>
                   <td class="px-4 py-2.5">
                     <div class="flex flex-col gap-0.5">
-                      <span class="font-bold uppercase text-zinc-900 dark:text-zinc-100 truncate">
-                        {{ s.full_name }}
-                      </span>
                       <div class="flex items-center gap-1.5">
+                        <span class="font-bold uppercase text-zinc-900 dark:text-zinc-100 truncate">
+                          {{ s.full_name }}
+                        </span>
+                        <span v-if="s.is_deleted" class="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20">
+                          Archive
+                        </span>
+                      </div>
+                      <div class="flex flex-wrap items-center gap-1.5">
                         <span class="font-mono font-bold text-[#0066cc] dark:text-blue-400 text-[11px]">
                           {{ s.id }}
                         </span>
@@ -2518,12 +3334,12 @@ const exportWithdrawalExcel = async () => {
                     </div>
                   </td>
                   <td class="px-4 py-2.5 font-mono text-zinc-600 dark:text-zinc-400 text-[11.5px]">
-                    {{ s.phone1 || '—' }}
+                    {{ s.phone1 || s.phone2 || '—' }}
                   </td>
                   <td class="px-4 py-2.5 font-semibold text-purple-600 dark:text-purple-400 uppercase">
                     {{ s.coordinator || '—' }}
                   </td>
-                  <td class="px-4 py-2.5 text-right font-mono font-extrabold text-red-600 dark:text-red-400 text-[13px]">
+                  <td class="px-4 py-2.5 text-right font-mono font-extrabold text-red-600 dark:text-red-400 text-[13.5px]">
                     -{{ formatUZS(Math.abs(Number(s.balance))) }} UZS
                   </td>
                   <td class="px-4 py-2.5 text-right font-mono text-zinc-500">
@@ -2541,19 +3357,19 @@ const exportWithdrawalExcel = async () => {
                   </td>
                 </tr>
                 <tr v-if="filteredDebtModalList.length === 0">
-                  <td colspan="7" class="px-4 py-8 text-center text-zinc-400">
-                    No debtor students found matching criteria.
+                  <td colspan="7" class="px-4 py-12 text-center text-zinc-400">
+                    No debtor students found matching the selected filter criteria.
                   </td>
                 </tr>
               </tbody>
             </table>
 
             <!-- 3. Discount Table -->
-            <table v-else-if="activeKpiModal === 'discount'" class="w-full border-collapse text-left text-xs">
-              <thead class="sticky top-0 z-10 bg-zinc-50 dark:bg-zinc-850/90 backdrop-blur-xs border-b border-zinc-200 dark:border-zinc-800 text-[11px] font-bold uppercase text-zinc-500 dark:text-zinc-400">
+            <table v-else-if="activeKpiModal === 'discount'" class="w-full border-collapse text-left">
+              <thead class="sticky top-0 z-10 bg-zinc-50 dark:bg-zinc-850/95 backdrop-blur-xs border-b border-zinc-200 dark:border-zinc-800 text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 select-none">
                 <tr>
                   <th class="px-4 py-2.5 w-12 text-center">No</th>
-                  <th class="px-4 py-2.5">Student / ID</th>
+                  <th class="px-4 py-2.5">Student / Full Name</th>
                   <th class="px-4 py-2.5 text-right">Discount Amount</th>
                   <th class="px-4 py-2.5">Granted By</th>
                   <th class="px-4 py-2.5">Reason / Notes</th>
@@ -2567,24 +3383,32 @@ const exportWithdrawalExcel = async () => {
                   class="hover:bg-zinc-50/80 dark:hover:bg-zinc-850/60 transition-colors"
                 >
                   <td class="px-4 py-2.5 text-center font-mono text-zinc-400 text-[11px]">
-                    {{ (kpiModalPage - 1) * KPI_PAGE_SIZE + idx + 1 }}
+                    {{ kpiPageSize === -1 ? idx + 1 : (kpiPage - 1) * kpiPageSize + idx + 1 }}
                   </td>
                   <td class="px-4 py-2.5">
                     <div class="flex flex-col gap-0.5">
-                      <span class="font-bold uppercase text-zinc-900 dark:text-zinc-100 truncate">
-                        {{ p.student_full_name || p.student_name || 'General' }}
-                      </span>
                       <div class="flex items-center gap-1.5">
+                        <span class="font-bold uppercase text-zinc-900 dark:text-zinc-100 truncate">
+                          {{ p.student_full_name || p.student_name || 'General' }}
+                        </span>
+                        <span v-if="getStudent(p.student_id)?.is_deleted" class="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20">
+                          Archive
+                        </span>
+                      </div>
+                      <div class="flex flex-wrap items-center gap-1.5">
                         <span class="font-mono font-bold text-[#0066cc] dark:text-blue-400 text-[11px]">
                           {{ p.student_id || '—' }}
                         </span>
                         <span v-if="getStudent(p.student_id)?.tariff" class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 uppercase">
                           {{ getStudent(p.student_id)?.tariff }}
                         </span>
+                        <span v-if="getStudent(p.student_id)?.coordinator" class="px-1.5 py-0.2 rounded text-[9px] font-semibold bg-purple-500/10 text-purple-600 dark:text-purple-400 uppercase">
+                          {{ getStudent(p.student_id)?.coordinator }}
+                        </span>
                       </div>
                     </div>
                   </td>
-                  <td class="px-4 py-2.5 text-right font-mono font-extrabold text-pink-600 dark:text-pink-400">
+                  <td class="px-4 py-2.5 text-right font-mono font-extrabold text-pink-600 dark:text-pink-400 text-[13px]">
                     {{ formatUZS(Math.abs(Number(p.amount))) }} UZS
                   </td>
                   <td class="px-4 py-2.5 font-medium uppercase text-zinc-500 dark:text-zinc-400">
@@ -2598,19 +3422,19 @@ const exportWithdrawalExcel = async () => {
                   </td>
                 </tr>
                 <tr v-if="filteredDiscountModalList.length === 0">
-                  <td colspan="6" class="px-4 py-8 text-center text-zinc-400">
-                    No discount records found in this period.
+                  <td colspan="6" class="px-4 py-12 text-center text-zinc-400">
+                    No discount records found matching the filter criteria.
                   </td>
                 </tr>
               </tbody>
             </table>
 
             <!-- 4. Withdrawals Table -->
-            <table v-else-if="activeKpiModal === 'withdraw'" class="w-full border-collapse text-left text-xs">
-              <thead class="sticky top-0 z-10 bg-zinc-50 dark:bg-zinc-850/90 backdrop-blur-xs border-b border-zinc-200 dark:border-zinc-800 text-[11px] font-bold uppercase text-zinc-500 dark:text-zinc-400">
+            <table v-else-if="activeKpiModal === 'withdraw'" class="w-full border-collapse text-left">
+              <thead class="sticky top-0 z-10 bg-zinc-50 dark:bg-zinc-850/95 backdrop-blur-xs border-b border-zinc-200 dark:border-zinc-800 text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 select-none">
                 <tr>
                   <th class="px-4 py-2.5 w-12 text-center">No</th>
-                  <th class="px-4 py-2.5">Student / ID</th>
+                  <th class="px-4 py-2.5">Student / Full Name</th>
                   <th class="px-4 py-2.5">Method</th>
                   <th class="px-4 py-2.5">Processed By</th>
                   <th class="px-4 py-2.5 text-right">Withdrawal Amount</th>
@@ -2626,19 +3450,27 @@ const exportWithdrawalExcel = async () => {
                   class="hover:bg-zinc-50/80 dark:hover:bg-zinc-850/60 transition-colors"
                 >
                   <td class="px-4 py-2.5 text-center font-mono text-zinc-400 text-[11px]">
-                    {{ (kpiModalPage - 1) * KPI_PAGE_SIZE + idx + 1 }}
+                    {{ kpiPageSize === -1 ? idx + 1 : (kpiPage - 1) * kpiPageSize + idx + 1 }}
                   </td>
                   <td class="px-4 py-2.5">
                     <div class="flex flex-col gap-0.5">
-                      <span class="font-bold uppercase text-zinc-900 dark:text-zinc-100 truncate">
-                        {{ p.student_full_name || p.student_name || 'General' }}
-                      </span>
                       <div class="flex items-center gap-1.5">
+                        <span class="font-bold uppercase text-zinc-900 dark:text-zinc-100 truncate">
+                          {{ p.student_full_name || p.student_name || 'General' }}
+                        </span>
+                        <span v-if="getStudent(p.student_id)?.is_deleted" class="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20">
+                          Archive
+                        </span>
+                      </div>
+                      <div class="flex flex-wrap items-center gap-1.5">
                         <span class="font-mono font-bold text-[#0066cc] dark:text-blue-400 text-[11px]">
                           {{ p.student_id || '—' }}
                         </span>
                         <span v-if="getStudent(p.student_id)?.tariff" class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 uppercase">
                           {{ getStudent(p.student_id)?.tariff }}
+                        </span>
+                        <span v-if="getStudent(p.student_id)?.coordinator" class="px-1.5 py-0.2 rounded text-[9px] font-semibold bg-purple-500/10 text-purple-600 dark:text-purple-400 uppercase">
+                          {{ getStudent(p.student_id)?.coordinator }}
                         </span>
                       </div>
                     </div>
@@ -2649,7 +3481,7 @@ const exportWithdrawalExcel = async () => {
                   <td class="px-4 py-2.5 font-medium uppercase text-zinc-500 dark:text-zinc-400">
                     {{ p.received_by || '—' }}
                   </td>
-                  <td class="px-4 py-2.5 text-right font-mono font-extrabold text-amber-600 dark:text-amber-400">
+                  <td class="px-4 py-2.5 text-right font-mono font-extrabold text-amber-600 dark:text-amber-400 text-[13.5px]">
                     -{{ formatUZS(Math.abs(Number(p.amount))) }} UZS
                   </td>
                   <td class="px-4 py-2.5 text-zinc-700 dark:text-zinc-300">
@@ -2662,7 +3494,7 @@ const exportWithdrawalExcel = async () => {
                     <button
                       type="button"
                       @click="viewingPayment = p"
-                      class="p-1 rounded-lg text-zinc-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 cursor-pointer"
+                      class="p-1.5 rounded-lg text-zinc-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 cursor-pointer"
                       title="View Receipt"
                     >
                       <Printer class="h-4 w-4" />
@@ -2670,48 +3502,109 @@ const exportWithdrawalExcel = async () => {
                   </td>
                 </tr>
                 <tr v-if="filteredWithdrawalModalList.length === 0">
-                  <td colspan="8" class="px-4 py-8 text-center text-zinc-400">
-                    No withdrawals recorded in this period.
+                  <td colspan="8" class="px-4 py-12 text-center text-zinc-400">
+                    No withdrawals recorded matching the filter criteria.
                   </td>
                 </tr>
               </tbody>
             </table>
           </div>
 
-          <!-- Modal Pagination Footer -->
-          <div class="px-5 py-3 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between bg-zinc-50/50 dark:bg-zinc-900/30">
-            <span class="text-xs text-zinc-500 font-mono">
-              Page {{ kpiModalPage }} of {{
-                activeKpiModal === 'collected' ? Math.max(1, Math.ceil(filteredCollectedModalList.length / KPI_PAGE_SIZE)) :
-                activeKpiModal === 'debt' ? Math.max(1, Math.ceil(filteredDebtModalList.length / KPI_PAGE_SIZE)) :
-                activeKpiModal === 'discount' ? Math.max(1, Math.ceil(filteredDiscountModalList.length / KPI_PAGE_SIZE)) :
-                Math.max(1, Math.ceil(filteredWithdrawalModalList.length / KPI_PAGE_SIZE))
-              }}
-            </span>
+          <!-- 4. Robust Modal Pagination Footer (shrink-0, ALWAYS visible) -->
+          <div class="px-5 py-3 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-[#15171a] flex flex-wrap items-center justify-between gap-3 shrink-0 select-none">
+            <!-- Left: Page Size Selector & Record Count -->
+            <div class="flex items-center gap-3">
+              <div class="flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400 font-medium">
+                <span>Show:</span>
+                <select
+                  v-model="kpiPageSize"
+                  class="px-2 py-1 text-xs font-bold border border-zinc-200 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 cursor-pointer focus:outline-none"
+                >
+                  <option :value="15">15 rows</option>
+                  <option :value="30">30 rows</option>
+                  <option :value="50">50 rows</option>
+                  <option :value="100">100 rows</option>
+                  <option :value="-1">All records</option>
+                </select>
+              </div>
 
-            <div class="flex items-center gap-2">
+              <span class="text-xs text-zinc-500 dark:text-zinc-400 font-mono">
+                <template v-if="kpiPageSize === -1">
+                  Showing all {{ currentModalTotalRecords }} records
+                </template>
+                <template v-else>
+                  Showing {{ currentModalTotalRecords === 0 ? 0 : (kpiPage - 1) * kpiPageSize + 1 }} - {{ Math.min(kpiPage * kpiPageSize, currentModalTotalRecords) }} of {{ currentModalTotalRecords }} records
+                </template>
+              </span>
+            </div>
+
+            <!-- Right: Interactive Page Numbers and Nav Buttons -->
+            <div v-if="kpiPageSize !== -1 && kpiTotalPages > 1" class="flex items-center gap-1">
+              <!-- First Page -->
               <button
                 type="button"
-                :disabled="kpiModalPage <= 1"
-                @click="kpiModalPage--"
-                class="px-3 py-1 text-xs font-bold rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-850 disabled:opacity-40 cursor-pointer text-zinc-700 dark:text-zinc-300"
+                :disabled="kpiPage <= 1"
+                @click="kpiPage = 1"
+                class="p-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-zinc-100 dark:hover:bg-zinc-700 cursor-pointer transition-colors text-zinc-700 dark:text-zinc-300"
+                title="First Page"
               >
-                Prev
+                <ChevronsLeft class="w-3.5 h-3.5" />
               </button>
+
+              <!-- Previous Page -->
               <button
                 type="button"
-                :disabled="
-                  kpiModalPage >= (
-                    activeKpiModal === 'collected' ? Math.max(1, Math.ceil(filteredCollectedModalList.length / KPI_PAGE_SIZE)) :
-                    activeKpiModal === 'debt' ? Math.max(1, Math.ceil(filteredDebtModalList.length / KPI_PAGE_SIZE)) :
-                    activeKpiModal === 'discount' ? Math.max(1, Math.ceil(filteredDiscountModalList.length / KPI_PAGE_SIZE)) :
-                    Math.max(1, Math.ceil(filteredWithdrawalModalList.length / KPI_PAGE_SIZE))
-                  )
-                "
-                @click="kpiModalPage++"
-                class="px-3 py-1 text-xs font-bold rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-850 disabled:opacity-40 cursor-pointer text-zinc-700 dark:text-zinc-300"
+                :disabled="kpiPage <= 1"
+                @click="kpiPage--"
+                class="px-2.5 py-1 text-xs font-bold rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-zinc-100 dark:hover:bg-zinc-700 cursor-pointer transition-colors text-zinc-700 dark:text-zinc-300 flex items-center gap-1"
               >
-                Next
+                <ChevronLeft class="w-3.5 h-3.5" />
+                <span>Prev</span>
+              </button>
+
+              <!-- Page Indicator / Number Buttons -->
+              <div class="flex items-center gap-1 px-1">
+                <template v-for="pageNum in Array.from({ length: kpiTotalPages }, (_, i) => i + 1)" :key="pageNum">
+                  <button
+                    v-if="pageNum === 1 || pageNum === kpiTotalPages || (pageNum >= kpiPage - 1 && pageNum <= kpiPage + 1)"
+                    type="button"
+                    @click="kpiPage = pageNum"
+                    class="h-7 w-7 rounded-lg text-xs font-mono font-bold cursor-pointer transition-colors flex items-center justify-center"
+                    :class="pageNum === kpiPage
+                      ? 'bg-blue-600 text-white shadow-xs'
+                      : 'border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700'"
+                  >
+                    {{ pageNum }}
+                  </button>
+                  <span
+                    v-else-if="(pageNum === kpiPage - 2 && pageNum > 1) || (pageNum === kpiPage + 2 && pageNum < kpiTotalPages)"
+                    class="px-1 text-zinc-400 text-xs select-none"
+                  >
+                    ...
+                  </span>
+                </template>
+              </div>
+
+              <!-- Next Page -->
+              <button
+                type="button"
+                :disabled="kpiPage >= kpiTotalPages"
+                @click="kpiPage++"
+                class="px-2.5 py-1 text-xs font-bold rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-zinc-100 dark:hover:bg-zinc-700 cursor-pointer transition-colors text-zinc-700 dark:text-zinc-300 flex items-center gap-1"
+              >
+                <span>Next</span>
+                <ChevronRight class="w-3.5 h-3.5" />
+              </button>
+
+              <!-- Last Page -->
+              <button
+                type="button"
+                :disabled="kpiPage >= kpiTotalPages"
+                @click="kpiPage = kpiTotalPages"
+                class="p-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-zinc-100 dark:hover:bg-zinc-700 cursor-pointer transition-colors text-zinc-700 dark:text-zinc-300"
+                title="Last Page"
+              >
+                <ChevronsRight class="w-3.5 h-3.5" />
               </button>
             </div>
           </div>
