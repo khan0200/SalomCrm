@@ -32,7 +32,7 @@ const ITEMS_PER_PAGE = 30
 // ── Date Filters ──────────────────────────────────────────────────────
 type DatePreset = 'all' | 'today' | 'yesterday' | 'this_week' | 'this_month' | 'last_month' | 'this_year' | 'custom'
 
-const selectedDatePreset = ref<DatePreset>('this_month')
+const selectedDatePreset = ref<DatePreset>('all')
 const customStartDate = ref('')
 const customEndDate = ref('')
 
@@ -903,7 +903,7 @@ const exportFinanceReportToExcel = async () => {
 const activeKpiModal = ref<'collected' | 'debt' | 'discount' | 'withdraw' | null>(null)
 const kpiSearchType = ref<'all' | 'id' | 'name' | 'phone' | 'method' | 'coordinator' | 'receiver' | 'notes'>('all')
 const kpiSearchQuery = ref('')
-const kpiDatePreset = ref<DatePreset>('this_month')
+const kpiDatePreset = ref<DatePreset>('all')
 const kpiCustomStartDate = ref('')
 const kpiCustomEndDate = ref('')
 const kpiSelectedStatuses = ref<string[]>([]) // ['ACTIVE'], ['ARCHIVE']
@@ -963,29 +963,61 @@ const toggleKpiList = (list: string[], value: string) => {
   else list.splice(idx, 1)
 }
 
+const handleKpiOutsideClick = (e: MouseEvent) => {
+  const anyOpen =
+    isKpiDateDropdownOpen.value ||
+    isKpiStatusDropdownOpen.value ||
+    isKpiTariffDropdownOpen.value ||
+    isKpiGroupDropdownOpen.value ||
+    isKpiCoordinatorDropdownOpen.value ||
+    isKpiLevelDropdownOpen.value ||
+    isKpiIdDropdownOpen.value ||
+    isKpiMethodDropdownOpen.value ||
+    isKpiReceiverDropdownOpen.value
+
+  if (!anyOpen) return
+
+  const target = e.target as HTMLElement | null
+  if (target?.closest('.kpi-dropdown-container')) {
+    return
+  }
+  closeAllKpiDropdowns()
+}
+
+onMounted(() => {
+  document.addEventListener('mousedown', handleKpiOutsideClick)
+  document.addEventListener('click', handleKpiOutsideClick)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('mousedown', handleKpiOutsideClick)
+  document.removeEventListener('click', handleKpiOutsideClick)
+})
+
 const kpiPage = ref(1)
 const kpiPageSize = ref(15)
 
 const openKpiModal = (type: 'collected' | 'debt' | 'discount' | 'withdraw') => {
   activeKpiModal.value = type
-  kpiSearchQuery.value = ''
+  kpiSearchQuery.value = searchFinance.value || ''
   kpiSearchType.value = 'all'
   kpiPage.value = 1
   kpiPageSize.value = 15
 
-  // Default to 'this_month' so "Total Collected" immediately matches the card (367,500,000 UZS)
-  kpiDatePreset.value = 'this_month'
-  kpiCustomStartDate.value = ''
-  kpiCustomEndDate.value = ''
+  // Inherit active date range from main page filters
+  kpiDatePreset.value = selectedDatePreset.value
+  kpiCustomStartDate.value = customStartDate.value || ''
+  kpiCustomEndDate.value = customEndDate.value || ''
 
+  // Inherit active multi-select student criteria from main page filters
   kpiSelectedStatuses.value = type === 'debt' ? ['ACTIVE'] : []
-  kpiSelectedTariffs.value = []
-  kpiSelectedGroups.value = []
-  kpiSelectedCoordinators.value = []
-  kpiSelectedLevels.value = []
-  kpiSelectedIds.value = []
-  kpiSelectedMethods.value = []
-  kpiSelectedReceivers.value = []
+  kpiSelectedTariffs.value = isAllTariffsSelected.value ? [] : [...effectiveSelectedTariffs.value]
+  kpiSelectedGroups.value = isAllGroupsSelected.value ? [] : [...effectiveSelectedGroups.value]
+  kpiSelectedCoordinators.value = isAllCoordinatorsSelected.value ? [] : [...effectiveSelectedCoordinators.value]
+  kpiSelectedLevels.value = isAllLevelsSelected.value ? [] : [...effectiveSelectedLevels.value]
+  kpiSelectedIds.value = isAllIdsSelected.value ? [] : [...effectiveSelectedIds.value]
+  kpiSelectedMethods.value = selectedMethod.value === 'all' ? [] : [selectedMethod.value]
+  kpiSelectedReceivers.value = selectedReceiver.value === 'all' ? [] : [selectedReceiver.value]
   closeAllKpiDropdowns()
 }
 
@@ -1341,7 +1373,7 @@ const paginatedWithdrawalModalList = computed(() => {
 // Active Filter Chips
 const hasActiveKpiFilters = computed(() => {
   return (
-    kpiDatePreset.value !== 'this_month' ||
+    kpiDatePreset.value !== 'all' ||
     kpiSelectedStatuses.value.length > 0 ||
     kpiSelectedTariffs.value.length > 0 ||
     kpiSelectedGroups.value.length > 0 ||
@@ -1356,11 +1388,11 @@ const hasActiveKpiFilters = computed(() => {
 
 const activeKpiFilterChips = computed(() => {
   const chips: { key: string; label: string; clear: () => void }[] = []
-  if (kpiDatePreset.value !== 'this_month') {
+  if (kpiDatePreset.value !== 'all') {
     chips.push({
       key: 'date',
       label: `Date: ${kpiDatePreset.value.replace('_', ' ').toUpperCase()}`,
-      clear: () => { kpiDatePreset.value = 'this_month'; kpiCustomStartDate.value = ''; kpiCustomEndDate.value = '' }
+      clear: () => { kpiDatePreset.value = 'all'; kpiCustomStartDate.value = ''; kpiCustomEndDate.value = '' }
     })
   }
   if (kpiSelectedStatuses.value.length > 0) {
@@ -1373,28 +1405,28 @@ const activeKpiFilterChips = computed(() => {
   if (kpiSelectedTariffs.value.length > 0) {
     chips.push({
       key: 'tariff',
-      label: `Tariff: ${kpiSelectedTariffs.value.length}`,
+      label: kpiSelectedTariffs.value.length === 1 ? `Tariff: ${kpiSelectedTariffs.value[0]}` : `Tariff (${kpiSelectedTariffs.value.length})`,
       clear: () => { kpiSelectedTariffs.value = [] }
     })
   }
   if (kpiSelectedGroups.value.length > 0) {
     chips.push({
       key: 'group',
-      label: `Group: ${kpiSelectedGroups.value.length}`,
+      label: kpiSelectedGroups.value.length === 1 ? `Group: ${kpiSelectedGroups.value[0]}` : `Group (${kpiSelectedGroups.value.length})`,
       clear: () => { kpiSelectedGroups.value = [] }
     })
   }
   if (kpiSelectedCoordinators.value.length > 0) {
     chips.push({
       key: 'coordinator',
-      label: `Coordinator: ${kpiSelectedCoordinators.value.length}`,
+      label: kpiSelectedCoordinators.value.length === 1 ? `Coordinator: ${kpiSelectedCoordinators.value[0]}` : `Coordinator (${kpiSelectedCoordinators.value.length})`,
       clear: () => { kpiSelectedCoordinators.value = [] }
     })
   }
   if (kpiSelectedLevels.value.length > 0) {
     chips.push({
       key: 'level',
-      label: `Level: ${kpiSelectedLevels.value.length}`,
+      label: kpiSelectedLevels.value.length === 1 ? `Level: ${kpiSelectedLevels.value[0]}` : `Level (${kpiSelectedLevels.value.length})`,
       clear: () => { kpiSelectedLevels.value = [] }
     })
   }
@@ -1408,14 +1440,14 @@ const activeKpiFilterChips = computed(() => {
   if (kpiSelectedMethods.value.length > 0) {
     chips.push({
       key: 'method',
-      label: `Method: ${kpiSelectedMethods.value.length}`,
+      label: kpiSelectedMethods.value.length === 1 ? `Method: ${kpiSelectedMethods.value[0]}` : `Method (${kpiSelectedMethods.value.length})`,
       clear: () => { kpiSelectedMethods.value = [] }
     })
   }
   if (kpiSelectedReceivers.value.length > 0) {
     chips.push({
       key: 'receiver',
-      label: `Receiver: ${kpiSelectedReceivers.value.length}`,
+      label: kpiSelectedReceivers.value.length === 1 ? `Receiver: ${kpiSelectedReceivers.value[0]}` : `Receiver (${kpiSelectedReceivers.value.length})`,
       clear: () => { kpiSelectedReceivers.value = [] }
     })
   }
@@ -1430,7 +1462,7 @@ const activeKpiFilterChips = computed(() => {
 })
 
 const clearAllKpiFilters = () => {
-  kpiDatePreset.value = 'this_month'
+  kpiDatePreset.value = 'all'
   kpiCustomStartDate.value = ''
   kpiCustomEndDate.value = ''
   kpiSelectedStatuses.value = []
@@ -1668,7 +1700,7 @@ const exportWithdrawalExcel = async () => {
 
     <!-- ── KPI Cards Grid ──────────────────────────────────────────────── -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-      <!-- 1. Total Collected (Today & This Month) -->
+      <!-- 1. Total Collected (Today & Selected Period) -->
       <div
         @click="openKpiModal('collected')"
         class="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-[#111315] p-4 shadow-2xs flex flex-col justify-between relative overflow-hidden cursor-pointer hover:border-blue-400 dark:hover:border-blue-600 hover:shadow-md transition-all group"
@@ -1683,12 +1715,12 @@ const exportWithdrawalExcel = async () => {
             </div>
             <div class="mt-1 flex items-baseline gap-1">
               <span class="text-xl font-extrabold text-zinc-900 dark:text-zinc-100 font-mono tracking-tight">
-                {{ formatUZS(thisMonthMetrics.collected) }}
+                {{ formatUZS(periodMetrics.totalCollected) }}
               </span>
               <span class="text-[11px] font-bold text-zinc-400 font-mono">UZS</span>
             </div>
             <span class="text-[10.5px] font-semibold text-blue-600 dark:text-blue-400">
-              This Month ({{ thisMonthMetrics.count }} payments)
+              {{ selectedDatePreset === 'all' ? `All Time (${periodMetrics.collectedTxCount} payments)` : selectedDatePreset === 'this_month' ? `This Month (${periodMetrics.collectedTxCount} payments)` : `${selectedDatePreset.replace('_', ' ').toUpperCase()} (${periodMetrics.collectedTxCount} payments)` }}
             </span>
           </div>
           <div class="h-9 w-9 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center group-hover:scale-110 transition-transform">
@@ -2819,7 +2851,7 @@ const exportWithdrawalExcel = async () => {
           </div>
 
           <!-- 2. Search & Filter Controls Bar (shrink-0, exactly matching /students Download Excel Modal) -->
-          <div class="p-3.5 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-850/40 space-y-2.5 shrink-0" @click.stop>
+          <div class="p-3.5 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-850/40 space-y-2.5 shrink-0">
             
             <!-- Search Row with Type Selector -->
             <div class="flex items-stretch gap-0 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 overflow-hidden focus-within:border-blue-500 transition-colors shadow-2xs">
@@ -2854,12 +2886,12 @@ const exportWithdrawalExcel = async () => {
             <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-2 text-xs">
               
               <!-- 1. Date Preset Filter (for collected, discount, withdraw) -->
-              <div v-if="activeKpiModal !== 'debt'" class="relative">
+              <div v-if="activeKpiModal !== 'debt'" class="kpi-dropdown-container relative">
                 <button
                   type="button"
-                  @click="toggleKpiDropdown('date')"
+                  @click.stop="toggleKpiDropdown('date')"
                   class="w-full h-8 px-2 rounded-lg font-semibold flex items-center justify-between cursor-pointer border transition-colors"
-                  :class="kpiDatePreset !== 'this_month'
+                  :class="kpiDatePreset !== 'all'
                     ? 'bg-blue-50 dark:bg-blue-950/40 border-blue-300 dark:border-blue-800 text-blue-700 dark:text-blue-300 font-bold'
                     : 'bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:border-zinc-300'"
                 >
@@ -2906,10 +2938,10 @@ const exportWithdrawalExcel = async () => {
               </div>
 
               <!-- 2. Status Filter (Active / Archive) -->
-              <div class="relative">
+              <div class="kpi-dropdown-container relative">
                 <button
                   type="button"
-                  @click="toggleKpiDropdown('status')"
+                  @click.stop="toggleKpiDropdown('status')"
                   class="w-full h-8 px-2 rounded-lg font-semibold flex items-center justify-between cursor-pointer border transition-colors"
                   :class="kpiSelectedStatuses.length > 0
                     ? 'bg-blue-50 dark:bg-blue-950/40 border-blue-300 dark:border-blue-800 text-blue-700 dark:text-blue-300 font-bold'
@@ -2944,10 +2976,10 @@ const exportWithdrawalExcel = async () => {
               </div>
 
               <!-- 3. Tariff Filter Dropdown -->
-              <div class="relative">
+              <div class="kpi-dropdown-container relative">
                 <button
                   type="button"
-                  @click="toggleKpiDropdown('tariff')"
+                  @click.stop="toggleKpiDropdown('tariff')"
                   class="w-full h-8 px-2 rounded-lg font-semibold flex items-center justify-between cursor-pointer border transition-colors"
                   :class="kpiSelectedTariffs.length > 0
                     ? 'bg-blue-50 dark:bg-blue-950/40 border-blue-300 dark:border-blue-800 text-blue-700 dark:text-blue-300 font-bold'
@@ -2955,7 +2987,7 @@ const exportWithdrawalExcel = async () => {
                 >
                   <div class="flex items-center gap-1.5 truncate">
                     <Award class="w-3.5 h-3.5 shrink-0 opacity-70" />
-                    <span class="truncate">{{ kpiSelectedTariffs.length === 0 ? 'Tariff' : `Tariff · ${kpiSelectedTariffs.length}` }}</span>
+                    <span class="truncate">{{ kpiSelectedTariffs.length === 0 ? 'Tariff' : kpiSelectedTariffs.length === 1 ? `Tariff (${kpiSelectedTariffs[0]})` : `Tariff · ${kpiSelectedTariffs.length}` }}</span>
                   </div>
                   <ChevronDown class="w-3 h-3 shrink-0 ml-0.5 opacity-60" />
                 </button>
@@ -2978,10 +3010,10 @@ const exportWithdrawalExcel = async () => {
               </div>
 
               <!-- 4. Group Filter Dropdown -->
-              <div class="relative">
+              <div class="kpi-dropdown-container relative">
                 <button
                   type="button"
-                  @click="toggleKpiDropdown('group')"
+                  @click.stop="toggleKpiDropdown('group')"
                   class="w-full h-8 px-2 rounded-lg font-semibold flex items-center justify-between cursor-pointer border transition-colors"
                   :class="kpiSelectedGroups.length > 0
                     ? 'bg-blue-50 dark:bg-blue-950/40 border-blue-300 dark:border-blue-800 text-blue-700 dark:text-blue-300 font-bold'
@@ -2989,7 +3021,7 @@ const exportWithdrawalExcel = async () => {
                 >
                   <div class="flex items-center gap-1.5 truncate">
                     <Users class="w-3.5 h-3.5 shrink-0 opacity-70" />
-                    <span class="truncate">{{ kpiSelectedGroups.length === 0 ? 'Group' : `Group · ${kpiSelectedGroups.length}` }}</span>
+                    <span class="truncate">{{ kpiSelectedGroups.length === 0 ? 'Group' : kpiSelectedGroups.length === 1 ? `Group (${kpiSelectedGroups[0]})` : `Group · ${kpiSelectedGroups.length}` }}</span>
                   </div>
                   <ChevronDown class="w-3 h-3 shrink-0 ml-0.5 opacity-60" />
                 </button>
@@ -3012,10 +3044,10 @@ const exportWithdrawalExcel = async () => {
               </div>
 
               <!-- 5. Coordinator Filter Dropdown -->
-              <div class="relative">
+              <div class="kpi-dropdown-container relative">
                 <button
                   type="button"
-                  @click="toggleKpiDropdown('coordinator')"
+                  @click.stop="toggleKpiDropdown('coordinator')"
                   class="w-full h-8 px-2 rounded-lg font-semibold flex items-center justify-between cursor-pointer border transition-colors"
                   :class="kpiSelectedCoordinators.length > 0
                     ? 'bg-blue-50 dark:bg-blue-950/40 border-blue-300 dark:border-blue-800 text-blue-700 dark:text-blue-300 font-bold'
@@ -3023,7 +3055,7 @@ const exportWithdrawalExcel = async () => {
                 >
                   <div class="flex items-center gap-1.5 truncate">
                     <Contact class="w-3.5 h-3.5 shrink-0 opacity-70" />
-                    <span class="truncate">{{ kpiSelectedCoordinators.length === 0 ? 'Coordinator' : `Coord · ${kpiSelectedCoordinators.length}` }}</span>
+                    <span class="truncate">{{ kpiSelectedCoordinators.length === 0 ? 'Coordinator' : kpiSelectedCoordinators.length === 1 ? `Coord (${kpiSelectedCoordinators[0]})` : `Coord · ${kpiSelectedCoordinators.length}` }}</span>
                   </div>
                   <ChevronDown class="w-3 h-3 shrink-0 ml-0.5 opacity-60" />
                 </button>
@@ -3046,10 +3078,10 @@ const exportWithdrawalExcel = async () => {
               </div>
 
               <!-- 6. Level Filter Dropdown -->
-              <div class="relative">
+              <div class="kpi-dropdown-container relative">
                 <button
                   type="button"
-                  @click="toggleKpiDropdown('level')"
+                  @click.stop="toggleKpiDropdown('level')"
                   class="w-full h-8 px-2 rounded-lg font-semibold flex items-center justify-between cursor-pointer border transition-colors"
                   :class="kpiSelectedLevels.length > 0
                     ? 'bg-blue-50 dark:bg-blue-950/40 border-blue-300 dark:border-blue-800 text-blue-700 dark:text-blue-300 font-bold'
@@ -3057,7 +3089,7 @@ const exportWithdrawalExcel = async () => {
                 >
                   <div class="flex items-center gap-1.5 truncate">
                     <GraduationCap class="w-3.5 h-3.5 shrink-0 opacity-70" />
-                    <span class="truncate">{{ kpiSelectedLevels.length === 0 ? 'Level' : `Level · ${kpiSelectedLevels.length}` }}</span>
+                    <span class="truncate">{{ kpiSelectedLevels.length === 0 ? 'Level' : kpiSelectedLevels.length === 1 ? `Level (${kpiSelectedLevels[0]})` : `Level · ${kpiSelectedLevels.length}` }}</span>
                   </div>
                   <ChevronDown class="w-3 h-3 shrink-0 ml-0.5 opacity-60" />
                 </button>
@@ -3080,10 +3112,10 @@ const exportWithdrawalExcel = async () => {
               </div>
 
               <!-- 7. ID Prefix Filter Dropdown -->
-              <div class="relative">
+              <div class="kpi-dropdown-container relative">
                 <button
                   type="button"
-                  @click="toggleKpiDropdown('id')"
+                  @click.stop="toggleKpiDropdown('id')"
                   class="w-full h-8 px-2 rounded-lg font-semibold flex items-center justify-between cursor-pointer border transition-colors"
                   :class="kpiSelectedIds.length > 0
                     ? 'bg-blue-50 dark:bg-blue-950/40 border-blue-300 dark:border-blue-800 text-blue-700 dark:text-blue-300 font-bold'
@@ -3114,10 +3146,10 @@ const exportWithdrawalExcel = async () => {
               </div>
 
               <!-- 8. Payment Method Filter (for collected & withdraw) -->
-              <div v-if="activeKpiModal === 'collected' || activeKpiModal === 'withdraw'" class="relative">
+              <div v-if="activeKpiModal === 'collected' || activeKpiModal === 'withdraw'" class="kpi-dropdown-container relative">
                 <button
                   type="button"
-                  @click="toggleKpiDropdown('method')"
+                  @click.stop="toggleKpiDropdown('method')"
                   class="w-full h-8 px-2 rounded-lg font-semibold flex items-center justify-between cursor-pointer border transition-colors"
                   :class="kpiSelectedMethods.length > 0
                     ? 'bg-blue-50 dark:bg-blue-950/40 border-blue-300 dark:border-blue-800 text-blue-700 dark:text-blue-300 font-bold'
@@ -3125,7 +3157,7 @@ const exportWithdrawalExcel = async () => {
                 >
                   <div class="flex items-center gap-1.5 truncate">
                     <CreditCard class="w-3.5 h-3.5 shrink-0 opacity-70" />
-                    <span class="truncate">{{ kpiSelectedMethods.length === 0 ? 'Method' : `Method · ${kpiSelectedMethods.length}` }}</span>
+                    <span class="truncate">{{ kpiSelectedMethods.length === 0 ? 'Method' : kpiSelectedMethods.length === 1 ? `Method (${kpiSelectedMethods[0]})` : `Method · ${kpiSelectedMethods.length}` }}</span>
                   </div>
                   <ChevronDown class="w-3 h-3 shrink-0 ml-0.5 opacity-60" />
                 </button>
@@ -3148,10 +3180,10 @@ const exportWithdrawalExcel = async () => {
               </div>
 
               <!-- 9. Receiver / Staff Filter (for collected, discount, withdraw) -->
-              <div v-if="activeKpiModal !== 'debt'" class="relative">
+              <div v-if="activeKpiModal !== 'debt'" class="kpi-dropdown-container relative">
                 <button
                   type="button"
-                  @click="toggleKpiDropdown('receiver')"
+                  @click.stop="toggleKpiDropdown('receiver')"
                   class="w-full h-8 px-2 rounded-lg font-semibold flex items-center justify-between cursor-pointer border transition-colors"
                   :class="kpiSelectedReceivers.length > 0
                     ? 'bg-blue-50 dark:bg-blue-950/40 border-blue-300 dark:border-blue-800 text-blue-700 dark:text-blue-300 font-bold'
@@ -3159,7 +3191,7 @@ const exportWithdrawalExcel = async () => {
                 >
                   <div class="flex items-center gap-1.5 truncate">
                     <Contact class="w-3.5 h-3.5 shrink-0 opacity-70" />
-                    <span class="truncate">{{ kpiSelectedReceivers.length === 0 ? 'Receiver' : `Rec · ${kpiSelectedReceivers.length}` }}</span>
+                    <span class="truncate">{{ kpiSelectedReceivers.length === 0 ? 'Receiver' : kpiSelectedReceivers.length === 1 ? `Rec (${kpiSelectedReceivers[0]})` : `Rec · ${kpiSelectedReceivers.length}` }}</span>
                   </div>
                   <ChevronDown class="w-3 h-3 shrink-0 ml-0.5 opacity-60" />
                 </button>

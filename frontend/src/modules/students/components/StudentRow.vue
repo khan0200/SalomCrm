@@ -160,13 +160,13 @@ const universities = computed(() => {
         <div class="group/doc relative inline-flex items-center justify-center">
           <span
             v-if="isDocumentComplete"
-            class="inline-flex items-center justify-center w-4 h-4 rounded-full bg-emerald-500 text-white text-[9px] font-bold shadow-xs shrink-0 cursor-help"
+            class="inline-flex items-center justify-center w-4 h-4 rounded-full bg-emerald-500 text-white text-[9px] font-bold shadow-xs shrink-0 cursor-default"
           >
             ✓
           </span>
           <span
             v-else
-            class="inline-flex items-center justify-center w-4 h-4 rounded-full bg-amber-500 text-white text-[9px] font-black shadow-xs shrink-0 cursor-help"
+            class="inline-flex items-center justify-center w-4 h-4 rounded-full bg-amber-500 text-white text-[9px] font-black shadow-xs shrink-0 cursor-default"
           >
             !
           </span>
@@ -188,7 +188,7 @@ const universities = computed(() => {
           class="group/office relative inline-flex items-center justify-center"
         >
           <span
-            class="inline-flex items-center justify-center w-4.5 h-4.5 rounded-full bg-blue-500/15 dark:bg-blue-500/25 text-blue-600 dark:text-blue-400 shrink-0 transition-transform hover:scale-110 cursor-help"
+            class="inline-flex items-center justify-center w-4.5 h-4.5 rounded-full bg-blue-500/15 dark:bg-blue-500/25 text-blue-600 dark:text-blue-400 shrink-0 transition-transform hover:scale-110 cursor-default"
           >
             <component :is="getOfficeIcon(student.office)" class="w-2.5 h-2.5 stroke-[2.4]" />
           </span>
