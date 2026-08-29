@@ -354,6 +354,12 @@ const formatDate = (dateStr?: string) => {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
+const handlePrint = () => {
+  if (typeof window !== 'undefined') {
+    window.print()
+  }
+}
+
 // ── Export Financial Report to Excel ─────────────────────────────────
 const exportFinanceReportToExcel = async () => {
   if (sortedFilteredPayments.value.length === 0) {
@@ -1006,7 +1012,7 @@ const exportFinanceReportToExcel = async () => {
           <div class="flex items-center justify-end gap-2 pt-2 border-t border-zinc-100 dark:border-zinc-800">
             <button
               type="button"
-              @click="window.print()"
+              @click="handlePrint"
               class="flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition-colors cursor-pointer"
             >
               <Printer class="h-4 w-4" />

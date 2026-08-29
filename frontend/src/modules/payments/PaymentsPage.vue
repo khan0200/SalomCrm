@@ -743,7 +743,7 @@ const exportStudentOverviewToExcel = async () => {
   const excelData = sortedStudents.value.map((s, index) => {
     const balance = Number(s.balance) || 0
     const discount = Number(s.discount) || 0
-    const paid = Number(s.paid_amount ?? (s as any).total_paid ?? 0)
+    const paid = Number(s.payments_sum ?? (s as any).paid_amount ?? 0)
     let tariffName = s.tariff || 'No Tariff'
     if (s.tariff === 'E-VISA') {
       tariffName += (s.language_certificate && s.language_certificate !== 'NO CERTIFICATE')
@@ -758,10 +758,9 @@ const exportStudentOverviewToExcel = async () => {
       No: index + 1,
       'Student ID': s.id || '',
       'Full Name': s.full_name || '',
-      'Phone': s.phone || '',
+      'Phone': s.phone1 || s.phone2 || '',
       'Group': s.student_group || 'No Group',
       'Tariff': tariffName,
-      'Tariff Price (UZS)': s.tariff_price ? Number(s.tariff_price) : '',
       'Paid Amount (UZS)': paid,
       'Discount (UZS)': discount,
       'Balance (UZS)': balance,
@@ -777,7 +776,6 @@ const exportStudentOverviewToExcel = async () => {
     { wch: 18 },  // Phone
     { wch: 15 },  // Group
     { wch: 25 },  // Tariff
-    { wch: 18 },  // Tariff Price
     { wch: 18 },  // Paid Amount
     { wch: 16 },  // Discount
     { wch: 18 },  // Balance
