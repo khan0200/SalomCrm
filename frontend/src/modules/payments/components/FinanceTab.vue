@@ -6,7 +6,8 @@ import {
   FileSpreadsheet, Filter, Calendar, Search, ArrowUpRight,
   ArrowDownRight, Percent, Wallet, CreditCard, Lock,
   ChevronDown, ChevronUp, Printer, Copy, Check, X,
-  Clock, Tag, RefreshCw, UserCheck, GraduationCap, Hash, RotateCcw
+  Clock, Tag, RefreshCw, UserCheck, GraduationCap, Hash, RotateCcw,
+  ExternalLink, Download, Phone, ArrowRight
 } from 'lucide-vue-next'
 
 const props = defineProps<{
@@ -896,6 +897,297 @@ const exportFinanceReportToExcel = async () => {
   const filename = `Finance_Report_${selectedDatePreset.value}_${dateStr}.xlsx`
   XLSX.writeFile(wb, filename)
 }
+
+// ── KPI Details Modal State ──────────────────────────────────────────
+const activeKpiModal = ref<'collected' | 'debt' | 'discount' | 'withdraw' | null>(null)
+const kpiModalSearch = ref('')
+const kpiModalPage = ref(1)
+const KPI_PAGE_SIZE = 15
+
+const openKpiModal = (type: 'collected' | 'debt' | 'discount' | 'withdraw') => {
+  activeKpiModal.value = type
+  kpiModalSearch.value = ''
+  kpiModalPage.value = 1
+}
+
+const closeKpiModal = () => {
+  activeKpiModal.value = null
+  kpiModalSearch.value = ''
+  kpiModalPage.value = 1
+}
+
+// 1. Collected Data
+const collectedTransactions = computed(() => {
+  return sortedFilteredPayments.value.filter(p => !p.is_withdrawal && !p.is_discount)
+})
+const filteredCollectedModalList = computed(() => {
+  const q = kpiModalSearch.value.trim().toLowerCase()
+  if (!q) return collectedTransactions.value
+  return collectedTransactions.value.filter(p => {
+    return (
+      (p.student_full_name || p.student_name || '').toLowerCase().includes(q) ||
+      (p.student_id || '').toLowerCase().includes(q) ||
+      (p.method || '').toLowerCase().includes(q) ||
+      (p.received_by || '').toLowerCase().includes(q) ||
+      (p.notes || '').toLowerCase().includes(q)
+    )
+  })
+})
+const paginatedCollectedModalList = computed(() => {
+  const start = (kpiModalPage.value - 1) * KPI_PAGE_SIZE
+  return filteredCollectedModalList.value.slice(start, start + KPI_PAGE_SIZE)
+})
+const totalCollectedModalAmount = computed(() => {
+  return filteredCollectedModalList.value.reduce((sum, p) => sum + (Number(p.amount) || 0), 0)
+})
+
+// 2. Debt Data (Debtor students)
+const debtorStudentsList = computed(() => {
+  return props.students
+    .filter(s => {
+      const bal = Number(s.balance) || 0
+      if (bal >= 0) return false
+      return matchesStudentCriteria(s.id)
+    })
+    .sort((a, b) => (Number(a.balance) || 0) - (Number(b.balance) || 0))
+})
+const filteredDebtModalList = computed(() => {
+  const q = kpiModalSearch.value.trim().toLowerCase()
+  if (!q) return debtorStudentsList.value
+  return debtorStudentsList.value.filter(s => {
+    return (
+      (s.full_name || '').toLowerCase().includes(q) ||
+      (s.id || '').toLowerCase().includes(q) ||
+      (s.phone1 || '').toLowerCase().includes(q) ||
+      (s.tariff || '').toLowerCase().includes(q) ||
+      (s.student_group || '').toLowerCase().includes(q) ||
+      (s.coordinator || '').toLowerCase().includes(q)
+    )
+  })
+})
+const paginatedDebtModalList = computed(() => {
+  const start = (kpiModalPage.value - 1) * KPI_PAGE_SIZE
+  return filteredDebtModalList.value.slice(start, start + KPI_PAGE_SIZE)
+})
+const totalDebtModalAmount = computed(() => {
+  return filteredDebtModalList.value.reduce((sum, s) => sum + Math.abs(Number(s.balance) || 0), 0)
+})
+
+// 3. Discount Data
+const discountTransactions = computed(() => {
+  return sortedFilteredPayments.value.filter(p => p.is_discount)
+})
+const filteredDiscountModalList = computed(() => {
+  const q = kpiModalSearch.value.trim().toLowerCase()
+  if (!q) return discountTransactions.value
+  return discountTransactions.value.filter(p => {
+    return (
+      (p.student_full_name || p.student_name || '').toLowerCase().includes(q) ||
+      (p.student_id || '').toLowerCase().includes(q) ||
+      (p.received_by || '').toLowerCase().includes(q) ||
+      (p.notes || '').toLowerCase().includes(q)
+    )
+  })
+})
+const paginatedDiscountModalList = computed(() => {
+  const start = (kpiModalPage.value - 1) * KPI_PAGE_SIZE
+  return filteredDiscountModalList.value.slice(start, start + KPI_PAGE_SIZE)
+})
+const totalDiscountModalAmount = computed(() => {
+  return filteredDiscountModalList.value.reduce((sum, p) => sum + Math.abs(Number(p.amount) || 0), 0)
+})
+
+// 4. Withdrawal Data
+const withdrawalTransactions = computed(() => {
+  return sortedFilteredPayments.value.filter(p => p.is_withdrawal)
+})
+const filteredWithdrawalModalList = computed(() => {
+  const q = kpiModalSearch.value.trim().toLowerCase()
+  if (!q) return withdrawalTransactions.value
+  return withdrawalTransactions.value.filter(p => {
+    return (
+      (p.student_full_name || p.student_name || '').toLowerCase().includes(q) ||
+      (p.student_id || '').toLowerCase().includes(q) ||
+      (p.method || '').toLowerCase().includes(q) ||
+      (p.received_by || '').toLowerCase().includes(q) ||
+      (p.notes || '').toLowerCase().includes(q)
+    )
+  })
+})
+const paginatedWithdrawalModalList = computed(() => {
+  const start = (kpiModalPage.value - 1) * KPI_PAGE_SIZE
+  return filteredWithdrawalModalList.value.slice(start, start + KPI_PAGE_SIZE)
+})
+const totalWithdrawalModalAmount = computed(() => {
+  return filteredWithdrawalModalList.value.reduce((sum, p) => sum + Math.abs(Number(p.amount) || 0), 0)
+})
+
+// ── Export Modal-Specific Excel Files ────────────────────────────────
+const exportCollectedExcel = async () => {
+  if (filteredCollectedModalList.value.length === 0) {
+    alert('No collected payment records to export!')
+    return
+  }
+  const XLSX = await import('xlsx-js-style')
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const formatDateTime = (dateStr?: string) => {
+    if (!dateStr) return ''
+    const d = new Date(dateStr)
+    if (isNaN(d.getTime())) return dateStr
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+  }
+
+  const data = filteredCollectedModalList.value.map((p, index) => {
+    const s = getStudent(p.student_id)
+    return {
+      No: index + 1,
+      'Receipt ID': p.id ? String(p.id).toUpperCase() : '',
+      'Student ID': p.student_id || '—',
+      'Student Full Name': p.student_full_name || p.student_name || 'General',
+      'Tariff': s?.tariff || '—',
+      'Group': s?.student_group || '—',
+      'Coordinator': s?.coordinator || '—',
+      'Level': s?.level || '—',
+      'Payment Method': p.method || '—',
+      'Received By': p.received_by || '—',
+      'Amount (UZS)': Number(p.amount) || 0,
+      'Date & Time': formatDateTime(p.created_at),
+      'Notes': p.notes || ''
+    }
+  })
+
+  const wb = XLSX.utils.book_new()
+  const ws = XLSX.utils.json_to_sheet(data)
+  ws['!cols'] = [
+    { wch: 6 }, { wch: 20 }, { wch: 14 }, { wch: 30 },
+    { wch: 18 }, { wch: 16 }, { wch: 18 }, { wch: 16 },
+    { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 20 }, { wch: 30 }
+  ]
+  XLSX.utils.book_append_sheet(wb, ws, 'Total Collected')
+  const dateStr = new Date().toISOString().split('T')[0]
+  XLSX.writeFile(wb, `Collected_Payments_${selectedDatePreset.value}_${dateStr}.xlsx`)
+}
+
+const exportDebtExcel = async () => {
+  if (filteredDebtModalList.value.length === 0) {
+    alert('No debtor student records to export!')
+    return
+  }
+  const XLSX = await import('xlsx-js-style')
+  const data = filteredDebtModalList.value.map((s, index) => {
+    return {
+      No: index + 1,
+      'Student ID': s.id || '—',
+      'Student Full Name': s.full_name || '—',
+      'Phone Number': s.phone1 || '—',
+      'Tariff': s.tariff || '—',
+      'Group': s.student_group || '—',
+      'Coordinator': s.coordinator || '—',
+      'Level': s.level || '—',
+      'Outstanding Debt (UZS)': Math.abs(Number(s.balance) || 0),
+      'Discount (UZS)': Number(s.discount) || 0,
+      'Status': s.is_deleted ? 'Archive' : 'Active'
+    }
+  })
+
+  const wb = XLSX.utils.book_new()
+  const ws = XLSX.utils.json_to_sheet(data)
+  ws['!cols'] = [
+    { wch: 6 }, { wch: 14 }, { wch: 30 }, { wch: 18 },
+    { wch: 18 }, { wch: 16 }, { wch: 18 }, { wch: 16 },
+    { wch: 22 }, { wch: 18 }, { wch: 12 }
+  ]
+  XLSX.utils.book_append_sheet(wb, ws, 'Outstanding Debtors')
+  const dateStr = new Date().toISOString().split('T')[0]
+  XLSX.writeFile(wb, `Outstanding_Debt_Report_${dateStr}.xlsx`)
+}
+
+const exportDiscountExcel = async () => {
+  if (filteredDiscountModalList.value.length === 0) {
+    alert('No discount records to export!')
+    return
+  }
+  const XLSX = await import('xlsx-js-style')
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const formatDateTime = (dateStr?: string) => {
+    if (!dateStr) return ''
+    const d = new Date(dateStr)
+    if (isNaN(d.getTime())) return dateStr
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+  }
+
+  const data = filteredDiscountModalList.value.map((p, index) => {
+    const s = getStudent(p.student_id)
+    return {
+      No: index + 1,
+      'Record ID': p.id ? String(p.id).toUpperCase() : '',
+      'Student ID': p.student_id || '—',
+      'Student Full Name': p.student_full_name || p.student_name || 'General',
+      'Tariff': s?.tariff || '—',
+      'Group': s?.student_group || '—',
+      'Coordinator': s?.coordinator || '—',
+      'Discount Amount (UZS)': Math.abs(Number(p.amount) || 0),
+      'Granted By': p.received_by || '—',
+      'Date & Time': formatDateTime(p.created_at),
+      'Reason / Notes': p.notes || ''
+    }
+  })
+
+  const wb = XLSX.utils.book_new()
+  const ws = XLSX.utils.json_to_sheet(data)
+  ws['!cols'] = [
+    { wch: 6 }, { wch: 20 }, { wch: 14 }, { wch: 30 },
+    { wch: 18 }, { wch: 16 }, { wch: 18 }, { wch: 22 },
+    { wch: 18 }, { wch: 20 }, { wch: 30 }
+  ]
+  XLSX.utils.book_append_sheet(wb, ws, 'Discounts Given')
+  const dateStr = new Date().toISOString().split('T')[0]
+  XLSX.writeFile(wb, `Discounts_Report_${selectedDatePreset.value}_${dateStr}.xlsx`)
+}
+
+const exportWithdrawalExcel = async () => {
+  if (filteredWithdrawalModalList.value.length === 0) {
+    alert('No withdrawal records to export!')
+    return
+  }
+  const XLSX = await import('xlsx-js-style')
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const formatDateTime = (dateStr?: string) => {
+    if (!dateStr) return ''
+    const d = new Date(dateStr)
+    if (isNaN(d.getTime())) return dateStr
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+  }
+
+  const data = filteredWithdrawalModalList.value.map((p, index) => {
+    const s = getStudent(p.student_id)
+    return {
+      No: index + 1,
+      'Withdrawal ID': p.id ? String(p.id).toUpperCase() : '',
+      'Student ID': p.student_id || '—',
+      'Student Full Name': p.student_full_name || p.student_name || 'General',
+      'Tariff': s?.tariff || '—',
+      'Group': s?.student_group || '—',
+      'Coordinator': s?.coordinator || '—',
+      'Payment Method': p.method || '—',
+      'Authorized / Processed By': p.received_by || '—',
+      'Withdrawal Amount (UZS)': Math.abs(Number(p.amount) || 0),
+      'Date & Time': formatDateTime(p.created_at),
+      'Reason / Notes': p.notes || ''
+    }
+  })
+
+  const wb = XLSX.utils.book_new()
+  const ws = XLSX.utils.json_to_sheet(data)
+  ws['!cols'] = [
+    { wch: 6 }, { wch: 20 }, { wch: 14 }, { wch: 30 },
+    { wch: 18 }, { wch: 16 }, { wch: 18 }, { wch: 18 },
+    { wch: 22 }, { wch: 22 }, { wch: 20 }, { wch: 30 }
+  ]
+  XLSX.utils.book_append_sheet(wb, ws, 'Withdrawals')
+  const dateStr = new Date().toISOString().split('T')[0]
+  XLSX.writeFile(wb, `Withdrawals_Report_${selectedDatePreset.value}_${dateStr}.xlsx`)
+}
 </script>
 
 <template>
@@ -947,12 +1239,18 @@ const exportFinanceReportToExcel = async () => {
     <!-- ── KPI Cards Grid ──────────────────────────────────────────────── -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
       <!-- 1. Total Collected (Today & This Month) -->
-      <div class="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-[#111315] p-4 shadow-2xs flex flex-col justify-between relative overflow-hidden">
+      <div
+        @click="openKpiModal('collected')"
+        class="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-[#111315] p-4 shadow-2xs flex flex-col justify-between relative overflow-hidden cursor-pointer hover:border-blue-400 dark:hover:border-blue-600 hover:shadow-md transition-all group"
+      >
         <div class="flex items-start justify-between">
           <div>
-            <span class="text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-              Total Collected
-            </span>
+            <div class="flex items-center gap-1.5">
+              <span class="text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                Total Collected
+              </span>
+              <ExternalLink class="h-3 w-3 text-zinc-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+            </div>
             <div class="mt-1 flex items-baseline gap-1">
               <span class="text-xl font-extrabold text-zinc-900 dark:text-zinc-100 font-mono tracking-tight">
                 {{ formatUZS(thisMonthMetrics.collected) }}
@@ -963,7 +1261,7 @@ const exportFinanceReportToExcel = async () => {
               This Month ({{ thisMonthMetrics.count }} payments)
             </span>
           </div>
-          <div class="h-9 w-9 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center">
+          <div class="h-9 w-9 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center group-hover:scale-110 transition-transform">
             <TrendingUp class="h-4.5 w-4.5" />
           </div>
         </div>
@@ -977,12 +1275,18 @@ const exportFinanceReportToExcel = async () => {
       </div>
 
       <!-- 2. Total Outstanding Debt -->
-      <div class="rounded-2xl border border-red-200/60 dark:border-red-950/50 bg-white dark:bg-[#111315] p-4 shadow-2xs flex flex-col justify-between relative overflow-hidden">
+      <div
+        @click="openKpiModal('debt')"
+        class="rounded-2xl border border-red-200/60 dark:border-red-950/50 bg-white dark:bg-[#111315] p-4 shadow-2xs flex flex-col justify-between relative overflow-hidden cursor-pointer hover:border-red-400 dark:hover:border-red-600 hover:shadow-md transition-all group"
+      >
         <div class="flex items-start justify-between">
           <div>
-            <span class="text-[11px] font-bold uppercase tracking-wider text-red-600 dark:text-red-400">
-              Outstanding Debt
-            </span>
+            <div class="flex items-center gap-1.5">
+              <span class="text-[11px] font-bold uppercase tracking-wider text-red-600 dark:text-red-400">
+                Outstanding Debt
+              </span>
+              <ExternalLink class="h-3 w-3 text-red-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+            </div>
             <div class="mt-1 flex items-baseline gap-1">
               <span class="text-xl font-extrabold text-red-600 dark:text-red-400 font-mono tracking-tight">
                 -{{ formatUZS(debtMetrics.totalDebt) }}
@@ -993,7 +1297,7 @@ const exportFinanceReportToExcel = async () => {
               Across {{ debtMetrics.debtorCount }} debtor students
             </span>
           </div>
-          <div class="h-9 w-9 rounded-xl bg-red-500/10 text-red-600 dark:text-red-400 flex items-center justify-center">
+          <div class="h-9 w-9 rounded-xl bg-red-500/10 text-red-600 dark:text-red-400 flex items-center justify-center group-hover:scale-110 transition-transform">
             <AlertCircle class="h-4.5 w-4.5" />
           </div>
         </div>
@@ -1007,12 +1311,18 @@ const exportFinanceReportToExcel = async () => {
       </div>
 
       <!-- 3. Total Discounts Given -->
-      <div class="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-[#111315] p-4 shadow-2xs flex flex-col justify-between relative overflow-hidden">
+      <div
+        @click="openKpiModal('discount')"
+        class="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-[#111315] p-4 shadow-2xs flex flex-col justify-between relative overflow-hidden cursor-pointer hover:border-pink-400 dark:hover:border-pink-600 hover:shadow-md transition-all group"
+      >
         <div class="flex items-start justify-between">
           <div>
-            <span class="text-[11px] font-bold uppercase tracking-wider text-pink-600 dark:text-pink-400">
-              Discounts Given
-            </span>
+            <div class="flex items-center gap-1.5">
+              <span class="text-[11px] font-bold uppercase tracking-wider text-pink-600 dark:text-pink-400">
+                Discounts Given
+              </span>
+              <ExternalLink class="h-3 w-3 text-pink-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+            </div>
             <div class="mt-1 flex items-baseline gap-1">
               <span class="text-xl font-extrabold text-pink-600 dark:text-pink-400 font-mono tracking-tight">
                 {{ formatUZS(periodMetrics.totalDiscounts) }}
@@ -1023,7 +1333,7 @@ const exportFinanceReportToExcel = async () => {
               In selected period ({{ periodMetrics.discountTxCount }} promos)
             </span>
           </div>
-          <div class="h-9 w-9 rounded-xl bg-pink-500/10 text-pink-600 dark:text-pink-400 flex items-center justify-center">
+          <div class="h-9 w-9 rounded-xl bg-pink-500/10 text-pink-600 dark:text-pink-400 flex items-center justify-center group-hover:scale-110 transition-transform">
             <Percent class="h-4.5 w-4.5" />
           </div>
         </div>
@@ -1037,12 +1347,18 @@ const exportFinanceReportToExcel = async () => {
       </div>
 
       <!-- 4. Total Withdrawals & Net Cashflow -->
-      <div class="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-[#111315] p-4 shadow-2xs flex flex-col justify-between relative overflow-hidden">
+      <div
+        @click="openKpiModal('withdraw')"
+        class="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-[#111315] p-4 shadow-2xs flex flex-col justify-between relative overflow-hidden cursor-pointer hover:border-amber-400 dark:hover:border-amber-600 hover:shadow-md transition-all group"
+      >
         <div class="flex items-start justify-between">
           <div>
-            <span class="text-[11px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
-              Total Withdrawals
-            </span>
+            <div class="flex items-center gap-1.5">
+              <span class="text-[11px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
+                Total Withdrawals
+              </span>
+              <ExternalLink class="h-3 w-3 text-amber-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+            </div>
             <div class="mt-1 flex items-baseline gap-1">
               <span class="text-xl font-extrabold text-amber-600 dark:text-amber-400 font-mono tracking-tight">
                 -{{ formatUZS(periodMetrics.totalWithdrawals) }}
@@ -1053,7 +1369,7 @@ const exportFinanceReportToExcel = async () => {
               {{ periodMetrics.withdrawalTxCount }} refunds/deductions
             </span>
           </div>
-          <div class="h-9 w-9 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center">
+          <div class="h-9 w-9 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center group-hover:scale-110 transition-transform">
             <TrendingDown class="h-4.5 w-4.5" />
           </div>
         </div>
@@ -1960,6 +2276,444 @@ const exportFinanceReportToExcel = async () => {
             >
               Close
             </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- ── KPI Detail Modal (Collected / Debt / Discount / Withdraw) ──────── -->
+    <Teleport to="body">
+      <div
+        v-if="activeKpiModal"
+        class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/65 backdrop-blur-xs select-none"
+      >
+        <div class="relative w-full max-w-5xl max-h-[90vh] rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121417] shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+          
+          <!-- Modal Header -->
+          <div class="px-5 py-4 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between gap-4 bg-zinc-50/50 dark:bg-zinc-900/30">
+            <div class="flex items-center gap-3">
+              <div
+                class="h-10 w-10 rounded-xl flex items-center justify-center shadow-xs shrink-0"
+                :class="[
+                  activeKpiModal === 'collected' ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400' :
+                  activeKpiModal === 'debt' ? 'bg-red-500/10 text-red-600 dark:text-red-400' :
+                  activeKpiModal === 'discount' ? 'bg-pink-500/10 text-pink-600 dark:text-pink-400' :
+                  'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                ]"
+              >
+                <TrendingUp v-if="activeKpiModal === 'collected'" class="h-5 w-5" />
+                <AlertCircle v-else-if="activeKpiModal === 'debt'" class="h-5 w-5" />
+                <Percent v-else-if="activeKpiModal === 'discount'" class="h-5 w-5" />
+                <TrendingDown v-else-if="activeKpiModal === 'withdraw'" class="h-5 w-5" />
+              </div>
+
+              <div>
+                <div class="flex items-center gap-2">
+                  <h3 class="text-sm font-bold text-zinc-900 dark:text-zinc-100">
+                    {{
+                      activeKpiModal === 'collected' ? 'Total Collected Payments' :
+                      activeKpiModal === 'debt' ? 'Outstanding Debtors Register' :
+                      activeKpiModal === 'discount' ? 'Discounts Given Breakdown' :
+                      'Total Withdrawals & Refunds'
+                    }}
+                  </h3>
+                  <span
+                    class="px-2 py-0.5 rounded-full text-[10.5px] font-mono font-bold"
+                    :class="[
+                      activeKpiModal === 'collected' ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400' :
+                      activeKpiModal === 'debt' ? 'bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400' :
+                      activeKpiModal === 'discount' ? 'bg-pink-50 dark:bg-pink-950/40 text-pink-600 dark:text-pink-400' :
+                      'bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400'
+                    ]"
+                  >
+                    {{
+                      activeKpiModal === 'collected' ? `${filteredCollectedModalList.length} payments` :
+                      activeKpiModal === 'debt' ? `${filteredDebtModalList.length} debtor students` :
+                      activeKpiModal === 'discount' ? `${filteredDiscountModalList.length} discounts` :
+                      `${filteredWithdrawalModalList.length} withdrawals`
+                    }}
+                  </span>
+                </div>
+                <p class="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">
+                  Filtered by active date range ({{ selectedDatePreset.replace('_', ' ') }}) and student criteria.
+                </p>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-2">
+              <button
+                type="button"
+                @click="
+                  activeKpiModal === 'collected' ? exportCollectedExcel() :
+                  activeKpiModal === 'debt' ? exportDebtExcel() :
+                  activeKpiModal === 'discount' ? exportDiscountExcel() :
+                  exportWithdrawalExcel()
+                "
+                class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl border border-emerald-300 dark:border-emerald-700/60 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-all cursor-pointer shadow-2xs"
+                title="Download Itemized Excel Report"
+              >
+                <Download class="h-3.5 w-3.5" />
+                <span>Download Excel</span>
+              </button>
+
+              <button
+                type="button"
+                @click="closeKpiModal"
+                class="p-1.5 rounded-xl text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+              >
+                <X class="h-4.5 w-4.5" />
+              </button>
+            </div>
+          </div>
+
+          <!-- Search & Summary Bar -->
+          <div class="px-5 py-3 border-b border-zinc-100 dark:border-zinc-800 flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-[#121417]">
+            <div class="relative flex-1 min-w-[240px]">
+              <Search class="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-400 pointer-events-none" />
+              <input
+                type="text"
+                v-model="kpiModalSearch"
+                placeholder="Search by student name, ID, phone, method, notes..."
+                class="w-full pl-8 pr-3 py-1.5 text-xs border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-850 rounded-lg text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:border-blue-500"
+              />
+            </div>
+
+            <!-- Metric Sum Badge -->
+            <div class="flex items-center gap-2">
+              <span class="text-zinc-500 dark:text-zinc-400 text-xs">Total Amount:</span>
+              <span
+                class="px-2.5 py-1 rounded-lg text-xs font-mono font-extrabold"
+                :class="[
+                  activeKpiModal === 'collected' ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400' :
+                  activeKpiModal === 'debt' ? 'bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400' :
+                  activeKpiModal === 'discount' ? 'bg-pink-50 dark:bg-pink-950/40 text-pink-600 dark:text-pink-400' :
+                  'bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400'
+                ]"
+              >
+                {{
+                  activeKpiModal === 'collected' ? `+${formatUZS(totalCollectedModalAmount)} UZS` :
+                  activeKpiModal === 'debt' ? `-${formatUZS(totalDebtModalAmount)} UZS` :
+                  activeKpiModal === 'discount' ? `${formatUZS(totalDiscountModalAmount)} UZS` :
+                  `-${formatUZS(totalWithdrawalModalAmount)} UZS`
+                }}
+              </span>
+            </div>
+          </div>
+
+          <!-- Modal Table Area -->
+          <div class="flex-1 overflow-y-auto max-h-[58vh]">
+            
+            <!-- 1. Collected Table -->
+            <table v-if="activeKpiModal === 'collected'" class="w-full border-collapse text-left text-xs">
+              <thead class="sticky top-0 z-10 bg-zinc-50 dark:bg-zinc-850/90 backdrop-blur-xs border-b border-zinc-200 dark:border-zinc-800 text-[11px] font-bold uppercase text-zinc-500 dark:text-zinc-400">
+                <tr>
+                  <th class="px-4 py-2.5 w-12 text-center">No</th>
+                  <th class="px-4 py-2.5">Student / ID</th>
+                  <th class="px-4 py-2.5">Method</th>
+                  <th class="px-4 py-2.5">Received By</th>
+                  <th class="px-4 py-2.5 text-right">Amount</th>
+                  <th class="px-4 py-2.5">Date & Time</th>
+                  <th class="px-4 py-2.5 text-center w-14">Receipt</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-zinc-100 dark:divide-zinc-800">
+                <tr
+                  v-for="(p, idx) in paginatedCollectedModalList"
+                  :key="p.id"
+                  class="hover:bg-zinc-50/80 dark:hover:bg-zinc-850/60 transition-colors"
+                >
+                  <td class="px-4 py-2.5 text-center font-mono text-zinc-400 text-[11px]">
+                    {{ (kpiModalPage - 1) * KPI_PAGE_SIZE + idx + 1 }}
+                  </td>
+                  <td class="px-4 py-2.5">
+                    <div class="flex flex-col gap-0.5">
+                      <span class="font-bold uppercase text-zinc-900 dark:text-zinc-100 truncate">
+                        {{ p.student_full_name || p.student_name || 'General' }}
+                      </span>
+                      <div class="flex items-center gap-1.5">
+                        <span class="font-mono font-bold text-[#0066cc] dark:text-blue-400 text-[11px]">
+                          {{ p.student_id || '—' }}
+                        </span>
+                        <span v-if="getStudent(p.student_id)?.tariff" class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 uppercase">
+                          {{ getStudent(p.student_id)?.tariff }}
+                        </span>
+                        <span v-if="getStudent(p.student_id)?.student_group" class="px-1.5 py-0.2 rounded text-[9px] font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 uppercase">
+                          {{ getStudent(p.student_id)?.student_group }}
+                        </span>
+                        <span v-if="getStudent(p.student_id)?.coordinator" class="px-1.5 py-0.2 rounded text-[9px] font-semibold bg-purple-500/10 text-purple-600 dark:text-purple-400 uppercase">
+                          {{ getStudent(p.student_id)?.coordinator }}
+                        </span>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="px-4 py-2.5 font-semibold uppercase text-zinc-700 dark:text-zinc-300">
+                    {{ p.method || '—' }}
+                  </td>
+                  <td class="px-4 py-2.5 font-medium uppercase text-zinc-500 dark:text-zinc-400">
+                    {{ p.received_by || '—' }}
+                  </td>
+                  <td class="px-4 py-2.5 text-right font-mono font-extrabold text-emerald-600 dark:text-emerald-400">
+                    +{{ formatUZS(Number(p.amount)) }} UZS
+                  </td>
+                  <td class="px-4 py-2.5 font-mono text-[11px] text-zinc-500 dark:text-zinc-400">
+                    {{ formatDate(p.created_at) }}
+                  </td>
+                  <td class="px-4 py-2.5 text-center">
+                    <button
+                      type="button"
+                      @click="viewingPayment = p"
+                      class="p-1 rounded-lg text-zinc-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 cursor-pointer"
+                      title="View Receipt"
+                    >
+                      <Printer class="h-4 w-4" />
+                    </button>
+                  </td>
+                </tr>
+                <tr v-if="filteredCollectedModalList.length === 0">
+                  <td colspan="7" class="px-4 py-8 text-center text-zinc-400">
+                    No collected payments found.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+
+            <!-- 2. Debt Table -->
+            <table v-else-if="activeKpiModal === 'debt'" class="w-full border-collapse text-left text-xs">
+              <thead class="sticky top-0 z-10 bg-zinc-50 dark:bg-zinc-850/90 backdrop-blur-xs border-b border-zinc-200 dark:border-zinc-800 text-[11px] font-bold uppercase text-zinc-500 dark:text-zinc-400">
+                <tr>
+                  <th class="px-4 py-2.5 w-12 text-center">No</th>
+                  <th class="px-4 py-2.5">Student / ID</th>
+                  <th class="px-4 py-2.5">Phone</th>
+                  <th class="px-4 py-2.5">Coordinator</th>
+                  <th class="px-4 py-2.5 text-right">Outstanding Debt</th>
+                  <th class="px-4 py-2.5 text-right">Discounts</th>
+                  <th class="px-4 py-2.5 text-center w-28">Action</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-zinc-100 dark:divide-zinc-800">
+                <tr
+                  v-for="(s, idx) in paginatedDebtModalList"
+                  :key="s.id"
+                  class="hover:bg-zinc-50/80 dark:hover:bg-zinc-850/60 transition-colors"
+                >
+                  <td class="px-4 py-2.5 text-center font-mono text-zinc-400 text-[11px]">
+                    {{ (kpiModalPage - 1) * KPI_PAGE_SIZE + idx + 1 }}
+                  </td>
+                  <td class="px-4 py-2.5">
+                    <div class="flex flex-col gap-0.5">
+                      <span class="font-bold uppercase text-zinc-900 dark:text-zinc-100 truncate">
+                        {{ s.full_name }}
+                      </span>
+                      <div class="flex items-center gap-1.5">
+                        <span class="font-mono font-bold text-[#0066cc] dark:text-blue-400 text-[11px]">
+                          {{ s.id }}
+                        </span>
+                        <span v-if="s.tariff" class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 uppercase">
+                          {{ s.tariff }}
+                        </span>
+                        <span v-if="s.student_group" class="px-1.5 py-0.2 rounded text-[9px] font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 uppercase">
+                          {{ s.student_group }}
+                        </span>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="px-4 py-2.5 font-mono text-zinc-600 dark:text-zinc-400 text-[11.5px]">
+                    {{ s.phone1 || '—' }}
+                  </td>
+                  <td class="px-4 py-2.5 font-semibold text-purple-600 dark:text-purple-400 uppercase">
+                    {{ s.coordinator || '—' }}
+                  </td>
+                  <td class="px-4 py-2.5 text-right font-mono font-extrabold text-red-600 dark:text-red-400 text-[13px]">
+                    -{{ formatUZS(Math.abs(Number(s.balance))) }} UZS
+                  </td>
+                  <td class="px-4 py-2.5 text-right font-mono text-zinc-500">
+                    {{ formatUZS(Number(s.discount) || 0) }} UZS
+                  </td>
+                  <td class="px-4 py-2.5 text-center">
+                    <button
+                      type="button"
+                      @click="emit('open-add-payment', s.id); closeKpiModal()"
+                      class="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors cursor-pointer shadow-xs"
+                    >
+                      <span>Pay</span>
+                      <ArrowRight class="h-3 w-3" />
+                    </button>
+                  </td>
+                </tr>
+                <tr v-if="filteredDebtModalList.length === 0">
+                  <td colspan="7" class="px-4 py-8 text-center text-zinc-400">
+                    No debtor students found matching criteria.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+
+            <!-- 3. Discount Table -->
+            <table v-else-if="activeKpiModal === 'discount'" class="w-full border-collapse text-left text-xs">
+              <thead class="sticky top-0 z-10 bg-zinc-50 dark:bg-zinc-850/90 backdrop-blur-xs border-b border-zinc-200 dark:border-zinc-800 text-[11px] font-bold uppercase text-zinc-500 dark:text-zinc-400">
+                <tr>
+                  <th class="px-4 py-2.5 w-12 text-center">No</th>
+                  <th class="px-4 py-2.5">Student / ID</th>
+                  <th class="px-4 py-2.5 text-right">Discount Amount</th>
+                  <th class="px-4 py-2.5">Granted By</th>
+                  <th class="px-4 py-2.5">Reason / Notes</th>
+                  <th class="px-4 py-2.5">Date & Time</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-zinc-100 dark:divide-zinc-800">
+                <tr
+                  v-for="(p, idx) in paginatedDiscountModalList"
+                  :key="p.id"
+                  class="hover:bg-zinc-50/80 dark:hover:bg-zinc-850/60 transition-colors"
+                >
+                  <td class="px-4 py-2.5 text-center font-mono text-zinc-400 text-[11px]">
+                    {{ (kpiModalPage - 1) * KPI_PAGE_SIZE + idx + 1 }}
+                  </td>
+                  <td class="px-4 py-2.5">
+                    <div class="flex flex-col gap-0.5">
+                      <span class="font-bold uppercase text-zinc-900 dark:text-zinc-100 truncate">
+                        {{ p.student_full_name || p.student_name || 'General' }}
+                      </span>
+                      <div class="flex items-center gap-1.5">
+                        <span class="font-mono font-bold text-[#0066cc] dark:text-blue-400 text-[11px]">
+                          {{ p.student_id || '—' }}
+                        </span>
+                        <span v-if="getStudent(p.student_id)?.tariff" class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 uppercase">
+                          {{ getStudent(p.student_id)?.tariff }}
+                        </span>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="px-4 py-2.5 text-right font-mono font-extrabold text-pink-600 dark:text-pink-400">
+                    {{ formatUZS(Math.abs(Number(p.amount))) }} UZS
+                  </td>
+                  <td class="px-4 py-2.5 font-medium uppercase text-zinc-500 dark:text-zinc-400">
+                    {{ p.received_by || '—' }}
+                  </td>
+                  <td class="px-4 py-2.5 text-zinc-700 dark:text-zinc-300">
+                    {{ p.notes || '—' }}
+                  </td>
+                  <td class="px-4 py-2.5 font-mono text-[11px] text-zinc-500 dark:text-zinc-400">
+                    {{ formatDate(p.created_at) }}
+                  </td>
+                </tr>
+                <tr v-if="filteredDiscountModalList.length === 0">
+                  <td colspan="6" class="px-4 py-8 text-center text-zinc-400">
+                    No discount records found in this period.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+
+            <!-- 4. Withdrawals Table -->
+            <table v-else-if="activeKpiModal === 'withdraw'" class="w-full border-collapse text-left text-xs">
+              <thead class="sticky top-0 z-10 bg-zinc-50 dark:bg-zinc-850/90 backdrop-blur-xs border-b border-zinc-200 dark:border-zinc-800 text-[11px] font-bold uppercase text-zinc-500 dark:text-zinc-400">
+                <tr>
+                  <th class="px-4 py-2.5 w-12 text-center">No</th>
+                  <th class="px-4 py-2.5">Student / ID</th>
+                  <th class="px-4 py-2.5">Method</th>
+                  <th class="px-4 py-2.5">Processed By</th>
+                  <th class="px-4 py-2.5 text-right">Withdrawal Amount</th>
+                  <th class="px-4 py-2.5">Reason / Notes</th>
+                  <th class="px-4 py-2.5">Date & Time</th>
+                  <th class="px-4 py-2.5 text-center w-14">Receipt</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-zinc-100 dark:divide-zinc-800">
+                <tr
+                  v-for="(p, idx) in paginatedWithdrawalModalList"
+                  :key="p.id"
+                  class="hover:bg-zinc-50/80 dark:hover:bg-zinc-850/60 transition-colors"
+                >
+                  <td class="px-4 py-2.5 text-center font-mono text-zinc-400 text-[11px]">
+                    {{ (kpiModalPage - 1) * KPI_PAGE_SIZE + idx + 1 }}
+                  </td>
+                  <td class="px-4 py-2.5">
+                    <div class="flex flex-col gap-0.5">
+                      <span class="font-bold uppercase text-zinc-900 dark:text-zinc-100 truncate">
+                        {{ p.student_full_name || p.student_name || 'General' }}
+                      </span>
+                      <div class="flex items-center gap-1.5">
+                        <span class="font-mono font-bold text-[#0066cc] dark:text-blue-400 text-[11px]">
+                          {{ p.student_id || '—' }}
+                        </span>
+                        <span v-if="getStudent(p.student_id)?.tariff" class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 uppercase">
+                          {{ getStudent(p.student_id)?.tariff }}
+                        </span>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="px-4 py-2.5 font-semibold uppercase text-zinc-700 dark:text-zinc-300">
+                    {{ p.method || '—' }}
+                  </td>
+                  <td class="px-4 py-2.5 font-medium uppercase text-zinc-500 dark:text-zinc-400">
+                    {{ p.received_by || '—' }}
+                  </td>
+                  <td class="px-4 py-2.5 text-right font-mono font-extrabold text-amber-600 dark:text-amber-400">
+                    -{{ formatUZS(Math.abs(Number(p.amount))) }} UZS
+                  </td>
+                  <td class="px-4 py-2.5 text-zinc-700 dark:text-zinc-300">
+                    {{ p.notes || '—' }}
+                  </td>
+                  <td class="px-4 py-2.5 font-mono text-[11px] text-zinc-500 dark:text-zinc-400">
+                    {{ formatDate(p.created_at) }}
+                  </td>
+                  <td class="px-4 py-2.5 text-center">
+                    <button
+                      type="button"
+                      @click="viewingPayment = p"
+                      class="p-1 rounded-lg text-zinc-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 cursor-pointer"
+                      title="View Receipt"
+                    >
+                      <Printer class="h-4 w-4" />
+                    </button>
+                  </td>
+                </tr>
+                <tr v-if="filteredWithdrawalModalList.length === 0">
+                  <td colspan="8" class="px-4 py-8 text-center text-zinc-400">
+                    No withdrawals recorded in this period.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Modal Pagination Footer -->
+          <div class="px-5 py-3 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between bg-zinc-50/50 dark:bg-zinc-900/30">
+            <span class="text-xs text-zinc-500 font-mono">
+              Page {{ kpiModalPage }} of {{
+                activeKpiModal === 'collected' ? Math.max(1, Math.ceil(filteredCollectedModalList.length / KPI_PAGE_SIZE)) :
+                activeKpiModal === 'debt' ? Math.max(1, Math.ceil(filteredDebtModalList.length / KPI_PAGE_SIZE)) :
+                activeKpiModal === 'discount' ? Math.max(1, Math.ceil(filteredDiscountModalList.length / KPI_PAGE_SIZE)) :
+                Math.max(1, Math.ceil(filteredWithdrawalModalList.length / KPI_PAGE_SIZE))
+              }}
+            </span>
+
+            <div class="flex items-center gap-2">
+              <button
+                type="button"
+                :disabled="kpiModalPage <= 1"
+                @click="kpiModalPage--"
+                class="px-3 py-1 text-xs font-bold rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-850 disabled:opacity-40 cursor-pointer text-zinc-700 dark:text-zinc-300"
+              >
+                Prev
+              </button>
+              <button
+                type="button"
+                :disabled="
+                  kpiModalPage >= (
+                    activeKpiModal === 'collected' ? Math.max(1, Math.ceil(filteredCollectedModalList.length / KPI_PAGE_SIZE)) :
+                    activeKpiModal === 'debt' ? Math.max(1, Math.ceil(filteredDebtModalList.length / KPI_PAGE_SIZE)) :
+                    activeKpiModal === 'discount' ? Math.max(1, Math.ceil(filteredDiscountModalList.length / KPI_PAGE_SIZE)) :
+                    Math.max(1, Math.ceil(filteredWithdrawalModalList.length / KPI_PAGE_SIZE))
+                  )
+                "
+                @click="kpiModalPage++"
+                class="px-3 py-1 text-xs font-bold rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-850 disabled:opacity-40 cursor-pointer text-zinc-700 dark:text-zinc-300"
+              >
+                Next
+              </button>
+            </div>
           </div>
         </div>
       </div>
