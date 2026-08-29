@@ -56,7 +56,8 @@ class PaymentOverviewStudentSerializer(serializers.ModelSerializer):
         model = Student
         fields = (
             'id', 'full_name', 'tariff', 'balance', 'discount',
-            'student_group', 'is_deleted', 'phone1', 'office'
+            'student_group', 'is_deleted', 'phone1', 'office',
+            'coordinator', 'level', 'level2'
         )
 
 

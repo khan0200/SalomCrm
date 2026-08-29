@@ -184,6 +184,8 @@ const { data: optionsData } = useQuery({
 const options = computed(() => optionsData.value || {
   tariffs: [],
   groups: [],
+  coordinators: [],
+  levels: [],
 })
 
 const { data: overviewData, isLoading: isOverviewLoading } = useQuery({
@@ -1019,6 +1021,7 @@ const exportPaymentHistoryToExcel = async () => {
         :students="allStudents"
         :payment-methods="paymentMethods"
         :payment-receivers="paymentReceivers"
+        :options="options"
         :is-loading="isHistoryLoading || isOverviewLoading"
         @lock-finance="handleLockFinance"
         @open-add-payment="openAddModal"

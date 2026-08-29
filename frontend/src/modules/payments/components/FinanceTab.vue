@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import type { Payment, Student } from '@/types'
 import {
   DollarSign, TrendingUp, TrendingDown, Users, AlertCircle,
   FileSpreadsheet, Filter, Calendar, Search, ArrowUpRight,
   ArrowDownRight, Percent, Wallet, CreditCard, Lock,
   ChevronDown, ChevronUp, Printer, Copy, Check, X,
-  Clock, Tag, RefreshCw
+  Clock, Tag, RefreshCw, UserCheck, GraduationCap, Hash, RotateCcw
 } from 'lucide-vue-next'
 
 const props = defineProps<{
@@ -14,6 +14,7 @@ const props = defineProps<{
   students: Student[]
   paymentMethods: string[]
   paymentReceivers: string[]
+  options?: any
   isLoading?: boolean
 }>()
 
@@ -51,6 +52,436 @@ const handleCopy = (field: string, text?: string | number | null) => {
   setTimeout(() => {
     if (copiedField.value === field) copiedField.value = null
   }, 1600)
+}
+
+// ── Student Lookup Map ────────────────────────────────────────────────
+const studentMap = computed(() => {
+  const map = new Map<string, Student>()
+  props.students.forEach(s => {
+    if (s.id) {
+      map.set(s.id, s)
+      map.set(s.id.toLowerCase(), s)
+    }
+  })
+  return map
+})
+
+const getStudent = (studentId?: string | null): Student | undefined => {
+  if (!studentId) return undefined
+  return studentMap.value.get(studentId) || studentMap.value.get(studentId.toLowerCase())
+}
+
+// ── 5 Multi-Select Filter Options (Tariff, Group, Coordinator, Level, ID) ──
+const availableTariffs = computed<string[]>(() => {
+  const set = new Set<string>()
+  if (props.options?.tariffs) {
+    props.options.tariffs.forEach((t: any) => {
+      const name = typeof t === 'string' ? t : t?.name
+      if (name && name !== 'No Tariff' && name !== 'NO_TARIFF') set.add(name)
+    })
+  }
+  props.students.forEach(s => {
+    if (s.tariff && s.tariff !== 'No Tariff' && s.tariff !== 'NO_TARIFF') {
+      set.add(s.tariff)
+    }
+  })
+  const sorted = Array.from(set).sort((a, b) => a.localeCompare(b))
+  return [...sorted, 'No Tariff']
+})
+
+const availableGroups = computed<string[]>(() => {
+  const set = new Set<string>()
+  if (props.options?.groups) {
+    props.options.groups.forEach((g: any) => {
+      const name = typeof g === 'string' ? g : g?.name
+      if (name && name !== 'No Group' && name !== 'NO_GROUP') set.add(name)
+    })
+  }
+  props.students.forEach(s => {
+    if (s.student_group && s.student_group !== 'No Group' && s.student_group !== 'NO_GROUP') {
+      set.add(s.student_group)
+    }
+  })
+  const sorted = Array.from(set).sort((a, b) => a.localeCompare(b))
+  return [...sorted, 'No Group']
+})
+
+const availableCoordinators = computed<string[]>(() => {
+  const set = new Set<string>()
+  if (props.options?.coordinators) {
+    props.options.coordinators.forEach((c: any) => {
+      const name = typeof c === 'string' ? c : c?.name
+      if (name && name !== 'No Coordinator' && name !== 'NO_COORDINATOR') set.add(name)
+    })
+  }
+  props.students.forEach(s => {
+    if (s.coordinator && s.coordinator !== 'No Coordinator' && s.coordinator !== 'NO_COORDINATOR') {
+      set.add(s.coordinator)
+    }
+  })
+  const sorted = Array.from(set).sort((a, b) => a.localeCompare(b))
+  return [...sorted, 'No Coordinator']
+})
+
+const availableLevels = computed<string[]>(() => {
+  const set = new Set<string>()
+  const defaultLevels = ['COLLEGE', 'BACHELOR', 'MASTERS', 'MASTER NO CERTIFICATE', 'LANGUAGE COURSE']
+  defaultLevels.forEach(l => set.add(l))
+  if (props.options?.levels) {
+    props.options.levels.forEach((l: any) => {
+      const name = typeof l === 'string' ? l : l?.name
+      if (name && name !== 'No Level' && name !== 'NO_LEVEL') set.add(name)
+    })
+  }
+  props.students.forEach(s => {
+    if (s.level) set.add(s.level)
+    if (s.level2) set.add(s.level2)
+  })
+  const sorted = Array.from(set).sort((a, b) => a.localeCompare(b))
+  return [...sorted, 'No Level']
+})
+
+const extractIdPrefix = (idStr?: string | null): string => {
+  if (!idStr) return 'No ID'
+  const str = idStr.trim()
+  if (!str || str === '—' || str === '-') return 'No ID'
+  const match = str.match(/^([A-Za-z]+)/)
+  if (match && match[1]) {
+    return match[1].toUpperCase()
+  }
+  return 'No ID'
+}
+
+const availableIds = computed<string[]>(() => {
+  const set = new Set<string>()
+  props.students.forEach(s => {
+    if (s.id) {
+      const prefix = extractIdPrefix(s.id)
+      if (prefix && prefix !== 'No ID') set.add(prefix)
+    }
+  })
+  props.payments.forEach(pay => {
+    if (pay.student_id) {
+      const prefix = extractIdPrefix(pay.student_id)
+      if (prefix && prefix !== 'No ID') set.add(prefix)
+    }
+  })
+  const sorted = Array.from(set).sort((a, b) => a.localeCompare(b))
+  return [...sorted, 'No ID']
+})
+
+const idPrefixStudentCounts = computed(() => {
+  const map = new Map<string, Set<string>>()
+
+  // 1. Unique students from props.students
+  props.students.forEach(s => {
+    const sid = s.id || (s as any).student_id
+    if (sid) {
+      const prefix = extractIdPrefix(sid)
+      if (!map.has(prefix)) map.set(prefix, new Set())
+      map.get(prefix)!.add(String(sid).trim().toUpperCase())
+    }
+  })
+
+  // 2. Unique students from props.payments
+  props.payments.forEach(pay => {
+    if (pay.student_id) {
+      const prefix = extractIdPrefix(pay.student_id)
+      if (!map.has(prefix)) map.set(prefix, new Set())
+      map.get(prefix)!.add(String(pay.student_id).trim().toUpperCase())
+    }
+  })
+
+  const counts = new Map<string, number>()
+  map.forEach((uniqueIds, prefix) => {
+    counts.set(prefix, uniqueIds.size)
+  })
+
+  // Count No ID
+  let noIdStudents = 0
+  props.students.forEach(s => {
+    const sid = s.id || (s as any).student_id
+    if (!sid || extractIdPrefix(sid) === 'No ID') noIdStudents++
+  })
+  if (noIdStudents === 0) {
+    const noIdTx = new Set<string>()
+    props.payments.forEach(pay => {
+      if (!pay.student_id || extractIdPrefix(pay.student_id) === 'No ID') {
+        noIdTx.add(pay.id || `${pay.amount}_${pay.created_at}`)
+      }
+    })
+    noIdStudents = noIdTx.size
+  }
+  counts.set('No ID', noIdStudents)
+
+  return counts
+})
+
+// ── Multi-Select States (null = all checked by default) ───────────────
+const selectedTariffs = ref<string[] | null>(null)
+const selectedGroups = ref<string[] | null>(null)
+const selectedCoordinators = ref<string[] | null>(null)
+const selectedLevels = ref<string[] | null>(null)
+const selectedIds = ref<string[] | null>(null)
+
+// Effective selected arrays
+const effectiveSelectedTariffs = computed<string[]>(() => selectedTariffs.value ?? availableTariffs.value)
+const effectiveSelectedGroups = computed<string[]>(() => selectedGroups.value ?? availableGroups.value)
+const effectiveSelectedCoordinators = computed<string[]>(() => selectedCoordinators.value ?? availableCoordinators.value)
+const effectiveSelectedLevels = computed<string[]>(() => selectedLevels.value ?? availableLevels.value)
+const effectiveSelectedIds = computed<string[]>(() => selectedIds.value ?? availableIds.value)
+
+// Checkers & Toggles for Tariff
+const isTariffSelected = (val: string) => effectiveSelectedTariffs.value.includes(val)
+const isAllTariffsSelected = computed(() => {
+  return availableTariffs.value.length > 0 &&
+    effectiveSelectedTariffs.value.length === availableTariffs.value.length
+})
+const toggleTariff = (val: string) => {
+  const current = [...effectiveSelectedTariffs.value]
+  const idx = current.indexOf(val)
+  if (idx >= 0) {
+    current.splice(idx, 1)
+  } else {
+    current.push(val)
+  }
+  selectedTariffs.value = current
+}
+const toggleAllTariffs = () => {
+  if (isAllTariffsSelected.value) {
+    selectedTariffs.value = []
+  } else {
+    selectedTariffs.value = [...availableTariffs.value]
+  }
+}
+
+// Checkers & Toggles for Group
+const isGroupSelected = (val: string) => effectiveSelectedGroups.value.includes(val)
+const isAllGroupsSelected = computed(() => {
+  return availableGroups.value.length > 0 &&
+    effectiveSelectedGroups.value.length === availableGroups.value.length
+})
+const toggleGroup = (val: string) => {
+  const current = [...effectiveSelectedGroups.value]
+  const idx = current.indexOf(val)
+  if (idx >= 0) {
+    current.splice(idx, 1)
+  } else {
+    current.push(val)
+  }
+  selectedGroups.value = current
+}
+const toggleAllGroups = () => {
+  if (isAllGroupsSelected.value) {
+    selectedGroups.value = []
+  } else {
+    selectedGroups.value = [...availableGroups.value]
+  }
+}
+
+// Checkers & Toggles for Coordinator
+const isCoordinatorSelected = (val: string) => effectiveSelectedCoordinators.value.includes(val)
+const isAllCoordinatorsSelected = computed(() => {
+  return availableCoordinators.value.length > 0 &&
+    effectiveSelectedCoordinators.value.length === availableCoordinators.value.length
+})
+const toggleCoordinator = (val: string) => {
+  const current = [...effectiveSelectedCoordinators.value]
+  const idx = current.indexOf(val)
+  if (idx >= 0) {
+    current.splice(idx, 1)
+  } else {
+    current.push(val)
+  }
+  selectedCoordinators.value = current
+}
+const toggleAllCoordinators = () => {
+  if (isAllCoordinatorsSelected.value) {
+    selectedCoordinators.value = []
+  } else {
+    selectedCoordinators.value = [...availableCoordinators.value]
+  }
+}
+
+// Checkers & Toggles for Level
+const isLevelSelected = (val: string) => effectiveSelectedLevels.value.includes(val)
+const isAllLevelsSelected = computed(() => {
+  return availableLevels.value.length > 0 &&
+    effectiveSelectedLevels.value.length === availableLevels.value.length
+})
+const toggleLevel = (val: string) => {
+  const current = [...effectiveSelectedLevels.value]
+  const idx = current.indexOf(val)
+  if (idx >= 0) {
+    current.splice(idx, 1)
+  } else {
+    current.push(val)
+  }
+  selectedLevels.value = current
+}
+const toggleAllLevels = () => {
+  if (isAllLevelsSelected.value) {
+    selectedLevels.value = []
+  } else {
+    selectedLevels.value = [...availableLevels.value]
+  }
+}
+
+// Checkers & Toggles for ID
+const isIdSelected = (val: string) => effectiveSelectedIds.value.includes(val)
+const isAllIdsSelected = computed(() => {
+  return availableIds.value.length > 0 &&
+    effectiveSelectedIds.value.length === availableIds.value.length
+})
+const toggleId = (val: string) => {
+  const current = [...effectiveSelectedIds.value]
+  const idx = current.indexOf(val)
+  if (idx >= 0) {
+    current.splice(idx, 1)
+  } else {
+    current.push(val)
+  }
+  selectedIds.value = current
+}
+const toggleAllIds = () => {
+  if (isAllIdsSelected.value) {
+    selectedIds.value = []
+  } else {
+    selectedIds.value = [...availableIds.value]
+  }
+}
+
+// ── Dropdown Open & Search States ────────────────────────────────────
+const isTariffOpen = ref(false)
+const isGroupOpen = ref(false)
+const isCoordinatorOpen = ref(false)
+const isLevelOpen = ref(false)
+const isIdOpen = ref(false)
+
+const tariffRef = ref<HTMLElement | null>(null)
+const groupRef = ref<HTMLElement | null>(null)
+const coordinatorRef = ref<HTMLElement | null>(null)
+const levelRef = ref<HTMLElement | null>(null)
+const idRef = ref<HTMLElement | null>(null)
+
+const tariffSearch = ref('')
+const groupSearch = ref('')
+const coordinatorSearch = ref('')
+const levelSearch = ref('')
+const idSearch = ref('')
+
+const filteredAvailableTariffs = computed(() => {
+  const q = tariffSearch.value.trim().toLowerCase()
+  if (!q) return availableTariffs.value
+  return availableTariffs.value.filter(t => t.toLowerCase().includes(q))
+})
+
+const filteredAvailableGroups = computed(() => {
+  const q = groupSearch.value.trim().toLowerCase()
+  if (!q) return availableGroups.value
+  return availableGroups.value.filter(g => g.toLowerCase().includes(q))
+})
+
+const filteredAvailableCoordinators = computed(() => {
+  const q = coordinatorSearch.value.trim().toLowerCase()
+  if (!q) return availableCoordinators.value
+  return availableCoordinators.value.filter(c => c.toLowerCase().includes(q))
+})
+
+const filteredAvailableLevels = computed(() => {
+  const q = levelSearch.value.trim().toLowerCase()
+  if (!q) return availableLevels.value
+  return availableLevels.value.filter(l => l.toLowerCase().includes(q))
+})
+
+const filteredAvailableIds = computed(() => {
+  const q = idSearch.value.trim().toLowerCase()
+  if (!q) return availableIds.value
+  return availableIds.value.filter(prefix => prefix.toLowerCase().includes(q))
+})
+
+const toggleDropdown = (name: 'tariff' | 'group' | 'coordinator' | 'level' | 'id') => {
+  isTariffOpen.value = name === 'tariff' ? !isTariffOpen.value : false
+  isGroupOpen.value = name === 'group' ? !isGroupOpen.value : false
+  isCoordinatorOpen.value = name === 'coordinator' ? !isCoordinatorOpen.value : false
+  isLevelOpen.value = name === 'level' ? !isLevelOpen.value : false
+  isIdOpen.value = name === 'id' ? !isIdOpen.value : false
+}
+
+const handleClickOutside = (e: MouseEvent) => {
+  const target = e.target as Node
+  if (tariffRef.value && !tariffRef.value.contains(target)) isTariffOpen.value = false
+  if (groupRef.value && !groupRef.value.contains(target)) isGroupOpen.value = false
+  if (coordinatorRef.value && !coordinatorRef.value.contains(target)) isCoordinatorOpen.value = false
+  if (levelRef.value && !levelRef.value.contains(target)) isLevelOpen.value = false
+  if (idRef.value && !idRef.value.contains(target)) isIdOpen.value = false
+}
+
+onMounted(() => {
+  document.addEventListener('mousedown', handleClickOutside)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('mousedown', handleClickOutside)
+})
+
+const hasActiveStudentFilters = computed(() => {
+  return !isAllTariffsSelected.value ||
+    !isAllGroupsSelected.value ||
+    !isAllCoordinatorsSelected.value ||
+    !isAllLevelsSelected.value ||
+    !isAllIdsSelected.value
+})
+
+const resetStudentFilters = () => {
+  selectedTariffs.value = null
+  selectedGroups.value = null
+  selectedCoordinators.value = null
+  selectedLevels.value = null
+  selectedIds.value = null
+  tariffSearch.value = ''
+  groupSearch.value = ''
+  coordinatorSearch.value = ''
+  levelSearch.value = ''
+  idSearch.value = ''
+}
+
+// ── Matching Helper for Student Criteria ─────────────────────────────
+const matchesStudentCriteria = (studentId?: string | null) => {
+  const s = getStudent(studentId)
+
+  // 1. Tariff Filter
+  const tariffVal = s?.tariff || 'No Tariff'
+  if (!effectiveSelectedTariffs.value.includes(tariffVal)) return false
+
+  // 2. Group Filter
+  const groupVal = s?.student_group || 'No Group'
+  if (!effectiveSelectedGroups.value.includes(groupVal)) return false
+
+  // 3. Coordinator Filter
+  const coordVal = s?.coordinator || 'No Coordinator'
+  if (!effectiveSelectedCoordinators.value.includes(coordVal)) return false
+
+  // 4. Level Filter
+  if (s) {
+    const hasLevel1 = !!s.level
+    const hasLevel2 = !!s.level2
+    if (!hasLevel1 && !hasLevel2) {
+      if (!effectiveSelectedLevels.value.includes('No Level')) return false
+    } else {
+      const match1 = hasLevel1 && effectiveSelectedLevels.value.includes(s.level!)
+      const match2 = hasLevel2 && effectiveSelectedLevels.value.includes(s.level2!)
+      if (!match1 && !match2) return false
+    }
+  } else {
+    if (!effectiveSelectedLevels.value.includes('No Level')) return false
+  }
+
+  // 5. ID Prefix Filter (e.g. CF, D, F, AB, T, YU, etc.)
+  const idPrefix = extractIdPrefix(studentId)
+  if (!effectiveSelectedIds.value.includes(idPrefix)) return false
+
+  return true
 }
 
 // ── Date Range Computation Helpers ─────────────────────────────────────
@@ -118,6 +549,7 @@ const todayMetrics = computed(() => {
   let count = 0
   props.payments.forEach(p => {
     if (!p.created_at || p.is_discount || p.is_withdrawal) return
+    if (!matchesStudentCriteria(p.student_id)) return
     const d = new Date(p.created_at)
     if (d >= start && d <= end) {
       const amt = Number(p.amount) || 0
@@ -138,6 +570,7 @@ const thisMonthMetrics = computed(() => {
   let count = 0
   props.payments.forEach(p => {
     if (!p.created_at || p.is_discount || p.is_withdrawal) return
+    if (!matchesStudentCriteria(p.student_id)) return
     const d = new Date(p.created_at)
     if (d >= start && d <= end) {
       const amt = Number(p.amount) || 0
@@ -150,7 +583,7 @@ const thisMonthMetrics = computed(() => {
   return { collected: total, count }
 })
 
-// Debt analysis across all active students
+// Debt analysis across active students filtered by selected student criteria
 const debtMetrics = computed(() => {
   let totalDebt = 0
   let debtorCount = 0
@@ -160,6 +593,8 @@ const debtMetrics = computed(() => {
 
   props.students.forEach(s => {
     if (s.is_deleted) return
+    if (!matchesStudentCriteria(s.id)) return
+
     totalActiveStudents++
     const bal = Number(s.balance) || 0
     if (bal < 0) {
@@ -212,7 +647,12 @@ const filteredPayments = computed(() => {
       return false
     }
 
-    // 5. Search Query
+    // 5. Student Criteria Filters (Tariff, Group, Coordinator, Level, ID)
+    if (!matchesStudentCriteria(p.student_id)) {
+      return false
+    }
+
+    // 6. Search Query
     if (searchFinance.value.trim()) {
       const q = searchFinance.value.toLowerCase()
       const matchName = (p.student_full_name || p.student_name || '').toLowerCase().includes(q)
@@ -335,7 +775,12 @@ const paginatedPayments = computed(() => {
   return sortedFilteredPayments.value.slice(start, start + ITEMS_PER_PAGE)
 })
 
-watch([selectedDatePreset, customStartDate, customEndDate, searchFinance, selectedMethod, selectedReceiver, selectedType], () => {
+watch([
+  selectedDatePreset, customStartDate, customEndDate, searchFinance,
+  selectedMethod, selectedReceiver, selectedType,
+  effectiveSelectedTariffs, effectiveSelectedGroups, effectiveSelectedCoordinators,
+  effectiveSelectedLevels, effectiveSelectedIds
+], () => {
   currentPage.value = 1
 })
 
@@ -400,11 +845,17 @@ const exportFinanceReportToExcel = async () => {
     if (p.is_withdrawal) txType = 'Withdrawal'
     else if (p.is_discount) txType = 'Discount'
 
+    const s = getStudent(p.student_id)
+
     return {
       No: index + 1,
       'Transaction ID': p.id ? String(p.id).toUpperCase() : '',
       'Student ID': p.student_id || '—',
       'Student Name': p.student_full_name || p.student_name || 'General Payment',
+      'Tariff': s?.tariff || '—',
+      'Group': s?.student_group || '—',
+      'Coordinator': s?.coordinator || '—',
+      'Level': s?.level || '—',
       'Type': txType,
       'Payment Method': p.method || '—',
       'Received By': p.received_by || '—',
@@ -423,6 +874,10 @@ const exportFinanceReportToExcel = async () => {
     { wch: 22 },  // ID
     { wch: 15 },  // Student ID
     { wch: 30 },  // Student Name
+    { wch: 18 },  // Tariff
+    { wch: 16 },  // Group
+    { wch: 18 },  // Coordinator
+    { wch: 16 },  // Level
     { wch: 15 },  // Type
     { wch: 18 },  // Method
     { wch: 18 },  // Received By
@@ -716,6 +1171,466 @@ const exportFinanceReportToExcel = async () => {
           </select>
         </div>
       </div>
+
+      <!-- Row 3: Multi-Select Filter Pills (Tariff, Group, Coordinator, Level, ID) -->
+      <div class="flex flex-wrap items-center gap-2 pt-2 border-t border-zinc-100 dark:border-zinc-800">
+        <div class="flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-zinc-400 mr-1 select-none">
+          <Filter class="h-3.5 w-3.5" />
+          <span>Filters:</span>
+        </div>
+
+        <!-- 1. Tariff Filter Dropdown -->
+        <div class="relative" ref="tariffRef">
+          <button
+            type="button"
+            @click="toggleDropdown('tariff')"
+            class="px-3 py-1.5 text-xs border rounded-xl cursor-pointer flex items-center justify-between gap-2 min-w-[125px] select-none transition-all shadow-2xs font-semibold"
+            :class="[
+              isTariffOpen
+                ? 'border-blue-600 bg-blue-50/50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 ring-1 ring-blue-600'
+                : !isAllTariffsSelected
+                  ? 'border-blue-500 bg-blue-50/40 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 ring-1 ring-blue-500/30'
+                  : 'border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-850 text-zinc-700 dark:text-zinc-300 hover:border-blue-400'
+            ]"
+          >
+            <div class="flex items-center gap-1.5 truncate">
+              <Tag class="h-3.5 w-3.5 text-zinc-400 shrink-0" />
+              <span class="truncate">
+                {{ isAllTariffsSelected
+                  ? 'All Tariffs'
+                  : effectiveSelectedTariffs.length === 0
+                    ? 'Tariff (None)'
+                    : `Tariff (${effectiveSelectedTariffs.length}/${availableTariffs.length})` }}
+              </span>
+            </div>
+            <ChevronDown
+              class="h-3.5 w-3.5 text-zinc-400 transition-transform duration-200 shrink-0"
+              :class="isTariffOpen ? 'rotate-180 text-blue-600' : ''"
+            />
+          </button>
+
+          <div
+            v-if="isTariffOpen"
+            class="absolute left-0 mt-1.5 w-60 rounded-xl border border-zinc-200 dark:border-zinc-750 bg-white dark:bg-[#181a1d] shadow-xl py-2 z-40 max-h-80 flex flex-col"
+          >
+            <div v-if="availableTariffs.length > 5" class="px-2.5 pb-1.5">
+              <div class="relative">
+                <Search class="absolute left-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-zinc-400 pointer-events-none" />
+                <input
+                  type="text"
+                  v-model="tariffSearch"
+                  placeholder="Search tariff..."
+                  class="w-full pl-7 pr-2 py-1 text-[11px] border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-850 rounded-lg text-zinc-800 dark:text-zinc-200 focus:outline-none focus:border-blue-500"
+                />
+              </div>
+            </div>
+
+            <div
+              @click="toggleAllTariffs"
+              class="px-3.5 py-1.5 flex items-center justify-between cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors text-xs font-bold text-zinc-800 dark:text-zinc-200 select-none"
+            >
+              <div class="flex items-center gap-2.5">
+                <input
+                  type="checkbox"
+                  :checked="isAllTariffsSelected"
+                  class="h-3.5 w-3.5 rounded border-zinc-300 text-blue-600 focus:ring-blue-500 cursor-pointer pointer-events-none"
+                />
+                <span>Select All</span>
+              </div>
+              <span class="text-[10.5px] font-mono text-zinc-400 font-normal">
+                {{ effectiveSelectedTariffs.length }}/{{ availableTariffs.length }}
+              </span>
+            </div>
+
+            <div class="h-px bg-zinc-100 dark:bg-zinc-800 my-1" />
+
+            <div class="overflow-y-auto max-h-56">
+              <div
+                v-for="opt in filteredAvailableTariffs"
+                :key="opt"
+                @click="toggleTariff(opt)"
+                class="px-3.5 py-1.5 flex items-center gap-2.5 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors text-xs font-medium text-zinc-700 dark:text-zinc-300 select-none"
+              >
+                <input
+                  type="checkbox"
+                  :checked="isTariffSelected(opt)"
+                  class="h-3.5 w-3.5 rounded border-zinc-300 text-blue-600 focus:ring-blue-500 cursor-pointer pointer-events-none"
+                />
+                <span class="truncate">{{ opt }}</span>
+              </div>
+              <div v-if="filteredAvailableTariffs.length === 0" class="px-3.5 py-3 text-center text-[11px] text-zinc-400">
+                No matches
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. Group Filter Dropdown -->
+        <div class="relative" ref="groupRef">
+          <button
+            type="button"
+            @click="toggleDropdown('group')"
+            class="px-3 py-1.5 text-xs border rounded-xl cursor-pointer flex items-center justify-between gap-2 min-w-[120px] select-none transition-all shadow-2xs font-semibold"
+            :class="[
+              isGroupOpen
+                ? 'border-blue-600 bg-blue-50/50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 ring-1 ring-blue-600'
+                : !isAllGroupsSelected
+                  ? 'border-blue-500 bg-blue-50/40 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 ring-1 ring-blue-500/30'
+                  : 'border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-850 text-zinc-700 dark:text-zinc-300 hover:border-blue-400'
+            ]"
+          >
+            <div class="flex items-center gap-1.5 truncate">
+              <Users class="h-3.5 w-3.5 text-zinc-400 shrink-0" />
+              <span class="truncate">
+                {{ isAllGroupsSelected
+                  ? 'All Groups'
+                  : effectiveSelectedGroups.length === 0
+                    ? 'Group (None)'
+                    : `Group (${effectiveSelectedGroups.length}/${availableGroups.length})` }}
+              </span>
+            </div>
+            <ChevronDown
+              class="h-3.5 w-3.5 text-zinc-400 transition-transform duration-200 shrink-0"
+              :class="isGroupOpen ? 'rotate-180 text-blue-600' : ''"
+            />
+          </button>
+
+          <div
+            v-if="isGroupOpen"
+            class="absolute left-0 mt-1.5 w-56 rounded-xl border border-zinc-200 dark:border-zinc-750 bg-white dark:bg-[#181a1d] shadow-xl py-2 z-40 max-h-80 flex flex-col"
+          >
+            <div v-if="availableGroups.length > 5" class="px-2.5 pb-1.5">
+              <div class="relative">
+                <Search class="absolute left-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-zinc-400 pointer-events-none" />
+                <input
+                  type="text"
+                  v-model="groupSearch"
+                  placeholder="Search group..."
+                  class="w-full pl-7 pr-2 py-1 text-[11px] border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-850 rounded-lg text-zinc-800 dark:text-zinc-200 focus:outline-none focus:border-blue-500"
+                />
+              </div>
+            </div>
+
+            <div
+              @click="toggleAllGroups"
+              class="px-3.5 py-1.5 flex items-center justify-between cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors text-xs font-bold text-zinc-800 dark:text-zinc-200 select-none"
+            >
+              <div class="flex items-center gap-2.5">
+                <input
+                  type="checkbox"
+                  :checked="isAllGroupsSelected"
+                  class="h-3.5 w-3.5 rounded border-zinc-300 text-blue-600 focus:ring-blue-500 cursor-pointer pointer-events-none"
+                />
+                <span>Select All</span>
+              </div>
+              <span class="text-[10.5px] font-mono text-zinc-400 font-normal">
+                {{ effectiveSelectedGroups.length }}/{{ availableGroups.length }}
+              </span>
+            </div>
+
+            <div class="h-px bg-zinc-100 dark:bg-zinc-800 my-1" />
+
+            <div class="overflow-y-auto max-h-56">
+              <div
+                v-for="opt in filteredAvailableGroups"
+                :key="opt"
+                @click="toggleGroup(opt)"
+                class="px-3.5 py-1.5 flex items-center gap-2.5 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors text-xs font-medium text-zinc-700 dark:text-zinc-300 select-none"
+              >
+                <input
+                  type="checkbox"
+                  :checked="isGroupSelected(opt)"
+                  class="h-3.5 w-3.5 rounded border-zinc-300 text-blue-600 focus:ring-blue-500 cursor-pointer pointer-events-none"
+                />
+                <span class="truncate">{{ opt }}</span>
+              </div>
+              <div v-if="filteredAvailableGroups.length === 0" class="px-3.5 py-3 text-center text-[11px] text-zinc-400">
+                No matches
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. Coordinator Filter Dropdown -->
+        <div class="relative" ref="coordinatorRef">
+          <button
+            type="button"
+            @click="toggleDropdown('coordinator')"
+            class="px-3 py-1.5 text-xs border rounded-xl cursor-pointer flex items-center justify-between gap-2 min-w-[145px] select-none transition-all shadow-2xs font-semibold"
+            :class="[
+              isCoordinatorOpen
+                ? 'border-blue-600 bg-blue-50/50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 ring-1 ring-blue-600'
+                : !isAllCoordinatorsSelected
+                  ? 'border-blue-500 bg-blue-50/40 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 ring-1 ring-blue-500/30'
+                  : 'border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-850 text-zinc-700 dark:text-zinc-300 hover:border-blue-400'
+            ]"
+          >
+            <div class="flex items-center gap-1.5 truncate">
+              <UserCheck class="h-3.5 w-3.5 text-zinc-400 shrink-0" />
+              <span class="truncate">
+                {{ isAllCoordinatorsSelected
+                  ? 'All Coordinators'
+                  : effectiveSelectedCoordinators.length === 0
+                    ? 'Coordinator (None)'
+                    : `Coordinator (${effectiveSelectedCoordinators.length}/${availableCoordinators.length})` }}
+              </span>
+            </div>
+            <ChevronDown
+              class="h-3.5 w-3.5 text-zinc-400 transition-transform duration-200 shrink-0"
+              :class="isCoordinatorOpen ? 'rotate-180 text-blue-600' : ''"
+            />
+          </button>
+
+          <div
+            v-if="isCoordinatorOpen"
+            class="absolute left-0 mt-1.5 w-60 rounded-xl border border-zinc-200 dark:border-zinc-750 bg-white dark:bg-[#181a1d] shadow-xl py-2 z-40 max-h-80 flex flex-col"
+          >
+            <div v-if="availableCoordinators.length > 5" class="px-2.5 pb-1.5">
+              <div class="relative">
+                <Search class="absolute left-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-zinc-400 pointer-events-none" />
+                <input
+                  type="text"
+                  v-model="coordinatorSearch"
+                  placeholder="Search coordinator..."
+                  class="w-full pl-7 pr-2 py-1 text-[11px] border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-850 rounded-lg text-zinc-800 dark:text-zinc-200 focus:outline-none focus:border-blue-500"
+                />
+              </div>
+            </div>
+
+            <div
+              @click="toggleAllCoordinators"
+              class="px-3.5 py-1.5 flex items-center justify-between cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors text-xs font-bold text-zinc-800 dark:text-zinc-200 select-none"
+            >
+              <div class="flex items-center gap-2.5">
+                <input
+                  type="checkbox"
+                  :checked="isAllCoordinatorsSelected"
+                  class="h-3.5 w-3.5 rounded border-zinc-300 text-blue-600 focus:ring-blue-500 cursor-pointer pointer-events-none"
+                />
+                <span>Select All</span>
+              </div>
+              <span class="text-[10.5px] font-mono text-zinc-400 font-normal">
+                {{ effectiveSelectedCoordinators.length }}/{{ availableCoordinators.length }}
+              </span>
+            </div>
+
+            <div class="h-px bg-zinc-100 dark:bg-zinc-800 my-1" />
+
+            <div class="overflow-y-auto max-h-56">
+              <div
+                v-for="opt in filteredAvailableCoordinators"
+                :key="opt"
+                @click="toggleCoordinator(opt)"
+                class="px-3.5 py-1.5 flex items-center gap-2.5 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors text-xs font-medium text-zinc-700 dark:text-zinc-300 select-none"
+              >
+                <input
+                  type="checkbox"
+                  :checked="isCoordinatorSelected(opt)"
+                  class="h-3.5 w-3.5 rounded border-zinc-300 text-blue-600 focus:ring-blue-500 cursor-pointer pointer-events-none"
+                />
+                <span class="truncate">{{ opt }}</span>
+              </div>
+              <div v-if="filteredAvailableCoordinators.length === 0" class="px-3.5 py-3 text-center text-[11px] text-zinc-400">
+                No matches
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4. Level Filter Dropdown -->
+        <div class="relative" ref="levelRef">
+          <button
+            type="button"
+            @click="toggleDropdown('level')"
+            class="px-3 py-1.5 text-xs border rounded-xl cursor-pointer flex items-center justify-between gap-2 min-w-[120px] select-none transition-all shadow-2xs font-semibold"
+            :class="[
+              isLevelOpen
+                ? 'border-blue-600 bg-blue-50/50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 ring-1 ring-blue-600'
+                : !isAllLevelsSelected
+                  ? 'border-blue-500 bg-blue-50/40 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 ring-1 ring-blue-500/30'
+                  : 'border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-850 text-zinc-700 dark:text-zinc-300 hover:border-blue-400'
+            ]"
+          >
+            <div class="flex items-center gap-1.5 truncate">
+              <GraduationCap class="h-3.5 w-3.5 text-zinc-400 shrink-0" />
+              <span class="truncate">
+                {{ isAllLevelsSelected
+                  ? 'All Levels'
+                  : effectiveSelectedLevels.length === 0
+                    ? 'Level (None)'
+                    : `Level (${effectiveSelectedLevels.length}/${availableLevels.length})` }}
+              </span>
+            </div>
+            <ChevronDown
+              class="h-3.5 w-3.5 text-zinc-400 transition-transform duration-200 shrink-0"
+              :class="isLevelOpen ? 'rotate-180 text-blue-600' : ''"
+            />
+          </button>
+
+          <div
+            v-if="isLevelOpen"
+            class="absolute left-0 mt-1.5 w-56 rounded-xl border border-zinc-200 dark:border-zinc-750 bg-white dark:bg-[#181a1d] shadow-xl py-2 z-40 max-h-80 flex flex-col"
+          >
+            <div v-if="availableLevels.length > 5" class="px-2.5 pb-1.5">
+              <div class="relative">
+                <Search class="absolute left-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-zinc-400 pointer-events-none" />
+                <input
+                  type="text"
+                  v-model="levelSearch"
+                  placeholder="Search level..."
+                  class="w-full pl-7 pr-2 py-1 text-[11px] border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-850 rounded-lg text-zinc-800 dark:text-zinc-200 focus:outline-none focus:border-blue-500"
+                />
+              </div>
+            </div>
+
+            <div
+              @click="toggleAllLevels"
+              class="px-3.5 py-1.5 flex items-center justify-between cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors text-xs font-bold text-zinc-800 dark:text-zinc-200 select-none"
+            >
+              <div class="flex items-center gap-2.5">
+                <input
+                  type="checkbox"
+                  :checked="isAllLevelsSelected"
+                  class="h-3.5 w-3.5 rounded border-zinc-300 text-blue-600 focus:ring-blue-500 cursor-pointer pointer-events-none"
+                />
+                <span>Select All</span>
+              </div>
+              <span class="text-[10.5px] font-mono text-zinc-400 font-normal">
+                {{ effectiveSelectedLevels.length }}/{{ availableLevels.length }}
+              </span>
+            </div>
+
+            <div class="h-px bg-zinc-100 dark:bg-zinc-800 my-1" />
+
+            <div class="overflow-y-auto max-h-56">
+              <div
+                v-for="opt in filteredAvailableLevels"
+                :key="opt"
+                @click="toggleLevel(opt)"
+                class="px-3.5 py-1.5 flex items-center gap-2.5 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors text-xs font-medium text-zinc-700 dark:text-zinc-300 select-none"
+              >
+                <input
+                  type="checkbox"
+                  :checked="isLevelSelected(opt)"
+                  class="h-3.5 w-3.5 rounded border-zinc-300 text-blue-600 focus:ring-blue-500 cursor-pointer pointer-events-none"
+                />
+                <span class="truncate">{{ opt }}</span>
+              </div>
+              <div v-if="filteredAvailableLevels.length === 0" class="px-3.5 py-3 text-center text-[11px] text-zinc-400">
+                No matches
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 5. ID Filter Dropdown -->
+        <div class="relative" ref="idRef">
+          <button
+            type="button"
+            @click="toggleDropdown('id')"
+            class="px-3 py-1.5 text-xs border rounded-xl cursor-pointer flex items-center justify-between gap-2 min-w-[115px] select-none transition-all shadow-2xs font-semibold"
+            :class="[
+              isIdOpen
+                ? 'border-blue-600 bg-blue-50/50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 ring-1 ring-blue-600'
+                : !isAllIdsSelected
+                  ? 'border-blue-500 bg-blue-50/40 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 ring-1 ring-blue-500/30'
+                  : 'border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-850 text-zinc-700 dark:text-zinc-300 hover:border-blue-400'
+            ]"
+          >
+            <div class="flex items-center gap-1.5 truncate">
+              <Hash class="h-3.5 w-3.5 text-zinc-400 shrink-0" />
+              <span class="truncate">
+                {{ isAllIdsSelected
+                  ? 'All IDs'
+                  : effectiveSelectedIds.length === 0
+                    ? 'ID (None)'
+                    : `ID (${effectiveSelectedIds.length}/${availableIds.length})` }}
+              </span>
+            </div>
+            <ChevronDown
+              class="h-3.5 w-3.5 text-zinc-400 transition-transform duration-200 shrink-0"
+              :class="isIdOpen ? 'rotate-180 text-blue-600' : ''"
+            />
+          </button>
+
+          <div
+            v-if="isIdOpen"
+            class="absolute left-0 mt-1.5 w-56 rounded-xl border border-zinc-200 dark:border-zinc-750 bg-white dark:bg-[#181a1d] shadow-xl py-2 z-40 max-h-80 flex flex-col"
+          >
+            <div class="px-2.5 pb-1.5">
+              <div class="relative">
+                <Search class="absolute left-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-zinc-400 pointer-events-none" />
+                <input
+                  type="text"
+                  v-model="idSearch"
+                  placeholder="Search ID prefix (CF, D, YU)..."
+                  class="w-full pl-7 pr-2 py-1 text-[11px] border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-850 rounded-lg text-zinc-800 dark:text-zinc-200 focus:outline-none focus:border-blue-500"
+                />
+              </div>
+            </div>
+
+            <div
+              @click="toggleAllIds"
+              class="px-3.5 py-1.5 flex items-center justify-between cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors text-xs font-bold text-zinc-800 dark:text-zinc-200 select-none"
+            >
+              <div class="flex items-center gap-2.5">
+                <input
+                  type="checkbox"
+                  :checked="isAllIdsSelected"
+                  class="h-3.5 w-3.5 rounded border-zinc-300 text-blue-600 focus:ring-blue-500 cursor-pointer pointer-events-none"
+                />
+                <span>Select All</span>
+              </div>
+              <span class="text-[10.5px] font-mono text-zinc-400 font-normal">
+                {{ effectiveSelectedIds.length }}/{{ availableIds.length }}
+              </span>
+            </div>
+
+            <div class="h-px bg-zinc-100 dark:bg-zinc-800 my-1" />
+
+            <div class="overflow-y-auto max-h-56">
+              <div
+                v-for="opt in filteredAvailableIds"
+                :key="opt"
+                @click="toggleId(opt)"
+                class="px-3.5 py-1.5 flex items-center justify-between gap-2 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors text-xs font-semibold text-zinc-800 dark:text-zinc-200 select-none"
+              >
+                <div class="flex items-center gap-2.5 truncate">
+                  <input
+                    type="checkbox"
+                    :checked="isIdSelected(opt)"
+                    class="h-3.5 w-3.5 rounded border-zinc-300 text-blue-600 focus:ring-blue-500 cursor-pointer pointer-events-none shrink-0"
+                  />
+                  <span
+                    class="font-mono font-extrabold text-[12.5px]"
+                    :class="opt === 'No ID' ? 'text-zinc-400' : 'text-[#0066cc] dark:text-blue-400'"
+                  >
+                    {{ opt }}
+                  </span>
+                </div>
+                <span class="text-[10.5px] font-mono text-zinc-400 font-normal">
+                  {{ idPrefixStudentCounts.get(opt) || 0 }} {{ (idPrefixStudentCounts.get(opt) || 0) === 1 ? 'student' : 'students' }}
+                </span>
+              </div>
+              <div v-if="filteredAvailableIds.length === 0" class="px-3.5 py-3 text-center text-[11px] text-zinc-400">
+                No matching ID prefixes
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Reset Student Filters Button -->
+        <button
+          v-if="hasActiveStudentFilters"
+          type="button"
+          @click="resetStudentFilters"
+          class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl border border-red-200 dark:border-red-900/40 bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/50 transition-all cursor-pointer shadow-2xs"
+          title="Reset all 5 student filters back to All"
+        >
+          <RotateCcw class="h-3.5 w-3.5" />
+          <span>Reset Filters</span>
+        </button>
+      </div>
     </div>
 
     <!-- ── Breakdown Sections: Method & Cashier Breakdown ──────────────── -->
@@ -821,13 +1736,13 @@ const exportFinanceReportToExcel = async () => {
           <thead>
             <tr class="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-850/60 text-[11.5px] font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-300 select-none">
               <th class="px-4 py-3 w-12 text-center">No</th>
-              <th class="px-4 py-3 w-[24%]">Student / Full Name</th>
-              <th class="px-4 py-3 w-[14%]">Type</th>
-              <th class="px-4 py-3 w-[16%]">Method / Channel</th>
-              <th class="px-4 py-3 w-[14%]">Received By</th>
+              <th class="px-4 py-3 w-[26%]">Student / Full Name</th>
+              <th class="px-4 py-3 w-[12%]">Type</th>
+              <th class="px-4 py-3 w-[15%]">Method / Channel</th>
+              <th class="px-4 py-3 w-[13%]">Received By</th>
               <th class="px-4 py-3 w-[16%] text-right">Amount</th>
-              <th class="px-4 py-3 w-[16%]">Date & Time</th>
-              <th class="px-4 py-3 text-center w-16">Receipt</th>
+              <th class="px-4 py-3 w-[14%]">Date & Time</th>
+              <th class="px-4 py-3 text-center w-14">Receipt</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-zinc-100 dark:divide-zinc-800 text-[13px]">
@@ -841,15 +1756,35 @@ const exportFinanceReportToExcel = async () => {
                 {{ (currentPage - 1) * ITEMS_PER_PAGE + idx + 1 }}
               </td>
 
-              <!-- Student Full Name & ID -->
+              <!-- Student Full Name & Info Badges -->
               <td class="px-4 py-3">
                 <div class="flex flex-col gap-0.5">
                   <span class="font-bold uppercase tracking-wide text-zinc-900 dark:text-zinc-100 truncate">
                     {{ p.student_full_name || p.student_name || 'General Payment' }}
                   </span>
-                  <span class="font-mono text-[11px] font-bold text-[#0066cc] dark:text-blue-400">
-                    {{ p.student_id || '—' }}
-                  </span>
+                  <div class="flex flex-wrap items-center gap-1.5 mt-0.5">
+                    <span class="font-mono text-[11px] font-bold text-[#0066cc] dark:text-blue-400">
+                      {{ p.student_id || '—' }}
+                    </span>
+                    <span
+                      v-if="getStudent(p.student_id)?.tariff"
+                      class="px-1.5 py-0.2 rounded text-[9.5px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 uppercase"
+                    >
+                      {{ getStudent(p.student_id)?.tariff }}
+                    </span>
+                    <span
+                      v-if="getStudent(p.student_id)?.student_group"
+                      class="px-1.5 py-0.2 rounded text-[9.5px] font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 uppercase"
+                    >
+                      {{ getStudent(p.student_id)?.student_group }}
+                    </span>
+                    <span
+                      v-if="getStudent(p.student_id)?.coordinator"
+                      class="px-1.5 py-0.2 rounded text-[9.5px] font-semibold bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 uppercase"
+                    >
+                      {{ getStudent(p.student_id)?.coordinator }}
+                    </span>
+                  </div>
                 </div>
               </td>
 
