@@ -3,7 +3,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import type { Student } from '@/types'
 import {
   Search, Plus, LayoutGrid, Table as TableIcon,
-  ChevronDown, ChevronUp, UserX
+  ChevronDown, ChevronUp, UserX, FileSpreadsheet
 } from 'lucide-vue-next'
 
 const props = defineProps<{
@@ -34,6 +34,7 @@ const emit = defineEmits<{
   (e: 'update:viewMode', val: 'grid' | 'table'): void
   (e: 'toggle-sort'): void
   (e: 'open-add-payment', studentId?: string): void
+  (e: 'export-excel'): void
 }>()
 
 const isStatusOpen = ref(false)
@@ -328,30 +329,43 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <!-- View Mode Switcher -->
-      <div class="flex items-center gap-1 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-850 p-1 ml-auto">
+      <!-- Actions: Export Excel + View Mode Switcher -->
+      <div class="flex items-center gap-2 ml-auto">
         <button
           type="button"
-          @click="emit('update:viewMode', 'grid')"
-          class="p-1.5 rounded-md transition-all cursor-pointer"
-          :class="viewMode === 'grid'
-            ? 'bg-blue-600 text-white shadow-xs'
-            : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100'"
-          title="Grid View (Cards)"
+          @click="emit('export-excel')"
+          class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg border border-emerald-300 dark:border-emerald-700/60 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-all cursor-pointer shadow-2xs"
+          title="Download Filtered Students Excel"
         >
-          <LayoutGrid class="h-4 w-4" />
+          <FileSpreadsheet class="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+          <span>Export Excel</span>
         </button>
-        <button
-          type="button"
-          @click="emit('update:viewMode', 'table')"
-          class="p-1.5 rounded-md transition-all cursor-pointer"
-          :class="viewMode === 'table'
-            ? 'bg-blue-600 text-white shadow-xs'
-            : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100'"
-          title="Table View"
-        >
-          <TableIcon class="h-4 w-4" />
-        </button>
+
+        <!-- View Mode Switcher -->
+        <div class="flex items-center gap-1 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-850 p-1">
+          <button
+            type="button"
+            @click="emit('update:viewMode', 'grid')"
+            class="p-1.5 rounded-md transition-all cursor-pointer"
+            :class="viewMode === 'grid'
+              ? 'bg-blue-600 text-white shadow-xs'
+              : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100'"
+            title="Grid View (Cards)"
+          >
+            <LayoutGrid class="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            @click="emit('update:viewMode', 'table')"
+            class="p-1.5 rounded-md transition-all cursor-pointer"
+            :class="viewMode === 'table'
+              ? 'bg-blue-600 text-white shadow-xs'
+              : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100'"
+            title="Table View"
+          >
+            <TableIcon class="h-4 w-4" />
+          </button>
+        </div>
       </div>
     </div>
 

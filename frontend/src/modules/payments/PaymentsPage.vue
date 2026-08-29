@@ -4,14 +4,17 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
 import { paymentsApi } from '@/api/payments'
 import { studentsApi } from '@/api/students'
 import { settingsApi } from '@/api/settings'
+import { authApi } from '@/api/auth'
 import type { Payment, Student } from '@/types'
 import { useUiStore } from '@/stores/ui'
 import {
-  Users, Receipt, Plus, Minus
+  Users, Receipt, Plus, Minus, DollarSign, Lock
 } from 'lucide-vue-next'
 
 import PaymentStudentOverview from './components/PaymentStudentOverview.vue'
 import PaymentHistoryTable from './components/PaymentHistoryTable.vue'
+import FinanceTab from './components/FinanceTab.vue'
+import VerifyFinanceModal from './components/VerifyFinanceModal.vue'
 import AddPaymentModal from './components/AddPaymentModal.vue'
 import WithdrawModal from './components/WithdrawModal.vue'
 import EditPaymentModal from './components/EditPaymentModal.vue'
@@ -95,9 +98,15 @@ const matchesBalanceOption = (studentBalance: number, option: string) => {
 }
 
 // ── Main Page State ───────────────────────────────────────────────────
-const activeTab = ref<'students' | 'history'>('students')
+const activeTab = ref<'students' | 'history' | 'finance'>('students')
 const viewMode = ref<'grid' | 'table'>('table')
 const sortOrder = ref<'asc' | 'desc'>('asc')
+
+// Finance Tab Security & Access State
+const isFinanceUnlocked = ref(sessionStorage.getItem('finance_unlocked') === 'true')
+const isVerifyModalOpen = ref(false)
+const isVerifyingPassword = ref(false)
+const verifyPasswordError = ref<string | null>(null)
 
 // Students Tab Filter State (Multi-Select Arrays)
 const studentSearch = ref('')
@@ -664,6 +673,129 @@ const handleDeletePayment = (payment: Payment) => {
   }
 }
 
+// ── Finance Tab Security & Authorization ─────────────────────────────
+const handleTabClick = (tab: 'students' | 'history' | 'finance') => {
+  if (tab === 'finance') {
+    if (isFinanceUnlocked.value) {
+      activeTab.value = 'finance'
+    } else {
+      verifyPasswordError.value = null
+      isVerifyModalOpen.value = true
+    }
+  } else {
+    activeTab.value = tab
+  }
+}
+
+const handleVerifyFinance = async (password: string) => {
+  isVerifyingPassword.value = true
+  verifyPasswordError.value = null
+  try {
+    const res = await authApi.verifyFinancePassword(password)
+    if (res.valid) {
+      isFinanceUnlocked.value = true
+      sessionStorage.setItem('finance_unlocked', 'true')
+      activeTab.value = 'finance'
+      isVerifyModalOpen.value = false
+      uiStore.addToast({
+        type: 'success',
+        title: 'Finance Unlocked',
+        message: `Authorized by ${res.manager_name || 'Head Manager'}.`
+      })
+    } else {
+      verifyPasswordError.value = 'Access denied. Incorrect password.'
+    }
+  } catch (err: any) {
+    verifyPasswordError.value = err.response?.data?.detail || 'Incorrect Head Manager password.'
+  } finally {
+    isVerifyingPassword.value = false
+  }
+}
+
+const handleLockFinance = () => {
+  isFinanceUnlocked.value = false
+  sessionStorage.removeItem('finance_unlocked')
+  activeTab.value = 'students'
+  uiStore.addToast({
+    type: 'info',
+    title: 'Finance Locked',
+    message: 'Finance session has been locked.'
+  })
+}
+
+// ── Students Overview Excel Export ───────────────────────────────────
+const exportStudentOverviewToExcel = async () => {
+  if (sortedStudents.value.length === 0) {
+    alert('No students to export!')
+    return
+  }
+
+  const XLSX = await import('xlsx-js-style')
+
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const formatDate = (dateStr?: string) => {
+    if (!dateStr) return ''
+    const d = new Date(dateStr)
+    if (isNaN(d.getTime())) return dateStr
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+  }
+
+  const excelData = sortedStudents.value.map((s, index) => {
+    const balance = Number(s.balance) || 0
+    const discount = Number(s.discount) || 0
+    const paid = Number(s.paid_amount ?? (s as any).total_paid ?? 0)
+    let tariffName = s.tariff || 'No Tariff'
+    if (s.tariff === 'E-VISA') {
+      tariffName += (s.language_certificate && s.language_certificate !== 'NO CERTIFICATE')
+        ? ' (TIL SERTIFIKATLI)'
+        : ' (TIL SERTIFIKATISIZ)'
+    }
+    let finStatus = 'Fully Paid'
+    if (balance < 0) finStatus = 'In Debt'
+    else if (balance > 0) finStatus = 'Advance / Overpaid'
+
+    return {
+      No: index + 1,
+      'Student ID': s.id || '',
+      'Full Name': s.full_name || '',
+      'Phone': s.phone || '',
+      'Group': s.student_group || 'No Group',
+      'Tariff': tariffName,
+      'Tariff Price (UZS)': s.tariff_price ? Number(s.tariff_price) : '',
+      'Paid Amount (UZS)': paid,
+      'Discount (UZS)': discount,
+      'Balance (UZS)': balance,
+      'Financial Status': finStatus,
+      'Status': s.is_deleted ? 'Archived' : 'Active'
+    }
+  })
+
+  const colWidths = [
+    { wch: 6 },   // No
+    { wch: 15 },  // Student ID
+    { wch: 30 },  // Full Name
+    { wch: 18 },  // Phone
+    { wch: 15 },  // Group
+    { wch: 25 },  // Tariff
+    { wch: 18 },  // Tariff Price
+    { wch: 18 },  // Paid Amount
+    { wch: 16 },  // Discount
+    { wch: 18 },  // Balance
+    { wch: 18 },  // Financial Status
+    { wch: 12 }   // Status
+  ]
+
+  const ws = XLSX.utils.json_to_sheet(excelData)
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, 'Students Financial Overview')
+  ws['!cols'] = colWidths
+
+  const dateStr = new Date().toISOString().split('T')[0]
+  const filename = `Students_Payments_Export_${dateStr}.xlsx`
+
+  XLSX.writeFile(wb, filename)
+}
+
 // ── Excel Export with xlsx-js-style matching UniApp2 ─────────────────
 const exportPaymentHistoryToExcel = async () => {
   if (sortedPayments.value.length === 0) {
@@ -732,11 +864,11 @@ const exportPaymentHistoryToExcel = async () => {
   <div class="flex flex-col gap-4 select-none">
     <!-- Header row: tab switcher + actions -->
     <div class="flex flex-wrap items-center justify-between gap-3">
-      <!-- Left: Tab Switcher (UniApp2 1-to-1) -->
+      <!-- Left: Tab Switcher (UniApp2 1-to-1 + Finance) -->
       <div class="flex items-center gap-1 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#111315] p-1 shadow-2xs">
         <button
           type="button"
-          @click="activeTab = 'students'"
+          @click="handleTabClick('students')"
           class="flex items-center gap-2 rounded-lg px-3.5 py-1.5 text-xs font-bold transition-all cursor-pointer select-none"
           :class="activeTab === 'students'
             ? 'bg-blue-600 text-white shadow-xs'
@@ -747,7 +879,7 @@ const exportPaymentHistoryToExcel = async () => {
         </button>
         <button
           type="button"
-          @click="activeTab = 'history'"
+          @click="handleTabClick('history')"
           class="flex items-center gap-2 rounded-lg px-3.5 py-1.5 text-xs font-bold transition-all cursor-pointer select-none"
           :class="activeTab === 'history'
             ? 'bg-blue-600 text-white shadow-xs'
@@ -755,6 +887,18 @@ const exportPaymentHistoryToExcel = async () => {
         >
           <Receipt class="h-4 w-4" />
           <span>Payment History</span>
+        </button>
+        <button
+          type="button"
+          @click="handleTabClick('finance')"
+          class="flex items-center gap-2 rounded-lg px-3.5 py-1.5 text-xs font-bold transition-all cursor-pointer select-none"
+          :class="activeTab === 'finance'
+            ? 'bg-blue-600 text-white shadow-xs'
+            : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-850 hover:text-zinc-900 dark:hover:text-zinc-100'"
+        >
+          <DollarSign class="h-4 w-4 stroke-[2.5]" />
+          <span>Finance</span>
+          <Lock v-if="!isFinanceUnlocked" class="h-3 w-3 text-amber-500 shrink-0" />
         </button>
       </div>
 
@@ -806,6 +950,7 @@ const exportPaymentHistoryToExcel = async () => {
         @update:view-mode="viewMode = $event"
         @toggle-sort="sortOrder = sortOrder === 'asc' ? 'desc' : 'asc'"
         @open-add-payment="openAddModal"
+        @export-excel="exportStudentOverviewToExcel"
       />
 
       <!-- Pagination -->
@@ -829,7 +974,7 @@ const exportPaymentHistoryToExcel = async () => {
     </div>
 
     <!-- ── Tab 2: Payment History ────────────────────────────────────── -->
-    <div v-else>
+    <div v-else-if="activeTab === 'history'">
       <PaymentHistoryTable
         :payments="paginatedPayments"
         :total-filtered-count="sortedPayments.length"
@@ -869,7 +1014,29 @@ const exportPaymentHistoryToExcel = async () => {
       </div>
     </div>
 
+    <!-- ── Tab 3: Executive Finance Dashboard ────────────────────────── -->
+    <div v-else-if="activeTab === 'finance'">
+      <FinanceTab
+        :payments="allPayments"
+        :students="allStudents"
+        :payment-methods="paymentMethods"
+        :payment-receivers="paymentReceivers"
+        :is-loading="isHistoryLoading || isOverviewLoading"
+        @lock-finance="handleLockFinance"
+        @open-add-payment="openAddModal"
+      />
+    </div>
+
     <!-- ── Modals ────────────────────────────────────────────────────── -->
+    <!-- Verify Finance Password Modal -->
+    <VerifyFinanceModal
+      :is-open="isVerifyModalOpen"
+      :is-verifying="isVerifyingPassword"
+      :error-message="verifyPasswordError"
+      @close="isVerifyModalOpen = false"
+      @submit="handleVerifyFinance"
+    />
+
     <!-- Add Payment Modal -->
     <AddPaymentModal
       :is-open="isAddModalOpen"

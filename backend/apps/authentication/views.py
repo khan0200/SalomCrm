@@ -140,6 +140,49 @@ class MeView(APIView):
         return Response(serializer.data)
 
 
+class VerifyFinancePasswordView(APIView):
+    """
+    Verifies that the provided password belongs to an authorized Head Manager or Super Admin
+    of the current tenant (or platform Super Admin).
+    Enforces strict tenant isolation.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        password = (request.data.get('password') or '').strip()
+        if not password:
+            return Response({'detail': 'Password is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        user = getattr(request, 'user', None)
+        tenant = getattr(request, 'tenant', None) or (getattr(user, 'tenant', None) if user and user.is_authenticated else None)
+
+        # 1. If user is authenticated in request, check their password if they belong to this tenant or are Super Admin
+        if user and user.is_authenticated:
+            if (user.is_superuser or getattr(user, 'role', '') in ['SUPER_ADMIN', 'HEAD_MANAGER', 'MANAGER']):
+                if user.check_password(password):
+                    return Response({'valid': True, 'manager_name': user.full_name, 'role': getattr(user, 'role', '')})
+
+        # 2. Check active Head Managers of THIS TENANT or Platform Super Admins
+        head_managers = User.objects.filter(is_active=True)
+        if tenant:
+            head_managers = head_managers.filter(
+                Q(tenant=tenant, role__in=['HEAD_MANAGER', 'MANAGER']) |
+                Q(role='SUPER_ADMIN') |
+                Q(is_superuser=True)
+            )
+        else:
+            head_managers = head_managers.filter(
+                Q(role__in=['HEAD_MANAGER', 'SUPER_ADMIN']) |
+                Q(is_superuser=True)
+            )
+
+        for hm in head_managers:
+            if hm.check_password(password):
+                return Response({'valid': True, 'manager_name': hm.full_name, 'role': hm.role})
+
+        return Response({'detail': 'Incorrect Head Manager password.'}, status=status.HTTP_400_BAD_REQUEST)
+
+
 class UserViewSet(viewsets.ModelViewSet):
     """
     CRUD for Tenant Users with strict tenant isolation:
