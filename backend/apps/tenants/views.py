@@ -169,3 +169,20 @@ class BranchViewSet(viewsets.ModelViewSet):
             from .models import Tenant
             tenant = Tenant.objects.first()
         serializer.save(tenant=tenant)
+
+    def perform_update(self, serializer):
+        instance = self.get_object()
+        old_name = instance.name
+        new_branch = serializer.save()
+        new_name = new_branch.name
+        if old_name and new_name and old_name != new_name and new_branch.tenant:
+            from apps.students.models import Student
+            Student.objects.filter(tenant=new_branch.tenant, office__iexact=old_name).update(office=new_name)
+
+    def perform_destroy(self, instance):
+        branch_name = instance.name
+        tenant = instance.tenant
+        instance.delete()
+        if branch_name and tenant:
+            from apps.students.models import Student
+            Student.objects.filter(tenant=tenant, office__iexact=branch_name).update(office=None)

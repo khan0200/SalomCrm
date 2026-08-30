@@ -132,20 +132,9 @@ const categories = computed<CategoryItem[]>(() => {
   const levelOpts = ['NO_LEVEL', ...(props.options.levels || [])]
   const groupOpts = ['NO_GROUP', ...(props.options.groups || [])]
   
-  const branchSet = new Set<string>()
-  if (props.options.offices) {
-    props.options.offices.forEach(o => {
-      if (o && o !== 'NO_BRANCH' && o !== 'No Branch') branchSet.add(o)
-    })
-  }
-  if (props.students) {
-    props.students.forEach(s => {
-      if (s.office && s.office !== 'NO_BRANCH' && s.office !== 'No Branch') {
-        branchSet.add(s.office)
-      }
-    })
-  }
-  const branchOpts = ['NO_BRANCH', ...Array.from(branchSet).sort((a, b) => a.localeCompare(b))]
+  const configuredOffices = (props.options.offices || [])
+    .filter((o: string) => o && o !== 'NO_BRANCH' && o !== 'No Branch')
+  const branchOpts = ['NO_BRANCH', ...Array.from(new Set(configuredOffices)).sort((a: string, b: string) => a.localeCompare(b))]
 
   const leadOpts = ['NO_LEADBY', ...(props.options.leads || [])]
   const dynamicTagOpts = tagsRegistry.value.map(t => t.name)
@@ -352,8 +341,13 @@ const matchingStudentsCount = computed(() => {
     // 4. Branch filter
     if (draftBranches.value.length > 0) {
       const matchNoBranch = draftBranches.value.includes('NO_BRANCH') && !student.office
-      const draftBranchesLower = draftBranches.value.filter(b => b !== 'NO_BRANCH').map(b => b.toLowerCase())
-      const matchBranch = !!student.office && draftBranchesLower.includes(student.office.toLowerCase())
+      const draftBranchesLower = draftBranches.value.filter(b => b !== 'NO_BRANCH').map(b => b.trim().toLowerCase())
+      const sOffice = (student.office || '').trim().toLowerCase()
+      const sOfficeBase = sOffice.replace(/\s+offis$/i, '').replace(/\s+office$/i, '').trim()
+      const matchBranch = !!student.office && draftBranchesLower.some(b => {
+        const bBase = b.replace(/\s+offis$/i, '').replace(/\s+office$/i, '').trim()
+        return sOffice === b || sOfficeBase === bBase || sOffice.startsWith(b) || b.startsWith(sOffice)
+      })
       if (!matchNoBranch && !matchBranch) return false
     }
 
@@ -444,7 +438,12 @@ const getOptionCount = (catId: string, opt: string): number => {
     }
     if (catId === 'branch') {
       if (opt === 'NO_BRANCH') return !s.office
-      return !!s.office && s.office.toLowerCase() === opt.toLowerCase()
+      if (!s.office) return false
+      const optLower = opt.trim().toLowerCase()
+      const optBase = optLower.replace(/\s+offis$/i, '').replace(/\s+office$/i, '').trim()
+      const sOffice = s.office.trim().toLowerCase()
+      const sOfficeBase = sOffice.replace(/\s+offis$/i, '').replace(/\s+office$/i, '').trim()
+      return sOffice === optLower || sOfficeBase === optBase || sOffice.startsWith(optLower) || optLower.startsWith(sOffice)
     }
     if (catId === 'cert') {
       if (opt === 'NO CERTIFICATE') return !s.language_certificate || s.language_certificate === 'NO CERTIFICATE'

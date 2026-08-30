@@ -324,10 +324,17 @@ const filteredStudents = computed(() => {
 
   if (selectedBranches.value.length > 0) {
     const hasNoBranch = selectedBranches.value.includes('NO_BRANCH') || selectedBranches.value.includes('No Branch')
-    const cleanBranches = selectedBranches.value.filter(b => b !== 'NO_BRANCH' && b !== 'No Branch').map(b => b.toLowerCase())
+    const cleanBranches = selectedBranches.value.filter(b => b !== 'NO_BRANCH' && b !== 'No Branch').map(b => b.trim().toLowerCase())
     list = list.filter(s => {
-      if (hasNoBranch && (!s.office || cleanBranches.includes(s.office.toLowerCase()))) return true
-      return !!s.office && cleanBranches.includes(s.office.toLowerCase())
+      if (!s.office) return hasNoBranch
+      const sOffice = s.office.trim().toLowerCase()
+      const sOfficeBase = sOffice.replace(/\s+offis$/i, '').replace(/\s+office$/i, '').trim()
+      const matchesSelected = cleanBranches.some(b => {
+        const bBase = b.replace(/\s+offis$/i, '').replace(/\s+office$/i, '').trim()
+        return sOffice === b || sOfficeBase === bBase || sOffice.startsWith(b) || b.startsWith(sOffice)
+      })
+      if (hasNoBranch && matchesSelected) return true
+      return matchesSelected
     })
   }
 

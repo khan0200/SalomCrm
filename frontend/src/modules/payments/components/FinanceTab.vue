@@ -92,19 +92,10 @@ const availableTariffs = computed<string[]>(() => {
 })
 
 const availableBranches = computed<string[]>(() => {
-  const set = new Set<string>()
-  if (props.options?.offices) {
-    props.options.offices.forEach((o: any) => {
-      const name = typeof o === 'string' ? o : o?.name
-      if (name && name !== 'No Branch' && name !== 'NO_BRANCH') set.add(name)
-    })
-  }
-  props.students.forEach(s => {
-    if (s.office && s.office !== 'No Branch' && s.office !== 'NO_BRANCH') {
-      set.add(s.office)
-    }
-  })
-  const sorted = Array.from(set).sort((a, b) => a.localeCompare(b))
+  const list: string[] = (props.options?.offices || [])
+    .map((o: any) => typeof o === 'string' ? o : o?.name)
+    .filter((name: string) => Boolean(name) && name !== 'No Branch' && name !== 'NO_BRANCH')
+  const sorted = Array.from(new Set<string>(list)).sort((a, b) => a.localeCompare(b))
   return [...sorted, 'No Branch']
 })
 
@@ -113,7 +104,12 @@ const branchStudentCounts = computed(() => {
   availableBranches.value.forEach(b => {
     const count = props.students.filter(s => {
       if (b === 'No Branch') return !s.office
-      return !!s.office && s.office.toLowerCase() === b.toLowerCase()
+      if (!s.office) return false
+      const bLower = b.trim().toLowerCase()
+      const bBase = bLower.replace(/\s+offis$/i, '').replace(/\s+office$/i, '').trim()
+      const sOffice = s.office.trim().toLowerCase()
+      const sOfficeBase = sOffice.replace(/\s+offis$/i, '').replace(/\s+office$/i, '').trim()
+      return sOffice === bLower || sOfficeBase === bBase || sOffice.startsWith(bLower) || bLower.startsWith(sOffice)
     }).length
     map.set(b, count)
   })
@@ -529,7 +525,12 @@ const matchesStudentCriteria = (studentId?: string | null) => {
   const branchVal = s?.office || 'No Branch'
   const isBranchMatched = effectiveSelectedBranches.value.some(b => {
     if (b === 'No Branch') return !s?.office
-    return !!s?.office && s.office.toLowerCase() === b.toLowerCase()
+    if (!s?.office) return false
+    const bLower = b.trim().toLowerCase()
+    const bBase = bLower.replace(/\s+offis$/i, '').replace(/\s+office$/i, '').trim()
+    const sOffice = s.office.trim().toLowerCase()
+    const sOfficeBase = sOffice.replace(/\s+offis$/i, '').replace(/\s+office$/i, '').trim()
+    return sOffice === bLower || sOfficeBase === bBase || sOffice.startsWith(bLower) || bLower.startsWith(sOffice)
   })
   if (!isBranchMatched) return false
 
