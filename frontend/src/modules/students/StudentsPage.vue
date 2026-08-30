@@ -101,6 +101,10 @@ const selectedGroups = computed({
   get: () => dashboardStore.selectedGroups,
   set: (v) => dashboardStore.selectedGroups = v,
 })
+const selectedBranches = computed({
+  get: () => dashboardStore.selectedBranches,
+  set: (v) => dashboardStore.selectedBranches = v,
+})
 const selectedCerts = computed({
   get: () => dashboardStore.selectedCerts,
   set: (v) => dashboardStore.selectedCerts = v,
@@ -131,6 +135,7 @@ watch([
   selectedTariffs,
   selectedLevels,
   selectedGroups,
+  selectedBranches,
   selectedCerts,
   selectedScores,
   selectedTags,
@@ -284,6 +289,15 @@ const filteredStudents = computed(() => {
     list = list.filter(s => {
       if (hasNoGroup && (!s.student_group || cleanGroups.includes(s.student_group))) return true
       return s.student_group && cleanGroups.includes(s.student_group)
+    })
+  }
+
+  if (selectedBranches.value.length > 0) {
+    const hasNoBranch = selectedBranches.value.includes('NO_BRANCH') || selectedBranches.value.includes('No Branch')
+    const cleanBranches = selectedBranches.value.filter(b => b !== 'NO_BRANCH' && b !== 'No Branch').map(b => b.toLowerCase())
+    list = list.filter(s => {
+      if (hasNoBranch && (!s.office || cleanBranches.includes(s.office.toLowerCase()))) return true
+      return !!s.office && cleanBranches.includes(s.office.toLowerCase())
     })
   }
 
@@ -716,6 +730,7 @@ const handleApplyFilters = (filters: {
   tariffs: string[]
   levels: string[]
   groups: string[]
+  branches?: string[]
   certs: string[]
   scores: string[]
   tags: string[]
@@ -725,6 +740,7 @@ const handleApplyFilters = (filters: {
   selectedTariffs.value = filters.tariffs
   selectedLevels.value = filters.levels
   selectedGroups.value = filters.groups
+  selectedBranches.value = filters.branches || []
   selectedCerts.value = filters.certs
   selectedScores.value = filters.scores
   selectedTags.value = filters.tags
@@ -739,6 +755,7 @@ const resetAllFilters = () => {
   selectedTariffs.value = []
   selectedLevels.value = []
   selectedGroups.value = []
+  selectedBranches.value = []
   selectedCerts.value = []
   selectedScores.value = []
   selectedTags.value = []
@@ -816,6 +833,7 @@ dashboardStore.onExportExcel = handleExportExcel
       :selected-tariffs="selectedTariffs"
       :selected-levels="selectedLevels"
       :selected-groups="selectedGroups"
+      :selected-branches="selectedBranches"
       :selected-certs="selectedCerts"
       :selected-scores="selectedScores"
       :selected-tags="selectedTags"
@@ -855,6 +873,15 @@ dashboardStore.onExportExcel = handleExportExcel
       >
         <span>Group: {{ g === 'NO_GROUP' ? 'No Group' : g }}</span>
         <X class="w-3 h-3 cursor-pointer hover:text-red-500" @click="selectedGroups = selectedGroups.filter(x => x !== g)" />
+      </span>
+
+      <span
+        v-for="b in selectedBranches"
+        :key="`b-${b}`"
+        class="inline-flex items-center gap-1 px-2.5 py-0.5 bg-teal-50 dark:bg-teal-950/40 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-800 rounded-full font-medium"
+      >
+        <span>Branch: {{ b === 'NO_BRANCH' ? 'No Branch' : b }}</span>
+        <X class="w-3 h-3 cursor-pointer hover:text-red-500" @click="selectedBranches = selectedBranches.filter(x => x !== b)" />
       </span>
 
       <span

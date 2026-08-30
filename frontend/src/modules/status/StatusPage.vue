@@ -67,6 +67,10 @@ const selectedGroups = computed({
   get: () => dashboardStore.selectedGroups,
   set: (v) => dashboardStore.selectedGroups = v,
 })
+const selectedBranches = computed({
+  get: () => dashboardStore.selectedBranches,
+  set: (v) => dashboardStore.selectedBranches = v,
+})
 const selectedCerts = computed({
   get: () => dashboardStore.selectedCerts,
   set: (v) => dashboardStore.selectedCerts = v,
@@ -315,6 +319,15 @@ const filteredStudents = computed(() => {
     list = list.filter(s => {
       if (selectedGroups.value.includes('NO_GROUP') && !s.student_group) return true
       return s.student_group && selectedGroups.value.includes(s.student_group)
+    })
+  }
+
+  if (selectedBranches.value.length > 0) {
+    const hasNoBranch = selectedBranches.value.includes('NO_BRANCH') || selectedBranches.value.includes('No Branch')
+    const cleanBranches = selectedBranches.value.filter(b => b !== 'NO_BRANCH' && b !== 'No Branch').map(b => b.toLowerCase())
+    list = list.filter(s => {
+      if (hasNoBranch && (!s.office || cleanBranches.includes(s.office.toLowerCase()))) return true
+      return !!s.office && cleanBranches.includes(s.office.toLowerCase())
     })
   }
 
@@ -680,6 +693,7 @@ const handleApplyFilters = (filters: any) => {
   selectedTariffs.value = filters.tariffs
   selectedLevels.value = filters.levels
   selectedGroups.value = filters.groups
+  selectedBranches.value = filters.branches || []
   selectedCerts.value = filters.certs
   selectedScores.value = filters.scores
   selectedTags.value = filters.tags
@@ -1118,11 +1132,12 @@ const handleSaveFolderAdd = async (selectedIds: string[]) => {
     <!-- Shared Filter Drawer -->
     <StudentFilters
       :is-open="isFilterPanelOpen"
-      :options="optionsData || { tariffs: [], levels: [], groups: [], leads: [], folders: [] }"
+      :options="optionsData || { tariffs: [], levels: [], groups: [], leads: [], folders: [], offices: [] }"
       :students="allStudents"
       :selected-tariffs="selectedTariffs"
       :selected-levels="selectedLevels"
       :selected-groups="selectedGroups"
+      :selected-branches="selectedBranches"
       :selected-certs="selectedCerts"
       :selected-scores="selectedScores"
       :selected-tags="selectedTags"

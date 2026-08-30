@@ -13,6 +13,7 @@ export const useStudentDashboardStore = defineStore('studentDashboard', () => {
   const selectedTariffs = ref<string[]>([])
   const selectedLevels = ref<string[]>([])
   const selectedGroups = ref<string[]>([])
+  const selectedBranches = ref<string[]>([])
   const selectedCerts = ref<string[]>([])
   const selectedScores = ref<string[]>([])
   const selectedTags = ref<string[]>([])
@@ -24,6 +25,7 @@ export const useStudentDashboardStore = defineStore('studentDashboard', () => {
       selectedTariffs.value.length +
       selectedLevels.value.length +
       selectedGroups.value.length +
+      selectedBranches.value.length +
       selectedCerts.value.length +
       selectedScores.value.length +
       selectedTags.value.length +
@@ -37,6 +39,7 @@ export const useStudentDashboardStore = defineStore('studentDashboard', () => {
     selectedTariffs.value = []
     selectedLevels.value = []
     selectedGroups.value = []
+    selectedBranches.value = []
     selectedCerts.value = []
     selectedScores.value = []
     selectedTags.value = []
@@ -74,6 +77,7 @@ export const useStudentDashboardStore = defineStore('studentDashboard', () => {
     selectedTariffs,
     selectedLevels,
     selectedGroups,
+    selectedBranches,
     selectedCerts,
     selectedScores,
     selectedTags,

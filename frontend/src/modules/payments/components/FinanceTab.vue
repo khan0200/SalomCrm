@@ -73,7 +73,7 @@ const getStudent = (studentId?: string | null): Student | undefined => {
   return studentMap.value.get(studentId) || studentMap.value.get(studentId.toLowerCase())
 }
 
-// ── 5 Multi-Select Filter Options (Tariff, Group, Coordinator, Level, ID) ──
+// ── 6 Multi-Select Filter Options (Tariff, Branch, Group, Coordinator, Level, ID) ──
 const availableTariffs = computed<string[]>(() => {
   const set = new Set<string>()
   if (props.options?.tariffs) {
@@ -89,6 +89,35 @@ const availableTariffs = computed<string[]>(() => {
   })
   const sorted = Array.from(set).sort((a, b) => a.localeCompare(b))
   return [...sorted, 'No Tariff']
+})
+
+const availableBranches = computed<string[]>(() => {
+  const set = new Set<string>()
+  if (props.options?.offices) {
+    props.options.offices.forEach((o: any) => {
+      const name = typeof o === 'string' ? o : o?.name
+      if (name && name !== 'No Branch' && name !== 'NO_BRANCH') set.add(name)
+    })
+  }
+  props.students.forEach(s => {
+    if (s.office && s.office !== 'No Branch' && s.office !== 'NO_BRANCH') {
+      set.add(s.office)
+    }
+  })
+  const sorted = Array.from(set).sort((a, b) => a.localeCompare(b))
+  return [...sorted, 'No Branch']
+})
+
+const branchStudentCounts = computed(() => {
+  const map = new Map<string, number>()
+  availableBranches.value.forEach(b => {
+    const count = props.students.filter(s => {
+      if (b === 'No Branch') return !s.office
+      return !!s.office && s.office.toLowerCase() === b.toLowerCase()
+    }).length
+    map.set(b, count)
+  })
+  return map
 })
 
 const availableGroups = computed<string[]>(() => {
@@ -221,6 +250,7 @@ const idPrefixStudentCounts = computed(() => {
 
 // ── Multi-Select States (null = all checked by default) ───────────────
 const selectedTariffs = ref<string[] | null>(null)
+const selectedBranches = ref<string[] | null>(null)
 const selectedGroups = ref<string[] | null>(null)
 const selectedCoordinators = ref<string[] | null>(null)
 const selectedLevels = ref<string[] | null>(null)
@@ -228,6 +258,7 @@ const selectedIds = ref<string[] | null>(null)
 
 // Effective selected arrays
 const effectiveSelectedTariffs = computed<string[]>(() => selectedTariffs.value ?? availableTariffs.value)
+const effectiveSelectedBranches = computed<string[]>(() => selectedBranches.value ?? availableBranches.value)
 const effectiveSelectedGroups = computed<string[]>(() => selectedGroups.value ?? availableGroups.value)
 const effectiveSelectedCoordinators = computed<string[]>(() => selectedCoordinators.value ?? availableCoordinators.value)
 const effectiveSelectedLevels = computed<string[]>(() => selectedLevels.value ?? availableLevels.value)
@@ -254,6 +285,30 @@ const toggleAllTariffs = () => {
     selectedTariffs.value = []
   } else {
     selectedTariffs.value = [...availableTariffs.value]
+  }
+}
+
+// Checkers & Toggles for Branch
+const isBranchSelected = (val: string) => effectiveSelectedBranches.value.includes(val)
+const isAllBranchesSelected = computed(() => {
+  return availableBranches.value.length > 0 &&
+    effectiveSelectedBranches.value.length === availableBranches.value.length
+})
+const toggleBranch = (val: string) => {
+  const current = [...effectiveSelectedBranches.value]
+  const idx = current.indexOf(val)
+  if (idx >= 0) {
+    current.splice(idx, 1)
+  } else {
+    current.push(val)
+  }
+  selectedBranches.value = current
+}
+const toggleAllBranches = () => {
+  if (isAllBranchesSelected.value) {
+    selectedBranches.value = []
+  } else {
+    selectedBranches.value = [...availableBranches.value]
   }
 }
 
@@ -355,18 +410,21 @@ const toggleAllIds = () => {
 
 // ── Dropdown Open & Search States ────────────────────────────────────
 const isTariffOpen = ref(false)
+const isBranchOpen = ref(false)
 const isGroupOpen = ref(false)
 const isCoordinatorOpen = ref(false)
 const isLevelOpen = ref(false)
 const isIdOpen = ref(false)
 
 const tariffRef = ref<HTMLElement | null>(null)
+const branchRef = ref<HTMLElement | null>(null)
 const groupRef = ref<HTMLElement | null>(null)
 const coordinatorRef = ref<HTMLElement | null>(null)
 const levelRef = ref<HTMLElement | null>(null)
 const idRef = ref<HTMLElement | null>(null)
 
 const tariffSearch = ref('')
+const branchSearch = ref('')
 const groupSearch = ref('')
 const coordinatorSearch = ref('')
 const levelSearch = ref('')
@@ -376,6 +434,12 @@ const filteredAvailableTariffs = computed(() => {
   const q = tariffSearch.value.trim().toLowerCase()
   if (!q) return availableTariffs.value
   return availableTariffs.value.filter(t => t.toLowerCase().includes(q))
+})
+
+const filteredAvailableBranches = computed(() => {
+  const q = branchSearch.value.trim().toLowerCase()
+  if (!q) return availableBranches.value
+  return availableBranches.value.filter(b => b.toLowerCase().includes(q))
 })
 
 const filteredAvailableGroups = computed(() => {
@@ -402,8 +466,9 @@ const filteredAvailableIds = computed(() => {
   return availableIds.value.filter(prefix => prefix.toLowerCase().includes(q))
 })
 
-const toggleDropdown = (name: 'tariff' | 'group' | 'coordinator' | 'level' | 'id') => {
+const toggleDropdown = (name: 'tariff' | 'branch' | 'group' | 'coordinator' | 'level' | 'id') => {
   isTariffOpen.value = name === 'tariff' ? !isTariffOpen.value : false
+  isBranchOpen.value = name === 'branch' ? !isBranchOpen.value : false
   isGroupOpen.value = name === 'group' ? !isGroupOpen.value : false
   isCoordinatorOpen.value = name === 'coordinator' ? !isCoordinatorOpen.value : false
   isLevelOpen.value = name === 'level' ? !isLevelOpen.value : false
@@ -413,6 +478,7 @@ const toggleDropdown = (name: 'tariff' | 'group' | 'coordinator' | 'level' | 'id
 const handleClickOutside = (e: MouseEvent) => {
   const target = e.target as Node
   if (tariffRef.value && !tariffRef.value.contains(target)) isTariffOpen.value = false
+  if (branchRef.value && !branchRef.value.contains(target)) isBranchOpen.value = false
   if (groupRef.value && !groupRef.value.contains(target)) isGroupOpen.value = false
   if (coordinatorRef.value && !coordinatorRef.value.contains(target)) isCoordinatorOpen.value = false
   if (levelRef.value && !levelRef.value.contains(target)) isLevelOpen.value = false
@@ -429,6 +495,7 @@ onUnmounted(() => {
 
 const hasActiveStudentFilters = computed(() => {
   return !isAllTariffsSelected.value ||
+    !isAllBranchesSelected.value ||
     !isAllGroupsSelected.value ||
     !isAllCoordinatorsSelected.value ||
     !isAllLevelsSelected.value ||
@@ -437,11 +504,13 @@ const hasActiveStudentFilters = computed(() => {
 
 const resetStudentFilters = () => {
   selectedTariffs.value = null
+  selectedBranches.value = null
   selectedGroups.value = null
   selectedCoordinators.value = null
   selectedLevels.value = null
   selectedIds.value = null
   tariffSearch.value = ''
+  branchSearch.value = ''
   groupSearch.value = ''
   coordinatorSearch.value = ''
   levelSearch.value = ''
@@ -456,7 +525,15 @@ const matchesStudentCriteria = (studentId?: string | null) => {
   const tariffVal = s?.tariff || 'No Tariff'
   if (!effectiveSelectedTariffs.value.includes(tariffVal)) return false
 
-  // 2. Group Filter
+  // 2. Branch Filter
+  const branchVal = s?.office || 'No Branch'
+  const isBranchMatched = effectiveSelectedBranches.value.some(b => {
+    if (b === 'No Branch') return !s?.office
+    return !!s?.office && s.office.toLowerCase() === b.toLowerCase()
+  })
+  if (!isBranchMatched) return false
+
+  // 3. Group Filter
   const groupVal = s?.student_group || 'No Group'
   if (!effectiveSelectedGroups.value.includes(groupVal)) return false
 
@@ -2043,7 +2120,98 @@ const exportWithdrawalExcel = async () => {
           </div>
         </div>
 
-        <!-- 2. Group Filter Dropdown -->
+        <!-- 2. Branch Filter Dropdown -->
+        <div class="relative" ref="branchRef">
+          <button
+            type="button"
+            @click="toggleDropdown('branch')"
+            class="px-3 py-1.5 text-xs border rounded-xl cursor-pointer flex items-center justify-between gap-2 min-w-[125px] select-none transition-all shadow-2xs font-semibold"
+            :class="[
+              isBranchOpen
+                ? 'border-blue-600 bg-blue-50/50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 ring-1 ring-blue-600'
+                : !isAllBranchesSelected
+                  ? 'border-blue-500 bg-blue-50/40 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 ring-1 ring-blue-500/30'
+                  : 'border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-850 text-zinc-700 dark:text-zinc-300 hover:border-blue-400'
+            ]"
+          >
+            <div class="flex items-center gap-1.5 truncate">
+              <Building2 class="h-3.5 w-3.5 text-zinc-400 shrink-0" />
+              <span class="truncate">
+                {{ isAllBranchesSelected
+                  ? 'All Branches'
+                  : effectiveSelectedBranches.length === 0
+                    ? 'Branch (None)'
+                    : `Branch (${effectiveSelectedBranches.length}/${availableBranches.length})` }}
+              </span>
+            </div>
+            <ChevronDown
+              class="h-3.5 w-3.5 text-zinc-400 transition-transform duration-200 shrink-0"
+              :class="isBranchOpen ? 'rotate-180 text-blue-600' : ''"
+            />
+          </button>
+
+          <div
+            v-if="isBranchOpen"
+            class="absolute left-0 mt-1.5 w-60 rounded-xl border border-zinc-200 dark:border-zinc-750 bg-white dark:bg-[#181a1d] shadow-xl py-2 z-40 max-h-80 flex flex-col"
+          >
+            <div v-if="availableBranches.length > 5" class="px-2.5 pb-1.5">
+              <div class="relative">
+                <Search class="absolute left-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-zinc-400 pointer-events-none" />
+                <input
+                  type="text"
+                  v-model="branchSearch"
+                  placeholder="Search branch..."
+                  class="w-full pl-7 pr-2 py-1 text-[11px] border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-850 rounded-lg text-zinc-800 dark:text-zinc-200 focus:outline-none focus:border-blue-500"
+                />
+              </div>
+            </div>
+
+            <div
+              @click="toggleAllBranches"
+              class="px-3.5 py-1.5 flex items-center justify-between cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors text-xs font-bold text-zinc-800 dark:text-zinc-200 select-none"
+            >
+              <div class="flex items-center gap-2.5">
+                <input
+                  type="checkbox"
+                  :checked="isAllBranchesSelected"
+                  class="h-3.5 w-3.5 rounded border-zinc-300 text-blue-600 focus:ring-blue-500 cursor-pointer pointer-events-none"
+                />
+                <span>Select All</span>
+              </div>
+              <span class="text-[10.5px] font-mono text-zinc-400 font-normal">
+                {{ effectiveSelectedBranches.length }}/{{ availableBranches.length }}
+              </span>
+            </div>
+
+            <div class="h-px bg-zinc-100 dark:bg-zinc-800 my-1" />
+
+            <div class="overflow-y-auto max-h-56">
+              <div
+                v-for="opt in filteredAvailableBranches"
+                :key="opt"
+                @click="toggleBranch(opt)"
+                class="px-3.5 py-1.5 flex items-center justify-between gap-2 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors text-xs font-medium text-zinc-700 dark:text-zinc-300 select-none"
+              >
+                <div class="flex items-center gap-2.5 truncate">
+                  <input
+                    type="checkbox"
+                    :checked="isBranchSelected(opt)"
+                    class="h-3.5 w-3.5 rounded border-zinc-300 text-blue-600 focus:ring-blue-500 cursor-pointer pointer-events-none shrink-0"
+                  />
+                  <span class="truncate">{{ opt }}</span>
+                </div>
+                <span class="text-[10.5px] font-mono text-zinc-400 font-normal">
+                  {{ branchStudentCounts.get(opt) || 0 }}
+                </span>
+              </div>
+              <div v-if="filteredAvailableBranches.length === 0" class="px-3.5 py-3 text-center text-[11px] text-zinc-400">
+                No matches
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. Group Filter Dropdown -->
         <div class="relative" ref="groupRef">
           <button
             type="button"

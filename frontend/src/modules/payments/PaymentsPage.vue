@@ -186,6 +186,7 @@ const options = computed(() => optionsData.value || {
   groups: [],
   coordinators: [],
   levels: [],
+  offices: [],
 })
 
 const { data: overviewData, isLoading: isOverviewLoading } = useQuery({

@@ -96,6 +96,7 @@ watch([
   () => dashboardStore.selectedTariffs,
   () => dashboardStore.selectedLevels,
   () => dashboardStore.selectedGroups,
+  () => dashboardStore.selectedBranches,
   () => dashboardStore.selectedCerts,
   () => dashboardStore.selectedScores,
   () => dashboardStore.selectedTags,
@@ -112,6 +113,7 @@ const handleApplyFilters = (filters: {
   tariffs: string[]
   levels: string[]
   groups: string[]
+  branches?: string[]
   certs: string[]
   scores: string[]
   tags: string[]
@@ -121,6 +123,7 @@ const handleApplyFilters = (filters: {
   dashboardStore.selectedTariffs = filters.tariffs
   dashboardStore.selectedLevels = filters.levels
   dashboardStore.selectedGroups = filters.groups
+  dashboardStore.selectedBranches = filters.branches || []
   dashboardStore.selectedCerts = filters.certs
   dashboardStore.selectedScores = filters.scores
   dashboardStore.selectedTags = filters.tags
@@ -161,6 +164,15 @@ const filteredStudents = computed(() => students.value.filter(student => {
     const matchesGroup = dashboardStore.selectedGroups.includes(student.student_group || '') ||
                          (dashboardStore.selectedGroups.includes('NO_GROUP') && !student.student_group)
     if (!matchesGroup) return false
+  }
+
+  // 4b. Branch Filter
+  if (dashboardStore.selectedBranches.length > 0) {
+    const hasNoBranch = dashboardStore.selectedBranches.includes('NO_BRANCH') || dashboardStore.selectedBranches.includes('No Branch')
+    const cleanBranches = dashboardStore.selectedBranches.filter(b => b !== 'NO_BRANCH' && b !== 'No Branch').map(b => b.toLowerCase())
+    const matchesBranch = (hasNoBranch && (!student.office || cleanBranches.includes(student.office.toLowerCase()))) ||
+                          (!!student.office && cleanBranches.includes(student.office.toLowerCase()))
+    if (!matchesBranch) return false
   }
 
   // 5. Certificate Filter
@@ -507,11 +519,12 @@ const DOC_BADGE_BASE = 'h-8 w-8 shrink-0 rounded-full inline-flex items-center j
     <!-- Master-Detail Filter Panel Popover (Triggered from Top Navbar) -->
     <StudentFilters
       :is-open="isFilterPanelOpen"
-      :options="optionsData || { tariffs: [], levels: [], groups: [], leads: [], folders: [] }"
+      :options="optionsData || { tariffs: [], levels: [], groups: [], leads: [], folders: [], offices: [] }"
       :students="students"
       :selected-tariffs="dashboardStore.selectedTariffs"
       :selected-levels="dashboardStore.selectedLevels"
       :selected-groups="dashboardStore.selectedGroups"
+      :selected-branches="dashboardStore.selectedBranches"
       :selected-certs="dashboardStore.selectedCerts"
       :selected-scores="dashboardStore.selectedScores"
       :selected-tags="dashboardStore.selectedTags"
@@ -551,6 +564,15 @@ const DOC_BADGE_BASE = 'h-8 w-8 shrink-0 rounded-full inline-flex items-center j
       >
         <span>Group: {{ g === 'NO_GROUP' ? 'No Group' : g }}</span>
         <X class="w-3 h-3 cursor-pointer hover:text-red-500" @click="dashboardStore.selectedGroups = dashboardStore.selectedGroups.filter(x => x !== g)" />
+      </span>
+
+      <span
+        v-for="b in dashboardStore.selectedBranches"
+        :key="`b-${b}`"
+        class="inline-flex items-center gap-1 px-2.5 py-0.5 bg-teal-50 dark:bg-teal-950/40 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-800 rounded-full font-medium"
+      >
+        <span>Branch: {{ b === 'NO_BRANCH' ? 'No Branch' : b }}</span>
+        <X class="w-3 h-3 cursor-pointer hover:text-red-500" @click="dashboardStore.selectedBranches = dashboardStore.selectedBranches.filter(x => x !== b)" />
       </span>
 
       <span

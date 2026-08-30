@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import {
-  X, Check, Tag, Layers, Users, Award, Bookmark, UserCheck, Hash, FileText
+  X, Check, Tag, Layers, Users, Award, Bookmark, UserCheck, Hash, FileText, Building2
 } from 'lucide-vue-next'
 import type { Student } from '@/types'
 import { useCustomTags } from '@/composables/useCustomTags'
@@ -20,11 +20,13 @@ const props = withDefaults(defineProps<{
     groups: string[]
     leads: string[]
     folders?: { id: string; name: string }[]
+    offices?: string[]
   }
   students?: Student[]
   selectedTariffs: string[]
   selectedLevels: string[]
   selectedGroups: string[]
+  selectedBranches?: string[]
   selectedCerts: string[]
   selectedScores: string[]
   selectedTags: string[]
@@ -33,6 +35,7 @@ const props = withDefaults(defineProps<{
   matchingCount?: number
 }>(), {
   students: () => [],
+  selectedBranches: () => [],
   selectedMissingDocs: () => []
 })
 
@@ -42,6 +45,7 @@ const emit = defineEmits<{
     tariffs: string[]
     levels: string[]
     groups: string[]
+    branches: string[]
     certs: string[]
     scores: string[]
     tags: string[]
@@ -57,6 +61,7 @@ const { tagsRegistry, getTagIcon, fetchTags } = useCustomTags()
 const draftTariffs = ref<string[]>([])
 const draftLevels = ref<string[]>([])
 const draftGroups = ref<string[]>([])
+const draftBranches = ref<string[]>([])
 const draftCerts = ref<string[]>([])
 const draftScores = ref<string[]>([])
 const draftTags = ref<string[]>([])
@@ -73,6 +78,7 @@ watch(() => props.isOpen, (newVal) => {
     draftTariffs.value = [...props.selectedTariffs]
     draftLevels.value = [...props.selectedLevels]
     draftGroups.value = [...props.selectedGroups]
+    draftBranches.value = [...(props.selectedBranches || [])]
     draftCerts.value = [...props.selectedCerts]
     draftScores.value = [...props.selectedScores]
     draftTags.value = [...props.selectedTags]
@@ -125,6 +131,22 @@ const categories = computed<CategoryItem[]>(() => {
   const tariffOpts = ['NO_TARIFF', ...(props.options.tariffs?.map(t => t.name) || [])]
   const levelOpts = ['NO_LEVEL', ...(props.options.levels || [])]
   const groupOpts = ['NO_GROUP', ...(props.options.groups || [])]
+  
+  const branchSet = new Set<string>()
+  if (props.options.offices) {
+    props.options.offices.forEach(o => {
+      if (o && o !== 'NO_BRANCH' && o !== 'No Branch') branchSet.add(o)
+    })
+  }
+  if (props.students) {
+    props.students.forEach(s => {
+      if (s.office && s.office !== 'NO_BRANCH' && s.office !== 'No Branch') {
+        branchSet.add(s.office)
+      }
+    })
+  }
+  const branchOpts = ['NO_BRANCH', ...Array.from(branchSet).sort((a, b) => a.localeCompare(b))]
+
   const leadOpts = ['NO_LEADBY', ...(props.options.leads || [])]
   const dynamicTagOpts = tagsRegistry.value.map(t => t.name)
 
@@ -156,6 +178,14 @@ const categories = computed<CategoryItem[]>(() => {
       drafts: draftGroups.value,
       fullOpts: groupOpts,
       labelMapping: (opt) => opt === 'NO_GROUP' ? 'No Group' : opt
+    },
+    {
+      id: 'branch',
+      label: 'Branch',
+      icon: Building2,
+      drafts: draftBranches.value,
+      fullOpts: branchOpts,
+      labelMapping: (opt) => opt === 'NO_BRANCH' ? 'No Branch' : opt
     },
     {
       id: 'cert',
@@ -225,6 +255,10 @@ const toggleDraftOption = (catId: string, val: string) => {
     draftGroups.value = draftGroups.value.includes(val)
       ? draftGroups.value.filter(x => x !== val)
       : [...draftGroups.value, val]
+  } else if (catId === 'branch') {
+    draftBranches.value = draftBranches.value.includes(val)
+      ? draftBranches.value.filter(x => x !== val)
+      : [...draftBranches.value, val]
   } else if (catId === 'cert') {
     draftCerts.value = draftCerts.value.includes(val)
       ? draftCerts.value.filter(x => x !== val)
@@ -252,6 +286,7 @@ const clearAll = () => {
   draftTariffs.value = []
   draftLevels.value = []
   draftGroups.value = []
+  draftBranches.value = []
   draftCerts.value = []
   draftScores.value = []
   draftTags.value = []
@@ -264,6 +299,7 @@ const handleApply = () => {
     tariffs: draftTariffs.value,
     levels: draftLevels.value,
     groups: draftGroups.value,
+    branches: draftBranches.value,
     certs: draftCerts.value,
     scores: draftScores.value,
     tags: draftTags.value,
@@ -276,6 +312,7 @@ const hasDrafts = computed(() => {
   return draftTariffs.value.length > 0 ||
     draftLevels.value.length > 0 ||
     draftGroups.value.length > 0 ||
+    draftBranches.value.length > 0 ||
     draftCerts.value.length > 0 ||
     draftScores.value.length > 0 ||
     draftTags.value.length > 0 ||
@@ -312,7 +349,15 @@ const matchingStudentsCount = computed(() => {
       if (!matchNoGroup && !matchGroup) return false
     }
 
-    // 4. Certificate filter
+    // 4. Branch filter
+    if (draftBranches.value.length > 0) {
+      const matchNoBranch = draftBranches.value.includes('NO_BRANCH') && !student.office
+      const draftBranchesLower = draftBranches.value.filter(b => b !== 'NO_BRANCH').map(b => b.toLowerCase())
+      const matchBranch = !!student.office && draftBranchesLower.includes(student.office.toLowerCase())
+      if (!matchNoBranch && !matchBranch) return false
+    }
+
+    // 5. Certificate filter
     if (draftCerts.value.length > 0) {
       let matchesCert = false
       if (draftCerts.value.includes('NO CERTIFICATE')) {
@@ -333,7 +378,7 @@ const matchingStudentsCount = computed(() => {
       if (!matchesCert) return false
     }
 
-    // 5. Score sub-filter
+    // 6. Score sub-filter
     if (draftScores.value.length > 0 && draftCerts.value.length === 1) {
       const cert = draftCerts.value[0] || ''
       const scores = [student.certificate_score, student.certificate_score_2, student.certificate_score_3]
@@ -348,7 +393,7 @@ const matchingStudentsCount = computed(() => {
       if (!matchesScore) return false
     }
 
-    // 6. Tags filter
+    // 7. Tags filter
     if (draftTags.value.length > 0) {
       const matchesTag = draftTags.value.some(tag => {
         if (tag === 'Custom') {
@@ -360,7 +405,7 @@ const matchingStudentsCount = computed(() => {
       if (!matchesTag) return false
     }
 
-    // 7. Lead By filter (case-insensitive -- lead_by is free-text and the
+    // 8. Lead By filter (case-insensitive -- lead_by is free-text and the
     // same source can be saved with different casing, e.g. "Ali Uncle" vs
     // "ALI UNCLE")
     if (draftLeads.value.length > 0) {
@@ -370,7 +415,7 @@ const matchingStudentsCount = computed(() => {
       if (!matchNoLead && !matchLead) return false
     }
 
-    // 8. Missing Docs filter
+    // 9. Missing Docs filter
     if (draftMissingDocs.value.length > 0) {
       const missingList = getEffectiveMissingDocs(student)
       const matchesMissing = draftMissingDocs.value.some(d => missingList.includes(d))
@@ -396,6 +441,10 @@ const getOptionCount = (catId: string, opt: string): number => {
     if (catId === 'group') {
       if (opt === 'NO_GROUP') return !s.student_group
       return s.student_group === opt
+    }
+    if (catId === 'branch') {
+      if (opt === 'NO_BRANCH') return !s.office
+      return !!s.office && s.office.toLowerCase() === opt.toLowerCase()
     }
     if (catId === 'cert') {
       if (opt === 'NO CERTIFICATE') return !s.language_certificate || s.language_certificate === 'NO CERTIFICATE'
