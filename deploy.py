@@ -221,10 +221,32 @@ def health_check(client):
     return out
 
 
-def deploy(client, path):
-    run(client, "cd %s && git fetch origin && git reset --hard origin/%s" % (path, BRANCH),
-        label="Pulling latest code")
+def sync_code(client, path):
+    code, _ = run(client, "cd %s && git fetch origin && git reset --hard origin/%s" % (path, BRANCH),
+                  check=False, label="Pulling latest code")
+    if code != 0:
+        print("  git fetch over network failed on server; transferring local git bundle via SFTP...", flush=True)
+        import tempfile, subprocess
+        bundle_path = os.path.join(tempfile.gettempdir(), "salomcrm_deploy.bundle")
+        if os.path.exists(bundle_path):
+            os.remove(bundle_path)
+        subprocess.run(["git", "bundle", "create", bundle_path, BRANCH], check=True)
+        sftp = client.open_sftp()
+        remote_bundle = "%s/salomcrm_deploy.bundle" % path
+        sftp.put(bundle_path, remote_bundle)
+        sftp.close()
+        try:
+            os.remove(bundle_path)
+        except Exception:
+            pass
+        run(client, "cd %s && git fetch %s %s && git reset --hard FETCH_HEAD && rm -f %s" % (
+            path, remote_bundle, BRANCH, remote_bundle
+        ), label="Applying git bundle on server")
     run(client, "cd %s && git log -1 --oneline | cat" % path)
+
+
+def deploy(client, path):
+    sync_code(client, path)
 
     # venv lives at the repo root, one level above backend/
     run(client,
