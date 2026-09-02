@@ -561,10 +561,21 @@ const triggerExtraction = async () => {
     ocrEngineUsed.value = response.metadata?.ocr_engine || null
 
     const fieldsArr: ExtractedField[] = []
+    const docTypeClean = (docType || '').toUpperCase()
+    const isCertDoc = (
+      docTypeClean.includes('CERTIFICATE') ||
+      docTypeClean.includes('SCORE REPORT') ||
+      ['TOPIK', 'IELTS', 'SAT', 'SKA', 'TOEFL', 'CEFR'].some(t => docTypeClean.includes(t))
+    )
 
     if (fieldsObj && typeof fieldsObj === 'object') {
       for (const [k, v] of Object.entries(fieldsObj)) {
         if (v && String(v).trim()) {
+          const upperK = k.toUpperCase().replace(/\s+/g, '_')
+          // Do not include FULL_NAME or personal identity fields for Language Certificates
+          if (isCertDoc && ['FULL_NAME', 'NAME', 'DATE_OF_BIRTH', 'BIRTHDAY', 'SEX', 'GENDER', 'PASSPORT_NUMBER'].includes(upperK)) {
+            continue
+          }
           let fieldVal = String(v).trim()
           if (k.toUpperCase().includes('DATE') || k.toUpperCase().includes('BIRTH') || k.toUpperCase().includes('ENTRY') || k.toUpperCase().includes('GRADUATION')) {
             fieldVal = normalizeDate(fieldVal)
@@ -692,10 +703,13 @@ const isCertificateDetected = computed(() => {
 
 const detectedCertData = computed(() => {
   const getVal = (possibleKeys: string[]) => {
-    const found = extractedFieldsList.value.find(f =>
-      possibleKeys.includes(f.key.toUpperCase().replace(/\s+/g, '_'))
-    )
-    return found ? found.value : ''
+    for (const pk of possibleKeys) {
+      const found = extractedFieldsList.value.find(f =>
+        f.key.toUpperCase().replace(/\s+/g, '_') === pk
+      )
+      if (found && found.value) return found.value
+    }
+    return ''
   }
 
   let type = getVal(['CERTIFICATE_TYPE', 'LANGUAGE_CERTIFICATE', 'CERTIFICATE', 'TEST_TYPE'])
@@ -709,10 +723,19 @@ const detectedCertData = computed(() => {
   }
   type = (type || '').toUpperCase().trim()
 
-  let score = getVal(['CERTIFICATE_SCORE', 'SCORE', 'TOTAL_SCORE', 'BAND_SCORE', 'OVERALL_SCORE', 'OVERALL_BAND_SCORE', 'LEVEL', 'GRADE'])
-  if (type === 'TOPIK' && score) {
-    const m = score.match(/([1-6])/)
-    if (m) score = m[1]
+  let score = getVal(['CERTIFICATE_SCORE', 'SCORE', 'LEVEL', 'GRADE', 'TOTAL_SCORE', 'BAND_SCORE', 'OVERALL_SCORE', 'OVERALL_BAND_SCORE'])
+  if (type === 'TOPIK') {
+    // If raw OCR text has an explicit level (e.g. '2급' or near 등급/Level), prioritize it
+    if (rawOcrText.value) {
+      const geupMatch = rawOcrText.value.match(/(?:등급|Level|Total\s*Score|총점)[\s\S]{0,60}?([1-6])\s*급/i) || rawOcrText.value.match(/([1-6])\s*급/)
+      if (geupMatch && geupMatch[1]) {
+        score = geupMatch[1]
+      }
+    }
+    if (score) {
+      const m = score.match(/([1-6])/)
+      if (m) score = m[1]
+    }
   }
 
   const testDate = normalizeDate(getVal(['CERTIFICATE_TEST_DATE', 'TEST_DATE', 'DATE_OF_TEST', 'DATE_OF_THE_ASSESSMENT', 'TEST_HELD_DATE', 'DATE_OF_EXAM']))

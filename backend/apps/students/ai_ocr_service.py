@@ -78,10 +78,23 @@ Specific instructions:
       - For Secondary School Certificates (Shahodatnoma): (Date of Graduation year - 3 years), on September 2nd in YYYY-MM-DD format (e.g. 2025 - 3 = '2022-09-02').
 - If the document is a Language Certificate or Test Score Report (e.g. TOPIK, IELTS, SAT, SKA, TOEFL, CEFR):
   - Set document_type to "TOPIK CERTIFICATE", "IELTS CERTIFICATE", "SAT SCORE REPORT", "SKA CERTIFICATE", "TOEFL CERTIFICATE", or "CEFR CERTIFICATE".
-  - Extract ONLY these certificate fields:
+  - Extract ONLY certificate fields. CRITICAL: DO NOT extract candidate FULL_NAME, DATE_OF_BIRTH, or personal identity details.
+  - Extract ONLY these fields:
     - "CERTIFICATE_TYPE": Exactly one of "TOPIK", "IELTS", "SAT", "SKA", "TOEFL", or "CEFR".
     - "CERTIFICATE_SCORE":
-      - For TOPIK (한국어능력시험 성적증명서 / OFFICIAL TOPIK SCORE REPORT): Extract the awarded level digit "1", "2", "3", "4", "5", or "6" (from '등급 Level' e.g. '2급' -> '2', '3급' -> '3', etc.). If unpassed / expected: "EXPECTED".
+      - For TOPIK (한국어능력시험 성적증명서 / OFFICIAL TOPIK SCORE REPORT):
+        * CRITICAL WARNING: Under "수험자 정보 (Test-taker's Information)", there is "시험종류 Test Type" showing "TOPIK I" or "TOPIK II". THIS IS ONLY THE TEST CATEGORY (Roman numeral I or II), NOT THE SCORE OR LEVEL! NEVER extract "1" or "2" based on "Test Type: TOPIK I" or "TOPIK II"!
+        * WHERE TO FIND THE ACTUAL SCORE: Look down at the "시험 결과 (Test Result)" table at the bottom of the report.
+        * Locate the column header "등급 / Level" (positioned immediately to the right of "총점 / TotalScore").
+        * The awarded level is written in this "등급 / Level" column (e.g. "2급", "1급", "3급", "4급", "5급", "6급"):
+          - If the cell in the "등급 / Level" column says "2급", the score is "2".
+          - If the cell in the "등급 / Level" column says "1급", the score is "1".
+          - If the cell in the "등급 / Level" column says "3급", the score is "3".
+          - If the cell in the "등급 / Level" column says "4급", the score is "4".
+          - If the cell in the "등급 / Level" column says "5급", the score is "5".
+          - If the cell in the "등급 / Level" column says "6급", the score is "6".
+          - If unpassed or marked with a dash "-", output "EXPECTED".
+        * Extract ONLY the single level digit "1", "2", "3", "4", "5", or "6" (or "EXPECTED").
       - For IELTS (Test Report Form): Extract the "Overall Band Score" (e.g. "7.0", "6.5", "8.0").
       - For SAT (College Board SAT / Your Scores): Extract the "TOTAL SCORE" (e.g. "1410", "1350", "1520").
       - For SKA (세종한국어평가 성적증명서 / Sejong Korean language Assessment): Extract the "총점 Total Score" (e.g. "515" from "515/800").
@@ -89,7 +102,6 @@ Specific instructions:
       - For CEFR: Extract the overall CEFR level (e.g. "B2", "C1", "B1").
     - "CERTIFICATE_TEST_DATE": The date the test was held/taken in strict ISO format YYYY-MM-DD (e.g., from 'Test Held/Test Date', 'Date', 'Tested on', 'Date of the Assessment').
     - "CERTIFICATE_VALID_DATE": The expiration/validity date in strict ISO format YYYY-MM-DD (e.g., from 'Valid Until', 'Period of Validity'). If not printed on the document, calculate as (Test Date + 2 years minus 1 day).
-    - "FULL_NAME": Candidate full name in ALL UPPERCASE if clearly visible on the score report.
 - If the document contains contact information or is a screenshot (e.g. a screenshot of a chat, Telegram, WhatsApp, SMS, profile card, or note):
   - Set document_type to "CONTACT INFO" or "MESSENGER SCREENSHOT".
   - Extract ONLY these fields if present:
@@ -309,16 +321,83 @@ Return JSON only. Do not explain anything. Output must be exactly in this JSON f
                 simple_fields["CERTIFICATE_TYPE"] = cert_type
                 break
 
+    is_cert_doc = bool(cert_type) or any(k in doc_type.upper() for k in ["CERTIFICATE", "SCORE REPORT", "TOPIK", "IELTS", "SAT", "SKA", "TOEFL", "CEFR"])
+
+    # No need to have FULL_NAME or personal details in language certificate when extracted
+    if is_cert_doc:
+        for personal_key in ["FULL_NAME", "NAME", "DATE_OF_BIRTH", "BIRTHDAY", "SEX", "GENDER", "PASSPORT_NUMBER"]:
+            simple_fields.pop(personal_key, None)
+
     if cert_type:
         # Standardize cert score
         raw_score = str(simple_fields.get("CERTIFICATE_SCORE") or "").strip()
         if cert_type == "TOPIK":
-            # Extract single level digit (e.g. 2 from "2급" or "Level 2")
-            lvl_match = re.search(r'([1-6])\s*(?:급|level|lvl)?', raw_score, re.IGNORECASE)
-            if lvl_match:
-                simple_fields["CERTIFICATE_SCORE"] = lvl_match.group(1)
-            elif "EXPECT" in raw_score.upper():
-                simple_fields["CERTIFICATE_SCORE"] = "EXPECTED"
+            topik_level = None
+
+            # 1. Search raw_ocr_text for explicit [1-6]급 near 등급 / Level / 총점 / TotalScore
+            # In official TOPIK score reports, the level is in the '등급 Level' column right next to '총점 TotalScore'
+            m_near = re.search(r'(?:등급|Level|Total\s*Score|총점)[\s\S]{0,60}?([1-6])\s*급', raw_ocr_text, re.IGNORECASE)
+            if m_near:
+                topik_level = m_near.group(1)
+            else:
+                # 2. Check if any [1-6]급 appears anywhere in raw_ocr_text
+                # '급' (grade) combined with 1-6 only designates the official TOPIK level on the certificate
+                all_geup = re.findall(r'([1-6])\s*급', raw_ocr_text)
+                if all_geup:
+                    topik_level = all_geup[-1]
+
+            # 3. Check Total Score threshold calculation as backup
+            # For TOPIK I (max 200 points): >= 140 is Level 2 (2급), 80-139 is Level 1 (1급)
+            # For TOPIK II (max 300 points): >= 230: 6급, 190-229: 5급, 150-189: 4급, 120-149: 3급
+            score_calc_level = None
+            ts_match = re.search(r'(?:Total\s*Score|총점)[\s\S]{0,40}?(\d{2,3})\s*(?:/\s*(200|300))?', raw_ocr_text, re.IGNORECASE)
+            if not ts_match:
+                ts_match = re.search(r'\b(\d{2,3})\s*/\s*(200|300)\b', raw_ocr_text)
+            if ts_match:
+                pts = int(ts_match.group(1))
+                denom = int(ts_match.group(2)) if ts_match.group(2) else (200 if pts <= 200 and ('TOPIK I' in raw_ocr_text or 'TOPIK 1' in raw_ocr_text) else 300)
+                if denom == 200:
+                    if pts >= 140:
+                        score_calc_level = '2'
+                    elif pts >= 80:
+                        score_calc_level = '1'
+                    else:
+                        score_calc_level = 'EXPECTED'
+                elif denom == 300:
+                    if pts >= 230:
+                        score_calc_level = '6'
+                    elif pts >= 190:
+                        score_calc_level = '5'
+                    elif pts >= 150:
+                        score_calc_level = '4'
+                    elif pts >= 120:
+                        score_calc_level = '3'
+                    else:
+                        score_calc_level = 'EXPECTED'
+
+            # 4. Check if other fields in simple_fields have level/grade (e.g. "LEVEL": "2급")
+            field_level = None
+            for key in ["LEVEL", "GRADE", "TOPIK_LEVEL", "TOPIK_GRADE", "AWARDED_LEVEL"]:
+                val = str(simple_fields.get(key) or '').strip()
+                if val:
+                    m_fld = re.search(r'([1-6])', val)
+                    if m_fld:
+                        field_level = m_fld.group(1)
+                        break
+
+            # Resolve the final score:
+            if topik_level:
+                simple_fields["CERTIFICATE_SCORE"] = topik_level
+            elif field_level:
+                simple_fields["CERTIFICATE_SCORE"] = field_level
+            elif score_calc_level and (not raw_score or (raw_score == '1' and score_calc_level != '1')):
+                simple_fields["CERTIFICATE_SCORE"] = score_calc_level
+            else:
+                lvl_match = re.search(r'([1-6])\s*(?:급|level|lvl)?', raw_score, re.IGNORECASE)
+                if lvl_match:
+                    simple_fields["CERTIFICATE_SCORE"] = lvl_match.group(1)
+                elif "EXPECT" in raw_score.upper():
+                    simple_fields["CERTIFICATE_SCORE"] = "EXPECTED"
         elif cert_type == "SKA":
             # Extract total score (e.g. 515 from "515/800" or "515")
             ska_match = re.search(r'(\d+)(?:\s*/\s*800)?', raw_score)
