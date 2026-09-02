@@ -1440,128 +1440,99 @@ const getInitials = (name?: string) => {
               </div>
             </div>
 
-            <!-- Language Certificate Auto-Filler Banner & Card -->
+            <!-- Language Certificate Auto-Filler Banner & Card (Compact) -->
             <div
               v-if="isCertificateDetected && detectedCertData.type"
-              class="p-4 rounded-2xl bg-gradient-to-br from-amber-500/10 via-orange-500/5 to-transparent border border-amber-500/30 dark:border-amber-500/20 text-zinc-900 dark:text-zinc-100 shadow-sm space-y-3.5"
+              class="p-3 rounded-xl bg-amber-500/10 dark:bg-amber-500/10 border border-amber-500/30 dark:border-amber-500/25 text-zinc-900 dark:text-zinc-100 shadow-xs space-y-2.5"
             >
-              <!-- Header -->
+              <!-- Top Compact Header with Inline Metadata -->
               <div class="flex items-center justify-between flex-wrap gap-2">
-                <div class="flex items-center gap-2.5">
-                  <div class="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 shadow-2xs">
-                    <Award class="w-5 h-5" />
+                <!-- Left: Title, Type Badge & Score -->
+                <div class="flex items-center gap-2 flex-wrap">
+                  <div class="w-6 h-6 rounded-lg bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+                    <Award class="w-3.5 h-3.5" />
                   </div>
-                  <div>
-                    <h4 class="text-xs font-black uppercase tracking-wider text-amber-700 dark:text-amber-300 flex items-center gap-2">
-                      <span>Language Certificate Detected</span>
-                      <span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase shadow-2xs" :class="certBadgeColor(detectedCertData.type)">
-                        {{ detectedCertData.type }}
-                      </span>
-                    </h4>
-                    <p class="text-[11px] text-zinc-500 dark:text-zinc-400 font-medium">
-                      Smart Auto-Filler: Select which certificate slot in the student's profile to apply.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Certificate Details Preview Cards -->
-              <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 p-3 rounded-xl bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 shadow-2xs">
-                <!-- Type -->
-                <div>
-                  <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 block mb-1">Type</span>
-                  <div class="text-xs font-extrabold text-zinc-900 dark:text-zinc-100 uppercase">
-                    {{ detectedCertData.type || '—' }}
-                  </div>
-                </div>
-
-                <!-- Score -->
-                <div>
-                  <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 block mb-1">
-                    {{ detectedCertData.type === 'TOPIK' ? 'TOPIK Level' : 'Score / Level' }}
+                  <span class="text-xs font-black uppercase tracking-wider text-amber-800 dark:text-amber-300">
+                    Language Certificate:
                   </span>
-                  <div class="text-xs font-extrabold text-blue-600 dark:text-blue-400 flex items-center gap-1.5">
-                    <span class="px-2 py-0.5 rounded-md bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 font-mono">
-                      {{ detectedCertData.score || '—' }}
-                    </span>
-                  </div>
+                  <span class="px-2 py-0.5 rounded-md text-[11px] font-black uppercase shadow-2xs" :class="certBadgeColor(detectedCertData.type)">
+                    {{ detectedCertData.type }}
+                  </span>
+                  <span class="px-2 py-0.5 rounded-md text-[11px] font-mono font-black bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800">
+                    {{ detectedCertData.type === 'TOPIK' ? `Level ${detectedCertData.score || '—'}` : `Score: ${detectedCertData.score || '—'}` }}
+                  </span>
                 </div>
 
-                <!-- Test Date -->
-                <div>
-                  <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 block mb-1">Test Date</span>
-                  <div class="text-xs font-bold text-zinc-700 dark:text-zinc-300 flex items-center gap-1">
+                <!-- Right: Test Date & Validity Date -->
+                <div class="flex items-center gap-3 text-[11px] font-medium text-zinc-600 dark:text-zinc-400">
+                  <span v-if="detectedCertData.test_date" class="flex items-center gap-1">
                     <Calendar class="w-3.5 h-3.5 text-zinc-400" />
-                    <span>{{ detectedCertData.test_date || '—' }}</span>
-                  </div>
-                </div>
-
-                <!-- Valid Date -->
-                <div>
-                  <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 block mb-1">Valid Until</span>
-                  <div class="text-xs font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                    <span class="text-zinc-400 text-[10px] font-bold uppercase">Test:</span>
+                    <span class="font-bold text-zinc-700 dark:text-zinc-300">{{ detectedCertData.test_date }}</span>
+                  </span>
+                  <span v-if="detectedCertData.valid_date" class="flex items-center gap-1">
                     <Calendar class="w-3.5 h-3.5 text-emerald-500" />
-                    <span>{{ detectedCertData.valid_date || '—' }}</span>
-                  </div>
+                    <span class="text-zinc-400 text-[10px] font-bold uppercase">Valid:</span>
+                    <span class="font-bold text-emerald-600 dark:text-emerald-400">{{ detectedCertData.valid_date }}</span>
+                  </span>
                 </div>
               </div>
 
-              <!-- Dedicated Save to Certificate Slots -->
-              <div class="space-y-2 pt-1">
-                <span class="text-[10.5px] font-black uppercase tracking-wider text-zinc-500 dark:text-zinc-400 flex items-center gap-1.5">
-                  <Sparkles class="w-3.5 h-3.5 text-amber-500" />
-                  <span>Choose Target Certificate Slot:</span>
-                </span>
-
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                  <button
-                    v-for="item in certSlots"
-                    :key="item.slot"
-                    type="button"
-                    @click="handleSaveToCertSlot(item.slot)"
-                    :disabled="savingCertSlot === item.slot || savedCertSlot === item.slot"
-                    :class="[
-                      'relative p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between gap-2.5 group/btn select-none',
-                      savedCertSlot === item.slot
-                        ? 'border-emerald-500 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 shadow-2xs'
-                        : item.slot === recommendedCertSlot && item.isEmpty
-                          ? 'border-amber-500/70 bg-white dark:bg-zinc-800 hover:border-amber-500 hover:shadow-md ring-2 ring-amber-500/20 active:scale-[0.98]'
-                          : 'border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800 active:scale-[0.98]'
-                    ]"
-                  >
-                    <div class="flex items-center justify-between gap-1">
-                      <span class="text-xs font-black uppercase tracking-wider flex items-center gap-1.5" :class="savedCertSlot === item.slot ? 'text-emerald-600' : 'text-zinc-800 dark:text-zinc-200'">
-                        <Award class="w-3.5 h-3.5" :class="item.slot === 1 ? 'text-amber-500' : item.slot === 2 ? 'text-cyan-500' : 'text-orange-500'" />
-                        <span>Save to Cert {{ item.slot }}</span>
+              <!-- Compact Save Slots (3 columns side-by-side) -->
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <button
+                  v-for="item in certSlots"
+                  :key="item.slot"
+                  type="button"
+                  @click="handleSaveToCertSlot(item.slot)"
+                  :disabled="savingCertSlot === item.slot || savedCertSlot === item.slot"
+                  :class="[
+                    'px-2.5 py-2 rounded-lg border text-left transition-all cursor-pointer flex items-center justify-between gap-2 group/btn select-none',
+                    savedCertSlot === item.slot
+                      ? 'border-emerald-500 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 shadow-2xs'
+                      : item.slot === recommendedCertSlot && item.isEmpty
+                        ? 'border-amber-500/80 bg-white dark:bg-zinc-800 hover:border-amber-500 hover:shadow-xs ring-1 ring-amber-500/25 active:scale-[0.98]'
+                        : 'border-zinc-200 dark:border-zinc-800 bg-white/80 dark:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800 active:scale-[0.98]'
+                  ]"
+                >
+                  <div class="min-w-0 flex-1">
+                    <div class="flex items-center gap-1.5">
+                      <span class="text-[11px] font-black uppercase tracking-wider flex items-center gap-1" :class="savedCertSlot === item.slot ? 'text-emerald-600' : 'text-zinc-800 dark:text-zinc-200'">
+                        <Award class="w-3 h-3" :class="item.slot === 1 ? 'text-amber-500' : item.slot === 2 ? 'text-cyan-500' : 'text-orange-500'" />
+                        <span>Cert {{ item.slot }}</span>
                       </span>
                       <span
                         v-if="item.slot === recommendedCertSlot && item.isEmpty && savedCertSlot !== item.slot"
-                        class="px-1.5 py-0.5 rounded text-[8.5px] font-extrabold uppercase tracking-tight bg-amber-500 text-white shadow-2xs"
+                        class="px-1 py-0.2 rounded text-[7.5px] font-black uppercase tracking-tight bg-amber-500 text-white"
                       >
-                        Recommended
+                        Rec
                       </span>
                     </div>
+                    <div class="text-[10px] truncate leading-tight mt-0.5">
+                      <span v-if="savedCertSlot === item.slot" class="font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-0.5">
+                        <CheckCircle2 class="w-3 h-3" />
+                        Applied!
+                      </span>
+                      <span v-else-if="item.isEmpty" class="italic text-zinc-400 dark:text-zinc-500">
+                        Empty (Click to apply)
+                      </span>
+                      <span v-else class="text-zinc-600 dark:text-zinc-400 font-medium truncate block">
+                        {{ item.currentType }} ({{ item.currentScore || '—' }})
+                      </span>
+                    </div>
+                  </div>
 
-                    <div class="text-[11px] text-zinc-500 dark:text-zinc-400 min-h-[1.25rem]">
-                      <span v-if="savedCertSlot === item.slot" class="font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-                        <CheckCircle2 class="w-3.5 h-3.5" />
-                        Successfully Applied!
-                      </span>
-                      <span v-else-if="item.isEmpty" class="italic text-zinc-400 dark:text-zinc-500 font-medium">
-                        Slot is Empty (Click to Apply)
-                      </span>
-                      <span v-else class="text-zinc-600 dark:text-zinc-300 font-semibold truncate block">
-                        Current: {{ item.currentType }} ({{ item.currentScore || '—' }})
-                      </span>
-                    </div>
-
-                    <div class="pt-1.5 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between text-[10px] font-extrabold uppercase tracking-wider text-zinc-400 group-hover/btn:text-amber-600 dark:group-hover/btn:text-amber-400">
-                      <span>{{ savedCertSlot === item.slot ? 'Applied' : 'Apply to Slot' }}</span>
-                      <Loader2 v-if="savingCertSlot === item.slot" class="w-3.5 h-3.5 animate-spin text-amber-500" />
-                      <ArrowRight v-else class="w-3.5 h-3.5 transition-transform group-hover/btn:translate-x-0.5" />
-                    </div>
-                  </button>
-                </div>
+                  <div class="shrink-0 flex items-center">
+                    <Loader2 v-if="savingCertSlot === item.slot" class="w-3.5 h-3.5 animate-spin text-amber-500" />
+                    <span
+                      v-else-if="savedCertSlot !== item.slot"
+                      class="px-2 py-1 rounded text-[9.5px] font-black uppercase tracking-wide bg-zinc-100 dark:bg-zinc-700/80 text-zinc-600 dark:text-zinc-300 group-hover/btn:bg-amber-500 group-hover/btn:text-white transition-colors flex items-center gap-1"
+                    >
+                      <span>Apply</span>
+                      <ArrowRight class="w-2.5 h-2.5" />
+                    </span>
+                  </div>
+                </button>
               </div>
             </div>
 
