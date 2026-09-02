@@ -36,9 +36,9 @@ const studentId = computed(() => route.params.id as string)
 
 // Fetch student details
 const { data: student, isLoading: isStudentLoading, refetch: refetchStudent } = useQuery<Student>({
-  queryKey: ['student-detail', studentId.value],
+  queryKey: computed(() => ['student-detail', studentId.value]),
   queryFn: () => studentsApi.getStudentDetail(studentId.value),
-  enabled: !!studentId.value,
+  enabled: computed(() => !!studentId.value),
 })
 
 // Fetch schools directory for auto-populating school details

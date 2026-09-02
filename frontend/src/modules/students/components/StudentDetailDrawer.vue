@@ -40,7 +40,8 @@ const emit = defineEmits<{
 }>()
 
 const navigateToExtract = () => {
-  if (props.student && authStore.canEdit) {
+  if (props.student?.id) {
+    emit('close')
     router.push(`/students/${props.student.id}/extract`)
   }
 }
