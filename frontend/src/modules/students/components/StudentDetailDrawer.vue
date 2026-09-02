@@ -39,10 +39,16 @@ const emit = defineEmits<{
   (e: 'open-add-payment', studentId: string): void
 }>()
 
-const navigateToExtract = () => {
-  if (props.student?.id) {
+const navigateToExtract = async () => {
+  const sid = props.student?.id
+  if (sid) {
     emit('close')
-    router.push(`/students/${props.student.id}/extract`)
+    try {
+      await router.push(`/students/${encodeURIComponent(sid)}/extract`)
+    } catch (err) {
+      console.error('Failed to route to extract page:', err)
+      window.location.href = `/students/${encodeURIComponent(sid)}/extract`
+    }
   }
 }
 
@@ -374,6 +380,14 @@ const handleCopy = (fieldKey: string, text?: string | null) => {
   setTimeout(() => {
     if (copiedField.value === fieldKey) copiedField.value = null
   }, 1600)
+}
+
+const getCertCopyText = (cert?: string | null, score?: string | null, testDate?: string | null, validDate?: string | null) => {
+  if (!cert || cert === 'NO CERTIFICATE') return ''
+  let text = `${cert} (SCORE: ${score || '—'})`
+  if (testDate) text += ` (TEST DATE: ${testDate})`
+  if (validDate) text += ` (VALID DATE: ${validDate})`
+  return text
 }
 
 // Inline Edit Handlers
@@ -2348,7 +2362,7 @@ const handleRestoreStudent = () => {
                   <div
                     class="sm:col-span-2 relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
                     :class="[copiedField === 'cert1' && 'animate-copy-press']"
-                    @click="handleCopy('cert1', `${student.language_certificate || ''} (SCORE: ${student.certificate_score || '—'})`)"
+                    @click="handleCopy('cert1', getCertCopyText(student.language_certificate, student.certificate_score, student.certificate_test_date, student.certificate_valid_date))"
                     title="Single-click to copy Language Certificate 1"
                   >
                     <div class="flex items-center justify-between">
@@ -2360,7 +2374,7 @@ const handleRestoreStudent = () => {
                         <button
                           v-if="student.language_certificate && student.language_certificate !== 'NO CERTIFICATE'"
                           type="button"
-                          @click.stop="handleCopy('cert1', `${student.language_certificate || ''} (SCORE: ${student.certificate_score || '—'})`)"
+                          @click.stop="handleCopy('cert1', getCertCopyText(student.language_certificate, student.certificate_score, student.certificate_test_date, student.certificate_valid_date))"
                           class="w-6 h-6 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-all cursor-pointer active:scale-90"
                           title="Copy Certificate 1"
                         >
@@ -2383,9 +2397,21 @@ const handleRestoreStudent = () => {
                     </div>
 
                     <div class="mt-0.5">
-                      <div v-if="student.language_certificate && student.language_certificate !== 'NO CERTIFICATE'" class="inline-flex items-center text-xs font-bold rounded-full overflow-hidden shadow-2xs select-none">
-                        <span class="bg-[#de350b] text-white px-2.5 py-0.5 uppercase tracking-wide text-[11px]">{{ student.language_certificate }}</span>
-                        <span class="bg-[#0052cc] text-white px-2.5 py-0.5 text-[11px]">SCORE: {{ student.certificate_score || '—' }}</span>
+                      <div v-if="student.language_certificate && student.language_certificate !== 'NO CERTIFICATE'" class="flex flex-col gap-1">
+                        <div class="inline-flex items-center text-xs font-bold rounded-full overflow-hidden shadow-2xs select-none self-start">
+                          <span class="bg-[#de350b] text-white px-2.5 py-0.5 uppercase tracking-wide text-[11px]">{{ student.language_certificate }}</span>
+                          <span class="bg-[#0052cc] text-white px-2.5 py-0.5 text-[11px]">SCORE: {{ student.certificate_score || '—' }}</span>
+                        </div>
+                        <div v-if="student.certificate_test_date || student.certificate_valid_date" class="flex flex-wrap items-center gap-x-3.5 gap-y-0.5 text-[11px] pt-0.5">
+                          <div v-if="student.certificate_test_date" class="flex items-center gap-1">
+                            <span class="text-[9.5px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">TEST DATE:</span>
+                            <span class="font-mono font-bold text-zinc-800 dark:text-zinc-200">{{ student.certificate_test_date }}</span>
+                          </div>
+                          <div v-if="student.certificate_valid_date" class="flex items-center gap-1">
+                            <span class="text-[9.5px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">VALID DATE:</span>
+                            <span class="font-mono font-bold text-zinc-800 dark:text-zinc-200">{{ student.certificate_valid_date }}</span>
+                          </div>
+                        </div>
                       </div>
                       <span v-else class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
                     </div>
@@ -2396,7 +2422,7 @@ const handleRestoreStudent = () => {
                     v-if="showCert2"
                     class="sm:col-span-2 relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
                     :class="[copiedField === 'cert2' && 'animate-copy-press']"
-                    @click="handleCopy('cert2', `${student.language_certificate_2 || ''} (SCORE: ${student.certificate_score_2 || '—'})`)"
+                    @click="handleCopy('cert2', getCertCopyText(student.language_certificate_2, student.certificate_score_2, student.certificate_2_test_date, student.certificate_2_valid_date))"
                     title="Single-click to copy Language Certificate 2"
                   >
                     <div class="flex items-center justify-between">
@@ -2408,7 +2434,7 @@ const handleRestoreStudent = () => {
                         <button
                           v-if="student.language_certificate_2 && student.language_certificate_2 !== 'NO CERTIFICATE'"
                           type="button"
-                          @click.stop="handleCopy('cert2', `${student.language_certificate_2 || ''} (SCORE: ${student.certificate_score_2 || '—'})`)"
+                          @click.stop="handleCopy('cert2', getCertCopyText(student.language_certificate_2, student.certificate_score_2, student.certificate_2_test_date, student.certificate_2_valid_date))"
                           class="w-6 h-6 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-all cursor-pointer active:scale-90"
                           title="Copy Certificate 2"
                         >
@@ -2434,9 +2460,21 @@ const handleRestoreStudent = () => {
                     </div>
 
                     <div class="mt-0.5">
-                      <div v-if="student.language_certificate_2 && student.language_certificate_2 !== 'NO CERTIFICATE'" class="inline-flex items-center text-xs font-bold rounded-full overflow-hidden shadow-2xs select-none">
-                        <span class="bg-[#00b8d9] text-white px-2.5 py-0.5 uppercase tracking-wide text-[11px]">{{ student.language_certificate_2 }}</span>
-                        <span class="bg-[#0052cc] text-white px-2.5 py-0.5 text-[11px]">SCORE: {{ student.certificate_score_2 || '—' }}</span>
+                      <div v-if="student.language_certificate_2 && student.language_certificate_2 !== 'NO CERTIFICATE'" class="flex flex-col gap-1">
+                        <div class="inline-flex items-center text-xs font-bold rounded-full overflow-hidden shadow-2xs select-none self-start">
+                          <span class="bg-[#00b8d9] text-white px-2.5 py-0.5 uppercase tracking-wide text-[11px]">{{ student.language_certificate_2 }}</span>
+                          <span class="bg-[#0052cc] text-white px-2.5 py-0.5 text-[11px]">SCORE: {{ student.certificate_score_2 || '—' }}</span>
+                        </div>
+                        <div v-if="student.certificate_2_test_date || student.certificate_2_valid_date" class="flex flex-wrap items-center gap-x-3.5 gap-y-0.5 text-[11px] pt-0.5">
+                          <div v-if="student.certificate_2_test_date" class="flex items-center gap-1">
+                            <span class="text-[9.5px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">TEST DATE:</span>
+                            <span class="font-mono font-bold text-zinc-800 dark:text-zinc-200">{{ student.certificate_2_test_date }}</span>
+                          </div>
+                          <div v-if="student.certificate_2_valid_date" class="flex items-center gap-1">
+                            <span class="text-[9.5px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">VALID DATE:</span>
+                            <span class="font-mono font-bold text-zinc-800 dark:text-zinc-200">{{ student.certificate_2_valid_date }}</span>
+                          </div>
+                        </div>
                       </div>
                       <span v-else class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
                     </div>
@@ -2447,7 +2485,7 @@ const handleRestoreStudent = () => {
                     v-if="showCert3"
                     class="sm:col-span-2 relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
                     :class="[copiedField === 'cert3' && 'animate-copy-press']"
-                    @click="handleCopy('cert3', `${student.language_certificate_3 || ''} (SCORE: ${student.certificate_score_3 || '—'})`)"
+                    @click="handleCopy('cert3', getCertCopyText(student.language_certificate_3, student.certificate_score_3, student.certificate_3_test_date, student.certificate_3_valid_date))"
                     title="Single-click to copy Language Certificate 3"
                   >
                     <div class="flex items-center justify-between">
@@ -2459,7 +2497,7 @@ const handleRestoreStudent = () => {
                         <button
                           v-if="student.language_certificate_3 && student.language_certificate_3 !== 'NO CERTIFICATE'"
                           type="button"
-                          @click.stop="handleCopy('cert3', `${student.language_certificate_3 || ''} (SCORE: ${student.certificate_score_3 || '—'})`)"
+                          @click.stop="handleCopy('cert3', getCertCopyText(student.language_certificate_3, student.certificate_score_3, student.certificate_3_test_date, student.certificate_3_valid_date))"
                           class="w-6 h-6 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-all cursor-pointer active:scale-90"
                           title="Copy Certificate 3"
                         >
@@ -2476,9 +2514,21 @@ const handleRestoreStudent = () => {
                     </div>
 
                     <div class="mt-0.5">
-                      <div v-if="student.language_certificate_3 && student.language_certificate_3 !== 'NO CERTIFICATE'" class="inline-flex items-center text-xs font-bold rounded-full overflow-hidden shadow-2xs select-none">
-                        <span class="bg-[#ff5630] text-white px-2.5 py-0.5 uppercase tracking-wide text-[11px]">{{ student.language_certificate_3 }}</span>
-                        <span class="bg-[#0052cc] text-white px-2.5 py-0.5 text-[11px]">SCORE: {{ student.certificate_score_3 || '—' }}</span>
+                      <div v-if="student.language_certificate_3 && student.language_certificate_3 !== 'NO CERTIFICATE'" class="flex flex-col gap-1">
+                        <div class="inline-flex items-center text-xs font-bold rounded-full overflow-hidden shadow-2xs select-none self-start">
+                          <span class="bg-[#ff5630] text-white px-2.5 py-0.5 uppercase tracking-wide text-[11px]">{{ student.language_certificate_3 }}</span>
+                          <span class="bg-[#0052cc] text-white px-2.5 py-0.5 text-[11px]">SCORE: {{ student.certificate_score_3 || '—' }}</span>
+                        </div>
+                        <div v-if="student.certificate_3_test_date || student.certificate_3_valid_date" class="flex flex-wrap items-center gap-x-3.5 gap-y-0.5 text-[11px] pt-0.5">
+                          <div v-if="student.certificate_3_test_date" class="flex items-center gap-1">
+                            <span class="text-[9.5px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">TEST DATE:</span>
+                            <span class="font-mono font-bold text-zinc-800 dark:text-zinc-200">{{ student.certificate_3_test_date }}</span>
+                          </div>
+                          <div v-if="student.certificate_3_valid_date" class="flex items-center gap-1">
+                            <span class="text-[9.5px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">VALID DATE:</span>
+                            <span class="font-mono font-bold text-zinc-800 dark:text-zinc-200">{{ student.certificate_3_valid_date }}</span>
+                          </div>
+                        </div>
                       </div>
                       <span v-else class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
                     </div>

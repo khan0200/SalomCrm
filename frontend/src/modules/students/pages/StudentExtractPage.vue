@@ -35,11 +35,11 @@ const router = useRouter()
 const uiStore = useUiStore()
 const queryClient = useQueryClient()
 
-const studentId = computed(() => route.params.id as string)
+const studentId = computed(() => (route.params.id as string) || '')
 
 // Fetch student details
 const { data: student, isLoading: isStudentLoading, refetch: refetchStudent } = useQuery<Student>({
-  queryKey: computed(() => ['student-detail', studentId.value]),
+  queryKey: ['student-detail', studentId],
   queryFn: () => studentsApi.getStudentDetail(studentId.value),
   enabled: computed(() => !!studentId.value),
 })
@@ -985,7 +985,6 @@ const getInitials = (name?: string) => {
   <div class="space-y-4">
     <!-- Student Header Banner with Back Button & AI Settings Toggle -->
     <div
-      v-if="student"
       class="p-3.5 sm:p-4 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs flex items-center justify-between gap-4 flex-wrap"
     >
       <div class="flex items-center gap-3 min-w-0">
@@ -998,21 +997,39 @@ const getInitials = (name?: string) => {
           <ArrowLeft class="w-4 h-4" />
         </button>
 
-        <div class="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-brand-500/10 border border-brand-500/20 text-brand-500 flex items-center justify-center font-black text-base sm:text-lg shrink-0">
-          {{ getInitials(student.full_name) }}
-        </div>
-        <div class="min-w-0">
-          <h2 class="text-sm sm:text-base font-extrabold text-zinc-900 dark:text-zinc-100 tracking-tight truncate">
-            {{ student.full_name || 'Unnamed Student' }}
-          </h2>
-          <div class="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs font-semibold text-zinc-500 dark:text-zinc-400 mt-0.5">
-            <span>ID: <strong class="text-brand-500 font-mono">{{ student.id }}</strong></span>
-            <span class="w-1 h-1 rounded-full bg-zinc-300 dark:bg-zinc-700 hidden sm:inline-block" />
-            <span>Passport: <strong class="text-zinc-800 dark:text-zinc-200">{{ student.passport || '—' }}</strong></span>
-            <span class="w-1 h-1 rounded-full bg-zinc-300 dark:bg-zinc-700 hidden sm:inline-block" />
-            <span>Tariff: <strong class="text-zinc-800 dark:text-zinc-200">{{ student.tariff || '—' }}</strong></span>
+        <template v-if="student">
+          <div class="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-blue-600 dark:text-blue-400 flex items-center justify-center font-black text-base sm:text-lg shrink-0">
+            {{ getInitials(student.full_name) }}
           </div>
-        </div>
+          <div class="min-w-0">
+            <h2 class="text-sm sm:text-base font-extrabold text-zinc-900 dark:text-zinc-100 tracking-tight truncate">
+              {{ student.full_name || 'Unnamed Student' }}
+            </h2>
+            <div class="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs font-semibold text-zinc-500 dark:text-zinc-400 mt-0.5">
+              <span>ID: <strong class="text-blue-600 dark:text-blue-400 font-mono">{{ student.id }}</strong></span>
+              <span class="w-1 h-1 rounded-full bg-zinc-300 dark:bg-zinc-700 hidden sm:inline-block" />
+              <span>Passport: <strong class="text-zinc-800 dark:text-zinc-200">{{ student.passport || '—' }}</strong></span>
+              <span class="w-1 h-1 rounded-full bg-zinc-300 dark:bg-zinc-700 hidden sm:inline-block" />
+              <span>Tariff: <strong class="text-zinc-800 dark:text-zinc-200">{{ student.tariff || '—' }}</strong></span>
+            </div>
+          </div>
+        </template>
+        <template v-else-if="isStudentLoading">
+          <div class="flex items-center gap-3 min-w-0">
+            <div class="w-11 h-11 rounded-2xl bg-zinc-100 dark:bg-zinc-800 animate-pulse shrink-0"></div>
+            <div class="space-y-1.5">
+              <div class="w-36 h-4 bg-zinc-200 dark:bg-zinc-800 rounded-md animate-pulse"></div>
+              <div class="w-24 h-3 bg-zinc-100 dark:bg-zinc-800 rounded-md animate-pulse"></div>
+            </div>
+          </div>
+        </template>
+        <template v-else>
+          <div class="min-w-0">
+            <h2 class="text-sm sm:text-base font-extrabold text-zinc-900 dark:text-zinc-100 tracking-tight">
+              Fill by Document (Student ID: {{ studentId }})
+            </h2>
+          </div>
+        </template>
       </div>
 
       <!-- Right Header Actions: Active Model Badge + AI Settings Button -->
