@@ -19,7 +19,10 @@ import {
   Sparkles,
   Sliders,
   Eye,
-  EyeOff
+  EyeOff,
+  Award,
+  Calendar,
+  ArrowRight
 } from 'lucide-vue-next'
 import { studentsApi } from '@/api/students'
 import { settingsApi } from '@/api/settings'
@@ -256,7 +259,25 @@ const FIELD_MAPPING: Record<string, keyof Student> = {
   'MOTHER PHONE NUMBER': 'mother_phone',
   'MOTHER_PHONE_NUMBER': 'mother_phone',
   'OYIM RAQAMI': 'mother_phone',
-  'ONAM RAQAMI': 'mother_phone'
+  'ONAM RAQAMI': 'mother_phone',
+  // Certificate mappings
+  'CERTIFICATE TYPE': 'language_certificate',
+  'CERTIFICATE_TYPE': 'language_certificate',
+  'LANGUAGE CERTIFICATE': 'language_certificate',
+  'LANGUAGE_CERTIFICATE': 'language_certificate',
+  'CERTIFICATE SCORE': 'certificate_score',
+  'CERTIFICATE_SCORE': 'certificate_score',
+  'SCORE': 'certificate_score',
+  'CERTIFICATE TEST DATE': 'certificate_test_date',
+  'CERTIFICATE_TEST_DATE': 'certificate_test_date',
+  'TEST DATE': 'certificate_test_date',
+  'TEST_DATE': 'certificate_test_date',
+  'CERTIFICATE VALID DATE': 'certificate_valid_date',
+  'CERTIFICATE_VALID_DATE': 'certificate_valid_date',
+  'VALID DATE': 'certificate_valid_date',
+  'VALID_DATE': 'certificate_valid_date',
+  'VALID UNTIL': 'certificate_valid_date',
+  'VALID_UNTIL': 'certificate_valid_date'
 }
 
 // File drop & selection handlers
@@ -514,8 +535,9 @@ const triggerExtraction = async () => {
     let detailsObj = response.field_details || {}
 
     // Client-side Parent Passport Safeguard (if not already isolated by backend)
-    const isParentDoc = response.is_parent_passport || docType.includes('PARENT') || docType.includes('MOTHER') || docType.includes('FATHER')
-    if (!isParentDoc && student.value?.birthday && fieldsObj.DATE_OF_BIRTH && ['PASSPORT', 'ID_CARD'].includes(docType)) {
+    const docTypeUpper = (docType || '').toUpperCase()
+    const isParentDoc = response.is_parent_passport || docTypeUpper.includes('PARENT') || docTypeUpper.includes('MOTHER') || docTypeUpper.includes('FATHER')
+    if (!isParentDoc && student.value?.birthday && fieldsObj.DATE_OF_BIRTH && (docTypeUpper.includes('PASSPORT') || docTypeUpper.includes('ID'))) {
       const matchDoc = String(fieldsObj.DATE_OF_BIRTH).match(/\b(19\d\d|20\d\d)\b/)
       const matchStu = String(student.value.birthday).match(/\b(19\d\d|20\d\d)\b/)
       if (matchDoc && matchStu) {
@@ -523,8 +545,8 @@ const triggerExtraction = async () => {
         const stuYear = parseInt(matchStu[1], 10)
         if (stuYear - docYear >= 15) {
           const sex = String(fieldsObj.SEX || '').toUpperCase()
-          const fullName = fieldsObj.FULL_NAME || ''
-          const isFemale = sex.startsWith('F') || ['QIZI', 'OVNA', 'EVNA', 'KYZY'].some(q => fullName.toUpperCase().includes(q))
+          const fullName = (fieldsObj.FULL_NAME || fieldsObj.FATHER_FULLNAME || fieldsObj.MOTHER_FULLNAME || '').trim()
+          const isFemale = sex.startsWith('F') || ['QIZI', 'KIZI', 'OVNA', 'EVNA', 'KYZY', 'AXON', 'KHON', 'QIZ'].some(q => fullName.toUpperCase().includes(q))
           const parentKey = isFemale ? 'MOTHER_FULLNAME' : 'FATHER_FULLNAME'
           docType = isFemale ? 'MOTHER_PASSPORT' : 'FATHER_PASSPORT'
           fieldsObj = { [parentKey]: fullName }
@@ -634,6 +656,179 @@ const handleSaveAllFields = async () => {
     })
   } finally {
     isSavingAll.value = false
+  }
+}
+
+// Language Certificate Identification & Auto-Filler Logic
+const certBadgeColor = (type?: string) => {
+  const t = (type || '').toUpperCase()
+  if (t === 'TOPIK') return 'bg-[#de350b] text-white'
+  if (t === 'IELTS') return 'bg-[#00b8d9] text-white'
+  if (t === 'SAT') return 'bg-[#ff5630] text-white'
+  if (t === 'SKA') return 'bg-indigo-600 text-white'
+  if (t === 'TOEFL') return 'bg-purple-600 text-white'
+  if (t === 'CEFR') return 'bg-emerald-600 text-white'
+  return 'bg-amber-500 text-white'
+}
+
+const isCertificateDetected = computed(() => {
+  if (!extractedDocType.value && extractedFieldsList.value.length === 0) return false
+  const docType = (extractedDocType.value || '').toUpperCase()
+  if (
+    docType.includes('CERTIFICATE') ||
+    docType.includes('TOPIK') ||
+    docType.includes('IELTS') ||
+    docType.includes('SAT') ||
+    docType.includes('SKA') ||
+    docType.includes('TOEFL') ||
+    docType.includes('CEFR') ||
+    docType.includes('SCORE REPORT')
+  ) {
+    return true
+  }
+  const keys = extractedFieldsList.value.map(f => f.key.toUpperCase())
+  return keys.some(k => k.includes('CERTIFICATE') || k === 'CERTIFICATE_TYPE' || k === 'CERTIFICATE_SCORE')
+})
+
+const detectedCertData = computed(() => {
+  const getVal = (possibleKeys: string[]) => {
+    const found = extractedFieldsList.value.find(f =>
+      possibleKeys.includes(f.key.toUpperCase().replace(/\s+/g, '_'))
+    )
+    return found ? found.value : ''
+  }
+
+  let type = getVal(['CERTIFICATE_TYPE', 'LANGUAGE_CERTIFICATE', 'CERTIFICATE', 'TEST_TYPE'])
+  if (!type && extractedDocType.value) {
+    for (const t of ['TOPIK', 'IELTS', 'SAT', 'SKA', 'TOEFL', 'CEFR']) {
+      if (extractedDocType.value.toUpperCase().includes(t)) {
+        type = t
+        break
+      }
+    }
+  }
+  type = (type || '').toUpperCase().trim()
+
+  let score = getVal(['CERTIFICATE_SCORE', 'SCORE', 'TOTAL_SCORE', 'BAND_SCORE', 'OVERALL_SCORE', 'OVERALL_BAND_SCORE', 'LEVEL', 'GRADE'])
+  if (type === 'TOPIK' && score) {
+    const m = score.match(/([1-6])/)
+    if (m) score = m[1]
+  }
+
+  const testDate = normalizeDate(getVal(['CERTIFICATE_TEST_DATE', 'TEST_DATE', 'DATE_OF_TEST', 'DATE_OF_THE_ASSESSMENT', 'TEST_HELD_DATE', 'DATE_OF_EXAM']))
+  let validDate = normalizeDate(getVal(['CERTIFICATE_VALID_DATE', 'VALID_DATE', 'VALID_UNTIL', 'EXPIRATION_DATE', 'PERIOD_OF_VALIDITY', 'VALID_TO']))
+
+  // Auto-calculate +2 years minus 1 day if test_date exists but valid_date is missing
+  if (testDate && !validDate && /^\d{4}-\d{2}-\d{2}$/.test(testDate)) {
+    try {
+      const parts = testDate.split('-').map(Number)
+      const d = new Date(parts[0] + 2, parts[1] - 1, parts[2] - 1)
+      const vy = d.getFullYear()
+      const vm = String(d.getMonth() + 1).padStart(2, '0')
+      const vd = String(d.getDate()).padStart(2, '0')
+      validDate = `${vy}-${vm}-${vd}`
+    } catch (e) {}
+  }
+
+  return {
+    type,
+    score,
+    test_date: testDate,
+    valid_date: validDate
+  }
+})
+
+const certSlots = computed(() => [
+  {
+    slot: 1 as const,
+    label: 'Certificate 1',
+    currentType: student.value?.language_certificate,
+    currentScore: student.value?.certificate_score,
+    currentTestDate: student.value?.certificate_test_date,
+    currentValidDate: student.value?.certificate_valid_date,
+    isEmpty: !student.value?.language_certificate || student.value?.language_certificate === 'NO CERTIFICATE'
+  },
+  {
+    slot: 2 as const,
+    label: 'Certificate 2',
+    currentType: student.value?.language_certificate_2,
+    currentScore: student.value?.certificate_score_2,
+    currentTestDate: student.value?.certificate_2_test_date,
+    currentValidDate: student.value?.certificate_2_valid_date,
+    isEmpty: !student.value?.language_certificate_2 || student.value?.language_certificate_2 === 'NO CERTIFICATE'
+  },
+  {
+    slot: 3 as const,
+    label: 'Certificate 3',
+    currentType: student.value?.language_certificate_3,
+    currentScore: student.value?.certificate_score_3,
+    currentTestDate: student.value?.certificate_3_test_date,
+    currentValidDate: student.value?.certificate_3_valid_date,
+    isEmpty: !student.value?.language_certificate_3 || student.value?.language_certificate_3 === 'NO CERTIFICATE'
+  }
+])
+
+const recommendedCertSlot = computed<1 | 2 | 3>(() => {
+  if (certSlots.value[0].isEmpty) return 1
+  if (certSlots.value[1].isEmpty) return 2
+  if (certSlots.value[2].isEmpty) return 3
+  return 1
+})
+
+const savingCertSlot = ref<number | null>(null)
+const savedCertSlot = ref<number | null>(null)
+
+const handleSaveToCertSlot = async (slot: 1 | 2 | 3) => {
+  if (!student.value || !detectedCertData.value.type) return
+  savingCertSlot.value = slot
+
+  const cData = detectedCertData.value
+  const updatePayload: Partial<Student> = {}
+
+  if (slot === 1) {
+    updatePayload.language_certificate = cData.type
+    updatePayload.certificate_score = cData.score || null
+    updatePayload.certificate_test_date = cData.test_date || null
+    updatePayload.certificate_valid_date = cData.valid_date || null
+  } else if (slot === 2) {
+    updatePayload.language_certificate_2 = cData.type
+    updatePayload.certificate_score_2 = cData.score || null
+    updatePayload.certificate_2_test_date = cData.test_date || null
+    updatePayload.certificate_2_valid_date = cData.valid_date || null
+  } else {
+    updatePayload.language_certificate_3 = cData.type
+    updatePayload.certificate_score_3 = cData.score || null
+    updatePayload.certificate_3_test_date = cData.test_date || null
+    updatePayload.certificate_3_valid_date = cData.valid_date || null
+  }
+
+  try {
+    await studentsApi.updateStudent(studentId.value, updatePayload)
+    savedCertSlot.value = slot
+    await refetchStudent()
+    queryClient.invalidateQueries({ queryKey: ['students'] })
+    uiStore.addToast({
+      type: 'success',
+      title: `Saved to Certificate ${slot}`,
+      message: `Successfully updated Certificate ${slot} to ${cData.type} (Score: ${cData.score || '—'})`
+    })
+
+    // Mark all certificate-related fields as saved
+    extractedFieldsList.value.forEach(f => {
+      const k = f.key.toUpperCase()
+      if (k.includes('CERTIFICATE') || k.includes('SCORE') || k.includes('TEST_DATE') || k.includes('VALID_DATE')) {
+        savedFields.value[f.key] = true
+      }
+    })
+  } catch (err: any) {
+    console.error(`Failed to save to Certificate ${slot}:`, err)
+    uiStore.addToast({
+      type: 'error',
+      title: 'Save Failed',
+      message: err.response?.data?.detail || `Could not save to Certificate ${slot}.`
+    })
+  } finally {
+    savingCertSlot.value = null
   }
 }
 
@@ -1225,6 +1420,131 @@ const getInitials = (name?: string) => {
                 <p class="text-[11px] text-amber-800/80 dark:text-amber-300/80">
                   The document owner is 15+ years older than the student. Personal identity fields (Passport No, DOB, Sex) have been isolated so they will not overwrite the student's personal identity records.
                 </p>
+              </div>
+            </div>
+
+            <!-- Language Certificate Auto-Filler Banner & Card -->
+            <div
+              v-if="isCertificateDetected && detectedCertData.type"
+              class="p-4 rounded-2xl bg-gradient-to-br from-amber-500/10 via-orange-500/5 to-transparent border border-amber-500/30 dark:border-amber-500/20 text-zinc-900 dark:text-zinc-100 shadow-sm space-y-3.5"
+            >
+              <!-- Header -->
+              <div class="flex items-center justify-between flex-wrap gap-2">
+                <div class="flex items-center gap-2.5">
+                  <div class="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 shadow-2xs">
+                    <Award class="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h4 class="text-xs font-black uppercase tracking-wider text-amber-700 dark:text-amber-300 flex items-center gap-2">
+                      <span>Language Certificate Detected</span>
+                      <span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase shadow-2xs" :class="certBadgeColor(detectedCertData.type)">
+                        {{ detectedCertData.type }}
+                      </span>
+                    </h4>
+                    <p class="text-[11px] text-zinc-500 dark:text-zinc-400 font-medium">
+                      Smart Auto-Filler: Select which certificate slot in the student's profile to apply.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Certificate Details Preview Cards -->
+              <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 p-3 rounded-xl bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 shadow-2xs">
+                <!-- Type -->
+                <div>
+                  <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 block mb-1">Type</span>
+                  <div class="text-xs font-extrabold text-zinc-900 dark:text-zinc-100 uppercase">
+                    {{ detectedCertData.type || '—' }}
+                  </div>
+                </div>
+
+                <!-- Score -->
+                <div>
+                  <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 block mb-1">
+                    {{ detectedCertData.type === 'TOPIK' ? 'TOPIK Level' : 'Score / Level' }}
+                  </span>
+                  <div class="text-xs font-extrabold text-blue-600 dark:text-blue-400 flex items-center gap-1.5">
+                    <span class="px-2 py-0.5 rounded-md bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 font-mono">
+                      {{ detectedCertData.score || '—' }}
+                    </span>
+                  </div>
+                </div>
+
+                <!-- Test Date -->
+                <div>
+                  <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 block mb-1">Test Date</span>
+                  <div class="text-xs font-bold text-zinc-700 dark:text-zinc-300 flex items-center gap-1">
+                    <Calendar class="w-3.5 h-3.5 text-zinc-400" />
+                    <span>{{ detectedCertData.test_date || '—' }}</span>
+                  </div>
+                </div>
+
+                <!-- Valid Date -->
+                <div>
+                  <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 block mb-1">Valid Until</span>
+                  <div class="text-xs font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                    <Calendar class="w-3.5 h-3.5 text-emerald-500" />
+                    <span>{{ detectedCertData.valid_date || '—' }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Dedicated Save to Certificate Slots -->
+              <div class="space-y-2 pt-1">
+                <span class="text-[10.5px] font-black uppercase tracking-wider text-zinc-500 dark:text-zinc-400 flex items-center gap-1.5">
+                  <Sparkles class="w-3.5 h-3.5 text-amber-500" />
+                  <span>Choose Target Certificate Slot:</span>
+                </span>
+
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                  <button
+                    v-for="item in certSlots"
+                    :key="item.slot"
+                    type="button"
+                    @click="handleSaveToCertSlot(item.slot)"
+                    :disabled="savingCertSlot === item.slot || savedCertSlot === item.slot"
+                    :class="[
+                      'relative p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between gap-2.5 group/btn select-none',
+                      savedCertSlot === item.slot
+                        ? 'border-emerald-500 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 shadow-2xs'
+                        : item.slot === recommendedCertSlot && item.isEmpty
+                          ? 'border-amber-500/70 bg-white dark:bg-zinc-800 hover:border-amber-500 hover:shadow-md ring-2 ring-amber-500/20 active:scale-[0.98]'
+                          : 'border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800 active:scale-[0.98]'
+                    ]"
+                  >
+                    <div class="flex items-center justify-between gap-1">
+                      <span class="text-xs font-black uppercase tracking-wider flex items-center gap-1.5" :class="savedCertSlot === item.slot ? 'text-emerald-600' : 'text-zinc-800 dark:text-zinc-200'">
+                        <Award class="w-3.5 h-3.5" :class="item.slot === 1 ? 'text-amber-500' : item.slot === 2 ? 'text-cyan-500' : 'text-orange-500'" />
+                        <span>Save to Cert {{ item.slot }}</span>
+                      </span>
+                      <span
+                        v-if="item.slot === recommendedCertSlot && item.isEmpty && savedCertSlot !== item.slot"
+                        class="px-1.5 py-0.5 rounded text-[8.5px] font-extrabold uppercase tracking-tight bg-amber-500 text-white shadow-2xs"
+                      >
+                        Recommended
+                      </span>
+                    </div>
+
+                    <div class="text-[11px] text-zinc-500 dark:text-zinc-400 min-h-[1.25rem]">
+                      <span v-if="savedCertSlot === item.slot" class="font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                        <CheckCircle2 class="w-3.5 h-3.5" />
+                        Successfully Applied!
+                      </span>
+                      <span v-else-if="item.isEmpty" class="italic text-zinc-400 dark:text-zinc-500 font-medium">
+                        Slot is Empty (Click to Apply)
+                      </span>
+                      <span v-else class="text-zinc-600 dark:text-zinc-300 font-semibold truncate block">
+                        Current: {{ item.currentType }} ({{ item.currentScore || '—' }})
+                      </span>
+                    </div>
+
+                    <div class="pt-1.5 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between text-[10px] font-extrabold uppercase tracking-wider text-zinc-400 group-hover/btn:text-amber-600 dark:group-hover/btn:text-amber-400">
+                      <span>{{ savedCertSlot === item.slot ? 'Applied' : 'Apply to Slot' }}</span>
+                      <Loader2 v-if="savingCertSlot === item.slot" class="w-3.5 h-3.5 animate-spin text-amber-500" />
+                      <ArrowRight v-else class="w-3.5 h-3.5 transition-transform group-hover/btn:translate-x-0.5" />
+                    </div>
+                  </button>
+                </div>
               </div>
             </div>
 

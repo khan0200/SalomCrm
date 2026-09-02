@@ -1024,7 +1024,8 @@ class ExtractDocumentView(APIView):
                         student_qs = student_qs.filter(tenant=tenant)
                     student = student_qs.first()
 
-                    if student and student.birthday and extracted_data.get('document_type') in ('PASSPORT', 'ID_CARD'):
+                    doc_type_raw = str(extracted_data.get('document_type', '')).upper()
+                    if student and student.birthday and any(p in doc_type_raw for p in ('PASSPORT', 'ID_CARD', 'ID CARD', 'IDENTITY')):
                         extracted_dob = extracted_data.get('fields', {}).get('DATE_OF_BIRTH')
                         if extracted_dob:
                             doc_year = None
@@ -1044,12 +1045,17 @@ class ExtractDocumentView(APIView):
                             # If the passport holder is 15+ years older than the student -> Parent Passport!
                             if age_diff >= 15:
                                 sex = str(extracted_data.get('fields', {}).get('SEX', '')).upper()
-                                full_name = extracted_data.get('fields', {}).get('FULL_NAME', '')
+                                full_name = (
+                                    extracted_data.get('fields', {}).get('FULL_NAME')
+                                    or extracted_data.get('fields', {}).get('FATHER_FULLNAME')
+                                    or extracted_data.get('fields', {}).get('MOTHER_FULLNAME')
+                                    or ''
+                                ).strip()
 
                                 # Infer gender if sex field wasn't clearly detected by OCR
                                 is_female = (sex in ('F', 'FEMALE', 'AYOL', 'ЖЕН', 'ЖЕНСКИЙ'))
                                 if not is_female and not (sex in ('M', 'MALE', 'ERKAK', 'МУЖ', 'МУЖСКОЙ')):
-                                    if any(q in full_name.upper() for q in ['QIZI', 'KIZI', 'OVNA', 'EVNA', 'KYZY']):
+                                    if any(q in full_name.upper() for q in ['QIZI', 'KIZI', 'OVNA', 'EVNA', 'KYZY', 'AXON', 'KHON', 'QIZ']):
                                         is_female = True
 
                                 parent_field = 'MOTHER_FULLNAME' if is_female else 'FATHER_FULLNAME'

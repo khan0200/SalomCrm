@@ -63,7 +63,7 @@ Specific instructions:
     - "SEX": Exactly "M" or "F".
   - If it is a Parent's Passport/ID (older person, parent document):
     - Set document_type to "FATHER'S PASSPORT" (if male) or "MOTHER'S PASSPORT" (if female).
-    - Extract ONLY "FATHER_FULLNAME" or "MOTHER_FULLNAME" in ALL UPPERCASE (do NOT extract personal passport numbers or birth dates into student's fields).
+    - Extract ONLY "FATHER_FULLNAME" or "MOTHER_FULLNAME" in ALL UPPERCASE (Concatenation of Surname + Given Names + Patronymic e.g. "RUZIMATOV KHUSNIDDIN INOMOVICH" or "RUZIMATOVA SHAKHNOZAKHON ESONOVNA"). Do NOT extract personal passport numbers or birth dates into student's fields.
 - If the document is a university/college diploma or secondary school certificate (e.g. Bachelor's Diploma / Bakalavr Diplomi, Master's Diploma / Magistr Diplomi, Shahodatnoma / Certificate of General Secondary Education):
   - Document Type: Set document_type to "BACHELOR'S DIPLOMA", "MASTER'S DIPLOMA", "SHAHODATNOMA", or "DIPLOMA".
   - Extract ONLY these educational fields (Do NOT extract personal details like FULL_NAME, DATE_OF_BIRTH, or personal ID numbers):
@@ -76,6 +76,20 @@ Specific instructions:
       - For Bachelor's Diplomas (4-year degree): (Date of Graduation year - 4 years), on September 2nd in YYYY-MM-DD format (e.g. 2025 - 4 = '2021-09-02').
       - For Master's Diplomas (2-year degree): (Date of Graduation year - 2 years), on September 2nd in YYYY-MM-DD format (e.g. 2025 - 2 = '2023-09-02').
       - For Secondary School Certificates (Shahodatnoma): (Date of Graduation year - 3 years), on September 2nd in YYYY-MM-DD format (e.g. 2025 - 3 = '2022-09-02').
+- If the document is a Language Certificate or Test Score Report (e.g. TOPIK, IELTS, SAT, SKA, TOEFL, CEFR):
+  - Set document_type to "TOPIK CERTIFICATE", "IELTS CERTIFICATE", "SAT SCORE REPORT", "SKA CERTIFICATE", "TOEFL CERTIFICATE", or "CEFR CERTIFICATE".
+  - Extract ONLY these certificate fields:
+    - "CERTIFICATE_TYPE": Exactly one of "TOPIK", "IELTS", "SAT", "SKA", "TOEFL", or "CEFR".
+    - "CERTIFICATE_SCORE":
+      - For TOPIK (한국어능력시험 성적증명서 / OFFICIAL TOPIK SCORE REPORT): Extract the awarded level digit "1", "2", "3", "4", "5", or "6" (from '등급 Level' e.g. '2급' -> '2', '3급' -> '3', etc.). If unpassed / expected: "EXPECTED".
+      - For IELTS (Test Report Form): Extract the "Overall Band Score" (e.g. "7.0", "6.5", "8.0").
+      - For SAT (College Board SAT / Your Scores): Extract the "TOTAL SCORE" (e.g. "1410", "1350", "1520").
+      - For SKA (세종한국어평가 성적증명서 / Sejong Korean language Assessment): Extract the "총점 Total Score" (e.g. "515" from "515/800").
+      - For TOEFL: Extract the total score (e.g. "95", "105").
+      - For CEFR: Extract the overall CEFR level (e.g. "B2", "C1", "B1").
+    - "CERTIFICATE_TEST_DATE": The date the test was held/taken in strict ISO format YYYY-MM-DD (e.g., from 'Test Held/Test Date', 'Date', 'Tested on', 'Date of the Assessment').
+    - "CERTIFICATE_VALID_DATE": The expiration/validity date in strict ISO format YYYY-MM-DD (e.g., from 'Valid Until', 'Period of Validity'). If not printed on the document, calculate as (Test Date + 2 years minus 1 day).
+    - "FULL_NAME": Candidate full name in ALL UPPERCASE if clearly visible on the score report.
 - If the document contains contact information or is a screenshot (e.g. a screenshot of a chat, Telegram, WhatsApp, SMS, profile card, or note):
   - Set document_type to "CONTACT INFO" or "MESSENGER SCREENSHOT".
   - Extract ONLY these fields if present:
@@ -262,7 +276,7 @@ Return JSON only. Do not explain anything. Output must be exactly in this JSON f
             y, m, d = int(m2.group(1)), int(m2.group(2)), int(m2.group(3))
             return f"{y:04d}-{m:02d}-{d:02d}"
 
-        # DD Mon YYYY e.g. 15 OCT 2007
+        # DD Mon YYYY e.g. 15 OCT 2007 or 30/NOV/2024
         m3 = re.match(r'^(\d{1,2})[\s\.\/\-]([A-Za-z]{3,5})[\s\.\/\-](\d{4})$', s)
         if m3:
             d = int(m3.group(1))
@@ -271,11 +285,66 @@ Return JSON only. Do not explain anything. Output must be exactly in this JSON f
             if mon in MONTH_MAP:
                 return f"{y:04d}-{MONTH_MAP[mon]:02d}-{d:02d}"
 
+        # Mon DD, YYYY e.g. May 3, 2025 or May 03, 2025
+        m4 = re.match(r'^([A-Za-z]{3,9})\s+(\d{1,2}),?\s+(\d{4})$', s)
+        if m4:
+            mon = m4.group(1).upper()[:3]
+            d = int(m4.group(2))
+            y = int(m4.group(3))
+            if mon in MONTH_MAP:
+                return f"{y:04d}-{MONTH_MAP[mon]:02d}-{d:02d}"
+
         return s
 
     doc_type = result_json.get("document_type", "UNKNOWN DOCUMENT")
     simple_fields = result_json.get("fields", {})
     raw_ocr_text = result_json.get("ocr_text", "")
+
+    # Post-process Certificate logic (TOPIK level, automatic expiry calculation)
+    cert_type = str(simple_fields.get("CERTIFICATE_TYPE") or "").upper().strip()
+    if not cert_type and any(k in doc_type.upper() for k in ["TOPIK", "IELTS", "SAT", "SKA", "TOEFL", "CEFR"]):
+        for k in ["TOPIK", "IELTS", "SAT", "SKA", "TOEFL", "CEFR"]:
+            if k in doc_type.upper():
+                cert_type = k
+                simple_fields["CERTIFICATE_TYPE"] = cert_type
+                break
+
+    if cert_type:
+        # Standardize cert score
+        raw_score = str(simple_fields.get("CERTIFICATE_SCORE") or "").strip()
+        if cert_type == "TOPIK":
+            # Extract single level digit (e.g. 2 from "2급" or "Level 2")
+            lvl_match = re.search(r'([1-6])\s*(?:급|level|lvl)?', raw_score, re.IGNORECASE)
+            if lvl_match:
+                simple_fields["CERTIFICATE_SCORE"] = lvl_match.group(1)
+            elif "EXPECT" in raw_score.upper():
+                simple_fields["CERTIFICATE_SCORE"] = "EXPECTED"
+        elif cert_type == "SKA":
+            # Extract total score (e.g. 515 from "515/800" or "515")
+            ska_match = re.search(r'(\d+)(?:\s*/\s*800)?', raw_score)
+            if ska_match:
+                simple_fields["CERTIFICATE_SCORE"] = ska_match.group(1)
+
+        # Date normalization & auto-valid date calculation (+2 years minus 1 day)
+        test_date = normalize_date_val(simple_fields.get("CERTIFICATE_TEST_DATE"))
+        if test_date and re.match(r'^\d{4}-\d{2}-\d{2}$', test_date):
+            simple_fields["CERTIFICATE_TEST_DATE"] = test_date
+            valid_date = normalize_date_val(simple_fields.get("CERTIFICATE_VALID_DATE"))
+            if not valid_date or not re.match(r'^\d{4}-\d{2}-\d{2}$', valid_date):
+                try:
+                    import datetime
+                    t_obj = datetime.date.fromisoformat(test_date)
+                    # +2 years minus 1 day
+                    try:
+                        v_obj = t_obj.replace(year=t_obj.year + 2) - datetime.timedelta(days=1)
+                    except ValueError:
+                        # Leap year case (e.g. Feb 29)
+                        v_obj = (t_obj + datetime.timedelta(days=730)) - datetime.timedelta(days=1)
+                    simple_fields["CERTIFICATE_VALID_DATE"] = v_obj.isoformat()
+                except Exception as e:
+                    logger.debug(f"Auto-valid date calculation failed: {e}")
+            else:
+                simple_fields["CERTIFICATE_VALID_DATE"] = valid_date
 
     DATE_KEYS = {'DATE_OF_BIRTH', 'DATE_OF_ISSUE', 'DATE_OF_EXPIRATION', 'DATE_OF_ENTRY', 'DATE_OF_GRADUATION', 'BIRTHDAY'}
 

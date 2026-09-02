@@ -17,7 +17,7 @@ import {
   Check, ChevronDown, ChevronUp, Folder, FolderPlus, ExternalLink, AlertTriangle, AlertCircle,
   BookOpen, ArrowLeft, FileText, Eraser, Loader2, ArrowDownCircle,
   Phone, MapPin, Briefcase, Award, Users, UserCheck, ShieldCheck, Sparkles, UserPlus,
-  Send
+  Send, Upload
 } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
 
@@ -1237,6 +1237,88 @@ const updateCertValidDate = (field: 'y' | 'm' | 'd', val: string) => {
 }
 
 // Certificate Modal Handlers
+const isExtractingCertInModal = ref(false)
+const certModalExtractError = ref<string | null>(null)
+const certFileInputRef = ref<HTMLInputElement | null>(null)
+
+const triggerCertModalUpload = () => {
+  certFileInputRef.value?.click()
+}
+
+const handleCertModalFileChange = async (e: Event) => {
+  const target = e.target as HTMLInputElement
+  const file = target.files?.[0]
+  if (!file) return
+
+  isExtractingCertInModal.value = true
+  certModalExtractError.value = null
+
+  try {
+    const formData = new FormData()
+    formData.append('file', file)
+    if (props.student?.id) {
+      formData.append('student_id', props.student.id)
+    }
+
+    const res = await studentsApi.extractDocument(formData)
+    const fields = res.fields || {}
+    const docType = (res.document_type || '').toUpperCase()
+
+    // Determine type
+    let type = fields.CERTIFICATE_TYPE || fields.LANGUAGE_CERTIFICATE || ''
+    if (!type && docType) {
+      for (const t of ['TOPIK', 'IELTS', 'SAT', 'SKA', 'TOEFL', 'CEFR']) {
+        if (docType.includes(t)) {
+          type = t
+          break
+        }
+      }
+    }
+    type = String(type).toUpperCase().trim()
+    if (type) {
+      certForm.value.type = type
+    }
+
+    // Determine score
+    let score = fields.CERTIFICATE_SCORE || fields.SCORE || fields.TOTAL_SCORE || fields.OVERALL_BAND_SCORE || fields.LEVEL || ''
+    if (type === 'TOPIK' && score) {
+      const m = String(score).match(/([1-6])/)
+      if (m) score = m[1]
+    }
+    if (score) {
+      certForm.value.score = String(score).trim()
+    }
+
+    // Determine test date
+    const testDate = fields.CERTIFICATE_TEST_DATE || fields.TEST_DATE || fields.DATE_OF_TEST || fields.DATE_OF_THE_ASSESSMENT || ''
+    if (testDate) {
+      certForm.value.test_date = String(testDate).trim()
+    }
+
+    // Determine valid date
+    let validDate = fields.CERTIFICATE_VALID_DATE || fields.VALID_DATE || fields.VALID_UNTIL || fields.PERIOD_OF_VALIDITY || ''
+    if (!validDate && testDate && /^\d{4}-\d{2}-\d{2}$/.test(String(testDate).trim())) {
+      try {
+        const parts = String(testDate).trim().split('-').map(Number)
+        const d = new Date(parts[0] + 2, parts[1] - 1, parts[2] - 1)
+        const vy = d.getFullYear()
+        const vm = String(d.getMonth() + 1).padStart(2, '0')
+        const vd = String(d.getDate()).padStart(2, '0')
+        validDate = `${vy}-${vm}-${vd}`
+      } catch (e) {}
+    }
+    if (validDate) {
+      certForm.value.valid_date = String(validDate).trim()
+    }
+  } catch (err: any) {
+    console.error('Certificate extraction error:', err)
+    certModalExtractError.value = err.response?.data?.error || 'Failed to extract certificate details.'
+  } finally {
+    isExtractingCertInModal.value = false
+    if (target) target.value = ''
+  }
+}
+
 const openCertModal = (slot: 1 | 2 | 3) => {
   if (!props.student || !authStore.canEdit) return
   certModalSlot.value = slot
@@ -3647,6 +3729,49 @@ const handleRestoreStudent = () => {
                 {{ student.level }}
               </span>
             </div>
+          </div>
+
+          <!-- AI Auto-Fill from Image / Document Scan Section -->
+          <div class="mb-4 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-zinc-900 dark:text-zinc-100 flex items-center justify-between gap-2.5">
+            <div class="flex items-center gap-2.5 min-w-0">
+              <div class="w-8 h-8 rounded-lg bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 shadow-2xs">
+                <Sparkles class="w-4 h-4" />
+              </div>
+              <div class="min-w-0">
+                <div class="text-[11px] font-black uppercase tracking-wider text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
+                  <span>AI Auto-Filler</span>
+                </div>
+                <div class="text-[11px] text-zinc-500 dark:text-zinc-400 truncate">
+                  Auto-fill from TOPIK, IELTS, SAT, SKA scan
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <input
+                ref="certFileInputRef"
+                type="file"
+                accept="image/*,.pdf"
+                class="hidden"
+                @change="handleCertModalFileChange"
+              />
+              <button
+                type="button"
+                @click="triggerCertModalUpload"
+                :disabled="isExtractingCertInModal"
+                class="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-[10.5px] uppercase font-extrabold tracking-wider transition-all flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-[0.96] disabled:opacity-50"
+              >
+                <Loader2 v-if="isExtractingCertInModal" class="w-3.5 h-3.5 animate-spin" />
+                <Upload v-else class="w-3.5 h-3.5" />
+                <span>{{ isExtractingCertInModal ? 'Scanning...' : 'Upload Scan' }}</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Extraction error if any -->
+          <div v-if="certModalExtractError" class="mb-4 p-2.5 rounded-lg bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-[11px] font-bold flex items-center gap-1.5">
+            <AlertCircle class="w-3.5 h-3.5 shrink-0" />
+            <span>{{ certModalExtractError }}</span>
           </div>
 
           <div class="space-y-4">
