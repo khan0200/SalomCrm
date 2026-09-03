@@ -342,25 +342,67 @@ const visibleMappings = computed(() => {
   return list
 })
 
+// All supported date fields that should display date format dropdown
+const DATE_FIELDS = [
+  'birthday',
+  'passport_issue_date',
+  'passport_expire_date',
+  'date_of_entry',
+  'date_of_graduation',
+  'today_date',
+  'certificate_test_date',
+  'certificate_valid_date',
+  'certificate_2_test_date',
+  'certificate_2_valid_date',
+  'certificate_3_test_date',
+  'certificate_3_valid_date',
+]
+
+// Category ordering and labels
+const CATEGORY_ORDER: { key: string; label: string }[] = [
+  { key: 'system', label: 'Tizim / Maxsus' },
+  { key: 'personal', label: 'Shaxsiy ma\'lumotlar' },
+  { key: 'passport', label: 'Pasport ma\'lumotlari' },
+  { key: 'contacts', label: 'Aloqa ma\'lumotlari' },
+  { key: 'parents', label: 'Ota-ona ma\'lumotlari' },
+  { key: 'education', label: 'Ta\'lim ma\'lumotlari (Educational Background)' },
+  { key: 'certificates', label: 'Til sertifikatlari' },
+  { key: 'university', label: 'Universitet tanlovlari' },
+  { key: 'management', label: 'Boshqa / CRM' },
+]
+
 const categorizedCrmFields = computed(() => {
   if (!analysisData.value?.available_fields) return {}
-  const groups: Record<string, { key: string; label: string }[]> = {
-    'Tizim / Maxsus': [],
-    "Shaxsiy ma'lumotlar": [],
-    'Pasport ma\'lumotlari': [],
-    "Aloqa ma'lumotlari": [],
-    "Ota-ona ma'lumotlari": [],
-    "Ta'lim va Sertifikatlar": [],
-  }
-  analysisData.value.available_fields.forEach(f => {
-    if (f.category === 'system') groups['Tizim / Maxsus'].push(f)
-    else if (f.category === 'personal') groups["Shaxsiy ma'lumotlar"].push(f)
-    else if (f.category === 'passport') groups["Pasport ma'lumotlari"].push(f)
-    else if (f.category === 'contacts') groups["Aloqa ma'lumotlari"].push(f)
-    else if (f.category === 'parents') groups["Ota-ona ma'lumotlari"].push(f)
-    else if (f.category === 'education') groups["Ta'lim va Sertifikatlar"].push(f)
+  const groups: Record<string, { key: string; label: string }[]> = {}
+
+  // Initialize ordered known categories
+  CATEGORY_ORDER.forEach(c => {
+    groups[c.label] = []
   })
-  return groups
+
+  // Category key to display label mapping
+  const categoryLabelMap = new Map(CATEGORY_ORDER.map(c => [c.key, c.label]))
+
+  analysisData.value.available_fields.forEach(f => {
+    let groupLabel = categoryLabelMap.get(f.category)
+    if (!groupLabel) {
+      groupLabel = f.category ? f.category.charAt(0).toUpperCase() + f.category.slice(1) : 'Boshqa'
+      if (!groups[groupLabel]) {
+        groups[groupLabel] = []
+      }
+    }
+    groups[groupLabel].push(f)
+  })
+
+  // Filter out empty groups
+  const nonEmptyGroups: Record<string, { key: string; label: string }[]> = {}
+  for (const [name, items] of Object.entries(groups)) {
+    if (items.length > 0) {
+      nonEmptyGroups[name] = items
+    }
+  }
+
+  return nonEmptyGroups
 })
 
 const confidenceBadge = (conf: number) => {
@@ -750,7 +792,7 @@ const resetWizard = () => {
                       class="w-full bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-[11px] rounded-lg px-2 py-1.5 text-zinc-800 dark:text-zinc-200 focus:border-blue-500 focus:outline-none"
                     />
 
-                    <div v-if="['birthday', 'passport_issue_date', 'passport_expire_date', 'certificate_valid_date'].includes(m.field)">
+                    <div v-if="DATE_FIELDS.includes(m.field)">
                       <select
                         v-model="m.format_rules.dateFormat"
                         @click.stop
@@ -759,7 +801,23 @@ const resetWizard = () => {
                         <option value="YYYY-MM-DD">2003-05-14</option>
                         <option value="YYYY.MM.DD">2003.05.14</option>
                         <option value="DD.MM.YYYY">14.05.2003</option>
+                        <option value="DD-MM-YYYY">14-05-2003</option>
                         <option value="YYYYMMDD">20030514</option>
+                        <option value="YYYY/MM/DD">2003/05/14</option>
+                      </select>
+                    </div>
+
+                    <div v-if="m.field === 'graduation_expected'">
+                      <select
+                        v-model="m.format_rules.boolFormat"
+                        @click.stop
+                        class="w-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-[10px] rounded-lg px-2 py-1 text-zinc-600 dark:text-zinc-400 cursor-pointer"
+                      >
+                        <option value="Yes/No">Yes / No</option>
+                        <option value="예/아니오">예 / 아니오</option>
+                        <option value="졸업예정/졸업">졸업예정 / 졸업</option>
+                        <option value="Y/N">Y / N</option>
+                        <option value="Ha/Yo'q">Ha / Yo'q</option>
                       </select>
                     </div>
 

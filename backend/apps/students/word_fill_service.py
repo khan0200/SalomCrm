@@ -67,16 +67,19 @@ WORD_SYSTEM_FIELDS = [
 ]
 
 # Extra fields useful in application forms but absent from the Excel list.
-WORD_EXTRA_FIELDS = [
-    {"key": "university_1", "label": "Universitet (Applying University)", "category": "education"},
-    {"key": "today_date", "label": "Bugungi sana (Application / Signature date)", "category": "system"},
-]
+WORD_EXTRA_FIELDS = []
 
 
 def get_word_crm_fields() -> List[Dict[str, Any]]:
     """CRM field dictionary tailored for Word forms (no sequence numbering)."""
     base = [f for f in CRM_FIELDS if f['key'] not in ('_sequence_no', '_static_value', '_skip')]
-    return WORD_SYSTEM_FIELDS + base + WORD_EXTRA_FIELDS
+    seen = set()
+    res = []
+    for item in (WORD_SYSTEM_FIELDS + base + WORD_EXTRA_FIELDS):
+        if item['key'] not in seen:
+            seen.add(item['key'])
+            res.append(item)
+    return res
 
 
 VALID_FIELD_KEYS = {f['key'] for f in get_word_crm_fields()}

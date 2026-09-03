@@ -1635,38 +1635,7 @@ class ExcelFillGenerateView(APIView):
         student_map = {s.id: s for s in qs}
         ordered_students = [student_map[sid] for sid in student_ids if sid in student_map]
 
-        students_data = [
-            {
-                "id": s.id,
-                "full_name": s.full_name,
-                "korean_name": s.korean_name,
-                "passport": s.passport,
-                "passport_issue_date": s.passport_issue_date,
-                "passport_expire_date": s.passport_expire_date,
-                "birthday": s.birthday,
-                "gender": s.gender,
-                "nationality": getattr(s, 'nationality', None) or 'UZBEKISTAN',
-                "phone1": s.phone1,
-                "phone2": s.phone2,
-                "email": s.email,
-                "address": s.address,
-                "father_name": s.father_name,
-                "father_phone": s.father_phone,
-                "father_job": s.father_job,
-                "mother_name": s.mother_name,
-                "mother_phone": s.mother_phone,
-                "mother_job": s.mother_job,
-                "level": s.level,
-                "major": s.major,
-                "final_school_name": s.final_school_name,
-                "gpa": s.gpa,
-                "language_certificate": s.language_certificate,
-                "certificate_score": s.certificate_score,
-                "certificate_valid_date": s.certificate_valid_date,
-                "university_1": s.university_1,
-            }
-            for s in ordered_students
-        ]
+        students_data = _serialize_students_for_fill(request, student_ids)
 
         try:
             from .excel_fill_service import generate_filled_excel
@@ -1712,33 +1681,84 @@ def _serialize_students_for_fill(request, student_ids):
 
     return [
         {
+            # Personal
             "id": s.id,
             "full_name": s.full_name,
+            "first_name": (s.full_name or "").split()[0] if s.full_name else "",
+            "last_name": " ".join((s.full_name or "").split()[1:]) if s.full_name and len((s.full_name or "").split()) > 1 else "",
             "korean_name": s.korean_name,
+            "gender": s.gender,
+            "birthday": s.birthday,
+            "nationality": getattr(s, 'nationality', None) or 'UZBEKISTAN',
+            "address": s.address,
+            # Passport
             "passport": s.passport,
             "passport_issue_date": s.passport_issue_date,
             "passport_expire_date": s.passport_expire_date,
-            "birthday": s.birthday,
-            "gender": s.gender,
-            "nationality": getattr(s, 'nationality', None) or 'UZBEKISTAN',
+            # Contacts
             "phone1": s.phone1,
             "phone2": s.phone2,
             "email": s.email,
-            "address": s.address,
+            "telegram_username": s.telegram_username,
+            # Parents
             "father_name": s.father_name,
             "father_phone": s.father_phone,
             "father_job": s.father_job,
             "mother_name": s.mother_name,
             "mother_phone": s.mother_phone,
             "mother_job": s.mother_job,
-            "level": s.level,
-            "major": s.major,
+            # Education & School
+            "educational_background": s.educational_background,
             "final_school_name": s.final_school_name,
+            "level": s.level,
+            "level2": s.level2,
+            "major": s.major,
+            "date_of_entry": s.date_of_entry,
+            "date_of_graduation": s.date_of_graduation,
+            "graduation_expected": s.graduation_expected,
+            "degree_no": s.degree_no,
             "gpa": s.gpa,
+            "gpa_system": s.gpa_system,
+            "school_address": s.school_address,
+            "school_phone": s.school_phone,
+            "school_email": s.school_email,
+            "school_website": s.school_website,
+            # Language Certificates (up to 3)
             "language_certificate": s.language_certificate,
             "certificate_score": s.certificate_score,
+            "certificate_test_date": s.certificate_test_date,
             "certificate_valid_date": s.certificate_valid_date,
+            "language_certificate_2": s.language_certificate_2,
+            "certificate_score_2": s.certificate_score_2,
+            "certificate_2_test_date": s.certificate_2_test_date,
+            "certificate_2_valid_date": s.certificate_2_valid_date,
+            "language_certificate_3": s.language_certificate_3,
+            "certificate_score_3": s.certificate_score_3,
+            "certificate_3_test_date": s.certificate_3_test_date,
+            "certificate_3_valid_date": s.certificate_3_valid_date,
+            # Target Universities
             "university_1": s.university_1,
+            "university_1_major": s.university_1_major,
+            "university_1_status": s.university_1_status,
+            "university_2": s.university_2,
+            "university_2_major": s.university_2_major,
+            "university_2_status": s.university_2_status,
+            "university_3": s.university_3,
+            "university_3_major": s.university_3_major,
+            "university_3_status": s.university_3_status,
+            "university_4": s.university_4,
+            "university_4_major": s.university_4_major,
+            "university_4_status": s.university_4_status,
+            "university_5": s.university_5,
+            "university_5_major": s.university_5_major,
+            "university_5_status": s.university_5_status,
+            # Management
+            "tariff": s.tariff,
+            "student_group": s.student_group,
+            "coordinator": s.coordinator,
+            "lead_by": s.lead_by,
+            "office": s.office,
+            "notes": s.notes,
         }
         for s in ordered
     ]

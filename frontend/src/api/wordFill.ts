@@ -58,6 +58,7 @@ export interface WordMappingConfig {
     dateFormat?: string
     genderFormat?: string
     phoneFormat?: string
+    boolFormat?: string
   }
 }
 

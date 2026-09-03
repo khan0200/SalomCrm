@@ -497,9 +497,34 @@ const KOREAN_HEADER_TRANSLATIONS: Record<string, string> = {
   '졸업일': 'Graduation Date',
   '졸업일자': 'Graduation Date',
   '졸업년월일': 'Graduation Date',
-  '입학일': 'Admission Date',
-  '입학일자': 'Admission Date',
-  '입학년월일': 'Admission Date',
+  '졸업예정': 'Expected Graduation',
+  '입학일': 'Date of Entry / Admission Date',
+  '입학일자': 'Date of Entry / Admission Date',
+  '입학년월일': 'Date of Entry / Admission Date',
+  '학력': 'Educational Background',
+  '학력사항': 'Educational Background',
+  '학력구분': 'Educational Background',
+  '학위번호': 'Degree / Diploma No',
+  '졸업증서번호': 'Diploma Number',
+  '학교주소': 'School Address',
+  '학교연락처': 'School Phone',
+  '학교전화': 'School Phone',
+  '학교이메일': 'School Email',
+  '학교홈페이지': 'School Website',
+  '응시일': 'Test Date',
+  '응시일자': 'Test Date',
+  '신청일': 'Application Date',
+  '신청일자': 'Application Date',
+  '작성일': 'Date of Preparation',
+  '작성일자': 'Date of Preparation',
+  '지망대학': 'Applying University',
+  '지원대학': 'Applying University',
+  '지망학과': 'Applying Major',
+  '지원학과': 'Applying Major',
+  '평점': 'GPA / Score',
+  '만점기준': 'GPA Scale',
+  '학번': 'Student ID',
+  '관리번호': 'Student ID / Management No',
 }
 
 const getHeaderDisplayInfo = (header: string) => {
@@ -519,25 +544,13 @@ const getHeaderDisplayInfo = (header: string) => {
     }
   }
 
-  const parenMatch = trimmed.match(/^([^\(]+)\s*\(([^)]+)\)$/)
-  if (parenMatch) {
-    const kPart = parenMatch[1].trim()
-    const ePart = parenMatch[2].trim()
-    if (/[\uac00-\ud7a3]/.test(kPart) && /[a-zA-Z]/.test(ePart)) {
-      return {
-        isKorean: true,
-        koreanText: kPart,
-        englishText: ePart
-      }
-    }
-  }
-
-  for (const [kKey, eVal] of Object.entries(KOREAN_HEADER_TRANSLATIONS)) {
-    if (trimmed.includes(kKey)) {
+  // Check if header contains any known Korean keyword
+  for (const [koreanWord, englishTrans] of Object.entries(KOREAN_HEADER_TRANSLATIONS)) {
+    if (trimmed.includes(koreanWord)) {
       return {
         isKorean: true,
         koreanText: trimmed,
-        englishText: eVal
+        englishText: `${englishTrans} (${trimmed})`
       }
     }
   }
@@ -569,28 +582,68 @@ const visibleMappings = computed(() => {
   return list
 })
 
+// All supported date fields that should display date format dropdown
+const DATE_FIELDS = [
+  'birthday',
+  'passport_issue_date',
+  'passport_expire_date',
+  'date_of_entry',
+  'date_of_graduation',
+  'today_date',
+  'certificate_test_date',
+  'certificate_valid_date',
+  'certificate_2_test_date',
+  'certificate_2_valid_date',
+  'certificate_3_test_date',
+  'certificate_3_valid_date',
+]
+
+// Category ordering and labels
+const CATEGORY_ORDER: { key: string; label: string }[] = [
+  { key: 'system', label: 'Tizim / Maxsus' },
+  { key: 'personal', label: 'Shaxsiy ma\'lumotlar' },
+  { key: 'passport', label: 'Pasport ma\'lumotlari' },
+  { key: 'contacts', label: 'Aloqa ma\'lumotlari' },
+  { key: 'parents', label: 'Ota-ona ma\'lumotlari' },
+  { key: 'education', label: 'Ta\'lim ma\'lumotlari (Educational Background)' },
+  { key: 'certificates', label: 'Til sertifikatlari' },
+  { key: 'university', label: 'Universitet tanlovlari' },
+  { key: 'management', label: 'Boshqa / CRM' },
+]
+
 // Group CRM fields by category for clean dropdown
 const categorizedCrmFields = computed(() => {
   if (!analysisData.value?.available_fields) return {}
-  const groups: Record<string, { key: string; label: string }[]> = {
-    'Tizim / Maxsus': [],
-    'Shaxsiy ma\'lumotlar': [],
-    'Pasport ma\'lumotlari': [],
-    'Aloqa ma\'lumotlari': [],
-    'Ota-ona ma\'lumotlari': [],
-    'Ta\'lim va Sertifikatlar': [],
-  }
+  const groups: Record<string, { key: string; label: string }[]> = {}
 
-  analysisData.value.available_fields.forEach(f => {
-    if (f.category === 'system') groups['Tizim / Maxsus'].push(f)
-    else if (f.category === 'personal') groups['Shaxsiy ma\'lumotlar'].push(f)
-    else if (f.category === 'passport') groups['Pasport ma\'lumotlari'].push(f)
-    else if (f.category === 'contacts') groups['Aloqa ma\'lumotlari'].push(f)
-    else if (f.category === 'parents') groups['Ota-ona ma\'lumotlari'].push(f)
-    else if (f.category === 'education') groups['Ta\'lim va Sertifikatlar'].push(f)
+  // Initialize ordered known categories
+  CATEGORY_ORDER.forEach(c => {
+    groups[c.label] = []
   })
 
-  return groups
+  // Category key to display label mapping
+  const categoryLabelMap = new Map(CATEGORY_ORDER.map(c => [c.key, c.label]))
+
+  analysisData.value.available_fields.forEach(f => {
+    let groupLabel = categoryLabelMap.get(f.category)
+    if (!groupLabel) {
+      groupLabel = f.category ? f.category.charAt(0).toUpperCase() + f.category.slice(1) : 'Boshqa'
+      if (!groups[groupLabel]) {
+        groups[groupLabel] = []
+      }
+    }
+    groups[groupLabel].push(f)
+  })
+
+  // Filter out empty groups
+  const nonEmptyGroups: Record<string, { key: string; label: string }[]> = {}
+  for (const [name, items] of Object.entries(groups)) {
+    if (items.length > 0) {
+      nonEmptyGroups[name] = items
+    }
+  }
+
+  return nonEmptyGroups
 })
 
 // ─── Student Selection Handlers ─────────────────────────────────────────────
@@ -1073,7 +1126,7 @@ const resetWizard = () => {
                       class="w-full bg-zinc-50 dark:bg-zinc-800 border border-amber-300 dark:border-amber-700/60 text-xs rounded-xl px-3 py-1.5 text-zinc-800 dark:text-zinc-200 placeholder-zinc-400"
                     />
                   </div>
-                  <div v-else-if="['birthday', 'passport_issue_date', 'passport_expire_date', 'certificate_valid_date'].includes(mapping.field)" class="flex items-center gap-2">
+                  <div v-else-if="DATE_FIELDS.includes(mapping.field)" class="flex items-center gap-2">
                     <select
                       v-model="mapping.format_rules.dateFormat"
                       class="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-[11px] font-semibold rounded-lg px-2.5 py-1.5 text-zinc-700 dark:text-zinc-300 cursor-pointer"
@@ -1082,6 +1135,20 @@ const resetWizard = () => {
                       <option value="YYYY.MM.DD">Sana formati: 2004.11.15</option>
                       <option value="YYYYMMDD">Sana formati: 20041115</option>
                       <option value="DD.MM.YYYY">Sana formati: 15.11.2004</option>
+                      <option value="DD-MM-YYYY">Sana formati: 15-11-2004</option>
+                      <option value="YYYY/MM/DD">Sana formati: 2004/11/15</option>
+                    </select>
+                  </div>
+                  <div v-else-if="mapping.field === 'graduation_expected'" class="flex items-center gap-2">
+                    <select
+                      v-model="mapping.format_rules.boolFormat"
+                      class="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-[11px] font-semibold rounded-lg px-2.5 py-1.5 text-zinc-700 dark:text-zinc-300 cursor-pointer"
+                    >
+                      <option value="Yes/No">Format: Yes / No</option>
+                      <option value="예/아니오">Format: 예 / 아니오 (Koreyscha)</option>
+                      <option value="졸업예정/졸업">Format: 졸업예정 / 졸업</option>
+                      <option value="Y/N">Format: Y / N</option>
+                      <option value="Ha/Yo'q">Format: Ha / Yo'q</option>
                     </select>
                   </div>
                   <div v-else-if="mapping.field === 'gender'">

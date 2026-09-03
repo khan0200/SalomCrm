@@ -141,6 +141,7 @@ def extract_city_and_state(address: str) -> Tuple[str, str]:
 
 # CRM Field dictionary for semantic mapping and UI selection
 CRM_FIELDS = [
+    # System / Special
     {
         "key": "_sequence_no",
         "label": "Tartib raqami (№ / 순번 / No)",
@@ -159,6 +160,13 @@ CRM_FIELDS = [
         "category": "system",
         "description": "Ushbu ustun to'ldirilmaydi"
     },
+    {
+        "key": "today_date",
+        "label": "Bugungi sana (Today / Application Date / 신청일)",
+        "category": "system",
+        "description": "Joriy / ariza topshirish sanasi"
+    },
+
     # Personal info
     {"key": "full_name", "label": "Full Name / F.I.SH (Inglizcha)", "category": "personal"},
     {"key": "first_name", "label": "Ism (First Name)", "category": "personal"},
@@ -167,17 +175,22 @@ CRM_FIELDS = [
     {"key": "gender", "label": "Jinsi (Sex / Gender / 성별)", "category": "personal"},
     {"key": "birthday", "label": "Tug'ilgan sana (Birth Date / 생년월일)", "category": "personal"},
     {"key": "nationality", "label": "Fuqaroligi (Nationality / 국적)", "category": "personal"},
+    {"key": "id", "label": "Talaba ID (Student ID / ID / 학번)", "category": "personal"},
     {"key": "address", "label": "To'liq yashash manzili (Full Address / 주소)", "category": "personal"},
     {"key": "address_city", "label": "Shahar / Tuman (City / District / 시·군·구)", "category": "personal"},
     {"key": "address_state", "label": "Viloyat / Region (State / Province / 도·시)", "category": "personal"},
+
     # Passport
     {"key": "passport", "label": "Pasport seriya va raqam (Passport No / 여권번호)", "category": "passport"},
     {"key": "passport_issue_date", "label": "Pasport berilgan sana (Issue Date / 발급일)", "category": "passport"},
     {"key": "passport_expire_date", "label": "Pasport amal qilish muddati (Expiry Date / 만료일)", "category": "passport"},
+
     # Contacts
     {"key": "phone1", "label": "Asosiy telefon raqam (Phone 1 / 연락처)", "category": "contacts"},
     {"key": "phone2", "label": "Qo'shimcha telefon (Phone 2 / 비상연락처)", "category": "contacts"},
     {"key": "email", "label": "Email manzil (Email / 이메일)", "category": "contacts"},
+    {"key": "telegram_username", "label": "Telegram username", "category": "contacts"},
+
     # Parents
     {"key": "father_name", "label": "Otasining ismi (Father's Name / 부 성명)", "category": "parents"},
     {"key": "father_phone", "label": "Otasining telefoni (Father's Phone / 부 연락처)", "category": "parents"},
@@ -185,14 +198,59 @@ CRM_FIELDS = [
     {"key": "mother_name", "label": "Onasining ismi (Mother's Name / 모 성명)", "category": "parents"},
     {"key": "mother_phone", "label": "Onasining telefoni (Mother's Phone / 모 연락처)", "category": "parents"},
     {"key": "mother_job", "label": "Onasining ish joyi (Mother's Job / 모 직업)", "category": "parents"},
-    # Education & Certificates
-    {"key": "level", "label": "Ta'lim bosqichi (Level / Degree / 과정)", "category": "education"},
-    {"key": "major", "label": "Yo'nalish / Mutaxassislik (Major / 전공)", "category": "education"},
-    {"key": "final_school_name", "label": "Tugatgan maktab/litsey/universitet (Previous School / University / 최종학력)", "category": "education"},
-    {"key": "gpa", "label": "GPA / O'rtacha baho", "category": "education"},
-    {"key": "language_certificate", "label": "Til sertifikati nomi (TOPIK / IELTS / SKA)", "category": "education"},
-    {"key": "certificate_score", "label": "Sertifikat bali (Score / 급수)", "category": "education"},
-    {"key": "certificate_valid_date", "label": "Sertifikat amal qilish muddati", "category": "education"},
+
+    # Education (Educational Background)
+    {"key": "educational_background", "label": "Ta'lim darajasi (Educational Background / 최종학력 / 학력사항)", "category": "education"},
+    {"key": "final_school_name", "label": "Tugatgan maktab/litsey/universitet (Previous School / 출신학교명)", "category": "education"},
+    {"key": "level", "label": "Topshirayotgan bosqich (Target Degree / Level / 지원과정)", "category": "education"},
+    {"key": "level2", "label": "Qo'shimcha ta'lim bosqichi (Secondary Level)", "category": "education"},
+    {"key": "major", "label": "Yo'nalish / Mutaxassislik (Major / 전공 / 학과)", "category": "education"},
+    {"key": "date_of_entry", "label": "O'qishga kirgan sana (Date of Entry / 입학일자)", "category": "education"},
+    {"key": "date_of_graduation", "label": "O'qishni bitirgan sana (Date of Graduation / 졸업일자)", "category": "education"},
+    {"key": "graduation_expected", "label": "Bitirish kutilmoqda (Graduation Expected / 졸업예정 여부)", "category": "education"},
+    {"key": "degree_no", "label": "Diplom / Attestat raqami (Degree / Diploma No / 학위번호)", "category": "education"},
+    {"key": "gpa", "label": "GPA / O'rtacha baho (GPA / 성적)", "category": "education"},
+    {"key": "gpa_system", "label": "GPA tizimi (GPA System / masalan 4.5, 5.0, 100)", "category": "education"},
+    {"key": "school_address", "label": "Maktab manzili (School Address / 학교 주소)", "category": "education"},
+    {"key": "school_phone", "label": "Maktab telefoni (School Phone / 학교 연락처)", "category": "education"},
+    {"key": "school_email", "label": "Maktab emaili (School Email / 학교 이메일)", "category": "education"},
+    {"key": "school_website", "label": "Maktab veb-sayti (School Website / 학교 웹사이트)", "category": "education"},
+
+    # Certificates (Language Certificates)
+    {"key": "language_certificate", "label": "1-Til sertifikati turi (TOPIK / IELTS / SKA)", "category": "certificates"},
+    {"key": "certificate_score", "label": "1-Sertifikat bali (Score / 급수)", "category": "certificates"},
+    {"key": "certificate_test_date", "label": "1-Sertifikat topshirilgan sana (Test Date / 응시일)", "category": "certificates"},
+    {"key": "certificate_valid_date", "label": "1-Sertifikat amal qilish muddati (Valid Date / 유효기간)", "category": "certificates"},
+    {"key": "language_certificate_2", "label": "2-Til sertifikati turi (2nd Certificate Type)", "category": "certificates"},
+    {"key": "certificate_score_2", "label": "2-Sertifikat bali (2nd Certificate Score)", "category": "certificates"},
+    {"key": "certificate_2_test_date", "label": "2-Sertifikat topshirilgan sana (2nd Test Date)", "category": "certificates"},
+    {"key": "certificate_2_valid_date", "label": "2-Sertifikat amal qilish muddati (2nd Valid Date)", "category": "certificates"},
+    {"key": "language_certificate_3", "label": "3-Til sertifikati turi (3rd Certificate Type)", "category": "certificates"},
+    {"key": "certificate_score_3", "label": "3-Sertifikat bali (3rd Certificate Score)", "category": "certificates"},
+    {"key": "certificate_3_test_date", "label": "3-Sertifikat topshirilgan sana (3rd Test Date)", "category": "certificates"},
+    {"key": "certificate_3_valid_date", "label": "3-Sertifikat amal qilish muddati (3rd Valid Date)", "category": "certificates"},
+
+    # University choices
+    {"key": "university_1", "label": "1-Universitet (Applying University 1 / 지망대학 1)", "category": "university"},
+    {"key": "university_1_major", "label": "1-Universitet yo'nalishi (Major 1 / 지망학과 1)", "category": "university"},
+    {"key": "university_1_status", "label": "1-Universitet holati (University 1 Status)", "category": "university"},
+    {"key": "university_2", "label": "2-Universitet (Applying University 2 / 지망대학 2)", "category": "university"},
+    {"key": "university_2_major", "label": "2-Universitet yo'nalishi (Major 2 / 지망학과 2)", "category": "university"},
+    {"key": "university_2_status", "label": "2-Universitet holati (University 2 Status)", "category": "university"},
+    {"key": "university_3", "label": "3-Universitet (Applying University 3 / 지망대학 3)", "category": "university"},
+    {"key": "university_3_major", "label": "3-Universitet yo'nalishi (Major 3 / 지망학과 3)", "category": "university"},
+    {"key": "university_4", "label": "4-Universitet (Applying University 4)", "category": "university"},
+    {"key": "university_4_major", "label": "4-Universitet yo'nalishi (Major 4)", "category": "university"},
+    {"key": "university_5", "label": "5-Universitet (Applying University 5)", "category": "university"},
+    {"key": "university_5_major", "label": "5-Universitet yo'nalishi (Major 5)", "category": "university"},
+
+    # Management / CRM
+    {"key": "tariff", "label": "Tarif (Tariff / Standart, Premium, E-Visa)", "category": "management"},
+    {"key": "student_group", "label": "Guruh (Student Group)", "category": "management"},
+    {"key": "coordinator", "label": "Koordinator (Coordinator)", "category": "management"},
+    {"key": "lead_by", "label": "Lid manbasi (Lead By)", "category": "management"},
+    {"key": "office", "label": "Ofis / Filial (Office)", "category": "management"},
+    {"key": "notes", "label": "Eslatma / Izoh (Notes)", "category": "management"},
 ]
 
 # Multi-lingual dictionary for automatic matching
@@ -205,23 +263,64 @@ SEMANTIC_PATTERNS = [
     
     # Parents specific FIRST
     (r"(father['’]?s\s*name|father\s*name|father\s*fullname|부\s*성명|부친\s*성명|otasining\s*ismi)", "father_name"),
-    (r"(father['’]?s\s*(number|phone|mobile)|father\s*(mobile|phone|no)|부\s*(연락처|전화번호)|부친\s*연락처|otasining\s*telefoni)", "father_phone"),
-    (r"(father['’]?s\s*job|부\s*직업|부친\s*직업|otasining\s*kasbi)", "father_job"),
+    (r"(father['’]?s\s*(number|phone|mobile|tel)|father\s*(mobile|phone|no|tel)|부\s*(연락처|전화번호)|부친\s*연락처|otasining\s*telefoni)", "father_phone"),
+    (r"(father['’]?s\s*job|부\s*직업|부친\s*직업|otasining\s*kasbi|otasining\s*ish)", "father_job"),
     
     (r"(mother['’]?s\s*name|mother\s*name|mother\s*fullname|모\s*성명|모친\s*성명|onasining\s*ismi)", "mother_name"),
-    (r"(mother['’]?s\s*(number|phone|mobile)|mother\s*(mobile|phone|no)|모\s*(연락처|전화번호)|모친\s*연락처|onasining\s*telefoni)", "mother_phone"),
-    (r"(mother['’]?s\s*job|모\s*직업|모친\s*직업|onasining\s*kasbi)", "mother_job"),
+    (r"(mother['’]?s\s*(number|phone|mobile|tel)|mother\s*(mobile|phone|no|tel)|모\s*(연락처|전화번호)|모친\s*연락처|onasining\s*telefoni)", "mother_phone"),
+    (r"(mother['’]?s\s*job|모\s*직업|모친\s*직업|onasining\s*kasbi|onasining\s*ish)", "mother_job"),
+
+    # Dates of entry, graduation, expected graduation
+    (r"(date\s*of\s*entry|entry\s*date|data\s*of\s*entry|admission\s*date|entrance\s*date|enrol+ment\s*date|입학\s*일자?|입학\s*년\s*월\s*일|입학년월일|kirish\s*sana|o'qishga\s*kirgan)", "date_of_entry"),
+    (r"(date\s*of\s*graduat|data\s*of\s*graduat|graduation\s*date|graduated\s*date|bitirgan\s*sana|tugatgan\s*sana|졸업\s*일자?|졸업\s*년\s*월\s*일|졸업년월일)", "date_of_graduation"),
+    (r"(graduation\s*expected|expected\s*graduation|졸업\s*예정|bitirish\s*kutil)", "graduation_expected"),
+
+    # Educational Background & Degree
+    (r"(educational\s*background|education\s*background|education\s*level|highest\s*education|최종\s*학력\s*\(?구분\)?|학력\s*사항|학력\s*구분|ta'lim\s*daraja)", "educational_background"),
+    (r"(degree\s*no|degree\s*number|diploma\s*no|diploma\s*number|attestat\s*raqam|diplom\s*raqam|학위\s*번호|졸업\s*증서\s*번호)", "degree_no"),
+
+    # School Contact & Address
+    (r"(school\s*address|university\s*address|출신\s*학교\s*주소|학교\s*주소|maktab\s*manzil)", "school_address"),
+    (r"(school\s*phone|school\s*tel|university\s*phone|출신\s*학교\s*연락처|출신\s*학교\s*전화|학교\s*전화|학교\s*연락처|maktab\s*telefon)", "school_phone"),
+    (r"(school\s*e?mail|university\s*e?mail|출신\s*학교\s*이메일|학교\s*이메일|maktab\s*email)", "school_email"),
+    (r"(school\s*web|school\s*site|university\s*web|출신\s*학교\s*홈페이지|학교\s*홈페이지|maktab\s*sayt)", "school_website"),
+
+    # Target / Applying University & Major
+    (r"(applying\s*university|target\s*university|chosen\s*university|지원\s*대학|지망\s*대학|topshirilayotgan\s*universitet)", "university_1"),
+    (r"(applying\s*major|target\s*major|chosen\s*major|지원\s*학과|지망\s*학과|지원\s*전공|지망\s*전공|topshirilayotgan\s*yo'nalish)", "university_1_major"),
+
+    # Today / Application Date
+    (r"(application\s*date|submission\s*date|apply\s*date|date\s*of\s*application|신청\s*일자?|접수\s*일자?|작성\s*일자?|ariza\s*sanasi)", "today_date"),
+
+    # Language certificate dates & scores
+    (r"(test\s*date|exam\s*date|examination\s*date|응시\s*일자?|시험\s*일자?|imtihon\s*sanasi|topshirilgan\s*sana)", "certificate_test_date"),
+    (r"(cert.*expir|cert.*valid|유효\s*기간|만료\s*일자?|sertifikat\s*amal\s*qilish)", "certificate_valid_date"),
+    (r"(certificate\s*score|topik\s*score|ielts\s*score|topik\s*level|급수|취득\s*점수|sertifikat\s*bali)", "certificate_score"),
+    (r"(language\s*certificate|language\s*proficiency|토픽\s*/?\s*ielts|topik|ielts|어학\s*능력|공인\s*어학|til\s*sertifikati|сертификат)", "language_certificate"),
+
+    # GPA & Scale
+    (r"(gpa\s*system|gpa\s*scale|grade\s*scale|만점\s*기준|기준\s*학점)", "gpa_system"),
+    (r"(gpa|grade\s*point|성적|평점|평균\s*평점|o'rtacha\s*baho)", "gpa"),
+
+    # Major / Department
+    (r"(major|department|학과명|전공|세부전공|yo'nalish|mutaxassislik|факультет|специальность)", "major"),
+
+    # Degree / Course Level
+    (r"(entry\s*level|course\s*level|degree\s*course|course|degree|전형\s*과정명?|학위\s*과정|daraja|bosqich)", "level"),
+
+    # Previous School / University
+    (r"(previous\s*university|previous\s*school|graduated\s*school|last\s*school|출신\s*학교명?|출신\s*교명|모교|tugatgan\s*maktab|bitirgan\s*maktab|avvalgi\s*maktab|school\s*name|university\s*name|학교명|school|university|maktab|litsey|universitet|college)", "final_school_name"),
 
     # Korean Name
     (r"(korean\s*name|국문\s*이름|국문성명|한글\s*이름|한글성명|korean_name)", "korean_name"),
 
     # English Full Name / Name (Excludes username)
     (r"(english\s*name|student\s*name|성명\s*\(?영문\)?|영문\s*이름|영문성명|name\s*\(as\s*appreaed|full\s*name|^name$|^f\.?i\.?sh$|^fio$|talaba\s*ismi|фио)", "full_name"),
+    (r"(first\s*name|given\s*name|ism|^이름$)", "first_name"),
+    (r"(last\s*name|sur\s*name|family\s*name|familiya|^성$)", "last_name"),
     
-    # Passport Number
+    # Passport Number & Dates
     (r"(passport\s*number|pasport\s*number|여권\s*번호|여권|passport\s*no|^passport$|^pasport$|серия\s*и\s*номер\s*паспорта)", "passport"),
-    
-    # Passport Dates
     (r"(passport\s*issue|issue\s*date|여권\s*발급일|발급일자|date\s*of\s*issue)", "passport_issue_date"),
     (r"(passport\s*expir|expiry\s*date|expiration|여권\s*만료일|만료일자|date\s*of\s*expiration)", "passport_expire_date"),
     
@@ -233,6 +332,9 @@ SEMANTIC_PATTERNS = [
     
     # Nationality
     (r"(nationality|citizenship|국적|fuqaroligi|гражданство)", "nationality"),
+
+    # Student ID
+    (r"(student\s*id|talaba\s*id|학번|관리번호)", "id"),
     
     # City / District
     (r"^(city|town|district|tuman|shahar|도시|시|군|구)$", "address_city"),
@@ -242,26 +344,21 @@ SEMANTIC_PATTERNS = [
     
     # Phone numbers
     (r"(student\s*number|student\s*phone|phone\s*1|^phone$|연락처|본인\s*연락처|전화번호|telefon|телефон)", "phone1"),
-    (r"(phone\s*2|extra\s*phone|비상\s*연락처|비상연락처|qo'shimcha\s*telefon)", "phone2"),
+    (r"(phone\s*2|extra\s*phone|emergency\s*phone|비상\s*연락처|비상연락처|qo'shimcha\s*telefon)", "phone2"),
     
     # Email
     (r"(email|e-mail|이메일|elektron\s*pochta)", "email"),
     
     # Address Full
     (r"(address\s*in\s*english|full\s*address|address|주소|manzil|адрес)", "address"),
-    
-    # Language certificate
-    (r"(language\s*certificate|토픽\s*/?\s*ielts|topik|ielts|어학\s*능력|til\s*sertifikati|сертификат)", "language_certificate"),
-    (r"(certificate\s*score|topik\s*score|ielts\s*score|급수|점수|sertifikat\s*bali)", "certificate_score"),
-    
-    # Major / Department
-    (r"(major|department|학과명|전공|세부전공|yo'nalish|mutaxassislik|факультет|специальность)", "major"),
-    
-    # Degree / Course Level
-    (r"(course|degree|entry\s*level|전형\s*과정명|학위\s*과정|daraja|bosqich)", "level"),
-    
-    # School / University (Always Graduated / Previous School in CRM)
-    (r"(university|previous\s*university|school|previous\s*school|graduated\s*school|최종\s*학력|출신\s*학교|maktab|litsey|universitet|college)", "final_school_name"),
+
+    # Management
+    (r"(tariff|tarif|plan)", "tariff"),
+    (r"(student\s*group|group\s*name|^group$|guruh|반|그룹)", "student_group"),
+    (r"(coordinator|koordinator)", "coordinator"),
+    (r"(lead\s*by|mas['’]ul)", "lead_by"),
+    (r"(office|filial|ofis)", "office"),
+    (r"(notes|remarks|memo|비고|특이사항|izoh|eslatma)", "notes"),
 ]
 
 
@@ -421,6 +518,24 @@ def analyze_excel_file(file_bytes: bytes) -> Dict[str, Any]:
     }
 
 
+DATE_FIELDS = {
+    'birthday',
+    'passport_issue_date',
+    'passport_expire_date',
+    'date_of_entry',
+    'date_of_graduation',
+    'today_date',
+    'certificate_test_date',
+    'certificate_valid_date',
+    'certificate_2_test_date',
+    'certificate_2_valid_date',
+    'certificate_3_test_date',
+    'certificate_3_valid_date',
+    'kdb_put_date',
+    'kdb_take_date',
+}
+
+
 def format_cell_value(
     raw_val: Any,
     field_key: str,
@@ -430,16 +545,19 @@ def format_cell_value(
     """
     Transforms CRM raw data according to column formatting rules (Date, Gender, Phone, Fallbacks).
     """
+    if field_key == 'today_date' and (raw_val is None or str(raw_val).strip() in ("", "None")):
+        raw_val = datetime.now().strftime('%Y-%m-%d')
+
     if raw_val is None or str(raw_val).strip() == "" or str(raw_val).strip() == "None":
         return fallback
 
     val_str = str(raw_val).strip()
 
     # 1. Date formatting
-    if field_key in ('birthday', 'passport_issue_date', 'passport_expire_date', 'certificate_valid_date'):
+    if field_key in DATE_FIELDS:
         date_format = format_rules.get('dateFormat', 'YYYY-MM-DD')
         parsed_date = None
-        for fmt in ('%Y-%m-%d', '%Y.%m.%d', '%Y%m%d', '%d.%m.%Y', '%d-%m-%Y', '%Y-%m-%d %H:%M:%S'):
+        for fmt in ('%Y-%m-%d', '%Y.%m.%d', '%Y%m%d', '%d.%m.%Y', '%d-%m-%Y', '%Y-%m-%d %H:%M:%S', '%Y/%m/%d'):
             try:
                 parsed_date = datetime.strptime(val_str.split()[0], fmt)
                 break
@@ -455,11 +573,28 @@ def format_cell_value(
                 return parsed_date.strftime('%d.%m.%Y')
             elif date_format == 'DD-MM-YYYY':
                 return parsed_date.strftime('%d-%m-%Y')
+            elif date_format == 'YYYY/MM/DD':
+                return parsed_date.strftime('%Y/%m/%d')
             else:
                 return parsed_date.strftime('%Y-%m-%d')
         return val_str
 
-    # 2. Gender formatting
+    # 2. Boolean formatting (e.g. graduation_expected)
+    if field_key == 'graduation_expected':
+        upper_val = val_str.upper()
+        is_true = upper_val in ('TRUE', '1', 'YES', 'HA', '예', 'Y', 'BITIRISH KUTILMOQDA', 'GRADUATION EXPECTED')
+        bool_format = format_rules.get('boolFormat', 'Yes/No')
+        if bool_format == '예/아니오':
+            return '예' if is_true else '아니오'
+        elif bool_format == '졸업예정/졸업':
+            return '졸업예정' if is_true else '졸업'
+        elif bool_format == 'Y/N':
+            return 'Y' if is_true else 'N'
+        elif bool_format == 'Ha/Yo\'q':
+            return 'Ha' if is_true else 'Yo\'q'
+        return 'Yes' if is_true else 'No'
+
+    # 3. Gender formatting
     if field_key == 'gender':
         gender_format = format_rules.get('genderFormat', 'MALE/FEMALE')
         upper_val = val_str.upper()
@@ -503,7 +638,7 @@ def format_cell_value(
                 return 'FEMALE'
         return val_str
 
-    # 3. Phone formatting
+    # 4. Phone formatting
     if 'phone' in field_key:
         phone_format = format_rules.get('phoneFormat', 'original')
         digits = re.sub(r'\D', '', val_str)
@@ -611,6 +746,9 @@ def generate_filled_excel(
                 cell.value = current_seq
             elif field_key == '_static_value':
                 cell.value = static_val
+            elif field_key == 'today_date':
+                today_raw = datetime.now().strftime('%Y-%m-%d')
+                cell.value = format_cell_value(today_raw, 'today_date', format_rules, fallback_val)
             elif field_key in ('first_name', 'last_name'):
                 full = student.get('full_name', '')
                 parts = full.split() if full else []

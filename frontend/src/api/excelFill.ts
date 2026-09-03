@@ -42,6 +42,7 @@ export interface ColumnMappingConfig {
     dateFormat?: string
     genderFormat?: string
     phoneFormat?: string
+    boolFormat?: string
   }
 }
 
