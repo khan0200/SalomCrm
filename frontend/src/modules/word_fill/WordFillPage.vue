@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useQuery } from '@tanstack/vue-query'
 import {
   Upload,
@@ -106,7 +106,7 @@ const toggleInList = (list: string[], value: string) => {
   else list.splice(idx, 1)
 }
 
-const CERT_OPTIONS = ['NO CERTIFICATE', 'TOPIK', 'IELTS', 'TOEFL', 'CEFR', 'SAT', 'SKA']
+const CERT_OPTIONS = ['NO CERTIFICATE', 'EXPECTED', 'TOPIK', 'IELTS', 'TOEFL', 'CEFR', 'SAT', 'SKA']
 const PREDEFINED_TAGS = ['Call', 'Apply', 'Documents', 'Payment']
 const TAG_OPTIONS = [...PREDEFINED_TAGS, 'Custom']
 
@@ -137,14 +137,14 @@ const { data: foldersData } = useQuery({
 })
 const folders = computed(() => foldersData.value || [])
 
-// Shared key with the Excel Fill tab so switching tabs reuses one fetch.
-const { data: allStudentsData } = useQuery({
-  queryKey: ['all-students-app-form'],
+// Synchronized with Master Student Roster cache
+const { data: allStudentsData, isLoading: isLoadingStudents } = useQuery({
+  queryKey: ['all-students-master'],
   queryFn: () => studentsApi.getStudents({
     page: 1,
     page_size: 5000,
     folder: 'all',
-    include_archive: false,
+    include_archive: true,
   }),
   staleTime: 1000 * 60 * 5,
 })
@@ -153,54 +153,127 @@ const allStudents = computed<Student[]>(
   () => (allStudentsData.value?.results || []).filter(s => !s.is_deleted)
 )
 
+// Dynamic Option Sources (from Config + Master Students)
+const tariffOptions = computed<string[]>(() => {
+  const custom = (options.value.tariffs || []).map((t: any) => typeof t === 'string' ? t : (t?.name || '')).filter(Boolean)
+  const set = new Set<string>(custom)
+  allStudents.value.forEach(s => { if (s.tariff) set.add(s.tariff) })
+  return Array.from(set).filter(t => t !== 'NO_TARIFF' && t !== 'No Tariff').sort((a, b) => a.localeCompare(b))
+})
+
+const levelOptions = computed<string[]>(() => {
+  const custom = (options.value.levels || []).map((l: any) => typeof l === 'string' ? l : (l?.name || '')).filter(Boolean)
+  const set = new Set<string>(custom)
+  allStudents.value.forEach(s => {
+    if (s.level) set.add(s.level)
+    if (s.level2) set.add(s.level2)
+  })
+  return Array.from(set).filter(l => l !== 'NO_LEVEL' && l !== 'No Level').sort((a, b) => a.localeCompare(b))
+})
+
+const groupOptions = computed<string[]>(() => {
+  const custom = (options.value.groups || []).map((g: any) => typeof g === 'string' ? g : (g?.name || '')).filter(Boolean)
+  const set = new Set<string>(custom)
+  allStudents.value.forEach(s => { if (s.student_group) set.add(s.student_group) })
+  return Array.from(set).filter(g => g !== 'NO_GROUP' && g !== 'No Group').sort((a, b) => a.localeCompare(b))
+})
+
+const leadOptions = computed<string[]>(() => {
+  const custom = (options.value.leads || []).map((l: any) => typeof l === 'string' ? l : (l?.name || '')).filter(Boolean)
+  const set = new Set<string>(custom)
+  allStudents.value.forEach(s => { if (s.lead_by) set.add(s.lead_by) })
+  return Array.from(set).filter(l => l !== 'NO_LEADBY' && l !== 'No Lead by').sort((a, b) => a.localeCompare(b))
+})
+
+const tagOptions = computed<string[]>(() => {
+  const backendTags = ((options.value as any).tags || []).map((t: any) => typeof t === 'string' ? t : (t?.name || '')).filter(Boolean)
+  const set = new Set<string>([...PREDEFINED_TAGS, ...backendTags])
+  allStudents.value.forEach(s => {
+    if (Array.isArray(s.task_tags)) {
+      s.task_tags.forEach(t => { if (t) set.add(t) })
+    }
+  })
+  const list = Array.from(set).filter(t => t !== 'Custom').sort((a, b) => a.localeCompare(b))
+  return [...list, 'Custom']
+})
+
 // ─── Filter students ────────────────────────────────────────────────────────
 const filteredStudents = computed(() => {
   const q = searchQuery.value.trim().toLowerCase()
   return allStudents.value.filter(s => {
     if (q) {
-      if (searchType.value === 'id' && !s.id.toLowerCase().includes(q)) return false
-      if (searchType.value === 'name' && !s.full_name.toLowerCase().includes(q) && !(s.korean_name || '').toLowerCase().includes(q)) return false
-      if (searchType.value === 'phone' && !(s.phone1 || '').includes(q) && !(s.phone2 || '').includes(q)) return false
+      const sId = (s.id || '').toLowerCase()
+      const sName = (s.full_name || '').toLowerCase()
+      const sKorean = (s.korean_name || '').toLowerCase()
+      const sPassport = (s.passport || '').toLowerCase()
+      const sPhone1 = (s.phone1 || '').toLowerCase()
+      const sPhone2 = (s.phone2 || '').toLowerCase()
+
+      if (searchType.value === 'id' && !sId.includes(q)) return false
+      if (searchType.value === 'name' && !sName.includes(q) && !sKorean.includes(q)) return false
+      if (searchType.value === 'phone' && !sPhone1.includes(q) && !sPhone2.includes(q)) return false
       if (searchType.value === 'university') {
         const unis = [s.university_1, s.university_2, s.university_3, s.university_4, s.university_5].filter(Boolean).join(' ').toLowerCase()
         if (!unis.includes(q)) return false
       }
       if (searchType.value === 'all') {
-        const match = s.id.toLowerCase().includes(q) ||
-          s.full_name.toLowerCase().includes(q) ||
-          (s.korean_name || '').toLowerCase().includes(q) ||
-          (s.passport || '').toLowerCase().includes(q) ||
-          (s.phone1 || '').includes(q) ||
-          (s.phone2 || '').includes(q) ||
+        const match = sId.includes(q) ||
+          sName.includes(q) ||
+          sKorean.includes(q) ||
+          sPassport.includes(q) ||
+          sPhone1.includes(q) ||
+          sPhone2.includes(q) ||
           (s.university_1 || '').toLowerCase().includes(q)
         if (!match) return false
       }
     }
 
     if (selectedFolders.value.length > 0) {
-      const studentFolderIds = (s.folders || []).map(f => f.id)
+      const studentFolderIds = (s.folder_ids || (s.folders || []).map((f: any) => f.id) || []).map((x: any) => String(x).toLowerCase())
       const hasFolder = selectedFolders.value.some(fid => {
         if (fid === 'NO_FOLDER') return studentFolderIds.length === 0
-        return studentFolderIds.includes(fid)
+        return studentFolderIds.includes(String(fid).toLowerCase())
       })
       if (!hasFolder) return false
     }
 
     if (selectedTariffs.value.length > 0) {
-      if (!selectedTariffs.value.includes(s.tariff || 'NO_TARIFF')) return false
+      const hasNoTariff = selectedTariffs.value.includes('NO_TARIFF') || selectedTariffs.value.includes('No Tariff')
+      const cleanTariffs = selectedTariffs.value.filter(t => t !== 'NO_TARIFF' && t !== 'No Tariff')
+      const sTariff = s.tariff || ''
+      const matchNo = hasNoTariff && (!sTariff || sTariff === 'NO_TARIFF' || sTariff === 'No Tariff')
+      const matchTariff = cleanTariffs.length > 0 && cleanTariffs.includes(sTariff)
+      if (!matchNo && !matchTariff) return false
     }
 
     if (selectedLevels.value.length > 0) {
-      const match = selectedLevels.value.includes(s.level || '') || selectedLevels.value.includes(s.level2 || '')
-      if (!match) return false
+      const hasNoLevel = selectedLevels.value.includes('NO_LEVEL') || selectedLevels.value.includes('No Level')
+      const cleanLevels = selectedLevels.value.filter(l => l !== 'NO_LEVEL' && l !== 'No Level')
+      const sLevel = s.level || ''
+      const sLevel2 = s.level2 || ''
+      const matchNo = hasNoLevel && (!sLevel || cleanLevels.includes(sLevel) || cleanLevels.includes(sLevel2))
+      const matchLevel = (sLevel && cleanLevels.includes(sLevel)) || (sLevel2 && cleanLevels.includes(sLevel2))
+      if (!matchNo && !matchLevel) return false
     }
 
-    if (selectedGroups.value.length > 0 && !selectedGroups.value.includes(s.student_group || '')) return false
+    if (selectedGroups.value.length > 0) {
+      const hasNoGroup = selectedGroups.value.includes('NO_GROUP') || selectedGroups.value.includes('No Group')
+      const cleanGroups = selectedGroups.value.filter(g => g !== 'NO_GROUP' && g !== 'No Group')
+      const sGroup = s.student_group || ''
+      const matchNo = hasNoGroup && (!sGroup || cleanGroups.includes(sGroup))
+      const matchGroup = cleanGroups.length > 0 && cleanGroups.includes(sGroup)
+      if (!matchNo && !matchGroup) return false
+    }
 
     if (selectedCerts.value.length > 0) {
       let matchesCert = false
       if (selectedCerts.value.includes('NO CERTIFICATE')) {
         if (!s.language_certificate || s.language_certificate === 'NO CERTIFICATE') matchesCert = true
+      }
+      if (selectedCerts.value.includes('EXPECTED')) {
+        const expected = [s.certificate_score, s.certificate_score_2, s.certificate_score_3]
+          .some(sc => (sc || '').toUpperCase() === 'EXPECTED')
+        if (expected) matchesCert = true
       }
       const certs = [s.language_certificate, s.language_certificate_2, s.language_certificate_3]
       if (certs.some(c => c && c !== 'NO CERTIFICATE' && selectedCerts.value.includes(c))) matchesCert = true
@@ -208,7 +281,7 @@ const filteredStudents = computed(() => {
     }
 
     if (selectedTags.value.length > 0) {
-      const tags = s.task_tags || []
+      const tags = Array.isArray(s.task_tags) ? s.task_tags : []
       const match = selectedTags.value.some(tag => {
         if (tag === 'Custom') return tags.some(t => !PREDEFINED_TAGS.includes(t))
         return tags.includes(tag)
@@ -216,7 +289,15 @@ const filteredStudents = computed(() => {
       if (!match) return false
     }
 
-    if (selectedLeads.value.length > 0 && !selectedLeads.value.includes(s.lead_by || '')) return false
+    if (selectedLeads.value.length > 0) {
+      const hasNoLead = selectedLeads.value.includes('NO_LEADBY') || selectedLeads.value.includes('No Lead by')
+      const cleanLeads = selectedLeads.value.filter(l => l !== 'NO_LEADBY' && l !== 'No Lead by')
+      const cleanLeadsLower = cleanLeads.map(l => l.toLowerCase())
+      const studentLead = (s.lead_by || '').trim()
+      const matchNo = hasNoLead && (!studentLead || cleanLeadsLower.includes(studentLead.toLowerCase()))
+      const matchLead = !!studentLead && cleanLeadsLower.includes(studentLead.toLowerCase())
+      if (!matchNo && !matchLead) return false
+    }
 
     return true
   })
@@ -234,17 +315,53 @@ const hasActiveFilters = computed(() =>
 
 const activeFilterChips = computed(() => {
   const chips: { key: string; label: string; clear: () => void }[] = []
-  if (selectedFolders.value.length) chips.push({ key: 'folder', label: `Folder: ${selectedFolders.value.length}`, clear: () => { selectedFolders.value = [] } })
-  if (selectedTariffs.value.length) chips.push({ key: 'tariff', label: `Tariff: ${selectedTariffs.value.length}`, clear: () => { selectedTariffs.value = [] } })
-  if (selectedLevels.value.length) chips.push({ key: 'level', label: `Level: ${selectedLevels.value.length}`, clear: () => { selectedLevels.value = [] } })
-  if (selectedGroups.value.length) chips.push({ key: 'group', label: `Group: ${selectedGroups.value.length}`, clear: () => { selectedGroups.value = [] } })
-  if (selectedCerts.value.length) chips.push({ key: 'cert', label: `Certificate: ${selectedCerts.value.length}`, clear: () => { selectedCerts.value = [] } })
-  if (selectedTags.value.length) chips.push({ key: 'tag', label: `Tag: ${selectedTags.value.length}`, clear: () => { selectedTags.value = [] } })
-  if (selectedLeads.value.length) chips.push({ key: 'lead', label: `Lead: ${selectedLeads.value.length}`, clear: () => { selectedLeads.value = [] } })
+  if (selectedFolders.value.length) {
+    const label = selectedFolders.value.length === 1
+      ? (selectedFolders.value[0] === 'NO_FOLDER' ? 'Folder: No Folder' : `Folder: ${folders.value.find(f => String(f.id).toLowerCase() === String(selectedFolders.value[0]).toLowerCase())?.name || '1'}`)
+      : `Folder: ${selectedFolders.value.length}`
+    chips.push({ key: 'folder', label, clear: () => { selectedFolders.value = [] } })
+  }
+  if (selectedTariffs.value.length) {
+    const label = selectedTariffs.value.length === 1
+      ? `Tariff: ${selectedTariffs.value[0] === 'NO_TARIFF' ? 'No Tariff' : selectedTariffs.value[0]}`
+      : `Tariff: ${selectedTariffs.value.length}`
+    chips.push({ key: 'tariff', label, clear: () => { selectedTariffs.value = [] } })
+  }
+  if (selectedLevels.value.length) {
+    const label = selectedLevels.value.length === 1
+      ? `Level: ${selectedLevels.value[0] === 'NO_LEVEL' ? 'No Level' : selectedLevels.value[0]}`
+      : `Level: ${selectedLevels.value.length}`
+    chips.push({ key: 'level', label, clear: () => { selectedLevels.value = [] } })
+  }
+  if (selectedGroups.value.length) {
+    const label = selectedGroups.value.length === 1
+      ? `Group: ${selectedGroups.value[0] === 'NO_GROUP' ? 'No Group' : selectedGroups.value[0]}`
+      : `Group: ${selectedGroups.value.length}`
+    chips.push({ key: 'group', label, clear: () => { selectedGroups.value = [] } })
+  }
+  if (selectedCerts.value.length) {
+    const label = selectedCerts.value.length === 1
+      ? `Cert: ${selectedCerts.value[0]}`
+      : `Certificate: ${selectedCerts.value.length}`
+    chips.push({ key: 'cert', label, clear: () => { selectedCerts.value = [] } })
+  }
+  if (selectedTags.value.length) {
+    const label = selectedTags.value.length === 1
+      ? `Tag: ${selectedTags.value[0]}`
+      : `Tag: ${selectedTags.value.length}`
+    chips.push({ key: 'tag', label, clear: () => { selectedTags.value = [] } })
+  }
+  if (selectedLeads.value.length) {
+    const label = selectedLeads.value.length === 1
+      ? `Lead: ${selectedLeads.value[0] === 'NO_LEADBY' ? 'No Lead by' : selectedLeads.value[0]}`
+      : `Lead: ${selectedLeads.value.length}`
+    chips.push({ key: 'lead', label, clear: () => { selectedLeads.value = [] } })
+  }
   return chips
 })
 
 const clearAllFilters = () => {
+  searchQuery.value = ''
   selectedFolders.value = []
   selectedTariffs.value = []
   selectedLevels.value = []
@@ -253,6 +370,22 @@ const clearAllFilters = () => {
   selectedTags.value = []
   selectedLeads.value = []
 }
+
+// ─── Click outside handler to dismiss open dropdowns ───────────────────────
+const handleWindowClick = (event: MouseEvent) => {
+  const target = event.target as HTMLElement | null
+  if (!target?.closest('.filter-dropdown-container')) {
+    closeAllDropdowns()
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('click', handleWindowClick)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('click', handleWindowClick)
+})
 
 // ─── File Upload & AI Analysis ──────────────────────────────────────────────
 const handleFileUpload = async (file: File) => {
@@ -910,7 +1043,7 @@ const resetWizard = () => {
 
             <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-2">
               <!-- Folder -->
-              <div class="relative">
+              <div class="relative filter-dropdown-container">
                 <button
                   type="button"
                   @click="toggleDropdown('folder')"
@@ -936,14 +1069,14 @@ const resetWizard = () => {
                     <span>No Folder</span>
                   </label>
                   <label v-for="f in folders" :key="f.id" class="px-3 py-1.5 flex items-center gap-2 hover:bg-zinc-50 dark:hover:bg-zinc-700 cursor-pointer">
-                    <input type="checkbox" :checked="selectedFolders.includes(f.id)" @change="toggleInList(selectedFolders, f.id)" class="rounded text-blue-600" />
+                    <input type="checkbox" :checked="selectedFolders.includes(String(f.id))" @change="toggleInList(selectedFolders, String(f.id))" class="rounded text-blue-600" />
                     <span class="truncate">{{ f.name }}</span>
                   </label>
                 </div>
               </div>
 
               <!-- Tariff -->
-              <div class="relative">
+              <div class="relative filter-dropdown-container">
                 <button
                   type="button"
                   @click="toggleDropdown('tariff')"
@@ -968,7 +1101,7 @@ const resetWizard = () => {
                     <input type="checkbox" :checked="selectedTariffs.includes('NO_TARIFF')" @change="toggleInList(selectedTariffs, 'NO_TARIFF')" class="rounded text-blue-600" />
                     <span>No Tariff</span>
                   </label>
-                  <label v-for="t in options.tariffs" :key="t" class="px-3 py-1.5 flex items-center gap-2 hover:bg-zinc-50 dark:hover:bg-zinc-700 cursor-pointer">
+                  <label v-for="t in tariffOptions" :key="t" class="px-3 py-1.5 flex items-center gap-2 hover:bg-zinc-50 dark:hover:bg-zinc-700 cursor-pointer">
                     <input type="checkbox" :checked="selectedTariffs.includes(t)" @change="toggleInList(selectedTariffs, t)" class="rounded text-blue-600" />
                     <span class="truncate">{{ t }}</span>
                   </label>
@@ -976,7 +1109,7 @@ const resetWizard = () => {
               </div>
 
               <!-- Level -->
-              <div class="relative">
+              <div class="relative filter-dropdown-container">
                 <button
                   type="button"
                   @click="toggleDropdown('level')"
@@ -997,7 +1130,11 @@ const resetWizard = () => {
                     <span>All Levels</span>
                   </label>
                   <div class="h-px bg-zinc-100 dark:bg-zinc-700 my-1" />
-                  <label v-for="l in options.levels" :key="l" class="px-3 py-1.5 flex items-center gap-2 hover:bg-zinc-50 dark:hover:bg-zinc-700 cursor-pointer">
+                  <label class="px-3 py-1.5 flex items-center gap-2 hover:bg-zinc-50 dark:hover:bg-zinc-700 cursor-pointer">
+                    <input type="checkbox" :checked="selectedLevels.includes('NO_LEVEL')" @change="toggleInList(selectedLevels, 'NO_LEVEL')" class="rounded text-blue-600" />
+                    <span>No Level</span>
+                  </label>
+                  <label v-for="l in levelOptions" :key="l" class="px-3 py-1.5 flex items-center gap-2 hover:bg-zinc-50 dark:hover:bg-zinc-700 cursor-pointer">
                     <input type="checkbox" :checked="selectedLevels.includes(l)" @change="toggleInList(selectedLevels, l)" class="rounded text-blue-600" />
                     <span class="truncate">{{ l }}</span>
                   </label>
@@ -1005,7 +1142,7 @@ const resetWizard = () => {
               </div>
 
               <!-- Group -->
-              <div class="relative">
+              <div class="relative filter-dropdown-container">
                 <button
                   type="button"
                   @click="toggleDropdown('group')"
@@ -1026,7 +1163,11 @@ const resetWizard = () => {
                     <span>All Groups</span>
                   </label>
                   <div class="h-px bg-zinc-100 dark:bg-zinc-700 my-1" />
-                  <label v-for="g in options.groups" :key="g" class="px-3 py-1.5 flex items-center gap-2 hover:bg-zinc-50 dark:hover:bg-zinc-700 cursor-pointer">
+                  <label class="px-3 py-1.5 flex items-center gap-2 hover:bg-zinc-50 dark:hover:bg-zinc-700 cursor-pointer">
+                    <input type="checkbox" :checked="selectedGroups.includes('NO_GROUP')" @change="toggleInList(selectedGroups, 'NO_GROUP')" class="rounded text-blue-600" />
+                    <span>No Group</span>
+                  </label>
+                  <label v-for="g in groupOptions" :key="g" class="px-3 py-1.5 flex items-center gap-2 hover:bg-zinc-50 dark:hover:bg-zinc-700 cursor-pointer">
                     <input type="checkbox" :checked="selectedGroups.includes(g)" @change="toggleInList(selectedGroups, g)" class="rounded text-blue-600" />
                     <span class="truncate">{{ g }}</span>
                   </label>
@@ -1034,7 +1175,7 @@ const resetWizard = () => {
               </div>
 
               <!-- Certificate -->
-              <div class="relative">
+              <div class="relative filter-dropdown-container">
                 <button
                   type="button"
                   @click="toggleDropdown('cert')"
@@ -1063,7 +1204,7 @@ const resetWizard = () => {
               </div>
 
               <!-- Tags -->
-              <div class="relative">
+              <div class="relative filter-dropdown-container">
                 <button
                   type="button"
                   @click="toggleDropdown('tag')"
@@ -1084,7 +1225,7 @@ const resetWizard = () => {
                     <span>All Tags</span>
                   </label>
                   <div class="h-px bg-zinc-100 dark:bg-zinc-700 my-1" />
-                  <label v-for="tg in TAG_OPTIONS" :key="tg" class="px-3 py-1.5 flex items-center gap-2 hover:bg-zinc-50 dark:hover:bg-zinc-700 cursor-pointer">
+                  <label v-for="tg in tagOptions" :key="tg" class="px-3 py-1.5 flex items-center gap-2 hover:bg-zinc-50 dark:hover:bg-zinc-700 cursor-pointer">
                     <input type="checkbox" :checked="selectedTags.includes(tg)" @change="toggleInList(selectedTags, tg)" class="rounded text-blue-600" />
                     <span class="truncate">{{ tg }}</span>
                   </label>
@@ -1092,7 +1233,7 @@ const resetWizard = () => {
               </div>
 
               <!-- Lead By -->
-              <div class="relative">
+              <div class="relative filter-dropdown-container">
                 <button
                   type="button"
                   @click="toggleDropdown('lead')"
@@ -1117,7 +1258,7 @@ const resetWizard = () => {
                     <input type="checkbox" :checked="selectedLeads.includes('NO_LEADBY')" @change="toggleInList(selectedLeads, 'NO_LEADBY')" class="rounded text-blue-600" />
                     <span>No Lead by</span>
                   </label>
-                  <label v-for="ld in options.leads" :key="ld" class="px-3 py-1.5 flex items-center gap-2 hover:bg-zinc-50 dark:hover:bg-zinc-700 cursor-pointer">
+                  <label v-for="ld in leadOptions" :key="ld" class="px-3 py-1.5 flex items-center gap-2 hover:bg-zinc-50 dark:hover:bg-zinc-700 cursor-pointer">
                     <input type="checkbox" :checked="selectedLeads.includes(ld)" @change="toggleInList(selectedLeads, ld)" class="rounded text-blue-600" />
                     <span class="truncate">{{ ld }}</span>
                   </label>
@@ -1172,6 +1313,19 @@ const resetWizard = () => {
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-zinc-100 dark:divide-zinc-800/60">
+                  <tr v-if="isLoadingStudents">
+                    <td colspan="7" class="p-8 text-center text-zinc-400">
+                      <div class="flex items-center justify-center gap-2">
+                        <RefreshCw class="w-4 h-4 animate-spin text-blue-500" />
+                        <span>Talabalar ro'yxati yuklanmoqda...</span>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr v-else-if="filteredStudents.length === 0">
+                    <td colspan="7" class="p-8 text-center text-zinc-400">
+                      Tanlangan filtrlarga mos keluvchi talabalar topilmadi.
+                    </td>
+                  </tr>
                   <tr
                     v-for="student in filteredStudents"
                     :key="student.id"
