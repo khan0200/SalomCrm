@@ -137,6 +137,25 @@ const certs = computed(() => {
   return list.filter(c => c.type && c.type !== 'NO CERTIFICATE')
 })
 
+const appliedUniversities = computed(() => {
+  const list: string[] = []
+  for (let i = 1; i <= 5; i++) {
+    const uniName = (props.student as any)[`university_${i}`]
+    const status = (props.student as any)[`university_${i}_status`]
+    if (typeof status === 'string' && status.trim().toUpperCase() === 'APPLIED') {
+      list.push(uniName ? `${uniName} (Choice ${i})` : `Choice ${i}`)
+    }
+  }
+  return list
+})
+
+const isApplied = computed(() => appliedUniversities.value.length > 0)
+
+const appliedTooltip = computed(() => {
+  if (appliedUniversities.value.length === 0) return ''
+  return `Applied: ${appliedUniversities.value.join(', ')}`
+})
+
 const handleRowClick = (e: MouseEvent) => {
   emit('click-row', props.student, e)
 }
@@ -359,8 +378,25 @@ const handleContextMenu = (e: MouseEvent) => {
 
     <!-- ── Standard Status Mode Columns ──────────────────────────────── -->
     <template v-else>
+      <!-- Apply Column -->
+      <td class="px-3 py-2.5 w-[11%] whitespace-nowrap">
+        <span
+          v-if="isApplied"
+          class="inline-flex items-center justify-center px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-600 dark:bg-emerald-500 text-white border border-transparent shadow-2xs select-none"
+          :title="appliedTooltip"
+        >
+          APPLIED
+        </span>
+        <span
+          v-else
+          class="inline-flex items-center justify-center px-2.5 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wider bg-zinc-400 dark:bg-zinc-500 text-white border border-transparent shadow-2xs select-none"
+        >
+          Not Applied
+        </span>
+      </td>
+
       <!-- Invoice Column -->
-      <td class="px-3.5 py-2.5 w-[12%] whitespace-nowrap" @click.stop>
+      <td class="px-3.5 py-2.5 w-[11%] whitespace-nowrap" @click.stop>
         <div class="flex flex-col items-start justify-center">
           <select
             :value="student.invoice || 'NOT TAKEN'"
@@ -403,7 +439,7 @@ const handleContextMenu = (e: MouseEvent) => {
 
       <!-- Embassy Column -->
       <td
-        class="px-3 py-2.5 w-[45%] max-w-0"
+        class="px-3 py-2.5 w-[36%] max-w-0"
         @click.stop="emit('open-embassy', student)"
       >
         <div class="flex flex-col gap-1 cursor-pointer hover:opacity-80 transition-opacity">

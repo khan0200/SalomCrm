@@ -29,12 +29,12 @@ const emit = defineEmits<{
 <template>
   <div class="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 overflow-hidden shadow-xs">
     <div class="overflow-x-auto scrollbar-thin">
-      <table class="w-full table-fixed border-collapse text-left min-w-[700px]">
+      <table class="w-full table-fixed border-collapse text-left min-w-[760px]">
         <!-- Table Column Widths matching Uniapp2 -->
         <colgroup>
           <col style="width: 4.5rem;" />
           <col :style="{ width: isKdbMode ? '22%' : '21%' }" />
-          <col :style="{ width: isKdbMode ? '11%' : '13%' }" />
+          <col :style="{ width: isKdbMode ? '11%' : '12%' }" />
           <template v-if="isKdbMode">
             <col style="width: 12%;" />
             <col style="width: 15%;" />
@@ -42,9 +42,10 @@ const emit = defineEmits<{
             <col style="width: 25%;" />
           </template>
           <template v-else>
-            <col style="width: 12%;" />
+            <col style="width: 11%;" />
+            <col style="width: 11%;" />
             <col style="width: 9%;" />
-            <col style="width: 45%;" />
+            <col style="width: 36%;" />
           </template>
         </colgroup>
 
@@ -67,7 +68,7 @@ const emit = defineEmits<{
             </th>
 
             <th class="px-2 py-2.5" :class="isKdbMode ? 'w-[22%]' : 'w-[21%]'">Full Name</th>
-            <th class="px-3.5 py-2.5" :class="isKdbMode ? 'w-[11%]' : 'w-[13%]'">Level</th>
+            <th class="px-3.5 py-2.5" :class="isKdbMode ? 'w-[11%]' : 'w-[12%]'">Level</th>
 
             <!-- KDB Mode Headers -->
             <template v-if="isKdbMode">
@@ -91,9 +92,10 @@ const emit = defineEmits<{
 
             <!-- Standard Mode Headers -->
             <template v-else>
-              <th class="px-3.5 py-2.5 w-[12%]">Invoice</th>
+              <th class="px-3 py-2.5 w-[11%]">Apply</th>
+              <th class="px-3.5 py-2.5 w-[11%]">Invoice</th>
               <th class="px-3 py-2.5 w-[9%]">CoA</th>
-              <th class="px-3 py-2.5 w-[45%]">Embassy</th>
+              <th class="px-3 py-2.5 w-[36%]">Embassy</th>
             </template>
           </tr>
         </thead>
@@ -101,14 +103,14 @@ const emit = defineEmits<{
         <!-- Table Body -->
         <tbody class="divide-y divide-zinc-100 dark:divide-zinc-850">
           <tr v-if="isLoading">
-            <td :colspan="isKdbMode ? 7 : 6" class="p-12 text-center text-zinc-400">
+            <td :colspan="7" class="p-12 text-center text-zinc-400">
               <Loader2 class="w-6 h-6 animate-spin mx-auto text-blue-600 mb-2" />
               <span class="text-xs font-medium">Loading status board data...</span>
             </td>
           </tr>
 
           <tr v-else-if="students.length === 0">
-            <td :colspan="isKdbMode ? 7 : 6" class="p-12 text-center text-zinc-400">
+            <td :colspan="7" class="p-12 text-center text-zinc-400">
               <Users class="w-8 h-8 mx-auto text-zinc-300 dark:text-zinc-700 mb-2" />
               <p class="font-bold text-sm text-zinc-700 dark:text-zinc-300">No students found</p>
               <p class="text-xs text-zinc-400 mt-0.5">Try adjusting your filters or search query.</p>
