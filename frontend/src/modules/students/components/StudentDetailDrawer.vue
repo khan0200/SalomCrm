@@ -64,7 +64,6 @@ const nameLanguage = ref<'EN' | 'KR'>('EN')
 // Accordion Collapsible States (Contact open by default)
 const contactExpanded = ref(true)
 const eduExpanded = ref(false)
-const isUniversitiesOpen = ref(true)
 const isFamilyOpen = ref(true)
 
 const toggleSection = (sec: 'contact' | 'education') => {
@@ -349,6 +348,47 @@ watch(() => props.student, (s) => {
     showLevel2.value = !!(s.level2 && s.level2.trim())
     showCert2.value = !!(s.language_certificate_2 && s.language_certificate_2.trim() && s.language_certificate_2 !== 'NO CERTIFICATE')
     showCert3.value = !!(s.language_certificate_3 && s.language_certificate_3.trim() && s.language_certificate_3 !== 'NO CERTIFICATE')
+
+    // Auto-compact universities if any gap is found (e.g. university_1 empty but university_2 exists)
+    const nonNullUnis: Array<{ name: string; status: string; major: string | null }> = []
+    let hasGap = false
+    let seenEmpty = false
+    for (let i = 1; i <= 5; i++) {
+      const val = (s as any)[`university_${i}`]
+      if (val && typeof val === 'string' && val.trim()) {
+        if (seenEmpty) hasGap = true
+        nonNullUnis.push({
+          name: val.trim(),
+          status: (s as any)[`university_${i}_status`] || 'Chosen',
+          major: (s as any)[`university_${i}_major`] || null
+        })
+      } else {
+        seenEmpty = true
+      }
+    }
+
+    if (hasGap) {
+      const patch: Record<string, any> = {}
+      for (let i = 1; i <= 5; i++) {
+        if (i <= nonNullUnis.length) {
+          patch[`university_${i}`] = nonNullUnis[i - 1].name
+          patch[`university_${i}_status`] = nonNullUnis[i - 1].status
+          patch[`university_${i}_major`] = nonNullUnis[i - 1].major
+          ;(s as any)[`university_${i}`] = nonNullUnis[i - 1].name
+          ;(s as any)[`university_${i}_status`] = nonNullUnis[i - 1].status
+          ;(s as any)[`university_${i}_major`] = nonNullUnis[i - 1].major
+        } else {
+          patch[`university_${i}`] = null
+          patch[`university_${i}_status`] = i === 1 ? '' : null
+          patch[`university_${i}_major`] = null
+          ;(s as any)[`university_${i}`] = null
+          ;(s as any)[`university_${i}_status`] = i === 1 ? '' : null
+          ;(s as any)[`university_${i}_major`] = null
+        }
+      }
+      emit('update-student', patch)
+    }
+
     showUni2.value = !!(s.university_2 && s.university_2.trim())
     showUni3.value = !!(s.university_3 && s.university_3.trim())
     showUni4.value = !!(s.university_4 && s.university_4.trim())
@@ -758,15 +798,61 @@ const handleStatusSelect = (slot: number, newStatus: string) => {
   activeStatusDropdown.value = null
 }
 
+// Sequential Removal & Compaction of University Slots (Ensures no gaps: e.g. deleting Uni 1 shifts Uni 2 to Uni 1)
+const removeUniversity = (targetSlot: number, skipConfirm = false) => {
+  if (!props.student || !authStore.canEdit) return
+  if (!skipConfirm && !window.confirm('Clear this university selection?')) return
+
+  const s = props.student as any
+  const list: Array<{ name: string; status: string; major: string | null }> = []
+
+  for (let i = 1; i <= 5; i++) {
+    if (i === targetSlot) continue
+    const name = s[`university_${i}`]
+    if (name && typeof name === 'string' && name.trim()) {
+      list.push({
+        name: name.trim(),
+        status: s[`university_${i}_status`] || 'Chosen',
+        major: s[`university_${i}_major`] || null
+      })
+    }
+  }
+
+  const patch: Record<string, any> = {}
+  for (let i = 1; i <= 5; i++) {
+    if (i <= list.length) {
+      patch[`university_${i}`] = list[i - 1].name
+      patch[`university_${i}_status`] = list[i - 1].status
+      patch[`university_${i}_major`] = list[i - 1].major
+      s[`university_${i}`] = list[i - 1].name
+      s[`university_${i}_status`] = list[i - 1].status
+      s[`university_${i}_major`] = list[i - 1].major
+    } else {
+      patch[`university_${i}`] = null
+      patch[`university_${i}_status`] = i === 1 ? '' : null
+      patch[`university_${i}_major`] = null
+      s[`university_${i}`] = null
+      s[`university_${i}_status`] = i === 1 ? '' : null
+      s[`university_${i}_major`] = null
+    }
+  }
+
+  showUni2.value = !!(s.university_2 && s.university_2.trim())
+  showUni3.value = !!(s.university_3 && s.university_3.trim())
+  showUni4.value = !!(s.university_4 && s.university_4.trim())
+  showUni5.value = !!(s.university_5 && s.university_5.trim())
+
+  emit('update-student', patch)
+}
+
 // Clear University Slot Handler (with Confirmation)
 const clearUniversitySlot = (slot: number) => {
-  if (!props.student || !authStore.canEdit) return
-  if (!window.confirm('Clear this university selection?')) return
-  const patch: Record<string, any> = {}
-  patch[`university_${slot}`] = null
-  patch[`university_${slot}_status`] = ''
-  patch[`university_${slot}_major`] = null
-  emit('update-student', patch)
+  removeUniversity(slot, false)
+}
+
+// Sequential Remover (X) Button Handler
+const clearAndHideUni = (slot: number) => {
+  removeUniversity(slot, true)
 }
 
 // University Edit Modal Handlers (Show ONLY University Name with live suggestions)
@@ -801,21 +887,20 @@ const closeCertModal = () => {
 const saveUniversityModal = () => {
   if (!props.student) return
   const slot = uniModalSlot.value
-  const patch: Record<string, any> = {}
   const val = tempUniName.value.trim() ? tempUniName.value.trim().toUpperCase() : null
+  if (!val) {
+    removeUniversity(slot, true)
+    isUniModalOpen.value = false
+    return
+  }
+  const patch: Record<string, any> = {}
   patch[`university_${slot}`] = val
   // If assigning a university and status is currently empty, default to Chosen
   const currentStatus = (props.student as any)[`university_${slot}_status`]
-  if (val && !currentStatus) {
+  if (!currentStatus) {
     patch[`university_${slot}_status`] = 'Chosen'
   }
   emit('update-student', patch)
-  if (!val && slot >= 2) {
-    if (slot === 2) showUni2.value = false
-    if (slot === 3) showUni3.value = false
-    if (slot === 4) showUni4.value = false
-    if (slot === 5) showUni5.value = false
-  }
   isUniModalOpen.value = false
 }// ═════════════════════════════════════════════════════════════
 // Educational Background Modal (100% UniApp2 UX & Behavior)
@@ -1334,18 +1419,6 @@ const clearAndHideCert = (slot: 2 | 3) => {
     })
     showCert3.value = false
   }
-}
-
-const clearAndHideUni = (slot: number) => {
-  const patch: Record<string, any> = {}
-  patch[`university_${slot}`] = null
-  patch[`university_${slot}_status`] = null
-  patch[`university_${slot}_major`] = null
-  emit('update-student', patch)
-  if (slot === 2) { showUni2.value = false; showUni3.value = false; showUni4.value = false; showUni5.value = false; }
-  else if (slot === 3) { showUni3.value = false; showUni4.value = false; showUni5.value = false; }
-  else if (slot === 4) { showUni4.value = false; showUni5.value = false; }
-  else if (slot === 5) { showUni5.value = false; }
 }
 
 // Google Drive Actions
@@ -2536,23 +2609,14 @@ const handleRestoreStudent = () => {
                 </div>
               </div>
 
-              <!-- 2.2 Chosen Universities Header & Cards (Collapsible Accordion) -->
+              <!-- 2.2 Chosen Universities Header & Cards -->
               <div class="flex flex-col gap-1.5">
-                <div
-                  class="flex items-center justify-between px-1 cursor-pointer select-none"
-                  @click="isUniversitiesOpen = !isUniversitiesOpen"
-                >
-                  <div class="flex items-center gap-1.5 text-zinc-500 dark:text-zinc-400 font-bold uppercase tracking-wider text-[11px]">
-                    <Landmark class="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-                    <span>CHOSEN UNIVERSITIES</span>
-                  </div>
-                  <button type="button" class="w-6 h-6 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 flex items-center justify-center transition-all">
-                    <ChevronDown class="w-3.5 h-3.5 transition-transform duration-200" :class="isUniversitiesOpen ? 'rotate-180' : ''" />
-                  </button>
+                <div class="flex items-center gap-1.5 px-1 text-zinc-500 dark:text-zinc-400 font-bold uppercase tracking-wider text-[11px]">
+                  <Landmark class="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                  <span>CHOSEN UNIVERSITIES</span>
                 </div>
 
-                <div class="accordion-collapse" :class="{ 'is-open': isUniversitiesOpen }">
-                <div class="accordion-collapse-inner flex flex-col gap-1.5">
+                <div class="flex flex-col gap-1.5">
                   <!-- Dynamic Loop for 5 University Slots -->
                   <template v-for="slot in 5" :key="slot">
                     <div
@@ -2594,20 +2658,20 @@ const handleRestoreStudent = () => {
                             <Pencil class="w-3.5 h-3.5" />
                           </button>
 
-                          <!-- Eraser (Clear university selection with prompt) -->
+                          <!-- Eraser (Clear university selection with prompt) - for slot 1 -->
                           <button
-                            v-if="(student as any)[`university_${slot}`]"
+                            v-if="slot === 1 && (student as any).university_1"
                             type="button"
-                            @click.stop="clearUniversitySlot(slot)"
+                            @click.stop="clearUniversitySlot(1)"
                             class="w-6 h-6 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-rose-600 flex items-center justify-center transition-all cursor-pointer active:scale-90"
                             title="Clear university selection"
                           >
                             <Eraser class="w-3.5 h-3.5" />
                           </button>
 
-                          <!-- Sequential + Adder Button -->
+                          <!-- Sequential + Adder Button (only if current slot is filled) -->
                           <button
-                            v-if="slot === 1 && !showUni2"
+                            v-if="slot === 1 && !showUni2 && (student as any).university_1"
                             type="button"
                             @click.stop="showUni2 = true; openUniversityModal(2);"
                             class="w-6 h-6 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-blue-600 flex items-center justify-center transition-all cursor-pointer active:scale-90"
@@ -2616,7 +2680,7 @@ const handleRestoreStudent = () => {
                             <Plus class="w-3.5 h-3.5" />
                           </button>
                           <button
-                            v-else-if="slot === 2 && !showUni3"
+                            v-else-if="slot === 2 && !showUni3 && (student as any).university_2"
                             type="button"
                             @click.stop="showUni3 = true; openUniversityModal(3);"
                             class="w-6 h-6 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-blue-600 flex items-center justify-center transition-all cursor-pointer active:scale-90"
@@ -2625,7 +2689,7 @@ const handleRestoreStudent = () => {
                             <Plus class="w-3.5 h-3.5" />
                           </button>
                           <button
-                            v-else-if="slot === 3 && !showUni4"
+                            v-else-if="slot === 3 && !showUni4 && (student as any).university_3"
                             type="button"
                             @click.stop="showUni4 = true; openUniversityModal(4);"
                             class="w-6 h-6 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-blue-600 flex items-center justify-center transition-all cursor-pointer active:scale-90"
@@ -2634,7 +2698,7 @@ const handleRestoreStudent = () => {
                             <Plus class="w-3.5 h-3.5" />
                           </button>
                           <button
-                            v-else-if="slot === 4 && !showUni5"
+                            v-else-if="slot === 4 && !showUni5 && (student as any).university_4"
                             type="button"
                             @click.stop="showUni5 = true; openUniversityModal(5);"
                             class="w-6 h-6 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-blue-600 flex items-center justify-center transition-all cursor-pointer active:scale-90"
@@ -2722,7 +2786,6 @@ const handleRestoreStudent = () => {
                       </div>
                     </div>
                   </template>
-                </div>
                 </div>
               </div>
 

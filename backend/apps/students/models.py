@@ -238,6 +238,45 @@ class Student(TenantAwareModel):
                 except Exception:
                     pass
 
+        # Sequential university slot compaction (no gaps allowed: e.g. deleting Uni 1 shifts Uni 2 to Uni 1)
+        unis = []
+        for i in range(1, 6):
+            u_name = getattr(self, f'university_{i}', None)
+            if u_name and isinstance(u_name, str) and u_name.strip():
+                unis.append({
+                    'name': u_name.strip(),
+                    'status': getattr(self, f'university_{i}_status', None) or 'Chosen',
+                    'major': getattr(self, f'university_{i}_major', None) or None,
+                })
+
+        uni_fields_changed = False
+        for i in range(1, 6):
+            if i <= len(unis):
+                new_name = unis[i - 1]['name']
+                new_status = unis[i - 1]['status']
+                new_major = unis[i - 1]['major']
+            else:
+                new_name = None
+                new_status = 'Chosen' if i == 1 else None
+                new_major = None
+
+            if (getattr(self, f'university_{i}', None) != new_name or
+                getattr(self, f'university_{i}_status', None) != new_status or
+                getattr(self, f'university_{i}_major', None) != new_major):
+                uni_fields_changed = True
+
+            setattr(self, f'university_{i}', new_name)
+            setattr(self, f'university_{i}_status', new_status)
+            setattr(self, f'university_{i}_major', new_major)
+
+        if uni_fields_changed and kwargs.get('update_fields') is not None:
+            uni_fields = [f'university_{i}' for i in range(1, 6)] + \
+                         [f'university_{i}_status' for i in range(1, 6)] + \
+                         [f'university_{i}_major' for i in range(1, 6)]
+            update_fields = set(kwargs['update_fields'])
+            update_fields.update(uni_fields)
+            kwargs['update_fields'] = list(update_fields)
+
         super().save(*args, **kwargs)
 
 

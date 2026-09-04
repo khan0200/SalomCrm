@@ -233,10 +233,20 @@ const FIELD_GROUPS: FieldGroup[] = [
     title: 'Chosen Universities',
     fields: [
       { key: 'university_1', label: 'University 1', checked: false, get: (s) => s.university_1 || '' },
+      { key: 'university_1_status', label: 'University 1 Status', checked: false, get: (s) => s.university_1_status || '' },
+      { key: 'university_1_major', label: 'University 1 Major', checked: false, get: (s) => s.university_1_major || '' },
       { key: 'university_2', label: 'University 2', checked: false, get: (s) => s.university_2 || '' },
+      { key: 'university_2_status', label: 'University 2 Status', checked: false, get: (s) => s.university_2_status || '' },
+      { key: 'university_2_major', label: 'University 2 Major', checked: false, get: (s) => s.university_2_major || '' },
       { key: 'university_3', label: 'University 3', checked: false, get: (s) => s.university_3 || '' },
+      { key: 'university_3_status', label: 'University 3 Status', checked: false, get: (s) => s.university_3_status || '' },
+      { key: 'university_3_major', label: 'University 3 Major', checked: false, get: (s) => s.university_3_major || '' },
       { key: 'university_4', label: 'University 4', checked: false, get: (s) => s.university_4 || '' },
+      { key: 'university_4_status', label: 'University 4 Status', checked: false, get: (s) => s.university_4_status || '' },
+      { key: 'university_4_major', label: 'University 4 Major', checked: false, get: (s) => s.university_4_major || '' },
       { key: 'university_5', label: 'University 5', checked: false, get: (s) => s.university_5 || '' },
+      { key: 'university_5_status', label: 'University 5 Status', checked: false, get: (s) => s.university_5_status || '' },
+      { key: 'university_5_major', label: 'University 5 Major', checked: false, get: (s) => s.university_5_major || '' },
     ]
   },
   {
