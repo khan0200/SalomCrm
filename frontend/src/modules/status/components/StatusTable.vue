@@ -34,7 +34,7 @@ const emit = defineEmits<{
         <colgroup>
           <col style="width: 4.5rem;" />
           <col :style="{ width: isKdbMode ? '22%' : '21%' }" />
-          <col :style="{ width: isKdbMode ? '11%' : '12%' }" />
+          <col :style="{ width: isKdbMode ? '11%' : '13%' }" />
           <template v-if="isKdbMode">
             <col style="width: 12%;" />
             <col style="width: 15%;" />
@@ -42,10 +42,10 @@ const emit = defineEmits<{
             <col style="width: 25%;" />
           </template>
           <template v-else>
-            <col style="width: 11%;" />
-            <col style="width: 11%;" />
+            <col style="width: 6.75rem;" />
+            <col style="width: 12%;" />
             <col style="width: 9%;" />
-            <col style="width: 36%;" />
+            <col style="width: 45%;" />
           </template>
         </colgroup>
 
@@ -68,7 +68,7 @@ const emit = defineEmits<{
             </th>
 
             <th class="px-2 py-2.5" :class="isKdbMode ? 'w-[22%]' : 'w-[21%]'">Full Name</th>
-            <th class="px-3.5 py-2.5" :class="isKdbMode ? 'w-[11%]' : 'w-[12%]'">Level</th>
+            <th class="px-3.5 py-2.5" :class="isKdbMode ? 'w-[11%]' : 'w-[13%]'">Level</th>
 
             <!-- KDB Mode Headers -->
             <template v-if="isKdbMode">
@@ -92,10 +92,10 @@ const emit = defineEmits<{
 
             <!-- Standard Mode Headers -->
             <template v-else>
-              <th class="px-3 py-2.5 w-[11%]">Apply</th>
-              <th class="px-3.5 py-2.5 w-[11%]">Invoice</th>
+              <th class="px-2.5 py-2.5 w-[6.75rem]">Apply</th>
+              <th class="px-3.5 py-2.5 w-[12%]">Invoice</th>
               <th class="px-3 py-2.5 w-[9%]">CoA</th>
-              <th class="px-3 py-2.5 w-[36%]">Embassy</th>
+              <th class="px-3 py-2.5 w-[45%]">Embassy</th>
             </template>
           </tr>
         </thead>

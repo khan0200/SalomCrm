@@ -379,7 +379,7 @@ const handleContextMenu = (e: MouseEvent) => {
     <!-- ── Standard Status Mode Columns ──────────────────────────────── -->
     <template v-else>
       <!-- Apply Column -->
-      <td class="px-3 py-2.5 w-[11%] whitespace-nowrap">
+      <td class="px-2.5 py-2.5 w-[6.75rem] whitespace-nowrap">
         <span
           v-if="isApplied"
           class="inline-flex items-center justify-center px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-600 dark:bg-emerald-500 text-white border border-transparent shadow-2xs select-none"
@@ -396,7 +396,7 @@ const handleContextMenu = (e: MouseEvent) => {
       </td>
 
       <!-- Invoice Column -->
-      <td class="px-3.5 py-2.5 w-[11%] whitespace-nowrap" @click.stop>
+      <td class="px-3.5 py-2.5 w-[12%] whitespace-nowrap" @click.stop>
         <div class="flex flex-col items-start justify-center">
           <select
             :value="student.invoice || 'NOT TAKEN'"
@@ -439,7 +439,7 @@ const handleContextMenu = (e: MouseEvent) => {
 
       <!-- Embassy Column -->
       <td
-        class="px-3 py-2.5 w-[36%] max-w-0"
+        class="px-3 py-2.5 w-[45%] max-w-0"
         @click.stop="emit('open-embassy', student)"
       >
         <div class="flex flex-col gap-1 cursor-pointer hover:opacity-80 transition-opacity">
