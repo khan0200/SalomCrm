@@ -138,23 +138,21 @@ const certs = computed(() => {
 })
 
 const appliedUniversities = computed(() => {
-  const list: string[] = []
+  const list: { slot: number; name: string }[] = []
   for (let i = 1; i <= 5; i++) {
     const uniName = (props.student as any)[`university_${i}`]
     const status = (props.student as any)[`university_${i}_status`]
     if (typeof status === 'string' && status.trim().toUpperCase() === 'APPLIED') {
-      list.push(uniName ? `${uniName} (Choice ${i})` : `Choice ${i}`)
+      list.push({
+        slot: i,
+        name: uniName && uniName.trim() ? uniName.trim() : `University ${i}`
+      })
     }
   }
   return list
 })
 
 const isApplied = computed(() => appliedUniversities.value.length > 0)
-
-const appliedTooltip = computed(() => {
-  if (appliedUniversities.value.length === 0) return ''
-  return `Applied: ${appliedUniversities.value.join(', ')}`
-})
 
 const handleRowClick = (e: MouseEvent) => {
   emit('click-row', props.student, e)
@@ -380,13 +378,37 @@ const handleContextMenu = (e: MouseEvent) => {
     <template v-else>
       <!-- Apply Column -->
       <td class="px-2.5 py-2.5 w-[6.75rem] whitespace-nowrap">
-        <span
-          v-if="isApplied"
-          class="inline-flex items-center justify-center px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-600 dark:bg-emerald-500 text-white border border-transparent shadow-2xs select-none"
-          :title="appliedTooltip"
-        >
-          APPLIED
-        </span>
+        <div v-if="isApplied" class="group/applied relative inline-flex items-center justify-center">
+          <span
+            class="inline-flex items-center justify-center px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-600 dark:bg-emerald-500 text-white border border-transparent shadow-2xs select-none cursor-default"
+          >
+            APPLIED
+          </span>
+
+          <!-- iOS Styled Solid Black Tooltip (Matching Reference) -->
+          <div
+            class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 opacity-0 scale-90 translate-y-1 group-hover/applied:opacity-100 group-hover/applied:scale-100 group-hover/applied:translate-y-0 transition-all duration-150 ease-out z-50 flex flex-col items-center select-none"
+          >
+            <div class="px-2.5 py-1 bg-black text-white text-[11px] font-semibold rounded-md shadow-xl shadow-black/50 whitespace-nowrap tracking-wide uppercase">
+              <template v-if="appliedUniversities.length === 1">
+                <span>{{ appliedUniversities[0].name }}</span>
+              </template>
+              <div v-else class="flex flex-col gap-1 text-left py-0.5">
+                <div
+                  v-for="uni in appliedUniversities"
+                  :key="uni.slot"
+                  class="flex items-center gap-1.5"
+                >
+                  <span class="text-zinc-400">•</span>
+                  <span>{{ uni.name }}</span>
+                </div>
+              </div>
+            </div>
+            <!-- Tooltip Arrow Tail -->
+            <div class="w-0 h-0 border-x-4 border-x-transparent border-t-4 border-t-black -mt-[0.5px]"></div>
+          </div>
+        </div>
+
         <span
           v-else
           class="inline-flex items-center justify-center px-2.5 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wider bg-zinc-400 dark:bg-zinc-500 text-white border border-transparent shadow-2xs select-none"

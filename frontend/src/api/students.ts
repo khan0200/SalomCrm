@@ -168,5 +168,31 @@ export const studentsApi = {
     })
     return response.data
   },
+
+  interpretAiCommand: async (
+    prompt: string,
+    universities?: string[],
+    folders?: Array<{ id: string; name: string }>,
+  ): Promise<{
+    action: string
+    student_ids?: string[]
+    university_name?: string | null
+    folder_name?: string | null
+    folder_id?: string | null
+    color?: string | null
+    cert?: string | null
+    score?: string | null
+    needs_clarification?: boolean
+    clarification_field?: string | null
+    clarification_question?: string | null
+    message?: string
+  }> => {
+    const response = await apiClient.post('/students/ai-command/', {
+      prompt,
+      universities,
+      folders,
+    })
+    return response.data
+  },
 }
 

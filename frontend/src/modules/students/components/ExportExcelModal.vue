@@ -19,6 +19,7 @@ import {
 import type { Student } from '@/types'
 import { ROW_COLOR_MAP } from '@/types'
 import { useUiStore } from '@/stores/ui'
+import { useStudentDashboardStore } from '@/stores/studentDashboard'
 import { useAlphanumericSort } from '@/composables/useAlphanumericSort'
 import XLSX from 'xlsx-js-style'
 
@@ -35,6 +36,7 @@ const emit = defineEmits<{
 }>()
 
 const uiStore = useUiStore()
+const dashboardStore = useStudentDashboardStore()
 const { compareStudentIds } = useAlphanumericSort()
 
 // ── Search & Filter State inside Modal ──────────────────────────────
@@ -279,10 +281,18 @@ const checkedFields = ref<string[]>(
   FIELD_GROUPS.flatMap(g => g.fields.filter(f => f.checked).map(f => f.key))
 )
 
-// When modal opens, select all students by default
+// When modal opens, initialize selection or honor external triggers
 watch(() => props.isOpen, (open) => {
   if (open) {
-    selectedStudentIds.value = []
+    const preselected = dashboardStore.excelInitialSelectedIds
+    const autoOpen = dashboardStore.excelAutoOpenFieldPicker
+    if (preselected && preselected.length > 0) {
+      selectedStudentIds.value = [...preselected]
+      dashboardStore.excelInitialSelectedIds = []
+    } else {
+      selectedStudentIds.value = []
+    }
+
     searchQuery.value = ''
     searchType.value = 'all'
     selectedFolders.value = []
@@ -292,11 +302,23 @@ watch(() => props.isOpen, (open) => {
     selectedCerts.value = []
     selectedTags.value = []
     selectedLeads.value = []
-    isFieldPickerOpen.value = false
+    isFieldPickerOpen.value = !!autoOpen
+    dashboardStore.excelAutoOpenFieldPicker = false
     expandedFieldGroup.value = 'Contact'
     closeAllDropdowns()
   }
 })
+
+// Also watch external selection updates if modal is already opening or active
+watch(() => dashboardStore.excelInitialSelectedIds, (newIds) => {
+  if (newIds && newIds.length > 0) {
+    selectedStudentIds.value = [...newIds]
+    if (dashboardStore.excelAutoOpenFieldPicker) {
+      isFieldPickerOpen.value = true
+      dashboardStore.excelAutoOpenFieldPicker = false
+    }
+  }
+}, { deep: true })
 
 // ── Filtered Students List ──────────────────────────────────────────
 const filteredStudents = computed(() => {

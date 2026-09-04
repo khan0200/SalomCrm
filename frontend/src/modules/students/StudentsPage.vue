@@ -178,6 +178,52 @@ const { data: foldersData } = useQuery({
 
 const folders = computed(() => foldersData.value || [])
 
+// AI folder navigation: when AI sets aiRequestedFolder, switch to that folder
+watch(
+  [() => dashboardStore.aiRequestedFolder, folders],
+  ([folderName, folderList]) => {
+    if (!folderName) return
+    const nameLower = folderName.trim().toLowerCase()
+
+    // Special virtual folder names
+    if (['all', 'archive', 'deleted', 'hidden', 'except'].includes(nameLower)) {
+      activeFolder.value = nameLower === 'archive' ? 'deleted' : nameLower
+      currentPage.value = 1
+      dashboardStore.aiRequestedFolder = null
+      return
+    }
+
+    const list = folderList || []
+    // 1. Exact match
+    let target = list.find(
+      (f: Folder) => f.name.trim().toLowerCase() === nameLower
+    )
+    // 2. Prefix match
+    if (!target) {
+      target = list.find(
+        (f: Folder) => f.name.trim().toLowerCase().startsWith(nameLower)
+      )
+    }
+    // 3. Substring match
+    if (!target) {
+      target = list.find(
+        (f: Folder) =>
+          f.name.trim().toLowerCase().includes(nameLower) ||
+          nameLower.includes(f.name.trim().toLowerCase())
+      )
+    }
+
+    if (target) {
+      activeFolder.value = String(target.id)
+      currentPage.value = 1
+      dashboardStore.aiRequestedFolder = null
+    } else if (list.length > 0) {
+      dashboardStore.aiRequestedFolder = null
+    }
+  },
+  { immediate: true }
+)
+
 // ── Full Master Students Roster (Loaded ONCE into In-Memory Cache) ───────────
 const { data: allStudentsData, isLoading, refetch } = useQuery({
   queryKey: ['all-students-master'],

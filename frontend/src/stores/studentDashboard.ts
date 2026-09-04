@@ -50,6 +50,19 @@ export const useStudentDashboardStore = defineStore('studentDashboard', () => {
   // Export event trigger callback
   const onExportExcel = ref<(() => void) | null>(null)
 
+  // Bulk Excel export helpers (e.g. via AI prompt /excel f1,f2)
+  const excelInitialSelectedIds = ref<string[]>([])
+  const excelAutoOpenFieldPicker = ref<boolean>(false)
+
+  const openExportWithSelection = (ids: string[], autoOpenFields = true) => {
+    excelInitialSelectedIds.value = [...ids]
+    excelAutoOpenFieldPicker.value = autoOpenFields
+    isExcelModalOpen.value = true
+  }
+
+  // AI folder navigation — when set, StudentsPage switches to this folder and clears it
+  const aiRequestedFolder = ref<string | null>(null)
+
   const triggerExportExcel = () => {
     if (onExportExcel.value) {
       onExportExcel.value()
@@ -87,5 +100,9 @@ export const useStudentDashboardStore = defineStore('studentDashboard', () => {
     resetAllFilters,
     onExportExcel,
     triggerExportExcel,
+    excelInitialSelectedIds,
+    excelAutoOpenFieldPicker,
+    openExportWithSelection,
+    aiRequestedFolder,
   }
 })

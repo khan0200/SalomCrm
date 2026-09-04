@@ -1893,5 +1893,31 @@ class WordFillGenerateView(APIView):
             )
 
 
+class AICommandInterpretView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
 
+    def post(self, request):
+        prompt = request.data.get('prompt', '').strip()
+        if not prompt:
+            return Response({'error': 'Prompt is required'}, status=status.HTTP_400_BAD_REQUEST)
 
+        tenant = getattr(request, 'tenant', None) or getattr(request.user, 'tenant', None)
+        if tenant:
+            official_unis = list(UniversityOption.objects.filter(tenant=tenant).values_list('name', flat=True).order_by('name'))
+        else:
+            official_unis = list(UniversityOption.objects.values_list('name', flat=True).order_by('name'))
+
+        # Load available folders for this tenant
+        if tenant:
+            folders_qs = Folder.objects.filter(tenant=tenant).order_by('name')
+        else:
+            folders_qs = Folder.objects.all().order_by('name')
+        available_folders = [{"id": str(f.id), "name": f.name} for f in folders_qs]
+
+        from .ai_command_service import interpret_ai_command
+        result = interpret_ai_command(
+            prompt,
+            official_universities=official_unis,
+            available_folders=available_folders,
+        )
+        return Response(result)

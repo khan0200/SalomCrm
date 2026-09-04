@@ -10,6 +10,7 @@ from .views import (
     VisaStudentLookupView, VisaStudentListCreateView, VisaStudentDetailView,
     VisaStudentBulkDeleteView, VisaOptionsView,
     ExcelFillAnalyzeView, ExcelFillGenerateView,
+    AICommandInterpretView
     # Word Fill is temporarily disabled -- the views still exist in views.py.
     # WordFillAnalyzeView, WordFillGenerateView
 )
@@ -44,6 +45,7 @@ urlpatterns = [
     path('students/visa/students/bulk-delete/', VisaStudentBulkDeleteView.as_view(), name='student-visa-bulk-delete'),
     path('students/visa/students/<str:passport>/', VisaStudentDetailView.as_view(), name='student-visa-detail'),
     path('students/visa/options/', VisaOptionsView.as_view(), name='student-visa-options'),
+    path('students/ai-command/', AICommandInterpretView.as_view(), name='student-ai-command'),
     path('student-options/', StudentOptionsViewSet.as_view({'get': 'list'}), name='student-options'),
     path('', include(router.urls)),
 ]

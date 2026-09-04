@@ -2,6 +2,7 @@
 import AppSidebar from './AppSidebar.vue'
 import AppHeader from './AppHeader.vue'
 import NotificationToast from '@/components/common/NotificationToast.vue'
+import AiPromptModal from '@/components/common/AiPromptModal.vue'
 </script>
 
 <template>
@@ -16,5 +17,6 @@ import NotificationToast from '@/components/common/NotificationToast.vue'
       </main>
     </div>
     <NotificationToast />
+    <AiPromptModal />
   </div>
 </template>
