@@ -56,6 +56,20 @@ class Student(TenantAwareModel):
     """
     # 1. Personal & Contact Information
     id = models.CharField(max_length=50, primary_key=True)  # Alphanumeric uppercase e.g. "UB120", "AA01"
+
+    # Immutable payment anchor — set once at creation from id (e.g. "PF49" for student "F49").
+    # NEVER updated after initial set. Payments FK points here so renaming Student.id
+    # never orphans payment history.
+    payment_id = models.CharField(
+        max_length=55,
+        unique=True,
+        null=True,
+        blank=True,
+        editable=False,
+        db_index=True,
+        help_text="Immutable payment anchor. Set once on creation (P + student id). Never changes."
+    )
+
     full_name = models.CharField(max_length=255, db_index=True)
     korean_name = models.CharField(max_length=255, blank=True, null=True)
     passport = models.CharField(max_length=50, blank=True, null=True, db_index=True)
@@ -203,6 +217,11 @@ class Student(TenantAwareModel):
             val = getattr(self, attr, None)
             if isinstance(val, str) and val:
                 setattr(self, attr, val.strip().upper())
+
+        # Set payment_id exactly once at creation — NEVER overwrite after that.
+        # This keeps payments correctly anchored even when Student.id is renamed.
+        if not self.payment_id and self.id:
+            self.payment_id = f"P{self.id.strip().upper()}"
 
         # Auto-extract Google Drive Folder ID from URL if not explicitly provided
         if self.google_drive_url and not self.google_drive_folder_id:

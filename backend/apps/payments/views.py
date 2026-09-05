@@ -52,6 +52,7 @@ class PaymentViewSet(viewsets.ModelViewSet):
         if search:
             qs = qs.filter(
                 Q(student_id__icontains=search) |
+                Q(student__id__icontains=search) |
                 Q(student_name__icontains=search) |
                 Q(student__full_name__icontains=search) |
                 Q(notes__icontains=search) |

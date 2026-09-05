@@ -28,7 +28,7 @@ class Payment(TenantAwareModel):
         blank=True,
         related_name='payments',
         db_column='student_id',
-        to_field='id',
+        to_field='payment_id',
         db_index=True
     )
     # Stored student name snapshot for audit history if student is ever detached

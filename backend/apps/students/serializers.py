@@ -110,7 +110,11 @@ class StudentCreateUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Student
         fields = '__all__'
-        read_only_fields = ('balance', 'discount', 'tenant', 'created_by', 'created_at', 'updated_at')
+        read_only_fields = (
+            'balance', 'discount', 'tenant', 'created_by',
+            'created_at', 'updated_at',
+            'payment_id',  # Immutable — set once on create, never via API
+        )
 
     def create(self, validated_data):
         # pick_needed is a manual checklist (PICK_NEEDED_LIST on the frontend);
@@ -143,6 +147,50 @@ class StudentCreateUpdateSerializer(serializers.ModelSerializer):
         return student
 
     def update(self, instance, validated_data):
+        # ── Student ID (primary key) rename ───────────────────────────────────
+        # Student.id is a CharField PK. Django cannot UPDATE a PK in-place.
+        # Since payments now FK to the immutable payment_id field (not id),
+        # we can safely rename id via raw SQL UPDATE — no cascade, no SET_NULL,
+        # no payment re-linking needed at all.
+        raw_new_id = validated_data.get('id')
+        old_id = instance.pk
+        if raw_new_id and str(raw_new_id).strip().upper() != str(old_id).strip().upper():
+            from django.db import connection, transaction
+
+            new_id_upper = str(raw_new_id).strip().upper()
+
+            with transaction.atomic():
+                # Raw SQL UPDATE on id — bypasses Django's PK-change restriction.
+                # payment_id is NOT updated (stays as original e.g. 'PT207').
+                # All other field changes are applied in the same transaction.
+                other_fields = {k: v for k, v in validated_data.items() if k != 'id'}
+                for attr, value in other_fields.items():
+                    setattr(instance, attr, value)
+
+                # First rename id via raw SQL (no FK cascades since payments
+                # reference payment_id, not id)
+                with connection.cursor() as cursor:
+                    cursor.execute(
+                        "UPDATE students SET id = %s WHERE id = %s",
+                        [new_id_upper, old_id]
+                    )
+
+                # Now save remaining field changes (update_fields avoids
+                # touching id or payment_id)
+                if other_fields:
+                    instance.pk = new_id_upper
+                    instance.save(update_fields=list(other_fields.keys()) + ['updated_at'])
+                else:
+                    instance.pk = new_id_upper
+
+                logger.info(
+                    f"Student ID renamed {old_id} -> {new_id_upper} via raw SQL. "
+                    f"payment_id '{instance.payment_id}' unchanged."
+                )
+
+            return instance
+        # ── End ID rename handling ────────────────────────────────────────────
+
         # If full_name was changed and korean_name was NOT explicitly sent, auto-translate full_name to Korean
         if 'full_name' in validated_data and validated_data['full_name']:
             new_name = validated_data['full_name'].strip()
