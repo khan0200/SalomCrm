@@ -3,8 +3,8 @@ from .models import Payment, PaymentMethodTemplate, PaymentReceiverTemplate, Pay
 from apps.students.models import Student
 
 class PaymentSerializer(serializers.ModelSerializer):
-    student_id = serializers.CharField(source='student.id', read_only=True)
-    student_full_name = serializers.CharField(source='student.full_name', read_only=True)
+    student_id = serializers.SerializerMethodField()
+    student_full_name = serializers.SerializerMethodField()
     created_by_name = serializers.SerializerMethodField()
 
     class Meta:
@@ -16,6 +16,18 @@ class PaymentSerializer(serializers.ModelSerializer):
             'created_at', 'updated_at'
         )
         read_only_fields = ('id', 'created_at', 'updated_at')
+
+    def get_student_id(self, obj):
+        if obj.student:
+            return obj.student.id
+        if obj.student_id:
+            return obj.student_id.lstrip('P') if obj.student_id.startswith('P') else obj.student_id
+        return None
+
+    def get_student_full_name(self, obj):
+        if obj.student and obj.student.full_name:
+            return obj.student.full_name
+        return obj.student_name or None
 
     def get_created_by_name(self, obj):
         try:

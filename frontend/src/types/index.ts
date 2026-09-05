@@ -55,6 +55,7 @@ export interface Folder {
 
 export interface Student {
   id: string
+  payment_id?: string | null
   full_name: string
   korean_name?: string | null
   passport?: string | null

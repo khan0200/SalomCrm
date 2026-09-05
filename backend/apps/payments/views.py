@@ -46,13 +46,19 @@ class PaymentViewSet(viewsets.ModelViewSet):
         # Filters
         student_id = self.request.query_params.get('student_id')
         if student_id:
-            qs = qs.filter(student_id=student_id.upper())
+            sid = student_id.strip().upper()
+            qs = qs.filter(
+                Q(student__id=sid) |
+                Q(student__payment_id=sid) |
+                Q(student_id=sid)
+            )
 
         search = self.request.query_params.get('search', '').strip()
         if search:
             qs = qs.filter(
                 Q(student_id__icontains=search) |
                 Q(student__id__icontains=search) |
+                Q(student__payment_id__icontains=search) |
                 Q(student_name__icontains=search) |
                 Q(student__full_name__icontains=search) |
                 Q(notes__icontains=search) |
@@ -87,7 +93,11 @@ class PaymentViewSet(viewsets.ModelViewSet):
         student_id = serializer.validated_data.get('student_id')
         student = None
         if student_id:
-            student = Student.objects.filter(id=student_id.upper(), tenant=tenant).first()
+            sid = student_id.strip().upper()
+            student_qs = Student.objects.filter(Q(id=sid) | Q(payment_id=sid))
+            if tenant and not (user.is_superuser or getattr(user, 'role', '') == 'SUPER_ADMIN'):
+                student_qs = student_qs.filter(tenant=tenant)
+            student = student_qs.first()
 
         payment = record_payment(
             tenant=tenant,
@@ -122,7 +132,11 @@ class PaymentViewSet(viewsets.ModelViewSet):
         student_id = serializer.validated_data.get('student_id')
         student = None
         if student_id:
-            student = Student.objects.filter(id=student_id.upper(), tenant=tenant).first()
+            sid = student_id.strip().upper()
+            student_qs = Student.objects.filter(Q(id=sid) | Q(payment_id=sid))
+            if tenant and not (user.is_superuser or getattr(user, 'role', '') == 'SUPER_ADMIN'):
+                student_qs = student_qs.filter(tenant=tenant)
+            student = student_qs.first()
 
         payment = record_payment(
             tenant=tenant,
@@ -285,7 +299,7 @@ class PaymentExportView(APIView):
             p_type = "Discount" if p.is_discount else ("Withdrawal" if p.is_withdrawal else "Payment")
             ws.append([
                 p.created_at.strftime('%Y-%m-%d %H:%M'),
-                p.student_id or '-',
+                (p.student.id if p.student else (p.student_id or '-')),
                 (p.student.full_name if p.student else p.student_name) or '-',
                 float(p.amount),
                 p.method,
