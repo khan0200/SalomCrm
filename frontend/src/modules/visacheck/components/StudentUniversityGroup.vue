@@ -87,7 +87,7 @@ const showPdfColumn = computed(() =>
 const showStatusDateColumn = computed(() => props.currentFilter === 'approved')
 
 const groupHasSelected = computed(() =>
-  props.students.some(s => props.selectedPassports.has(s.passport))
+  showSelectColumn.value && props.students.some(s => props.selectedPassports.has(s.passport))
 )
 </script>
 
@@ -180,7 +180,7 @@ const groupHasSelected = computed(() =>
                 <span v-if="st.student_id || st.id" class="text-xs text-zinc-400 font-mono">#{{ st.student_id || st.id }}</span>
               </div>
             </div>
-            <div v-if="showSelectColumn" class="flex items-center justify-center shrink-0 pt-0.5">
+            <div v-if="showSelectColumn && getStudentVisaStatus(st) !== 'APPROVED' && getStudentVisaStatus(st) !== 'CANCELLED'" class="flex items-center justify-center shrink-0 pt-0.5">
               <input
                 type="checkbox"
                 class="size-6 rounded border-2 border-neutral-300 dark:border-neutral-600 text-blue-600 focus:ring-2 focus:ring-blue-500 cursor-pointer transition-all"
@@ -282,7 +282,7 @@ const groupHasSelected = computed(() =>
               v-for="st in students"
               :key="st.passport"
               class="cursor-pointer transition-colors hover:bg-blue-50/60 dark:hover:bg-white/[0.03]"
-              :class="{ 'bg-blue-50/30 dark:bg-white/[0.02]': selectedPassports.has(st.passport) }"
+              :class="{ 'bg-blue-50/30 dark:bg-white/[0.02]': showSelectColumn && selectedPassports.has(st.passport) }"
               @click="emit('details', st)"
               @contextmenu.prevent="emit('contextmenu', st, $event)"
             >
@@ -370,7 +370,7 @@ const groupHasSelected = computed(() =>
 
               <!-- Select Column -->
               <td v-if="showSelectColumn" class="px-3 py-3 align-middle text-center">
-                <div class="flex items-center justify-center h-full">
+                <div v-if="getStudentVisaStatus(st) !== 'APPROVED' && getStudentVisaStatus(st) !== 'CANCELLED'" class="flex items-center justify-center h-full">
                   <input
                     type="checkbox"
                     class="size-6 rounded border-2 border-neutral-300 dark:border-neutral-600 text-blue-600 focus:ring-2 focus:ring-blue-500 focus:ring-offset-0 cursor-pointer transition-all hover:border-blue-500"

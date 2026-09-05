@@ -1137,7 +1137,10 @@ class VisaCheckView(APIView):
             vs_obj = vs.filter(passport__iexact=passport).first()
             if vs_obj:
                 if result.get('latest_status'):
-                    vs_obj.status = result.get('latest_status').upper()
+                    new_status = result.get('latest_status').upper()
+                    vs_obj.status = new_status
+                    if any(w in new_status for w in ('APPROV', 'VISA USED', 'ISSUED', '허가', 'REJECT', 'CANCEL', 'RETURN', 'EXPIRED', '불허')):
+                        vs_obj.batch_selected = False
                 if result.get('latest_date'):
                     vs_obj.application_date = result.get('latest_date')
                 if result.get('entry_date'):
@@ -1320,6 +1323,21 @@ class VisaStudentListCreateView(APIView):
         qs = VisaStudent.objects.filter(is_deleted=False)
         if tenant:
             qs = qs.filter(tenant=tenant)
+
+        # Clear any stale batch_selected flags on approved or cancelled students
+        qs.filter(
+            batch_selected=True
+        ).filter(
+            Q(status__icontains='APPROV') |
+            Q(status__icontains='VISA USED') |
+            Q(status__icontains='ISSUED') |
+            Q(status__icontains='허가') |
+            Q(status__icontains='REJECT') |
+            Q(status__icontains='CANCEL') |
+            Q(status__icontains='RETURN') |
+            Q(status__icontains='EXPIRED') |
+            Q(status__icontains='불허')
+        ).update(batch_selected=False)
 
         # Search filter
         search = request.query_params.get('search', '').strip()

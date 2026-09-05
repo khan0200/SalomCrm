@@ -115,12 +115,23 @@ async function loadStudents() {
     const res = await visaApi.getVisaStudents()
     students.value = res.results || []
 
-    // Restore selection state from database
+    // Restore selection state from database (only for active/pending, clearing stale selections on approved/cancelled)
     selectedPassports.value.clear()
+    const staleApprovedPassports: string[] = []
     for (const s of students.value) {
       if (s.batch_selected) {
-        selectedPassports.value.add(s.passport)
+        const bucket = bucketForStatus(s.status)
+        if (bucket === 'approved' || bucket === 'cancelled') {
+          s.batch_selected = false
+          staleApprovedPassports.push(s.passport)
+        } else {
+          selectedPassports.value.add(s.passport)
+        }
       }
+    }
+    // Asynchronously clear stale batch_selected flags in database
+    for (const pass of staleApprovedPassports) {
+      visaApi.updateVisaStudent(pass, { batch_selected: false }).catch(() => {})
     }
   } catch (err: any) {
     uiStore.addToast({ type: 'error', message: err.message || 'Viza ma\'lumotlarini yuklashda xatolik' })
@@ -391,18 +402,58 @@ const groupedStudents = computed((): { groupName: string; students: VisaStudent[
 })
 
 // ─── Show/Hide Columns ────────────────────────────────────────────────────────
-const showSelectColumn = computed(() => !!searchQuery.value.trim() || currentFilter.value === 'application' || currentFilter.value === 'pending')
+const isSelectableTab = computed(() => currentFilter.value === 'application' || currentFilter.value === 'pending')
+const showSelectColumn = computed(() => isSelectableTab.value)
 const showAppliedColumn = computed(() => !!searchQuery.value.trim() || currentFilter.value !== 'pending')
 const showPdfColumn = computed(() =>
   !!searchQuery.value.trim() || currentFilter.value === 'approved' || filteredStudents.value.some(s => isPdfEligible(s))
 )
 const showStatusDateColumn = computed(() => !searchQuery.value.trim() && currentFilter.value === 'approved')
 
+// ─── Sort Options per Tab ─────────────────────────────────────────────────────
+const sortOptions = computed(() => {
+  const options: { id: SortOption; label: string }[] = [
+    { id: 'university',  label: 'University (Guruhlash)' },
+    { id: 'tariff',      label: 'Tariff (Guruhlash)' },
+    { id: 'date',        label: 'Date (Guruhlash)' },
+    { id: 'statusDate',  label: 'Status Date (Guruhlash)' }
+  ]
+  if (currentFilter.value === 'application') {
+    options.push({ id: 'underReview', label: 'Under Review (Guruhlash)' })
+  }
+  if (isSelectableTab.value) {
+    options.push({ id: 'selected',    label: 'Selected (Tanlanganlar)' })
+  }
+  return options
+})
+
+watch(currentFilter, (newTab) => {
+  if (newTab === 'approved' || newTab === 'cancelled') {
+    if (sortBy.value === 'selected' || sortBy.value === 'underReview') {
+      sortBy.value = 'university'
+    }
+  } else if (newTab === 'pending') {
+    if (sortBy.value === 'underReview') {
+      sortBy.value = 'university'
+    }
+  }
+})
+
 // ─── Selection ────────────────────────────────────────────────────────────────
-const hasAnySelected = computed(() => filteredStudents.value.some(s => selectedPassports.value.has(s.passport)))
-const selectedInCurrentTab = computed(() => filteredStudents.value.filter(s => selectedPassports.value.has(s.passport)))
+const selectedInCurrentTab = computed(() => {
+  if (!isSelectableTab.value) return []
+  return filteredStudents.value.filter(s =>
+    bucketForStatus(s.status) !== 'approved' &&
+    bucketForStatus(s.status) !== 'cancelled' &&
+    selectedPassports.value.has(s.passport)
+  )
+})
+const hasAnySelected = computed(() => selectedInCurrentTab.value.length > 0)
 
 async function toggleSelect(student: VisaStudent, checked: boolean) {
+  if (!isSelectableTab.value || bucketForStatus(student.status) === 'approved' || bucketForStatus(student.status) === 'cancelled') {
+    return
+  }
   student.batch_selected = checked
   if (checked) selectedPassports.value.add(student.passport)
   else selectedPassports.value.delete(student.passport)
@@ -415,7 +466,7 @@ async function toggleSelect(student: VisaStudent, checked: boolean) {
 }
 
 async function handleDeselectAll() {
-  const toDeselect = filteredStudents.value.filter(s => selectedPassports.value.has(s.passport))
+  const toDeselect = selectedInCurrentTab.value
   for (const s of toDeselect) {
     s.batch_selected = false
     selectedPassports.value.delete(s.passport)
@@ -512,6 +563,15 @@ async function checkStudentVisa(
     if (res.rejection_reason) student.rejection_reason = res.rejection_reason
     if (res.pdf_url) student.pdf_url = res.pdf_url
     student.last_checked = new Date().toISOString()
+
+    const newBucket = bucketForStatus(student.status)
+    if (newBucket === 'approved' || newBucket === 'cancelled') {
+      if (student.batch_selected || selectedPassports.value.has(student.passport)) {
+        student.batch_selected = false
+        selectedPassports.value.delete(student.passport)
+        visaApi.updateVisaStudent(student.passport, { batch_selected: false }).catch(() => {})
+      }
+    }
 
     if (changed) {
       const exists = sessionChanges.value.some(c => c.passport === student.passport)
@@ -669,7 +729,7 @@ async function runBatchCheck(list: VisaStudent[]) {
 
 // Batch check selected in table
 async function handleBatchCheck() {
-  if (!selectedInCurrentTab.value.length) return
+  if (!isSelectableTab.value || !selectedInCurrentTab.value.length) return
   await runBatchCheck(selectedInCurrentTab.value)
 }
 
@@ -874,14 +934,7 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
               class="absolute left-0 mt-1 w-52 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-2xl py-2 z-40 text-xs"
             >
               <button
-                v-for="opt in [
-                  { id: 'university',  label: 'University (Guruhlash)' },
-                  { id: 'tariff',      label: 'Tariff (Guruhlash)' },
-                  { id: 'date',        label: 'Date (Guruhlash)' },
-                  { id: 'statusDate',  label: 'Status Date (Guruhlash)' },
-                  { id: 'underReview', label: 'Under Review (Guruhlash)' },
-                  { id: 'selected',    label: 'Selected (Tanlanganlar)' }
-                ]"
+                v-for="opt in sortOptions"
                 :key="opt.id"
                 type="button"
                 @click="sortBy = opt.id as any; isSortMenuOpen = false"
@@ -896,7 +949,7 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
 
         <!-- Undo (deselect) -->
         <button
-          v-if="selectedInCurrentTab.length > 0"
+          v-if="isSelectableTab && selectedInCurrentTab.length > 0"
           type="button"
           @click="handleDeselectAll"
           class="h-11 px-4 rounded-lg bg-[#FBBF24] hover:bg-[#F59E0B] text-[#0B4133] font-bold text-sm shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
@@ -906,7 +959,7 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
 
         <!-- Batch Check -->
         <button
-          v-if="selectedInCurrentTab.length > 0"
+          v-if="isSelectableTab && selectedInCurrentTab.length > 0"
           type="button"
           :disabled="batchProgress.active"
           @click="handleBatchCheck"
@@ -1044,7 +1097,7 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
                 <span v-if="st.student_id || st.id" class="text-xs text-zinc-400 font-mono">#{{ st.student_id || st.id }}</span>
               </div>
             </div>
-            <div v-if="showSelectColumn" class="flex items-center justify-center shrink-0 pt-0.5">
+            <div v-if="showSelectColumn && bucketForStatus(st.status) !== 'approved' && bucketForStatus(st.status) !== 'cancelled'" class="flex items-center justify-center shrink-0 pt-0.5">
               <input
                 type="checkbox"
                 class="size-6 rounded border-2 border-neutral-300 dark:border-neutral-600 text-blue-600 focus:ring-2 focus:ring-blue-500 cursor-pointer transition-all"
@@ -1157,7 +1210,7 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
               v-for="st in visibleStudents"
               :key="st.passport"
               class="cursor-pointer transition-colors hover:bg-blue-50/60 dark:hover:bg-white/[0.03]"
-              :class="{ 'bg-blue-50/30 dark:bg-white/[0.02]': selectedPassports.has(st.passport) }"
+              :class="{ 'bg-blue-50/30 dark:bg-white/[0.02]': showSelectColumn && selectedPassports.has(st.passport) }"
               @click="onRowClick(st, $event)"
               @contextmenu.prevent="onContextMenu(st, $event)"
             >
@@ -1245,7 +1298,7 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
 
               <!-- Select Column -->
               <td v-if="showSelectColumn" class="px-3 py-3 align-middle text-center">
-                <div class="flex items-center justify-center h-full">
+                <div v-if="bucketForStatus(st.status) !== 'approved' && bucketForStatus(st.status) !== 'cancelled'" class="flex items-center justify-center h-full">
                   <input
                     type="checkbox"
                     class="size-5 rounded border-2 border-neutral-400 dark:border-neutral-500 text-blue-600 focus:ring-2 focus:ring-blue-500 cursor-pointer"
