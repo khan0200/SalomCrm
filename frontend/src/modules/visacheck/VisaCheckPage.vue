@@ -144,6 +144,11 @@ async function loadStudents() {
     const res = await visaApi.getVisaStudents()
     students.value = res.results || []
 
+    if (detailsStudent.value) {
+      const refreshed = students.value.find(s => s.passport === detailsStudent.value?.passport)
+      if (refreshed) detailsStudent.value = refreshed
+    }
+
     // Restore selection state from database (only for active/pending, clearing stale selections on approved/cancelled)
     selectedPassports.value.clear()
     const staleApprovedPassports: string[] = []
@@ -588,6 +593,9 @@ function openDetails(student: VisaStudent) {
 
 function openEditModal(student: VisaStudent) {
   if (!authStore.canEdit) return
+  if (detailsModalOpen.value) {
+    detailsModalOpen.value = false
+  }
   editingStudent.value = student
   isAddModalOpen.value = true
 }
@@ -1480,14 +1488,6 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
 
     <!-- ── Modals ── -->
 
-    <!-- Add / Edit Student Modal -->
-    <StudentFormModal
-      :is-open="isAddModalOpen"
-      :editing-student="editingStudent"
-      @close="handleModalClose"
-      @saved="loadStudents"
-    />
-
     <!-- Student Details Modal -->
     <StudentDetailsModal
       :is-open="detailsModalOpen"
@@ -1499,6 +1499,14 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
       @refresh="checkStudentVisa"
       @download-pdf="handleDownloadPdf"
       @updated="handleStudentUpdated"
+    />
+
+    <!-- Add / Edit Student Modal -->
+    <StudentFormModal
+      :is-open="isAddModalOpen"
+      :editing-student="editingStudent"
+      @close="handleModalClose"
+      @saved="loadStudents"
     />
 
     <!-- Delete Confirm Modal -->

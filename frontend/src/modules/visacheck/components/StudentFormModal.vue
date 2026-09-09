@@ -258,7 +258,7 @@ async function handleSubmit() {
     >
       <div
         v-if="isOpen"
-        class="visacheck-page fixed inset-0 z-[60] flex items-end sm:items-center justify-center sm:p-4"
+        class="visacheck-page fixed inset-0 z-[70] flex items-end sm:items-center justify-center sm:p-4"
         @mousedown.self="emit('close')"
       >
         <!-- Backdrop -->

@@ -532,7 +532,7 @@ async function clearField(fieldName: ManagementField) {
                 <button
                   v-if="authStore.canEdit"
                   type="button"
-                  @click="emit('edit', student)"
+                  @click="emit('edit', student); emit('close')"
                   class="flex items-center gap-1.5 h-10 px-6 rounded-md border border-slate-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 font-semibold text-sm hover:bg-slate-50 dark:hover:bg-zinc-700 transition-colors cursor-pointer"
                 >
                   <Pencil class="size-4" />
