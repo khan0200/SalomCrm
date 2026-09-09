@@ -20,6 +20,7 @@ import VisaTypeBadge from './components/VisaTypeBadge.vue'
 import CopyField from './components/CopyField.vue'
 import { formatTimestampCompact } from './useTimeAgo'
 import { parseRejectionReasons } from './utils/rejectionParser'
+import { getStatusAppliedDate } from './utils/statusDateHelper'
 
 const uiStore = useUiStore()
 const dashboardStore = useStudentDashboardStore()
@@ -44,9 +45,37 @@ const isAddModalOpen = computed({
   set: (v) => { dashboardStore.isAddStudentModalOpen = v }
 })
 
-type SortOption = 'university' | 'tariff' | 'date' | 'statusDate' | 'underReview' | 'selected'
+type SortOption = 'university' | 'tariff' | 'date' | 'statusDate' | 'statusDateDesc' | 'statusDateAsc' | 'underReview' | 'selected'
 const sortBy = ref<SortOption>('university')
 const isSortMenuOpen = ref(false)
+
+function normalizeDateStr(d: string | null | undefined): string {
+  if (!d) return ''
+  return d.trim().replace(/[./]/g, '-')
+}
+
+function compareStatusDates(dateA?: string, dateB?: string, direction: 'desc' | 'asc' = 'desc'): number {
+  const normA = normalizeDateStr(dateA)
+  const normB = normalizeDateStr(dateB)
+
+  if (!normA && !normB) return 0
+  if (!normA) return 1  // items without date always go to bottom
+  if (!normB) return -1 // items without date always go to bottom
+
+  const scoreA = Date.parse(normA)
+  const scoreB = Date.parse(normB)
+
+  let cmp = 0
+  if (!isNaN(scoreA) && !isNaN(scoreB)) {
+    cmp = scoreA - scoreB
+  } else {
+    cmp = normA.localeCompare(normB)
+  }
+
+  // direction: 'desc' means newest first (scoreB - scoreA, so cmp < 0)
+  // direction: 'asc' means oldest first (scoreA - scoreB, so cmp > 0)
+  return direction === 'desc' ? -cmp : cmp
+}
 
 const students = ref<VisaStudent[]>([])
 const isLoading = ref(true)
@@ -298,10 +327,19 @@ const filteredStudents = computed(() => {
     if (a.pinned && !b.pinned) return -1
     if (!a.pinned && b.pinned) return 1
 
+    if (sortBy.value === 'statusDateDesc') {
+      const cmp = compareStatusDates(a.status_date, b.status_date, 'desc')
+      if (cmp !== 0) return cmp
+    }
+
+    if (sortBy.value === 'statusDateAsc') {
+      const cmp = compareStatusDates(a.status_date, b.status_date, 'asc')
+      if (cmp !== 0) return cmp
+    }
+
     if (sortBy.value === 'statusDate') {
-      const dateA = a.status_date || '9999-99-99'
-      const dateB = b.status_date || '9999-99-99'
-      if (dateA !== dateB) return dateB.localeCompare(dateA)
+      const cmp = compareStatusDates(a.status_date, b.status_date, 'desc')
+      if (cmp !== 0) return cmp
     }
 
     // Compare case-insensitively so differently-cased spellings of one name stay
@@ -325,7 +363,7 @@ const hasAnyGroup = computed(() => {
   if (sort === 'university') return filteredStudents.value.some(s => !!s.university)
   if (sort === 'tariff') return filteredStudents.value.some(s => !!s.tariff)
   if (sort === 'date') return filteredStudents.value.some(s => !!s.application_date)
-  if (sort === 'statusDate') return filteredStudents.value.some(s => !!s.status_date)
+  if (sort === 'statusDate' || sort === 'statusDateDesc' || sort === 'statusDateAsc') return filteredStudents.value.some(s => !!s.status_date)
   if (sort === 'underReview') return filteredStudents.value.some(s => (s.status || '').toUpperCase().includes('REVIEW') || (s.status || '').toUpperCase().includes('SUPPLEM'))
   return false
 })
@@ -363,7 +401,7 @@ const groupedStudents = computed((): { groupName: string; students: VisaStudent[
     if (sort === 'university') raw = s.university?.trim() || ''
     else if (sort === 'tariff') raw = s.tariff?.trim() || ''
     else if (sort === 'date') raw = s.application_date?.trim() || ''
-    else if (sort === 'statusDate') raw = s.status_date?.trim() || ''
+    else if (sort === 'statusDate' || sort === 'statusDateDesc' || sort === 'statusDateAsc') raw = s.status_date?.trim() || ''
     else if (sort === 'underReview') {
       const st = (s.status || '').toUpperCase()
       if (st.includes('SUPPLEM') && st.includes('SUBMIT')) raw = 'Supplement Submitted'
@@ -396,6 +434,12 @@ const groupedStudents = computed((): { groupName: string; students: VisaStudent[
       }
       if (a === '') return 1
       if (b === '') return -1
+      if (sort === 'statusDateDesc') {
+        return compareStatusDates(a, b, 'desc')
+      }
+      if (sort === 'statusDateAsc') {
+        return compareStatusDates(a, b, 'asc')
+      }
       return a.localeCompare(b)
     })
     .map(([, group]) => ({ groupName: group.label, students: group.students }))
@@ -412,6 +456,16 @@ const showStatusDateColumn = computed(() => !searchQuery.value.trim() && current
 
 // ─── Sort Options per Tab ─────────────────────────────────────────────────────
 const sortOptions = computed(() => {
+  if (currentFilter.value === 'approved') {
+    return [
+      { id: 'statusDateDesc' as SortOption, label: 'Status tepaga' },
+      { id: 'statusDateAsc' as SortOption,  label: 'Status pastga' },
+      { id: 'university' as SortOption,     label: 'University (Guruhlash)' },
+      { id: 'tariff' as SortOption,         label: 'Tariff (Guruhlash)' },
+      { id: 'date' as SortOption,           label: 'Date (Guruhlash)' }
+    ]
+  }
+
   const options: { id: SortOption; label: string }[] = [
     { id: 'university',  label: 'University (Guruhlash)' },
     { id: 'tariff',      label: 'Tariff (Guruhlash)' },
@@ -427,13 +481,41 @@ const sortOptions = computed(() => {
   return options
 })
 
+const currentSortLabel = computed(() => {
+  if (sortBy.value === 'statusDateDesc') return 'Status tepaga'
+  if (sortBy.value === 'statusDateAsc') return 'Status pastga'
+  if (sortBy.value === 'statusDate') return 'Status Date'
+  if (sortBy.value === 'university') return 'University'
+  if (sortBy.value === 'tariff') return 'Tariff'
+  if (sortBy.value === 'date') return 'Date'
+  if (sortBy.value === 'underReview') return 'Under Review'
+  if (sortBy.value === 'selected') return 'Selected'
+  return String(sortBy.value)
+})
+
+function toggleStatusDateSort() {
+  if (sortBy.value === 'statusDateDesc') {
+    sortBy.value = 'statusDateAsc'
+  } else {
+    sortBy.value = 'statusDateDesc'
+  }
+}
+
 watch(currentFilter, (newTab) => {
-  if (newTab === 'approved' || newTab === 'cancelled') {
-    if (sortBy.value === 'selected' || sortBy.value === 'underReview') {
+  if (newTab === 'approved') {
+    if (sortBy.value === 'selected' || sortBy.value === 'underReview' || sortBy.value === 'statusDate') {
+      sortBy.value = 'statusDateDesc'
+    }
+  } else if (newTab === 'cancelled') {
+    if (sortBy.value === 'selected' || sortBy.value === 'underReview' || sortBy.value === 'statusDateDesc' || sortBy.value === 'statusDateAsc') {
       sortBy.value = 'university'
     }
   } else if (newTab === 'pending') {
-    if (sortBy.value === 'underReview') {
+    if (sortBy.value === 'underReview' || sortBy.value === 'statusDateDesc' || sortBy.value === 'statusDateAsc') {
+      sortBy.value = 'university'
+    }
+  } else if (newTab === 'application') {
+    if (sortBy.value === 'statusDateDesc' || sortBy.value === 'statusDateAsc') {
       sortBy.value = 'university'
     }
   }
@@ -918,7 +1000,7 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
             class="h-11 px-4 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200 font-bold text-sm flex items-center gap-2 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors shadow-xs cursor-pointer"
           >
             <ArrowUpDown class="size-4 text-zinc-400" />
-            <span>Sort: <span class="text-blue-600 dark:text-blue-400 capitalize">{{ sortBy }}</span></span>
+            <span>Sort: <span class="text-blue-600 dark:text-blue-400 font-semibold">{{ currentSortLabel }}</span></span>
             <ChevronDown class="size-3.5 text-zinc-400" />
           </button>
           <Transition
@@ -1040,6 +1122,7 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
         :group-name="group.groupName"
         :students="group.students"
         :current-filter="currentFilter"
+        :sort-by="sortBy"
         :checking-passports="checkingPassports"
         :selected-passports="selectedPassports"
         :downloading-passports="downloadingPassports"
@@ -1054,6 +1137,7 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
         @toggle-flag="handleFlagToggle"
         @deselect-group="handleDeselectGroup"
         @contextmenu="onContextMenu"
+        @toggle-status-date-sort="toggleStatusDateSort"
       />
     </div>
 
@@ -1113,7 +1197,15 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
               <CopyField :value="st.passport" label="Copy passport" class="font-bold font-mono text-zinc-700 dark:text-zinc-300">{{ st.passport }}</CopyField>
               <CopyField :value="st.birthday" label="Copy birthday" class="text-xs font-bold font-mono text-zinc-400 mt-0.5">{{ st.birthday }}</CopyField>
             </div>
-            <StatusBadge :status="getStudentVisaStatus(st)" />
+            <div class="flex flex-col items-end gap-0.5">
+              <StatusBadge :status="getStudentVisaStatus(st)" />
+              <span
+                v-if="getStatusAppliedDate(st, getStudentVisaStatus(st))"
+                class="text-[10px] font-mono text-zinc-400 dark:text-zinc-500 font-medium tracking-tight pr-0.5"
+              >
+                {{ getStatusAppliedDate(st, getStudentVisaStatus(st)) }}
+              </span>
+            </div>
           </div>
 
           <!-- Rejection reasons in mobile card -->
@@ -1136,7 +1228,8 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
           </div>
 
           <div class="flex items-center justify-between text-xs text-zinc-400">
-            <span v-if="showAppliedColumn">Applied: {{ st.application_date || st.created_at?.slice(0, 10) || '--' }}</span>
+            <span v-if="showStatusDateColumn">Status: <strong class="text-emerald-600 dark:text-emerald-400 font-mono">{{ st.status_date || '--' }}</strong></span>
+            <span v-else-if="showAppliedColumn">Applied: {{ st.application_date || st.created_at?.slice(0, 10) || '--' }}</span>
             <span v-if="checkingPassports.has(st.passport)" class="inline-flex items-center gap-1 text-blue-600 dark:text-blue-400 font-medium">
               <RefreshCw class="size-3 animate-spin" />Checking...
             </span>
@@ -1181,7 +1274,19 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
               <th class="px-4 py-2 w-36">Passport</th>
               <th class="px-4 py-2 w-36">Status</th>
               <th v-if="showAppliedColumn" class="px-3 py-2 w-28 text-center">Applied</th>
-              <th v-if="showStatusDateColumn" class="px-3 py-2 w-32 text-center">Status Date</th>
+              <th
+                v-if="showStatusDateColumn"
+                class="px-3 py-2 w-32 text-center cursor-pointer hover:bg-neutral-200/70 dark:hover:bg-white/10 transition-colors select-none"
+                :title="sortBy === 'statusDateDesc' ? 'Status tepaga (bosilsa: Status pastga)' : 'Status pastga (bosilsa: Status tepaga)'"
+                @click="toggleStatusDateSort"
+              >
+                <div class="inline-flex items-center justify-center gap-1">
+                  <span>Status Date</span>
+                  <span v-if="sortBy === 'statusDateDesc'" class="text-blue-600 dark:text-blue-400 font-bold text-xs" title="Status tepaga">↑</span>
+                  <span v-else-if="sortBy === 'statusDateAsc'" class="text-blue-600 dark:text-blue-400 font-bold text-xs" title="Status pastga">↓</span>
+                  <ArrowUpDown v-else class="size-3 text-zinc-400 opacity-60" />
+                </div>
+              </th>
               <th v-else class="px-3 py-2 w-36 text-center">Checked</th>
               <th v-if="showSelectColumn" class="px-3 py-2 w-20 text-center align-middle">
                 <div class="flex items-center justify-center gap-1.5">
@@ -1271,7 +1376,15 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
 
               <!-- Status Column -->
               <td class="px-4 py-3 align-middle whitespace-nowrap">
-                <StatusBadge :status="getStudentVisaStatus(st)" />
+                <div class="inline-flex flex-col items-start gap-0.5">
+                  <StatusBadge :status="getStudentVisaStatus(st)" />
+                  <span
+                    v-if="getStatusAppliedDate(st, getStudentVisaStatus(st))"
+                    class="text-[11px] font-mono text-zinc-400 dark:text-zinc-500 font-medium tracking-tight pl-0.5"
+                  >
+                    {{ getStatusAppliedDate(st, getStudentVisaStatus(st)) }}
+                  </span>
+                </div>
               </td>
 
               <!-- Applied Column -->

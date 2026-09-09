@@ -2,7 +2,7 @@
 import { ref, computed } from 'vue'
 import {
   Building2, Tag, Calendar, Eye, AlertCircle, RefreshCw, ChevronDown, FileCheck,
-  Pin, Check, X, FileDown, AlertTriangle
+  Pin, Check, X, FileDown, AlertTriangle, ArrowUpDown
 } from 'lucide-vue-next'
 import type { VisaStudent } from '@/api/visa'
 import { useUiStore } from '@/stores/ui'
@@ -11,11 +11,13 @@ import VisaTypeBadge from './VisaTypeBadge.vue'
 import CopyField from './CopyField.vue'
 import { formatTimestampCompact } from '../useTimeAgo'
 import { parseRejectionReasons } from '../utils/rejectionParser'
+import { getStatusAppliedDate } from '../utils/statusDateHelper'
 
 const props = defineProps<{
   groupName: string
   students: VisaStudent[]
   currentFilter: string
+  sortBy?: string
   checkingPassports: Map<string, 'queued' | 'processing'>
   selectedPassports: Set<string>
   downloadingPassports: Set<string>
@@ -33,6 +35,7 @@ const emit = defineEmits<{
   (e: 'toggle-flag', student: VisaStudent): void
   (e: 'deselect-group', students: VisaStudent[]): void
   (e: 'contextmenu', student: VisaStudent, event: MouseEvent): void
+  (e: 'toggle-status-date-sort'): void
 }>()
 
 const uiStore = useUiStore()
@@ -196,7 +199,15 @@ const groupHasSelected = computed(() =>
               <CopyField :value="st.passport" label="Copy passport" class="font-bold font-mono text-zinc-700 dark:text-zinc-300">{{ st.passport }}</CopyField>
               <CopyField :value="st.birthday" label="Copy birthday" class="text-xs font-bold font-mono text-zinc-400 mt-0.5">{{ st.birthday }}</CopyField>
             </div>
-            <StatusBadge :status="getStudentVisaStatus(st)" />
+            <div class="flex flex-col items-end gap-0.5">
+              <StatusBadge :status="getStudentVisaStatus(st)" />
+              <span
+                v-if="getStatusAppliedDate(st, getStudentVisaStatus(st))"
+                class="text-[10px] font-mono text-zinc-400 dark:text-zinc-500 font-medium tracking-tight pr-0.5"
+              >
+                {{ getStatusAppliedDate(st, getStudentVisaStatus(st)) }}
+              </span>
+            </div>
           </div>
 
           <!-- Rejection reasons in mobile card -->
@@ -219,7 +230,8 @@ const groupHasSelected = computed(() =>
           </div>
 
           <div class="flex items-center justify-between text-xs text-zinc-400">
-            <span v-if="showAppliedColumn">Applied: {{ st.application_date || st.created_at?.slice(0, 10) || '--' }}</span>
+            <span v-if="showStatusDateColumn">Status: <strong class="text-emerald-600 dark:text-emerald-400 font-mono">{{ st.status_date || '--' }}</strong></span>
+            <span v-else-if="showAppliedColumn">Applied: {{ st.application_date || st.created_at?.slice(0, 10) || '--' }}</span>
             <span v-if="checkingPassports.has(st.passport)" class="inline-flex items-center gap-1 text-blue-600 dark:text-blue-400 font-medium">
               <RefreshCw class="size-3 animate-spin" />Checking...
             </span>
@@ -257,7 +269,19 @@ const groupHasSelected = computed(() =>
               <th class="px-4 py-2 w-36">Passport</th>
               <th class="px-4 py-2 w-36">Status</th>
               <th v-if="showAppliedColumn" class="px-3 py-2 w-28 text-center">Applied</th>
-              <th v-if="showStatusDateColumn" class="px-3 py-2 w-32 text-center">Status Date</th>
+              <th
+                v-if="showStatusDateColumn"
+                class="px-3 py-2 w-32 text-center cursor-pointer hover:bg-neutral-200/70 dark:hover:bg-white/10 transition-colors select-none"
+                :title="props.sortBy === 'statusDateDesc' ? 'Status tepaga (bosilsa: Status pastga)' : 'Status pastga (bosilsa: Status tepaga)'"
+                @click="emit('toggle-status-date-sort')"
+              >
+                <div class="inline-flex items-center justify-center gap-1">
+                  <span>Status Date</span>
+                  <span v-if="props.sortBy === 'statusDateDesc'" class="text-blue-600 dark:text-blue-400 font-bold text-xs" title="Status tepaga">↑</span>
+                  <span v-else-if="props.sortBy === 'statusDateAsc'" class="text-blue-600 dark:text-blue-400 font-bold text-xs" title="Status pastga">↓</span>
+                  <ArrowUpDown v-else class="size-3 text-zinc-400 opacity-60" />
+                </div>
+              </th>
               <th v-else class="px-3 py-2 w-36 text-center">Checked</th>
               <th v-if="showSelectColumn" class="px-3 py-2 w-20 text-center align-middle">
                 <div class="flex items-center justify-center gap-1.5">
@@ -343,7 +367,15 @@ const groupHasSelected = computed(() =>
 
               <!-- Status Column -->
               <td class="px-4 py-3 align-middle whitespace-nowrap">
-                <StatusBadge :status="getStudentVisaStatus(st)" />
+                <div class="inline-flex flex-col items-start gap-0.5">
+                  <StatusBadge :status="getStudentVisaStatus(st)" />
+                  <span
+                    v-if="getStatusAppliedDate(st, getStudentVisaStatus(st))"
+                    class="text-[11px] font-mono text-zinc-400 dark:text-zinc-500 font-medium tracking-tight pl-0.5"
+                  >
+                    {{ getStatusAppliedDate(st, getStudentVisaStatus(st)) }}
+                  </span>
+                </div>
               </td>
 
               <!-- Applied Column -->
