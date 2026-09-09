@@ -149,12 +149,43 @@ def notify_new_registration(student: Any) -> None:
     except Exception as e:
         logger.error(f"Failed to create new registration telegram message: {e}")
 
+def resolve_student_id(payment: Any = None, student: Optional[Any] = None) -> str:
+    """
+    Extract the human-readable student ID (e.g. 'G45') rather than the internal
+    payment anchor (e.g. 'PG45').
+    """
+    student_obj = student or getattr(payment, 'student', None)
+    if student_obj and getattr(student_obj, 'id', None):
+        return str(student_obj.id).strip()
+
+    raw_pid = getattr(payment, 'student_id', None)
+    if raw_pid is None and isinstance(payment, dict):
+        raw_pid = payment.get('student_id')
+
+    if raw_pid:
+        try:
+            from apps.students.models import Student
+            st = Student.objects.filter(payment_id=raw_pid).only('id').first()
+            if st and st.id:
+                return str(st.id).strip()
+        except Exception:
+            pass
+
+        s_raw = str(raw_pid).strip()
+        # In Uniapp, student payment_id is created as 'P' + student.id (e.g. 'PG45' for 'G45').
+        # If DB query was unavailable or student record was removed, strip leading 'P' fallback.
+        if s_raw.startswith('P') and len(s_raw) > 1:
+            return s_raw[1:]
+        return s_raw
+
+    return "-"
+
 # ── 2. Payment Received Notification ──────────────────────────────────────────
 def notify_payment_received(payment: Any, student: Optional[Any] = None) -> None:
     try:
         student_obj = student or getattr(payment, 'student', None)
-        safe_id = escape_html(payment.student_id or (student_obj.id if student_obj else "-"))
-        safe_name = escape_html(payment.student_name or (student_obj.full_name if student_obj else "Unknown"))
+        safe_id = escape_html(resolve_student_id(payment, student_obj))
+        safe_name = escape_html((student_obj.full_name if student_obj else None) or getattr(payment, 'student_name', None) or "Unknown")
 
         tariff_name = "-"
         if student_obj and student_obj.tariff:
@@ -193,8 +224,8 @@ def notify_payment_received(payment: Any, student: Optional[Any] = None) -> None
 def notify_discount_added(payment: Any, student: Optional[Any] = None) -> None:
     try:
         student_obj = student or getattr(payment, 'student', None)
-        safe_id = escape_html(payment.student_id or (student_obj.id if student_obj else "-"))
-        safe_name = escape_html(payment.student_name or (student_obj.full_name if student_obj else "Unknown"))
+        safe_id = escape_html(resolve_student_id(payment, student_obj))
+        safe_name = escape_html((student_obj.full_name if student_obj else None) or getattr(payment, 'student_name', None) or "Unknown")
 
         amount_str = format_uzs(payment.amount)
         balance_str = format_uzs_signed(student_obj.balance) if student_obj and student_obj.balance is not None else "-"
@@ -218,8 +249,8 @@ def notify_discount_added(payment: Any, student: Optional[Any] = None) -> None:
 def notify_withdrawal(payment: Any, student: Optional[Any] = None) -> None:
     try:
         student_obj = student or getattr(payment, 'student', None)
-        safe_id = escape_html(payment.student_id or (student_obj.id if student_obj else "-"))
-        safe_name = escape_html(payment.student_name or (student_obj.full_name if student_obj else "General Withdrawal"))
+        safe_id = escape_html(resolve_student_id(payment, student_obj))
+        safe_name = escape_html((student_obj.full_name if student_obj else None) or getattr(payment, 'student_name', None) or "General Withdrawal")
 
         amount_str = format_uzs(payment.amount)
         balance_str = format_uzs_signed(student_obj.balance) if student_obj and student_obj.balance is not None else "-"
@@ -243,8 +274,8 @@ def notify_withdrawal(payment: Any, student: Optional[Any] = None) -> None:
 def notify_payment_deleted(payment: Any, student: Optional[Any] = None) -> None:
     try:
         student_obj = student or getattr(payment, 'student', None)
-        safe_id = escape_html(payment.student_id or (student_obj.id if student_obj else "-"))
-        safe_name = escape_html(payment.student_name or (student_obj.full_name if student_obj else "Unknown"))
+        safe_id = escape_html(resolve_student_id(payment, student_obj))
+        safe_name = escape_html((student_obj.full_name if student_obj else None) or getattr(payment, 'student_name', None) or "Unknown")
 
         amount_str = format_uzs(payment.amount)
         balance_str = format_uzs_signed(student_obj.balance) if student_obj and student_obj.balance is not None else "-"
