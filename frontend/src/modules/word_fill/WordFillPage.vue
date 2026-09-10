@@ -645,16 +645,22 @@ const handleGenerate = async () => {
       ? `Filled_${uploadedFile.value.name.replace(/\.[^/.]+$/, '')}_${count}ta.zip`
       : filenamePreview.value
 
-    downloadedFileName.value = fileName
-
-    const url = window.URL.createObjectURL(blob)
+    const mimeType = fileName.endsWith('.zip') ? 'application/zip' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    const file = new File([blob], fileName, { type: mimeType })
+    const url = window.URL.createObjectURL(file)
     const link = document.createElement('a')
     link.href = url
+    link.setAttribute('download', fileName)
     link.download = fileName
+    link.style.display = 'none'
     document.body.appendChild(link)
     link.click()
-    document.body.removeChild(link)
-    window.URL.revokeObjectURL(url)
+    setTimeout(() => {
+      if (document.body.contains(link)) {
+        document.body.removeChild(link)
+      }
+      window.URL.revokeObjectURL(url)
+    }, 2000)
 
     generationSuccess.value = true
   } catch (err: any) {
@@ -728,8 +734,9 @@ const resetWizard = () => {
       </div>
     </header>
 
-    <main class="flex-1 overflow-y-auto p-6 scrollbar-thin">
-      <div class="max-w-6xl mx-auto">
+    <!-- Main Content Area -->
+    <main class="flex-1 overflow-y-auto p-4 sm:p-6 scrollbar-thin">
+      <div class="w-full max-w-[1800px] mx-auto">
         <!-- ═══════════════════ STEP 1: UPLOAD ═══════════════════ -->
         <div v-if="currentStep === 1" class="space-y-6">
           <div

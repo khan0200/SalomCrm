@@ -107,6 +107,35 @@ class TestExcelFillFieldsAndMatching(unittest.TestCase):
         self.assertEqual(match_column_field('Test Date')[0], 'certificate_test_date')
         self.assertEqual(match_column_field('응시일')[0], 'certificate_test_date')
 
+    def test_semantic_matching_phone_sequence_and_certificates(self):
+        # Mobile number and phone variations
+        self.assertEqual(match_column_field('Mobile number')[0], 'phone1')
+        self.assertEqual(match_column_field('Mobile Phone')[0], 'phone1')
+        self.assertEqual(match_column_field('Cell phone')[0], 'phone1')
+        self.assertEqual(match_column_field('H.P')[0], 'phone1')
+        self.assertEqual(match_column_field('휴대폰')[0], 'phone1')
+        self.assertEqual(match_column_field('휴대전화')[0], 'phone1')
+        self.assertEqual(match_column_field('핸드폰')[0], 'phone1')
+        self.assertEqual(match_column_field('Telefon raqam')[0], 'phone1')
+        self.assertEqual(match_column_field('Мобильный телефон')[0], 'phone1')
+
+        # Sequence numbers including Korean '연번'
+        self.assertEqual(match_column_field('연번')[0], '_sequence_no')
+        self.assertEqual(match_column_field('연번 (No)')[0], '_sequence_no')
+        self.assertEqual(match_column_field('순번 (No)')[0], '_sequence_no')
+        self.assertEqual(match_column_field('No.')[0], '_sequence_no')
+        self.assertEqual(match_column_field('T/R')[0], '_sequence_no')
+        self.assertEqual(match_column_field('Tartib raqam')[0], '_sequence_no')
+
+        # Certificates & Tests
+        self.assertEqual(match_column_field('SAT')[0], 'language_certificate')
+        self.assertEqual(match_column_field('SAT score')[0], 'certificate_score')
+
+        # Parent and emergency phones
+        self.assertEqual(match_column_field("Father's Mobile")[0], 'father_phone')
+        self.assertEqual(match_column_field("Mother's Mobile")[0], 'mother_phone')
+        self.assertEqual(match_column_field("Emergency Phone")[0], 'phone2')
+
 
 class TestExcelFormattingAndGeneration(unittest.TestCase):
     def test_date_formatting_for_all_date_fields(self):
@@ -200,6 +229,23 @@ class TestExcelFormattingAndGeneration(unittest.TestCase):
         self.assertEqual(filled_ws.cell(2, 4).value, "2020.09.02")
         self.assertEqual(filled_ws.cell(2, 5).value, "2024.06.25")
         self.assertEqual(filled_ws.cell(2, 6).value, "B1234567")
+
+    def test_extract_city_and_state(self):
+        from apps.students.excel_fill_service import extract_city_and_state
+        # Test Tashkent city + Sergeli district
+        city, state = extract_city_and_state("TASHKENT CITY, SERGELI DISTRICT, 4-MAVZE, 25-HOUSE")
+        self.assertEqual(city, "Sergeli")
+        self.assertEqual(state, "Tashkent")
+
+        # Test Jizzakh region + Bakhmal district
+        city2, state2 = extract_city_and_state("JIZZAKH REGION ; BAKHMAL DISTRICT ; NOVKA MFY")
+        self.assertEqual(city2, "Bakhmal")
+        self.assertEqual(state2, "Jizzakh")
+
+        # Test simple Tashkent city
+        city3, state3 = extract_city_and_state("Tashkent city")
+        self.assertEqual(city3, "Tashkent")
+        self.assertEqual(state3, "Tashkent")
 
 
 if __name__ == '__main__':

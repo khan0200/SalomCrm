@@ -1669,13 +1669,17 @@ class ExcelFillGenerateView(APIView):
             )
 
             original_name = os.path.splitext(file_obj.name)[0]
-            export_filename = f"Filled_{original_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+            clean_name = re.sub(r'[^\w\s\.-]', '_', original_name).strip()
+            export_filename = f"Filled_{clean_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+            
+            from urllib.parse import quote
+            safe_ascii_name = re.sub(r'[^\w\.-]', '_', export_filename)
             
             response = HttpResponse(
                 output_stream.getvalue(),
                 content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
             )
-            response['Content-Disposition'] = f'attachment; filename="{export_filename}"'
+            response['Content-Disposition'] = f'attachment; filename="{safe_ascii_name}"; filename*=UTF-8\'\'{quote(export_filename)}'
             response['Access-Control-Expose-Headers'] = 'Content-Disposition'
             return response
         except Exception as e:

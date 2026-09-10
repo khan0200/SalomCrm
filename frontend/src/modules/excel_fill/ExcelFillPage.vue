@@ -28,7 +28,10 @@ import {
   Award,
   Contact,
   Bookmark,
-  X
+  X,
+  Table,
+  ListFilter,
+  LayoutGrid
 } from 'lucide-vue-next'
 import { excelFillApi, type ExcelAnalysisResult, type ColumnMappingConfig, type ExcelSheet } from '@/api/excelFill'
 import { studentsApi } from '@/api/students'
@@ -48,7 +51,9 @@ const isDragging = ref(false)
 
 // ─── Mappings State ─────────────────────────────────────────────────────────
 const columnMappings = ref<ColumnMappingConfig[]>([])
-const onlyMappedFilter = ref(false)
+const mappingFilterTab = ref<'all' | 'mapped' | 'skipped'>('all')
+const sortMappedFirst = ref(false)
+const step2ViewMode = ref<'grid' | 'table' | 'cards'>('grid')
 
 // ─── Student Selection State & Advanced Filters ─────────────────────────────
 const searchType = ref<'all' | 'id' | 'name' | 'phone' | 'university'>('all')
@@ -548,7 +553,10 @@ const KOREAN_HEADER_TRANSLATIONS: Record<string, string> = {
   '연락처': 'Contact / Phone',
   '본인연락처': 'Student Phone',
   '휴대전화': 'Mobile Phone',
+  '휴대전화번호': 'Mobile Phone Number',
   '휴대폰': 'Mobile Phone',
+  '핸드폰': 'Mobile Phone',
+  '핸드폰번호': 'Mobile Phone Number',
   '비상연락처': 'Emergency Contact',
   '보호자연락처': 'Guardian Contact',
   '이메일': 'Email Address',
@@ -677,25 +685,53 @@ const getHeaderDisplayInfo = (header: string) => {
   }
 }
 
-// ─── Visible Mappings: Skipped columns shown at the end ─────────────────────
+// ─── Visible Mappings: Natural Excel column sequence by default ─────────────
 const visibleMappings = computed(() => {
   let list = [...columnMappings.value.filter(m => m.header_name && m.header_name.trim() !== '')]
-  if (onlyMappedFilter.value) {
+  
+  if (mappingFilterTab.value === 'mapped') {
     list = list.filter(m => m.field !== '_skip')
+  } else if (mappingFilterTab.value === 'skipped') {
+    list = list.filter(m => m.field === '_skip')
   }
 
-  // Sort so that mapped columns come first (sorted by col_idx), then skipped columns come at the end
+  // Preserve natural Excel sheet column order (A, B, C, D, E...) by default
+  // Only group mapped to top if user explicitly enables sortMappedFirst
   list.sort((a, b) => {
-    const aSkipped = a.field === '_skip' ? 1 : 0
-    const bSkipped = b.field === '_skip' ? 1 : 0
-    if (aSkipped !== bSkipped) {
-      return aSkipped - bSkipped
+    if (sortMappedFirst.value) {
+      const aSkipped = a.field === '_skip' ? 1 : 0
+      const bSkipped = b.field === '_skip' ? 1 : 0
+      if (aSkipped !== bSkipped) {
+        return aSkipped - bSkipped
+      }
     }
     return a.col_idx - b.col_idx
   })
 
   return list
 })
+
+// Rows from template preview after header row (for Step 2 table preview)
+const dataPreviewRows = computed(() => {
+  if (!currentSheet.value?.preview_rows) return []
+  const headerRowIdx = currentSheet.value.detected_header_row
+  const rowsAfterHeader = currentSheet.value.preview_rows.filter(r => r.row_idx > headerRowIdx)
+  if (rowsAfterHeader.length > 0) {
+    return rowsAfterHeader
+  }
+  return currentSheet.value.preview_rows.filter(r => r.row_idx !== headerRowIdx)
+})
+
+// Sample value getter for a column
+const getColumnSampleValue = (colIdx: number): string => {
+  if (!currentSheet.value) return ''
+  const col = currentSheet.value.columns.find(c => c.col_idx === colIdx)
+  if (col?.sample_value) return col.sample_value
+  const headerRowIdx = currentSheet.value.detected_header_row
+  const nextRow = currentSheet.value.preview_rows?.find(r => r.row_idx > headerRowIdx)
+  if (nextRow && nextRow.values[colIdx - 1]) return nextRow.values[colIdx - 1]
+  return ''
+}
 
 // All supported date fields that should display date format dropdown
 const DATE_FIELDS = [
@@ -858,7 +894,7 @@ const handleGenerateExcel = async (targetFileName?: string) => {
   generationSuccess.value = false
 
   try {
-    const blob = await excelFillApi.generateFilledExcel({
+    const res = await excelFillApi.generateFilledExcel({
       file: uploadedFile.value,
       sheet_name: selectedSheetName.value,
       column_mappings: columnMappings.value,
@@ -868,7 +904,7 @@ const handleGenerateExcel = async (targetFileName?: string) => {
       auto_increment_sequence: autoIncrementSeq.value,
     })
 
-    let fileName = targetFileName
+    let fileName = targetFileName || res.fileName
     if (!fileName) {
       const originalName = uploadedFile.value.name.replace(/\.[^/.]+$/, '')
       fileName = `Filled_${originalName}_${new Date().toISOString().slice(0, 10)}.xlsx`
@@ -878,15 +914,27 @@ const handleGenerateExcel = async (targetFileName?: string) => {
     }
     downloadedFileName.value = fileName
 
-    const url = window.URL.createObjectURL(blob)
+    // Create a File object with explicit MIME type.
+    // In Chromium/Edge, Blob object URLs without a File wrapper or explicit MIME type
+    // frequently cause the browser to ignore the download attribute and save as GUID.
+    const file = new File([res.blob], fileName, {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    })
+    const url = window.URL.createObjectURL(file)
     downloadUrl.value = url
 
     const link = document.createElement('a')
     link.href = url
+    link.setAttribute('download', fileName)
     link.download = fileName
+    link.style.display = 'none'
     document.body.appendChild(link)
     link.click()
-    document.body.removeChild(link)
+    setTimeout(() => {
+      if (document.body.contains(link)) {
+        document.body.removeChild(link)
+      }
+    }, 1000)
 
     generationSuccess.value = true
   } catch (err: any) {
@@ -968,8 +1016,8 @@ const resetWizard = () => {
     </header>
 
     <!-- Main Content Area -->
-    <main class="flex-1 overflow-y-auto p-6 scrollbar-thin">
-      <div class="max-w-6xl mx-auto">
+    <main class="flex-1 overflow-y-auto p-4 sm:p-6 scrollbar-thin">
+      <div class="w-full max-w-[1800px] mx-auto">
         <!-- ═════════════════════════════════════════════════════════════════════ -->
         <!-- STEP 1: UPLOAD TEMPLATE & INSPECT -->
         <!-- ═════════════════════════════════════════════════════════════════════ -->
@@ -1081,7 +1129,7 @@ const resetWizard = () => {
                 </span>
               </div>
 
-              <div class="border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-x-auto max-h-64 scrollbar-thin">
+              <div class="border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-x-auto max-h-80 scrollbar-thin">
                 <table class="w-full text-[11px] border-collapse">
                   <!-- Excel Column Header Row: A, B, C, D... -->
                   <thead class="sticky top-0 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 font-mono font-bold select-none border-b border-zinc-200 dark:border-zinc-700 z-10">
@@ -1139,35 +1187,435 @@ const resetWizard = () => {
         <!-- ═════════════════════════════════════════════════════════════════════ -->
         <div v-if="currentStep === 2" class="space-y-5">
           <!-- Filter & Stats Bar -->
-          <div class="bg-white dark:bg-[#111315] border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 flex items-center justify-between">
-            <div class="flex items-center gap-4 text-xs">
-              <span class="font-bold text-zinc-800 dark:text-zinc-200">
-                Ustunlar tahlili:
-              </span>
-              <span class="px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 font-bold border border-emerald-200 dark:border-emerald-800">
-                {{ mappedCount }} ta to'ldiriladi
-              </span>
-              <span class="px-2.5 py-1 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 font-medium">
-                {{ skippedCount }} ta o'tkazib yuboriladi
-              </span>
+          <div class="bg-white dark:bg-[#111315] border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3">
+            <!-- Left: Tab Pills (All / Mapped / Skipped) -->
+            <div class="flex items-center gap-2">
+              <button
+                type="button"
+                @click="mappingFilterTab = 'all'"
+                class="px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+                :class="mappingFilterTab === 'all'
+                  ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 shadow-sm'
+                  : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200/70 dark:hover:bg-zinc-700/70'"
+              >
+                <span>Barchasi</span>
+                <span class="px-1.5 py-0.5 rounded-md text-[10px] font-mono" :class="mappingFilterTab === 'all' ? 'bg-zinc-700 text-zinc-200 dark:bg-zinc-200 dark:text-zinc-800' : 'bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300'">
+                  {{ columnMappings.length }}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                @click="mappingFilterTab = 'mapped'"
+                class="px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+                :class="mappingFilterTab === 'mapped'
+                  ? 'bg-emerald-600 text-white shadow-sm'
+                  : 'bg-emerald-50/80 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200/70 dark:border-emerald-800/60 hover:bg-emerald-100/70'"
+              >
+                <span>To'ldiriladiganlar</span>
+                <span class="px-1.5 py-0.5 rounded-md text-[10px] font-mono" :class="mappingFilterTab === 'mapped' ? 'bg-emerald-700 text-emerald-100' : 'bg-emerald-100 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-300'">
+                  {{ mappedCount }}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                @click="mappingFilterTab = 'skipped'"
+                class="px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+                :class="mappingFilterTab === 'skipped'
+                  ? 'bg-zinc-700 text-white shadow-sm'
+                  : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200/70 dark:hover:bg-zinc-700/70'"
+              >
+                <span>O'tkazib yuborilganlar</span>
+                <span class="px-1.5 py-0.5 rounded-md text-[10px] font-mono" :class="mappingFilterTab === 'skipped' ? 'bg-zinc-600 text-zinc-200' : 'bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300'">
+                  {{ skippedCount }}
+                </span>
+              </button>
             </div>
 
+            <!-- Right: View Mode Toggle & Sort options -->
             <div class="flex items-center gap-3">
-              <label class="flex items-center gap-2 text-xs font-semibold text-zinc-600 dark:text-zinc-400 cursor-pointer select-none">
+              <!-- View Mode Switcher -->
+              <div class="flex items-center bg-zinc-100 dark:bg-zinc-800 p-1 rounded-xl border border-zinc-200 dark:border-zinc-700">
+                <button
+                  type="button"
+                  @click="step2ViewMode = 'grid'"
+                  class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer"
+                  :class="step2ViewMode === 'grid'
+                    ? 'bg-white dark:bg-zinc-700 text-emerald-600 dark:text-emerald-400 shadow-xs'
+                    : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'"
+                  title="Excel jadvali ko'rinishi (huddi 1.Shablonlar kabi gorizontal jadval)"
+                >
+                  <FileSpreadsheet class="w-3.5 h-3.5" />
+                  <span>Excel jadvali</span>
+                </button>
+
+                <button
+                  type="button"
+                  @click="step2ViewMode = 'table'"
+                  class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer"
+                  :class="step2ViewMode === 'table'
+                    ? 'bg-white dark:bg-zinc-700 text-emerald-600 dark:text-emerald-400 shadow-xs'
+                    : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'"
+                  title="Ro'yxat jadvali (vertikal qatorlar)"
+                >
+                  <Table class="w-3.5 h-3.5" />
+                  <span>Ro'yxat jadvali</span>
+                </button>
+
+                <button
+                  type="button"
+                  @click="step2ViewMode = 'cards'"
+                  class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer"
+                  :class="step2ViewMode === 'cards'
+                    ? 'bg-white dark:bg-zinc-700 text-emerald-600 dark:text-emerald-400 shadow-xs'
+                    : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'"
+                  title="Kartalar ko'rinishi"
+                >
+                  <LayoutGrid class="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              <!-- Sort options -->
+              <label class="flex items-center gap-2 text-xs font-medium text-zinc-600 dark:text-zinc-400 cursor-pointer select-none hover:text-zinc-900 dark:hover:text-zinc-200">
                 <input
                   type="checkbox"
-                  v-model="onlyMappedFilter"
+                  v-model="sortMappedFirst"
                   class="rounded text-emerald-600 focus:ring-emerald-500 border-zinc-300 dark:border-zinc-700"
                 />
-                Faqat to'ldiriladigan ustunlarni ko'rsatish
+                Tepaga surish
               </label>
             </div>
           </div>
 
-          <!-- Column Mapping Cards Grid -->
-          <!-- Format: A-Column | Header: Koreyscha (English tarjima) | CRM field -->
-          <!-- Skipped columns shown at the end -->
-          <div class="space-y-3">
+          <!-- ═════════════════════════════════════════════════════════════════ -->
+          <!-- VIEW 1: EXCEL SPREADSHEET GRID VIEW (HUDDI 1.SHABLONLAR KABI)    -->
+          <!-- ═════════════════════════════════════════════════════════════════ -->
+          <div
+            v-if="step2ViewMode === 'grid'"
+            class="border border-zinc-200 dark:border-zinc-800 rounded-2xl overflow-hidden bg-white dark:bg-[#111315] shadow-xs"
+          >
+            <div class="overflow-x-auto max-h-[75vh] scrollbar-thin">
+              <table class="w-full text-xs border-collapse border-spacing-0">
+                <!-- 1. The Sticky Column Letters Header: # | A | B | C | D | E ... -->
+                <thead class="sticky top-0 z-30 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 font-mono font-bold select-none border-b border-zinc-200 dark:border-zinc-700">
+                  <tr>
+                    <!-- Fixed Left Header -->
+                    <th class="sticky left-0 z-40 px-3 py-2.5 bg-zinc-200 dark:bg-zinc-750 text-zinc-600 dark:text-zinc-300 text-center w-36 text-[11px] font-mono border-r border-b border-zinc-200 dark:border-zinc-700 whitespace-nowrap shadow-xs">
+                      Ustun (#)
+                    </th>
+                    <th
+                      v-for="mapping in visibleMappings"
+                      :key="mapping.col_idx"
+                      class="px-3 py-2.5 text-center border-r border-zinc-200 dark:border-zinc-700 min-w-[240px] max-w-[280px]"
+                      :class="mapping.field !== '_skip' ? 'bg-emerald-50/60 dark:bg-emerald-950/40' : ''"
+                    >
+                      <div class="flex items-center justify-center gap-1.5">
+                        <span
+                          class="px-2.5 py-1 rounded-lg text-xs font-mono font-extrabold flex items-center gap-1"
+                          :class="mapping.field !== '_skip'
+                            ? 'bg-emerald-100 dark:bg-emerald-900/80 text-emerald-800 dark:text-emerald-200 border border-emerald-300 dark:border-emerald-700'
+                            : 'bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-300 border border-zinc-300 dark:border-zinc-600'"
+                        >
+                          {{ mapping.col_letter }}-Column (#{{ mapping.col_idx }})
+                        </span>
+                      </div>
+                    </th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  <!-- ROW 1: CRM MAPPING SELECTOR ROW (Highlighted, interactive!) -->
+                  <tr class="bg-zinc-50/90 dark:bg-zinc-900/70 border-b-2 border-emerald-500/40">
+                    <td class="sticky left-0 z-20 px-3 py-3 bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 font-bold text-xs border-r border-zinc-200 dark:border-zinc-700 whitespace-nowrap shadow-xs">
+                      <div class="flex flex-col">
+                        <span class="font-bold text-emerald-700 dark:text-emerald-400">CRM Maydoni</span>
+                        <span class="text-[10px] text-zinc-400 font-normal">To'ldiriladigan qiymat</span>
+                      </div>
+                    </td>
+                    <td
+                      v-for="mapping in visibleMappings"
+                      :key="mapping.col_idx"
+                      class="px-2.5 py-3 border-r border-zinc-200 dark:border-zinc-700 align-top"
+                      :class="mapping.field !== '_skip' ? 'bg-emerald-50/30 dark:bg-emerald-950/20' : 'bg-zinc-50/20 dark:bg-zinc-900/10'"
+                    >
+                      <div class="space-y-2">
+                        <div class="relative">
+                          <select
+                            v-model="mapping.field"
+                            class="w-full bg-white dark:bg-zinc-800 border text-xs font-semibold rounded-xl pl-2.5 pr-7 py-2 text-zinc-800 dark:text-zinc-200 focus:ring-2 focus:ring-emerald-500 focus:outline-none appearance-none cursor-pointer shadow-2xs"
+                            :class="mapping.field !== '_skip' ? 'border-emerald-500 bg-emerald-50/30 text-emerald-800 dark:text-emerald-200 font-bold' : 'border-zinc-300 dark:border-zinc-700 text-zinc-500'"
+                          >
+                            <option value="_skip">❌ O'tkazib yuborish (Bo'sh)</option>
+                            <optgroup v-for="(fields, groupName) in categorizedCrmFields" :key="groupName" :label="groupName">
+                              <option v-for="f in fields" :key="f.key" :value="f.key">
+                                {{ f.label }}
+                              </option>
+                            </optgroup>
+                          </select>
+                          <ChevronDown class="w-3.5 h-3.5 text-zinc-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+                        </div>
+
+                        <!-- Format settings in cell -->
+                        <div v-if="mapping.field === '_static_value'">
+                          <input
+                            type="text"
+                            v-model="mapping.static_value"
+                            placeholder="Statik matn..."
+                            class="w-full bg-white dark:bg-zinc-800 border border-amber-300 dark:border-amber-700 text-[11px] rounded-lg px-2 py-1 text-zinc-800 dark:text-zinc-200 placeholder-zinc-400"
+                          />
+                        </div>
+                        <div v-else-if="DATE_FIELDS.includes(mapping.field)">
+                          <select
+                            v-model="mapping.format_rules.dateFormat"
+                            class="w-full bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-[10.5px] font-semibold rounded-lg px-2 py-1 text-zinc-700 dark:text-zinc-300 cursor-pointer"
+                          >
+                            <option value="YYYY-MM-DD">2004-11-15 (Chiziqcha)</option>
+                            <option value="YYYY.MM.DD">2004.11.15 (Nuqta)</option>
+                            <option value="YYYYMMDD">20041115 (Raqamlar)</option>
+                            <option value="DD.MM.YYYY">15.11.2004 (Kun/Oy)</option>
+                            <option value="DD-MM-YYYY">15-11-2004</option>
+                            <option value="YYYY/MM/DD">2004/11/15</option>
+                          </select>
+                        </div>
+                        <div v-else-if="mapping.field === 'graduation_expected'">
+                          <select
+                            v-model="mapping.format_rules.boolFormat"
+                            class="w-full bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-[10.5px] font-semibold rounded-lg px-2 py-1 text-zinc-700 dark:text-zinc-300 cursor-pointer"
+                          >
+                            <option value="Yes/No">Format: Yes / No</option>
+                            <option value="예/아니오">Format: 예 / 아니오</option>
+                            <option value="졸업예정/졸업">Format: 졸업예정 / 졸업</option>
+                            <option value="Y/N">Format: Y / N</option>
+                            <option value="Ha/Yo'q">Format: Ha / Yo'q</option>
+                          </select>
+                        </div>
+                        <div v-else-if="mapping.field === 'gender'">
+                          <select
+                            v-model="mapping.format_rules.genderFormat"
+                            class="w-full bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-[10.5px] font-semibold rounded-lg px-2 py-1 text-zinc-700 dark:text-zinc-300 cursor-pointer"
+                          >
+                            <option value="남/여">Jins: 남 / 여</option>
+                            <option value="MALE/FEMALE">Jins: MALE / FEMALE</option>
+                            <option value="남성/여성">Jins: 남성 / 여성</option>
+                            <option value="Male/Female">Jins: Male / Female</option>
+                            <option value="M/F">Jins: M / F</option>
+                          </select>
+                        </div>
+                        <div v-else-if="mapping.field.includes('phone')">
+                          <select
+                            v-model="mapping.format_rules.phoneFormat"
+                            class="w-full bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-[10.5px] font-semibold rounded-lg px-2 py-1 text-zinc-700 dark:text-zinc-300 cursor-pointer"
+                          >
+                            <option value="original">Format: Original</option>
+                            <option value="dashed">Format: 90-123-45-67</option>
+                            <option value="plus_998">Format: +998901234567</option>
+                            <option value="digits_only">Format: Faqat raqamlar</option>
+                          </select>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+
+                  <!-- ROW 2: ORIGINAL EXCEL HEADER ROW (Highlighted in Green just like Step 1) -->
+                  <tr class="bg-emerald-50/80 dark:bg-emerald-950/40 border-b border-zinc-200 dark:border-zinc-700">
+                    <td class="sticky left-0 z-20 px-3 py-2.5 bg-emerald-100/90 dark:bg-emerald-900/60 text-emerald-900 dark:text-emerald-200 font-bold text-xs border-r border-zinc-200 dark:border-zinc-700 whitespace-nowrap shadow-xs">
+                      <span class="flex items-center gap-1">
+                        Sarlavha ({{ currentSheet?.detected_header_row || 1 }}-qator)
+                      </span>
+                    </td>
+                    <td
+                      v-for="mapping in visibleMappings"
+                      :key="mapping.col_idx"
+                      class="px-3 py-2.5 border-r border-zinc-200/80 dark:border-zinc-700/80 text-zinc-900 dark:text-zinc-100"
+                    >
+                      <div class="text-xs">
+                        <template v-if="getHeaderDisplayInfo(mapping.header_name).isKorean">
+                          <span class="font-extrabold text-zinc-900 dark:text-zinc-100">
+                            {{ getHeaderDisplayInfo(mapping.header_name).koreanText }}
+                          </span>
+                          <span class="text-zinc-600 dark:text-zinc-400 text-[11px] block font-semibold mt-0.5">
+                            ({{ getHeaderDisplayInfo(mapping.header_name).englishText }})
+                          </span>
+                        </template>
+                        <template v-else>
+                          <span class="font-extrabold text-zinc-900 dark:text-zinc-100">
+                            {{ getHeaderDisplayInfo(mapping.header_name).englishText }}
+                          </span>
+                        </template>
+                      </div>
+                    </td>
+                  </tr>
+
+                  <!-- ROWS 3+: PREVIEW DATA ROWS FROM TEMPLATE (Row 2, Row 3...) -->
+                  <tr
+                    v-for="row in dataPreviewRows"
+                    :key="row.row_idx"
+                    class="border-b border-zinc-100 dark:border-zinc-800/60 hover:bg-zinc-50/50 dark:hover:bg-zinc-800/30 transition-colors"
+                  >
+                    <td class="sticky left-0 z-20 px-3 py-2 bg-zinc-100/90 dark:bg-zinc-800/90 text-zinc-500 font-mono text-[11px] text-center border-r border-zinc-200 dark:border-zinc-800 whitespace-nowrap shadow-xs">
+                      {{ row.row_idx }}-qator
+                    </td>
+                    <td
+                      v-for="mapping in visibleMappings"
+                      :key="mapping.col_idx"
+                      class="px-3 py-2 border-r border-zinc-100 dark:border-zinc-800/60 text-zinc-700 dark:text-zinc-300 text-[11px] whitespace-nowrap truncate max-w-[280px]"
+                    >
+                      <span class="font-mono text-zinc-800 dark:text-zinc-200">
+                        {{ row.values[mapping.col_idx - 1] || '-' }}
+                      </span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- ═════════════════════════════════════════════════════════════════ -->
+          <!-- VIEW 2: VERTICAL DATA TABLE VIEW (RO'YXAT JADVALI)               -->
+          <!-- ═════════════════════════════════════════════════════════════════ -->
+          <div
+            v-else-if="step2ViewMode === 'table'"
+            class="border border-zinc-200 dark:border-zinc-800 rounded-2xl overflow-hidden bg-white dark:bg-[#111315] shadow-xs"
+          >
+            <div class="overflow-x-auto max-h-[75vh] scrollbar-thin">
+              <table class="w-full text-xs border-collapse">
+                <thead class="sticky top-0 z-20 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 font-bold select-none border-b border-zinc-200 dark:border-zinc-700">
+                  <tr>
+                    <th class="px-3 py-2.5 text-center w-12 border-r border-zinc-200 dark:border-zinc-700">#</th>
+                    <th class="px-4 py-2.5 text-left w-36 border-r border-zinc-200 dark:border-zinc-700">Excel Ustuni</th>
+                    <th class="px-4 py-2.5 text-left border-r border-zinc-200 dark:border-zinc-700 min-w-[240px]">Excel Sarlavhasi (Header)</th>
+                    <th class="px-4 py-2.5 text-left border-r border-zinc-200 dark:border-zinc-700 min-w-[180px]">Namuna qiymat</th>
+                    <th class="px-4 py-2.5 text-left border-r border-zinc-200 dark:border-zinc-700 min-w-[280px]">CRM Maydoni</th>
+                    <th class="px-4 py-2.5 text-left min-w-[220px]">Qo'shimcha sozlamalar</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-zinc-100 dark:divide-zinc-800/80">
+                  <tr
+                    v-for="(mapping, idx) in visibleMappings"
+                    :key="mapping.col_idx"
+                    class="hover:bg-zinc-50/60 dark:hover:bg-zinc-800/40 transition-colors"
+                    :class="mapping.field !== '_skip' ? 'bg-emerald-50/15 dark:bg-emerald-950/10' : ''"
+                  >
+                    <td class="px-3 py-3 text-center text-zinc-400 font-mono text-[11px] border-r border-zinc-200 dark:border-zinc-800">
+                      {{ idx + 1 }}
+                    </td>
+                    <td class="px-4 py-3 border-r border-zinc-200 dark:border-zinc-800">
+                      <div
+                        class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-mono font-extrabold"
+                        :class="mapping.field !== '_skip'
+                          ? 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
+                          : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 border border-zinc-200 dark:border-zinc-700'"
+                      >
+                        {{ mapping.col_letter }}-Column (#{{ mapping.col_idx }})
+                      </div>
+                    </td>
+                    <td class="px-4 py-3 border-r border-zinc-200 dark:border-zinc-800">
+                      <div class="text-xs font-medium">
+                        <template v-if="getHeaderDisplayInfo(mapping.header_name).isKorean">
+                          <span class="font-bold text-zinc-900 dark:text-zinc-100">
+                            {{ getHeaderDisplayInfo(mapping.header_name).koreanText }}
+                          </span>
+                          <span class="text-zinc-500 dark:text-zinc-400 text-xs ml-1.5 font-semibold">
+                            ({{ getHeaderDisplayInfo(mapping.header_name).englishText }})
+                          </span>
+                        </template>
+                        <template v-else>
+                          <span class="font-bold text-zinc-900 dark:text-zinc-100">
+                            {{ getHeaderDisplayInfo(mapping.header_name).englishText }}
+                          </span>
+                        </template>
+                      </div>
+                    </td>
+                    <td class="px-4 py-3 border-r border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 font-mono text-[11px] truncate max-w-[200px]">
+                      {{ getColumnSampleValue(mapping.col_idx) || '-' }}
+                    </td>
+                    <td class="px-4 py-3 border-r border-zinc-200 dark:border-zinc-800">
+                      <div class="relative">
+                        <select
+                          v-model="mapping.field"
+                          class="w-full bg-white dark:bg-zinc-800 border text-xs font-semibold rounded-xl pl-3 pr-8 py-2 text-zinc-800 dark:text-zinc-200 focus:ring-2 focus:ring-emerald-500 focus:outline-none appearance-none cursor-pointer"
+                          :class="mapping.field !== '_skip' ? 'border-emerald-500 bg-emerald-50/20 text-emerald-800 dark:text-emerald-200 font-bold' : 'border-zinc-300 dark:border-zinc-700 text-zinc-500'"
+                        >
+                          <option value="_skip">❌ O'tkazib yuborish (Bo'sh)</option>
+                          <optgroup v-for="(fields, groupName) in categorizedCrmFields" :key="groupName" :label="groupName">
+                            <option v-for="f in fields" :key="f.key" :value="f.key">
+                              {{ f.label }}
+                            </option>
+                          </optgroup>
+                        </select>
+                        <ChevronDown class="w-3.5 h-3.5 text-zinc-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      </div>
+                    </td>
+                    <td class="px-4 py-3">
+                      <div v-if="mapping.field === '_static_value'">
+                        <input
+                          type="text"
+                          v-model="mapping.static_value"
+                          placeholder="Statik matn..."
+                          class="w-full bg-white dark:bg-zinc-800 border border-amber-300 dark:border-amber-700 text-xs rounded-xl px-3 py-1.5 text-zinc-800 dark:text-zinc-200 placeholder-zinc-400"
+                        />
+                      </div>
+                      <div v-else-if="DATE_FIELDS.includes(mapping.field)">
+                        <select
+                          v-model="mapping.format_rules.dateFormat"
+                          class="w-full bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-xs font-semibold rounded-lg px-2.5 py-1.5 text-zinc-700 dark:text-zinc-300 cursor-pointer"
+                        >
+                          <option value="YYYY-MM-DD">2004-11-15 (Chiziqcha)</option>
+                          <option value="YYYY.MM.DD">2004.11.15 (Nuqta)</option>
+                          <option value="YYYYMMDD">20041115 (Raqamlar)</option>
+                          <option value="DD.MM.YYYY">15.11.2004 (Kun/Oy)</option>
+                          <option value="DD-MM-YYYY">15-11-2004</option>
+                          <option value="YYYY/MM/DD">2004/11/15</option>
+                        </select>
+                      </div>
+                      <div v-else-if="mapping.field === 'graduation_expected'">
+                        <select
+                          v-model="mapping.format_rules.boolFormat"
+                          class="w-full bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-xs font-semibold rounded-lg px-2.5 py-1.5 text-zinc-700 dark:text-zinc-300 cursor-pointer"
+                        >
+                          <option value="Yes/No">Format: Yes / No</option>
+                          <option value="예/아니오">Format: 예 / 아니오</option>
+                          <option value="졸업예정/졸업">Format: 졸업예정 / 졸업</option>
+                          <option value="Y/N">Format: Y / N</option>
+                          <option value="Ha/Yo'q">Format: Ha / Yo'q</option>
+                        </select>
+                      </div>
+                      <div v-else-if="mapping.field === 'gender'">
+                        <select
+                          v-model="mapping.format_rules.genderFormat"
+                          class="w-full bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-xs font-semibold rounded-lg px-2.5 py-1.5 text-zinc-700 dark:text-zinc-300 cursor-pointer"
+                        >
+                          <option value="남/여">Jins: 남 / 여</option>
+                          <option value="MALE/FEMALE">Jins: MALE / FEMALE</option>
+                          <option value="남성/여성">Jins: 남성 / 여성</option>
+                          <option value="Male/Female">Jins: Male / Female</option>
+                          <option value="M/F">Jins: M / F</option>
+                        </select>
+                      </div>
+                      <div v-else-if="mapping.field.includes('phone')">
+                        <select
+                          v-model="mapping.format_rules.phoneFormat"
+                          class="w-full bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-xs font-semibold rounded-lg px-2.5 py-1.5 text-zinc-700 dark:text-zinc-300 cursor-pointer"
+                        >
+                          <option value="original">Format: Original</option>
+                          <option value="dashed">Format: 90-123-45-67</option>
+                          <option value="plus_998">Format: +998901234567</option>
+                          <option value="digits_only">Format: Faqat raqamlar</option>
+                        </select>
+                      </div>
+                      <span v-else class="text-zinc-400 text-xs">-</span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- ═════════════════════════════════════════════════════════════════ -->
+          <!-- VIEW 3: CARDS GRID VIEW                                         -->
+          <!-- ═════════════════════════════════════════════════════════════════ -->
+          <div v-else class="space-y-3">
             <div
               v-for="mapping in visibleMappings"
               :key="mapping.col_idx"
@@ -1909,7 +2357,17 @@ const resetWizard = () => {
               </p>
             </div>
 
-            <div class="flex items-center justify-center gap-4 pt-2">
+            <div class="flex flex-wrap items-center justify-center gap-3 pt-2">
+              <a
+                v-if="downloadUrl"
+                :href="downloadUrl"
+                :download="downloadedFileName"
+                class="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-md shadow-emerald-600/25 transition-all cursor-pointer"
+              >
+                <Download class="w-4 h-4" />
+                Faylni qayta yuklab olish (.xlsx)
+              </a>
+
               <button
                 @click="resetWizard"
                 class="px-5 py-2.5 rounded-xl bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-xs font-bold text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors cursor-pointer"

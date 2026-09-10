@@ -72,7 +72,7 @@ export const excelFillApi = {
     return response.data
   },
 
-  generateFilledExcel: async (params: GenerateFilledExcelParams): Promise<Blob> => {
+  generateFilledExcel: async (params: GenerateFilledExcelParams): Promise<{ blob: Blob; fileName?: string }> => {
     const formData = new FormData()
     formData.append('file', params.file)
     formData.append('sheet_name', params.sheet_name)
@@ -94,6 +94,21 @@ export const excelFillApi = {
         responseType: 'blob',
       }
     )
-    return response.data
+
+    let fileName: string | undefined
+    const disposition = response.headers?.['content-disposition'] || ''
+    if (disposition) {
+      const utf8Match = disposition.match(/filename\*=UTF-8''([^;]+)/i)
+      if (utf8Match && utf8Match[1]) {
+        fileName = decodeURIComponent(utf8Match[1])
+      } else {
+        const match = disposition.match(/filename="?([^";]+)"?/i)
+        if (match && match[1]) {
+          fileName = match[1]
+        }
+      }
+    }
+
+    return { blob: response.data, fileName }
   },
 }

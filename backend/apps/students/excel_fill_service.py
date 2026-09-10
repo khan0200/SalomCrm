@@ -16,125 +16,141 @@ from copy import copy
 logger = logging.getLogger(__name__)
 
 # Uzbekistan regions normalization dictionary
+# Uzbekistan regions normalization dictionary (normalized to Title Case)
 UZB_REGIONS = {
-    'TASHKENT': 'TASHKENT', 'TOSHKENT': 'TASHKENT',
-    'ANDIJAN': 'ANDIJAN', 'ANDIJON': 'ANDIJAN',
-    'SAMARKAND': 'SAMARKAND', 'SAMARQAND': 'SAMARKAND',
-    'FERGANA': 'FERGANA', 'FARG\'ONA': 'FERGANA', 'FARGONA': 'FERGANA',
-    'NAMANGAN': 'NAMANGAN',
-    'BUKHARA': 'BUKHARA', 'BUXORO': 'BUKHARA',
-    'KHOREZM': 'KHOREZM', 'XORAZM': 'KHOREZM',
-    'KASHKADARYA': 'KASHKADARYA', 'QASHQADARYO': 'KASHKADARYA', 'QASHKADARYO': 'KASHKADARYA',
-    'SURKHANDARYA': 'SURKHANDARYA', 'SURXONDARYO': 'SURKHANDARYA',
-    'JIZZAKH': 'JIZZAKH', 'JIZZAX': 'JIZZAKH',
-    'SIRDARYA': 'SIRDARYA', 'SIRDARYO': 'SIRDARYA',
-    'NAVOIY': 'NAVOIY', 'NAVOI': 'NAVOIY',
-    'KARAKALPAKSTAN': 'KARAKALPAKSTAN', 'QORAQALPOG\'ISTON': 'KARAKALPAKSTAN', 'QORAQALPOQ': 'KARAKALPAKSTAN'
+    'TASHKENT': 'Tashkent', 'TOSHKENT': 'Tashkent',
+    'ANDIJAN': 'Andijan', 'ANDIJON': 'Andijan',
+    'SAMARKAND': 'Samarkand', 'SAMARQAND': 'Samarkand',
+    'FERGANA': 'Fergana', 'FARG\'ONA': 'Fergana', 'FARGONA': 'Fergana',
+    'NAMANGAN': 'Namangan',
+    'BUKHARA': 'Bukhara', 'BUXORO': 'Bukhara',
+    'KHOREZM': 'Khorezm', 'XORAZM': 'Khorezm', 'KHORAZM': 'Khorezm',
+    'KASHKADARYA': 'Kashkadarya', 'QASHQADARYO': 'Kashkadarya', 'QASHKADARYO': 'Kashkadarya',
+    'SURKHANDARYA': 'Surkhandarya', 'SURXONDARYO': 'Surkhandarya',
+    'JIZZAKH': 'Jizzakh', 'JIZZAX': 'JIZZAKH',
+    'SIRDARYA': 'Sirdarya', 'SIRDARYO': 'Sirdarya',
+    'NAVOIY': 'Navoiy', 'NAVOI': 'Navoiy',
+    'KARAKALPAKSTAN': 'Karakalpakstan', 'QORAQALPOG\'ISTON': 'Karakalpakstan', 'QORAQALPOQ': 'Karakalpakstan'
 }
 
 # Uzbekistan district to region mapping
 DISTRICT_TO_REGION = {
     # Andijan
-    'ANDIJAN': 'ANDIJAN', 'ANDIJON': 'ANDIJAN', 'ASAKA': 'ANDIJAN', 'BALIQCHI': 'ANDIJAN', 'BOZ': 'ANDIJAN', 
-    'BULOQBOSHI': 'ANDIJAN', 'IZBOSKAN': 'ANDIJAN', 'JALAKUDUQ': 'ANDIJAN', 'XOJAOBOD': 'ANDIJAN', 
-    'QORGONTEPA': 'ANDIJAN', 'MARHAMAT': 'ANDIJAN', 'MARKHAMAT': 'ANDIJAN', 'OLTINKOL': 'ANDIJAN', 
-    'PAXTAOBOD': 'ANDIJAN', 'PAKHTABAD': 'ANDIJAN', 'PAKTABAD': 'ANDIJAN', 'SHAHRIXON': 'ANDIJAN', 'ULUGNOR': 'ANDIJAN', 'XONOBOD': 'ANDIJAN',
+    'ANDIJAN': 'Andijan', 'ANDIJON': 'Andijan', 'ASAKA': 'Andijan', 'BALIQCHI': 'Andijan', 'BOZ': 'Andijan', 
+    'BULOQBOSHI': 'Andijan', 'IZBOSKAN': 'Andijan', 'JALAKUDUQ': 'Andijan', 'XOJAOBOD': 'Andijan', 
+    'QORGONTEPA': 'Andijan', 'MARHAMAT': 'Andijan', 'MARKHAMAT': 'Andijan', 'OLTINKOL': 'Andijan', 
+    'PAXTAOBOD': 'Andijan', 'PAKHTABAD': 'Andijan', 'PAKTABAD': 'Andijan', 'SHAHRIXON': 'Andijan', 'ULUGNOR': 'Andijan', 'XONOBOD': 'Andijan',
     # Tashkent
-    'TASHKENT': 'TASHKENT', 'TOSHKENT': 'TASHKENT', 'BEKOBOD': 'TASHKENT', 'BOSTANLYK': 'TASHKENT', 'BOSTONLIQ': 'TASHKENT',
-    'BUKA': 'TASHKENT', 'CHINOZ': 'TASHKENT', 'QIBRAY': 'TASHKENT', 'KIBRAY': 'TASHKENT', 
-    'PARKENT': 'TASHKENT', 'PISKENT': 'TASHKENT', 'QUYICHIRCHIQ': 'TASHKENT', 'ORTACHIRCHIQ': 'TASHKENT',
-    'YUQORICHIRCHIQ': 'TASHKENT', 'YANGIYOL': 'TASHKENT', 'ZANGIOTA': 'TASHKENT', 'CHILANZAR': 'TASHKENT', 
-    'YUNUSABAD': 'TASHKENT', 'MIRZO ULUGBEK': 'TASHKENT', 'YASHNABOD': 'TASHKENT', 'SHAYXONTOHUR': 'TASHKENT',
+    'TASHKENT': 'Tashkent', 'TOSHKENT': 'Tashkent', 'BEKOBOD': 'Tashkent', 'BOSTANLYK': 'Tashkent', 'BOSTONLIQ': 'Tashkent',
+    'BUKA': 'Tashkent', 'CHINOZ': 'Tashkent', 'QIBRAY': 'Tashkent', 'KIBRAY': 'Tashkent', 
+    'PARKENT': 'Tashkent', 'PISKENT': 'Tashkent', 'QUYICHIRCHIQ': 'Tashkent', 'ORTACHIRCHIQ': 'Tashkent',
+    'YUQORICHIRCHIQ': 'Tashkent', 'YANGIYOL': 'Tashkent', 'ZANGIOTA': 'Tashkent', 'CHILANZAR': 'Tashkent', 'CHILONZOR': 'Tashkent',
+    'YUNUSABAD': 'Tashkent', 'YUNUSOBOD': 'Tashkent', 'MIRZO ULUGBEK': 'Tashkent', 'YASHNABOD': 'Tashkent', 'SHAYXONTOHUR': 'Tashkent',
+    'SERGELI': 'Tashkent', 'MIROBOD': 'Tashkent', 'YAKKASAROY': 'Tashkent', 'BEKTEMIR': 'Tashkent', 'UCHTEPA': 'Tashkent',
+    'ALMAZAR': 'Tashkent', 'OLMAZOR': 'Tashkent',
     # Samarkand
-    'SAMARKAND': 'SAMARKAND', 'SAMARQAND': 'SAMARKAND', 'BULUNGUR': 'SAMARKAND', 'ISHTIXON': 'SAMARKAND', 
-    'JOMBOY': 'SAMARKAND', 'KATTAQORGON': 'SAMARKAND', 'QOSHRABOT': 'SAMARKAND', 'NARPAY': 'SAMARKAND', 
-    'NUROBOD': 'SAMARKAND', 'OQDARYO': 'SAMARKAND', 'PASTDARGOM': 'SAMARKAND', 'PAXTACHI': 'SAMARKAND', 
-    'PAYARIQ': 'SAMARKAND', 'TOYLOQ': 'SAMARKAND', 'URGUT': 'SAMARKAND',
+    'SAMARKAND': 'Samarkand', 'SAMARQAND': 'Samarkand', 'BULUNGUR': 'Samarkand', 'ISHTIXON': 'Samarkand', 
+    'JOMBOY': 'Samarkand', 'KATTAQORGON': 'Samarkand', 'QOSHRABOT': 'Samarkand', 'NARPAY': 'Samarkand', 
+    'NUROBOD': 'Samarkand', 'OQDARYO': 'Samarkand', 'PASTDARGOM': 'Samarkand', 'PAXTACHI': 'Samarkand', 
+    'PAYARIQ': 'Samarkand', 'TOYLOQ': 'Samarkand', 'URGUT': 'Samarkand',
     # Fergana
-    'FERGANA': 'FERGANA', 'FARG\'ONA': 'FERGANA', 'BESHARIK': 'FERGANA', 'BOGDOD': 'FERGANA', 'BUVAYDA': 'FERGANA', 
-    'DANGARA': 'FERGANA', 'FARGONA': 'FERGANA', 'FURQAT': 'FERGANA', 'QOQON': 'FERGANA', 'KOKAND': 'FERGANA', 
-    'QUVA': 'FERGANA', 'QUVASOY': 'FERGANA', 'RISHTON': 'FERGANA', 'SOX': 'FERGANA', 'TOSHLOQ': 'FERGANA', 
-    'UCHKOPRIK': 'FERGANA', 'YOZYOVON': 'FERGANA', 'MARGILON': 'FERGANA',
+    'FERGANA': 'Fergana', 'FARG\'ONA': 'Fergana', 'BESHARIK': 'Fergana', 'BOGDOD': 'Fergana', 'BUVAYDA': 'Fergana', 
+    'DANGARA': 'Fergana', 'FARGONA': 'Fergana', 'FURQAT': 'Fergana', 'QOQON': 'Fergana', 'KOKAND': 'Fergana', 
+    'QUVA': 'Fergana', 'QUVASOY': 'Fergana', 'RISHTON': 'Fergana', 'SOX': 'Fergana', 'TOSHLOQ': 'Fergana', 
+    'UCHKOPRIK': 'Fergana', 'YOZYOVON': 'Fergana', 'MARGILON': 'Fergana',
     # Namangan
-    'NAMANGAN': 'NAMANGAN', 'CHORTOQ': 'NAMANGAN', 'CHUST': 'NAMANGAN', 'KOSONSOY': 'NAMANGAN', 
-    'MINGBULOQ': 'NAMANGAN', 'NORIN': 'NAMANGAN', 'POP': 'NAMANGAN', 'TORAQORGON': 'NAMANGAN', 
-    'UCHQORGON': 'NAMANGAN', 'UYCHI': 'NAMANGAN', 'YANGIQORGON': 'NAMANGAN',
+    'NAMANGAN': 'Namangan', 'CHORTOQ': 'Namangan', 'CHUST': 'Namangan', 'KOSONSOY': 'Namangan', 
+    'MINGBULOQ': 'Namangan', 'NORIN': 'Namangan', 'POP': 'Namangan', 'TORAQORGON': 'Namangan', 
+    'UCHQORGON': 'Namangan', 'UYCHI': 'Namangan', 'YANGIQORGON': 'Namangan',
     # Bukhara
-    'BUKHARA': 'BUKHARA', 'BUXORO': 'BUKHARA', 'G`IJDUVON': 'BUKHARA', 'GIJDUVAN': 'BUKHARA', 'JONDOR': 'BUKHARA', 
-    'KOGON': 'BUKHARA', 'QORAKOL': 'BUKHARA', 'QOROVULBOZOR': 'BUKHARA', 'OLOT': 'BUKHARA', 'PESHKU': 'BUKHARA', 
-    'ROMITAN': 'BUKHARA', 'SHOFIRKON': 'BUKHARA', 'VOBKENT': 'BUKHARA',
+    'BUKHARA': 'Bukhara', 'BUXORO': 'Bukhara', 'G`IJDUVON': 'Bukhara', 'GIJDUVAN': 'Bukhara', 'JONDOR': 'Bukhara', 
+    'KOGON': 'Bukhara', 'QORAKOL': 'Bukhara', 'QOROVULBOZOR': 'Bukhara', 'OLOT': 'Bukhara', 'PESHKU': 'Bukhara', 
+    'ROMITAN': 'Bukhara', 'SHOFIRKON': 'Bukhara', 'VOBKENT': 'Bukhara',
     # Sirdarya
-    'SIRDARYA': 'SIRDARYA', 'SIRDARYO': 'SIRDARYA', 'BOYOVUT': 'SIRDARYA', 'GULISTON': 'SIRDARYA', 
-    'XOVOS': 'SIRDARYA', 'MEHNATOBOD': 'SIRDARYA', 'MIRZAOBOD': 'SIRDARYA', 'OQOLTIN': 'SIRDARYA', 
-    'SARDABA': 'SIRDARYA', 'SARDOBA': 'SIRDARYA', 'SAYXUNOBOD': 'SIRDARYA', 'YANGIYER': 'SIRDARYA',
+    'SIRDARYA': 'Sirdarya', 'SIRDARYO': 'Sirdarya', 'BOYOVUT': 'Sirdarya', 'GULISTON': 'Sirdarya', 
+    'XOVOS': 'Sirdarya', 'MEHNATOBOD': 'Sirdarya', 'MIRZAOBOD': 'Sirdarya', 'OQOLTIN': 'Sirdarya', 
+    'SARDABA': 'Sirdarya', 'SARDOBA': 'Sirdarya', 'SAYXUNOBOD': 'Sirdarya', 'YANGIYER': 'Sirdarya',
     # Kashkadarya
-    'KASHKADARYA': 'KASHKADARYA', 'QASHQADARYO': 'KASHKADARYA', 'CHIROQCHI': 'KASHKADARYA', 'DEHQONOBOD': 'KASHKADARYA', 
-    'GUZOR': 'KASHKADARYA', 'QAMASHI': 'KASHKADARYA', 'QARSHI': 'KASHKADARYA', 'KASBI': 'KASHKADARYA', 
-    'KITOB': 'KASHKADARYA', 'KOSON': 'KASHKADARYA', 'MIRISHKOR': 'KASHKADARYA', 'MUBORAK': 'KASHKADARYA', 
-    'NISHON': 'KASHKADARYA', 'SHAHRISABZ': 'KASHKADARYA', 'YAKKABOG': 'KASHKADARYA',
+    'KASHKADARYA': 'Kashkadarya', 'QASHQADARYO': 'Kashkadarya', 'CHIROQCHI': 'Kashkadarya', 'DEHQONOBOD': 'Kashkadarya', 
+    'GUZOR': 'Kashkadarya', 'QAMASHI': 'Kashkadarya', 'QARSHI': 'Kashkadarya', 'KASBI': 'Kashkadarya', 
+    'KITOB': 'Kashkadarya', 'KOSON': 'Kashkadarya', 'MIRISHKOR': 'Kashkadarya', 'MUBORAK': 'Kashkadarya', 
+    'NISHON': 'Kashkadarya', 'SHAHRISABZ': 'Kashkadarya', 'YAKKABOG': 'Kashkadarya',
     # Surkhandarya
-    'SURKHANDARYA': 'SURKHANDARYA', 'SURXONDARYO': 'SURKHANDARYA', 'ANGOR': 'SURKHANDARYA', 'BANDIXON': 'SURKHANDARYA', 
-    'BOYSUN': 'SURKHANDARYA', 'DENOV': 'SURKHANDARYA', 'JARQORGON': 'SURKHANDARYA', 'QIZIRIQ': 'SURKHANDARYA', 
-    'QUMQORGON': 'SURKHANDARYA', 'MUZRABOT': 'SURKHANDARYA', 'OLTINSOY': 'SURKHANDARYA', 'SARIOSIYO': 'SURKHANDARYA', 
-    'SHEROBOD': 'SURKHANDARYA', 'SHO`RCHI': 'SURKHANDARYA', 'TERMIZ': 'SURKHANDARYA', 'UZUN': 'SURKHANDARYA',
+    'SURKHANDARYA': 'Surkhandarya', 'SURXONDARYO': 'Surkhandarya', 'ANGOR': 'Surkhandarya', 'BANDIXON': 'Surkhandarya', 
+    'BOYSUN': 'Surkhandarya', 'DENOV': 'Surkhandarya', 'JARQORGON': 'Surkhandarya', 'QIZIRIQ': 'Surkhandarya', 
+    'QUMQORGON': 'Surkhandarya', 'MUZRABOT': 'Surkhandarya', 'OLTINSOY': 'Surkhandarya', 'SARIOSIYO': 'Surkhandarya', 
+    'SHEROBOD': 'Surkhandarya', 'SHO`RCHI': 'Surkhandarya', 'TERMIZ': 'Surkhandarya', 'UZUN': 'Surkhandarya',
     # Khorezm
-    'KHOREZM': 'KHOREZM', 'XORAZM': 'KHOREZM', 'BOGOT': 'KHOREZM', 'GURLAN': 'KHOREZM', 'XIVA': 'KHOREZM', 
-    'XAZORASP': 'KHOREZM', 'XONQA': 'KHOREZM', 'QOSHKOPIR': 'KHOREZM', 'SHOVOT': 'KHOREZM', 'URGANCH': 'KHOREZM', 
-    'YANGIARIQ': 'KHOREZM', 'YANGIBOZOR': 'KHOREZM',
+    'KHOREZM': 'Khorezm', 'XORAZM': 'Khorezm', 'KHORAZM': 'Khorezm', 'BOGOT': 'Khorezm', 'GURLAN': 'Khorezm', 'XIVA': 'Khorezm', 'KHIVA': 'Khorezm', 
+    'XAZORASP': 'Khorezm', 'XONQA': 'Khorezm', 'QOSHKOPIR': 'Khorezm', 'SHOVOT': 'Khorezm', 'URGANCH': 'Khorezm', 
+    'YANGIARIQ': 'Khorezm', 'YANGIBOZOR': 'Khorezm',
     # Jizzakh
-    'JIZZAKH': 'JIZZAKH', 'JIZZAX': 'JIZZAKH', 'ARNASOY': 'JIZZAKH', 'BAXMAL': 'JIZZAKH', 'DOSTLIK': 'JIZZAKH', 
-    'FORISH': 'JIZZAKH', 'GALLAOROL': 'JIZZAKH', 'SHAROF RASHIDOV': 'JIZZAKH', 'MIRZACHOL': 'JIZZAKH', 
-    'PAXTAKOR': 'JIZZAKH', 'YANGIOBOD': 'JIZZAKH', 'ZOMIN': 'JIZZAKH', 'ZAFAROBOD': 'JIZZAKH',
+    'JIZZAKH': 'Jizzakh', 'JIZZAX': 'Jizzakh', 'ARNASOY': 'Jizzakh', 'BAXMAL': 'Jizzakh', 'BAKHMAL': 'Jizzakh', 'DOSTLIK': 'Jizzakh', 
+    'FORISH': 'JIZZAKH', 'GALLAOROL': 'Jizzakh', 'SHAROF RASHIDOV': 'Jizzakh', 'MIRZACHOL': 'Jizzakh', 
+    'PAXTAKOR': 'Jizzakh', 'YANGIOBOD': 'Jizzakh', 'ZOMIN': 'Jizzakh', 'ZAFAROBOD': 'Jizzakh',
     # Navoiy
-    'NAVOIY': 'NAVOIY', 'NAVOI': 'NAVOIY', 'KONIMEX': 'NAVOIY', 'QIZILTEPA': 'NAVOIY', 'XATIRCHI': 'NAVOIY', 
-    'KARMANA': 'NAVOIY', 'NUROTA': 'NAVOIY', 'TOMDI': 'NAVOIY', 'UCHQUDUQ': 'NAVOIY', 'ZARAFSHON': 'NAVOIY',
+    'NAVOIY': 'Navoiy', 'NAVOI': 'Navoiy', 'KONIMEX': 'Navoiy', 'QIZILTEPA': 'Navoiy', 'XATIRCHI': 'Navoiy', 
+    'KARMANA': 'Navoiy', 'NUROTA': 'Navoiy', 'TOMDI': 'Navoiy', 'UCHQUDUQ': 'Navoiy', 'ZARAFSHON': 'Navoiy',
     # Karakalpakstan
-    'KARAKALPAKSTAN': 'KARAKALPAKSTAN', 'QORAQALPOG\'ISTON': 'KARAKALPAKSTAN', 'NUKUS': 'KARAKALPAKSTAN', 
-    'AMUDARYO': 'KARAKALPAKSTAN', 'BERUNIY': 'KARAKALPAKSTAN', 'CHIMBOY': 'KARAKALPAKSTAN', 'ELLIKQALA': 'KARAKALPAKSTAN', 
-    'QONLIKO`L': 'KARAKALPAKSTAN', 'QORAO`ZAK': 'KARAKALPAKSTAN', 'MOYNOQ': 'KARAKALPAKSTAN', 
-    'SHUMANAY': 'KARAKALPAKSTAN', 'TAXTIKO`PIR': 'KARAKALPAKSTAN', 'TO`RTKO`L': 'KARAKALPAKSTAN', 'XO`JAYLI': 'KARAKALPAKSTAN'
+    'KARAKALPAKSTAN': 'Karakalpakstan', 'QORAQALPOG\'ISTON': 'Karakalpakstan', 'NUKUS': 'Karakalpakstan', 
+    'AMUDARYO': 'Karakalpakstan', 'BERUNIY': 'Karakalpakstan', 'CHIMBOY': 'Karakalpakstan', 'ELLIKQALA': 'Karakalpakstan', 
+    'QONLIKO`L': 'Karakalpakstan', 'QORAO`ZAK': 'Karakalpakstan', 'MOYNOQ': 'Karakalpakstan', 
+    'SHUMANAY': 'Karakalpakstan', 'TAXTIKO`PIR': 'Karakalpakstan', 'TO`RTKO`L': 'Karakalpakstan', 'XO`JAYLI': 'Karakalpakstan'
 }
 
 
 def extract_city_and_state(address: str) -> Tuple[str, str]:
     """
     Intelligently extracts City / District and State / Region from a raw full address string.
+    Returns (city_district, state_region) formatted in clean Title Case.
     """
     if not address or not str(address).strip():
         return '', ''
     
-    clean = ' '.join(str(address).upper().replace(',', ' , ').replace('.', ' . ').split())
+    clean = ' '.join(str(address).upper().replace(';', ' , ').replace(',', ' , ').replace('.', ' . ').split())
     
     # 1. State / Region detection directly from text
     detected_state = ''
     for key, val in UZB_REGIONS.items():
-        if re.search(r'\b' + re.escape(key) + r'(?:\s+(?:REGION|VILOYATI|VILOYAT|OBLAST))?\b', clean):
+        if re.search(r'\b' + re.escape(key) + r'(?:\s+(?:REGION|VILOYATI|VILOYAT|OBLAST|SHAHRI|SHAHAR|CITY))?\b', clean):
             detected_state = val
             break
             
-    # 2. City / District extraction
-    m = re.search(r'(?:,\s*|\b)([A-Z\'-]+)\s+(?:DISTRICT|DISRTIKT|TUMAN|TUMANI|SHAHAR|SHAHRI|CITY)\b', clean)
+    # 2. City / District extraction (look for district/tuman first as it's more specific)
+    m_dist = re.search(r'(?:,\s*|\b)([A-Z\'-]+)\s+(?:DISTRICT|DISRTIKT|TUMAN|TUMANI)\b', clean)
     detected_city = ''
-    if m:
-        word = m.group(1).strip()
+    if m_dist:
+        word = m_dist.group(1).strip()
         if word not in ['REGION', 'VILOYATI', 'VILOYAT', 'OBLAST', 'STREET', 'ST', 'HOUSE', 'VILLAGE', 'MFY', 'UZBEKISTAN']:
-            detected_city = word
+            detected_city = word.title()
+
+    # If no district found, look for city/shahar
+    if not detected_city:
+        m_city = re.search(r'(?:,\s*|\b)([A-Z\'-]+)\s+(?:SHAHAR|SHAHRI|CITY)\b', clean)
+        if m_city:
+            word = m_city.group(1).strip()
+            if word not in ['REGION', 'VILOYATI', 'VILOYAT', 'OBLAST', 'STREET', 'ST', 'HOUSE', 'VILLAGE', 'MFY', 'UZBEKISTAN']:
+                detected_city = word.title()
             
     # If not found via regex, search for known district names in address
     if not detected_city:
         for dist_key in DISTRICT_TO_REGION.keys():
             if re.search(r'\b' + re.escape(dist_key) + r'\b', clean):
-                detected_city = dist_key
+                detected_city = dist_key.title()
                 if not detected_state:
                     detected_state = DISTRICT_TO_REGION[dist_key]
                 break
 
     # If state not found yet, infer from detected city
     if detected_city and not detected_state:
-        detected_state = DISTRICT_TO_REGION.get(detected_city, '')
+        detected_state = DISTRICT_TO_REGION.get(detected_city.upper(), '')
 
     if detected_state:
-        detected_state = UZB_REGIONS.get(detected_state, detected_state)
+        detected_state = UZB_REGIONS.get(detected_state.upper(), detected_state).title()
+
+    # If only one was found (e.g. "Tashkent city"), ensure state is set to Tashkent
+    if not detected_state and detected_city:
+        detected_state = detected_city
 
     return detected_city, detected_state
 
@@ -255,110 +271,134 @@ CRM_FIELDS = [
 
 # Multi-lingual dictionary for automatic matching
 SEMANTIC_PATTERNS = [
-    # Sequence / No
-    (r"^(no|№|n|순번|번호|num|seq|순서)$", "_sequence_no"),
+    # Sequence / No / 연번 / №
+    (
+        r"(^(no|no\.|№|n|num|seq|seq\.|index|순번|연번|번호|순서|t/?r)$|"
+        r"^(serial\s*no|seq\s*no|tartib\s*raqami?|номер\s*п/?п)|"
+        r"^(no|연번|순번)\s*\(.*\)|"
+        r"^(연번|순번)\b)",
+        "_sequence_no"
+    ),
     
     # Telegram / Username (Always Skip)
     (r"(telegram|username|tg_username|telegram_username|telegr)", "_skip"),
     
-    # Parents specific FIRST
-    (r"(father['’]?s\s*name|father\s*name|father\s*fullname|부\s*성명|부친\s*성명|otasining\s*ismi)", "father_name"),
-    (r"(father['’]?s\s*(number|phone|mobile|tel)|father\s*(mobile|phone|no|tel)|부\s*(연락처|전화번호)|부친\s*연락처|otasining\s*telefoni)", "father_phone"),
-    (r"(father['’]?s\s*job|부\s*직업|부친\s*직업|otasining\s*kasbi|otasining\s*ish)", "father_job"),
+    # Parents specific FIRST (ensures father/mother phones and names don't get captured as student's)
+    (r"(father['’]?s\s*name|father\s*name|father\s*fullname|부\s*성명|부\s*이름|부친\s*성명|부친\s*이름|아버지\s*성명|아버지\s*이름|otasining\s*ismi|фио\s*отца)", "father_name"),
+    (r"(father['’]?s\s*(number|phone|mobile|tel|cell)|father\s*(mobile|phone|no|tel|cell)|부\s*(연락처|전화번호|휴대전화|휴대폰|핸드폰)|부친\s*(연락처|전화|휴대폰)|아버지\s*(연락처|전화번호|휴대폰)|otasining\s*(telefoni|raqami)|телефон\s*отца)", "father_phone"),
+    (r"(father['’]?s\s*(job|occupation|work)|father\s*(job|occupation)|부\s*직업|부친\s*직업|아버지\s*직업|otasining\s*(kasbi|ish\s*joyi)|место\s*работы\s*отца)", "father_job"),
     
-    (r"(mother['’]?s\s*name|mother\s*name|mother\s*fullname|모\s*성명|모친\s*성명|onasining\s*ismi)", "mother_name"),
-    (r"(mother['’]?s\s*(number|phone|mobile|tel)|mother\s*(mobile|phone|no|tel)|모\s*(연락처|전화번호)|모친\s*연락처|onasining\s*telefoni)", "mother_phone"),
-    (r"(mother['’]?s\s*job|모\s*직업|모친\s*직업|onasining\s*kasbi|onasining\s*ish)", "mother_job"),
+    (r"(mother['’]?s\s*name|mother\s*name|mother\s*fullname|모\s*성명|모\s*이름|모친\s*성명|모친\s*이름|어머니\s*성명|어머니\s*이름|onasining\s*ismi|фио\s*матери)", "mother_name"),
+    (r"(mother['’]?s\s*(number|phone|mobile|tel|cell)|mother\s*(mobile|phone|no|tel|cell)|모\s*(연락처|전화번호|휴대전화|휴대폰|핸드폰)|모친\s*(연락처|전화|휴대폰)|어머니\s*(연락처|전화번호|휴대폰)|onasining\s*(telefoni|raqami)|телефон\s*матери)", "mother_phone"),
+    (r"(mother['’]?s\s*(job|occupation|work)|mother\s*(job|occupation)|모\s*직업|모친\s*직업|어머니\s*직업|onasining\s*(kasbi|ish\s*joyi)|место\s*работы\s*матери)", "mother_job"),
 
     # Dates of entry, graduation, expected graduation
-    (r"(date\s*of\s*entry|entry\s*date|data\s*of\s*entry|admission\s*date|entrance\s*date|enrol+ment\s*date|입학\s*일자?|입학\s*년\s*월\s*일|입학년월일|kirish\s*sana|o'qishga\s*kirgan)", "date_of_entry"),
-    (r"(date\s*of\s*graduat|data\s*of\s*graduat|graduation\s*date|graduated\s*date|bitirgan\s*sana|tugatgan\s*sana|졸업\s*일자?|졸업\s*년\s*월\s*일|졸업년월일)", "date_of_graduation"),
-    (r"(graduation\s*expected|expected\s*graduation|졸업\s*예정|bitirish\s*kutil)", "graduation_expected"),
+    (r"(date\s*of\s*entry|entry\s*date|data\s*of\s*entry|admission\s*date|entrance\s*date|enrol+ment\s*date|입학\s*일자?|입학\s*년\s*월\s*일|입학년월일|kirish\s*sana(si)?|o'qishga\s*kirgan\s*sana|дата\s*поступления)", "date_of_entry"),
+    (r"(date\s*of\s*graduat|data\s*of\s*graduat|graduation\s*date|graduated\s*date|bitirgan\s*sana(si)?|tugatgan\s*sana(si)?|졸업\s*일자?|졸업\s*년\s*월\s*일|졸업년월일|дата\s*окончания)", "date_of_graduation"),
+    (r"(graduation\s*expected|expected\s*graduation|졸업\s*예정|졸업예정\s*여부|bitirish\s*kutilmoqda|ожидаемый\s*выпуск)", "graduation_expected"),
 
     # Educational Background & Degree
-    (r"(educational\s*background|education\s*background|education\s*level|highest\s*education|최종\s*학력\s*\(?구분\)?|학력\s*사항|학력\s*구분|ta'lim\s*daraja)", "educational_background"),
-    (r"(degree\s*no|degree\s*number|diploma\s*no|diploma\s*number|attestat\s*raqam|diplom\s*raqam|학위\s*번호|졸업\s*증서\s*번호)", "degree_no"),
+    (r"(educational\s*background|education\s*background|education\s*level|highest\s*education|최종\s*학력\s*\(?구분\)?|최종학력|학력\s*사항|학력\s*구분|ta'lim\s*daraja(si)?|уровень\s*образования)", "educational_background"),
+    (r"(degree\s*no|degree\s*number|diploma\s*no|diploma\s*number|attestat\s*raqam(i)?|diplom\s*raqam(i)?|학위\s*번호|졸업\s*증서\s*번호|номер\s*диплома|номер\s*аттестата)", "degree_no"),
 
     # School Contact & Address
-    (r"(school\s*address|university\s*address|출신\s*학교\s*주소|학교\s*주소|maktab\s*manzil)", "school_address"),
-    (r"(school\s*phone|school\s*tel|university\s*phone|출신\s*학교\s*연락처|출신\s*학교\s*전화|학교\s*전화|학교\s*연락처|maktab\s*telefon)", "school_phone"),
-    (r"(school\s*e?mail|university\s*e?mail|출신\s*학교\s*이메일|학교\s*이메일|maktab\s*email)", "school_email"),
-    (r"(school\s*web|school\s*site|university\s*web|출신\s*학교\s*홈페이지|학교\s*홈페이지|maktab\s*sayt)", "school_website"),
+    (r"(school\s*address|university\s*address|출신\s*학교\s*주소|학교\s*주소|maktab\s*manzil(i)?|адрес\s*школы)", "school_address"),
+    (r"(school\s*phone|school\s*tel|school\s*mobile|university\s*phone|출신\s*학교\s*연락처|출신\s*학교\s*전화|학교\s*전화|학교\s*연락처|maktab\s*telefon(i)?|телефон\s*школы)", "school_phone"),
+    (r"(school\s*e?mail|university\s*e?mail|출신\s*학교\s*이메일|학교\s*이메일|maktab\s*e?mail(i)?|email\s*школы)", "school_email"),
+    (r"(school\s*web|school\s*site|university\s*web|출신\s*학교\s*홈페이지|학교\s*홈페이지|maktab\s*sayt(i)?|сайт\s*школы)", "school_website"),
 
     # Target / Applying University & Major
-    (r"(applying\s*university|target\s*university|chosen\s*university|지원\s*대학|지망\s*대학|topshirilayotgan\s*universitet)", "university_1"),
-    (r"(applying\s*major|target\s*major|chosen\s*major|지원\s*학과|지망\s*학과|지원\s*전공|지망\s*전공|topshirilayotgan\s*yo'nalish)", "university_1_major"),
+    (r"(applying\s*university|target\s*university|chosen\s*university|지원\s*대학|지망\s*대학|topshirilayotgan\s*universitet|целевой\s*университет)", "university_1"),
+    (r"(applying\s*major|target\s*major|chosen\s*major|지원\s*학과|지망\s*학과|지원\s*전공|지망\s*전공|topshirilayotgan\s*yo'nalish|выбранная\s*специальность)", "university_1_major"),
 
     # Today / Application Date
-    (r"(application\s*date|submission\s*date|apply\s*date|date\s*of\s*application|신청\s*일자?|접수\s*일자?|작성\s*일자?|ariza\s*sanasi)", "today_date"),
+    (r"(application\s*date|submission\s*date|apply\s*date|date\s*of\s*application|신청\s*일자?|접수\s*일자?|작성\s*일자?|ariza\s*sanasi|дата\s*подачи)", "today_date"),
 
-    # Language certificate dates & scores
-    (r"(test\s*date|exam\s*date|examination\s*date|응시\s*일자?|시험\s*일자?|imtihon\s*sanasi|topshirilgan\s*sana)", "certificate_test_date"),
-    (r"(cert.*expir|cert.*valid|유효\s*기간|만료\s*일자?|sertifikat\s*amal\s*qilish)", "certificate_valid_date"),
-    (r"(certificate\s*score|topik\s*score|ielts\s*score|topik\s*level|급수|취득\s*점수|sertifikat\s*bali)", "certificate_score"),
-    (r"(language\s*certificate|language\s*proficiency|토픽\s*/?\s*ielts|topik|ielts|어학\s*능력|공인\s*어학|til\s*sertifikati|сертификат)", "language_certificate"),
+    # Language certificate dates & scores & types
+    (r"(test\s*date|exam\s*date|examination\s*date|응시\s*일자?|시험\s*일자?|imtihon\s*sanasi|topshirilgan\s*sana|дата\s*экзамена)", "certificate_test_date"),
+    (r"(cert.*expir|cert.*valid|유효\s*기간|만료\s*일자?|sertifikat\s*amal\s*qilish|срок\s*действия\s*сертификата)", "certificate_valid_date"),
+    (r"(certificate\s*score|topik\s*score|ielts\s*score|sat\s*score|sat\s*point|topik\s*level|급수|취득\s*점수|sertifikat\s*bali|балл\s*сертификата)", "certificate_score"),
+    (r"(language\s*certificate|language\s*proficiency|토픽\s*/?\s*ielts|topik|ielts|toefl|cefr|^sat$|ska|어학\s*능력|공인\s*어학|한국어\s*능력|til\s*sertifikati|языковой\s*сертификат|сертификат)", "language_certificate"),
 
     # GPA & Scale
     (r"(gpa\s*system|gpa\s*scale|grade\s*scale|만점\s*기준|기준\s*학점)", "gpa_system"),
-    (r"(gpa|grade\s*point|성적|평점|평균\s*평점|o'rtacha\s*baho)", "gpa"),
+    (r"(gpa|grade\s*point|성적|평점|평균\s*평점|학점|o'rtacha\s*baho|средний\s*балл)", "gpa"),
 
     # Major / Department
     (r"(major|department|학과명|전공|세부전공|yo'nalish|mutaxassislik|факультет|специальность)", "major"),
 
     # Degree / Course Level
-    (r"(entry\s*level|course\s*level|degree\s*course|course|degree|전형\s*과정명?|학위\s*과정|daraja|bosqich)", "level"),
+    (r"(entry\s*level|course\s*level|degree\s*course|course|degree|전형\s*과정명?|학위\s*과정|daraja|bosqich|уровень\s*обучения)", "level"),
 
     # Previous School / University
-    (r"(previous\s*university|previous\s*school|graduated\s*school|last\s*school|출신\s*학교명?|출신\s*교명|모교|tugatgan\s*maktab|bitirgan\s*maktab|avvalgi\s*maktab|school\s*name|university\s*name|학교명|school|university|maktab|litsey|universitet|college)", "final_school_name"),
+    (r"(previous\s*university|previous\s*school|graduated\s*school|last\s*school|high\s*school|highschool|출신\s*학교명?|출신\s*교명|최종\s*학교|모교|tugatgan\s*maktab|bitirgan\s*maktab|avvalgi\s*maktab|school\s*name|university\s*name|학교명|school|university|maktab|litsey|universitet|college)", "final_school_name"),
 
     # Korean Name
-    (r"(korean\s*name|국문\s*이름|국문성명|한글\s*이름|한글성명|korean_name)", "korean_name"),
+    (r"(korean\s*name|국문\s*이름|국문성명|국문\s*성명|한글\s*이름|한글성명|한글\s*성명|한국어\s*성명|한국어\s*이름|korean_name)", "korean_name"),
 
-    # English Full Name / Name (Excludes username)
-    (r"(english\s*name|student\s*name|성명\s*\(?영문\)?|영문\s*이름|영문성명|name\s*\(as\s*appreaed|full\s*name|^name$|^f\.?i\.?sh$|^fio$|talaba\s*ismi|фио)", "full_name"),
-    (r"(first\s*name|given\s*name|ism|^이름$)", "first_name"),
-    (r"(last\s*name|sur\s*name|family\s*name|familiya|^성$)", "last_name"),
+    # English Full Name / Name
+    (r"(english\s*name|student\s*name|applicant\s*name|candidate\s*name|성명\s*\(?영문\)?|영문\s*이름|영문성명|영문\s*성명|성명|name\s*\(as\s*apprea?ed|full\s*name|^name$|^f\.?i\.?sh$|^fio$|talaba\s*ismi|фио)", "full_name"),
+    (r"(first\s*name|given\s*name|ism|^이름$|영문명|영문\s*명|имя)", "first_name"),
+    (r"(last\s*name|sur\s*name|family\s*name|familiya|^성$|영문성|영문\s*성|фамилия)", "last_name"),
     
     # Passport Number & Dates
-    (r"(passport\s*number|pasport\s*number|여권\s*번호|여권|passport\s*no|^passport$|^pasport$|серия\s*и\s*номер\s*паспорта)", "passport"),
-    (r"(passport\s*issue|issue\s*date|여권\s*발급일|발급일자|date\s*of\s*issue)", "passport_issue_date"),
-    (r"(passport\s*expir|expiry\s*date|expiration|여권\s*만료일|만료일자|date\s*of\s*expiration)", "passport_expire_date"),
+    (r"(passport\s*number|pasport\s*number|여권\s*번호|여권|passport\s*no|^passport$|^pasport$|passport\s*#|passport\s*num|серия\s*и\s*номер\s*паспорта)", "passport"),
+    (r"(passport\s*issue|issue\s*date|여권\s*발급일|발급일자|발급일|date\s*of\s*issue|дата\s*выдачи\s*паспорта)", "passport_issue_date"),
+    (r"(passport\s*expir|expiry\s*date|expiration\s*date|expiration|여권\s*만료일|만료일자|만료일|date\s*of\s*expiration|срок\s*действия\s*паспорта)", "passport_expire_date"),
     
     # Birthday / DOB
-    (r"(birth\s*date|date\s*of\s*birth|birthday|생년월일|생일|생년|tugilgan\s*sana|дата\s*рождения|^dob$)", "birthday"),
+    (r"(birth\s*date|date\s*of\s*birth|birthday|생년월일|생일|생년|tugilgan\s*sana|tug'ilgan\s*sana|дата\s*рождения|^dob$|d\.o\.b)", "birthday"),
     
     # Gender / Sex
-    (r"(gender|sex|성별|jinsi|пол)", "gender"),
+    (r"(gender|sex|성별|남\s*/?\s*여|jinsi|пол)", "gender"),
     
     # Nationality
     (r"(nationality|citizenship|국적|fuqaroligi|гражданство)", "nationality"),
 
-    # Student ID
-    (r"(student\s*id|talaba\s*id|학번|관리번호)", "id"),
+    # Student ID / Management No
+    (r"(student\s*id|talaba\s*id|학번|관리번호|applicant\s*id|registration\s*no|номер\s*студента)", "id"),
     
     # City / District
-    (r"^(city|town|district|tuman|shahar|도시|시|군|구)$", "address_city"),
+    (r"^(city|town|district|tuman|shahar|도시|시|군|구|시\s*[/·]\s*군\s*[/·]\s*구|город|район)$", "address_city"),
     
     # State / Region / Province
-    (r"^(state|province|region|viloyat|도|주)$", "address_state"),
+    (r"^(state|province|region|viloyat|도|주|시\s*[/·]\s*도|область|регион)$", "address_state"),
     
-    # Phone numbers
-    (r"(student\s*number|student\s*phone|phone\s*1|^phone$|연락처|본인\s*연락처|전화번호|telefon|телефон)", "phone1"),
-    (r"(phone\s*2|extra\s*phone|emergency\s*phone|비상\s*연락처|비상연락처|qo'shimcha\s*telefon)", "phone2"),
+    # Secondary / Emergency Phone (checked before generic phone1)
+    (
+        r"(phone\s*2|extra\s*phone|emergency\s*phone|emergency\s*contact|emergency\s*number|"
+        r"secondary\s*phone|second\s*phone|alt\s*phone|alternative\s*phone|"
+        r"비상\s*연락처|비상연락처|추가\s*연락처|추가연락처|"
+        r"qo'shimcha\s*(telefon|aloqa)|favqulodda\s*(telefon|aloqa)|"
+        r"дополнительный\s*телефон|экстренный\s*телефон)",
+        "phone2"
+    ),
+
+    # Primary Phone / Mobile numbers (student phone)
+    (
+        r"(mobile\s*number|mobile\s*phone|cell\s*phone|cell\s*number|^mobile$|^cell$|cellular|"
+        r"handphone|hand\s*phone|h\.?p\.?|"
+        r"contact\s*number|contact\s*no|phone\s*number|phone\s*no|^phone$|phone\s*1|^tel$|tel\s*no|tel\s*number|telephone|"
+        r"student\s*(number|phone|mobile|tel)|applicant\s*(phone|mobile|tel)|"
+        r"연락처|본인\s*연락처|전화번호|전화\s*번호|휴대전화|휴대폰|핸드폰|휴대\s*전화|"
+        r"telefon|telefon\s*raqam|tel\s*raqam|mobil\s*raqam|"
+        r"телефон|номер\s*телефона|мобильный\s*телефон|мобильный|сотовый)",
+        "phone1"
+    ),
     
     # Email
-    (r"(email|e-mail|이메일|elektron\s*pochta)", "email"),
+    (r"(email|e-mail|mail|이메일|전자우편|elektron\s*pochta|электронная\s*почта)", "email"),
     
     # Address Full
-    (r"(address\s*in\s*english|full\s*address|address|주소|manzil|адрес)", "address"),
+    (r"(address\s*in\s*english|full\s*address|home\s*address|residence\s*address|^address$|주소|본국\s*주소|거주지|영문\s*주소|manzil|to'liq\s*manzil|адрес)", "address"),
 
     # Management
-    (r"(tariff|tarif|plan)", "tariff"),
-    (r"(student\s*group|group\s*name|^group$|guruh|반|그룹)", "student_group"),
-    (r"(coordinator|koordinator)", "coordinator"),
-    (r"(lead\s*by|mas['’]ul)", "lead_by"),
-    (r"(office|filial|ofis)", "office"),
-    (r"(notes|remarks|memo|비고|특이사항|izoh|eslatma)", "notes"),
+    (r"(tariff|tarif|plan|тариф)", "tariff"),
+    (r"(student\s*group|group\s*name|^group$|guruh|반|그룹|группа)", "student_group"),
+    (r"(coordinator|koordinator|куратор)", "coordinator"),
+    (r"(lead\s*by|mas['’]ul|ответственный)", "lead_by"),
+    (r"(office|filial|ofis|офис)", "office"),
+    (r"(notes|remarks|memo|비고|특이사항|izoh|eslatma|примечание)", "notes"),
 ]
 
 
@@ -369,6 +409,12 @@ def detect_header_row(ws: openpyxl.worksheet.worksheet.Worksheet, max_scan_rows:
     """
     best_row = 1
     best_score = -1
+    
+    header_keywords = [
+        'name', 'no', '№', 'passport', 'birth', 'gender', 'sex', 'city', 'state',
+        'phone', 'mobile', 'tel', 'cell', '성명', '여권', '순번', '연번', '생년',
+        '연락처', '주소', '휴대', '핸드폰', 'telefon', 'ism', 'manzil'
+    ]
     
     for r in range(1, min(ws.max_row + 1, max_scan_rows + 1)):
         row_vals = [ws.cell(r, c).value for c in range(1, min(ws.max_column + 1, 100))]
@@ -381,7 +427,7 @@ def detect_header_row(ws: openpyxl.worksheet.worksheet.Worksheet, max_scan_rows:
         
         for val in non_empty:
             low = val.lower()
-            if any(kw in low for kw in ['name', 'no', '№', 'passport', 'birth', 'gender', 'sex', 'city', 'state', '성명', '여권', '순번', '생년', '연락처', '주소']):
+            if any(kw in low for kw in header_keywords):
                 score += 5
             if len(non_empty) <= 2 and len(val) > 30:
                 score -= 10
@@ -411,35 +457,47 @@ def match_column_field(header_text: str) -> Tuple[str, float]:
         if re.search(pattern, cleaned, re.IGNORECASE):
             return (field_key, 0.95)
             
-    # Fuzzy keyword check
-    if cleaned in ('city', 'district', 'town', 'tuman', 'shahar'):
+    # Fuzzy keyword checks for common terms not captured by exact regex
+    if any(k in cleaned for k in ('city', 'district', 'town', 'tuman', 'shahar', '도시', '군', '구')):
         return ('address_city', 0.95)
-    if cleaned in ('state', 'province', 'region', 'viloyat'):
+    if any(k in cleaned for k in ('state', 'province', 'region', 'viloyat', '도', '주', 'область')):
         return ('address_state', 0.95)
-    if 'name' in cleaned or 'ism' in cleaned or '성명' in cleaned:
+    if 'name' in cleaned or 'ism' in cleaned or '성명' in cleaned or 'фио' in cleaned:
+        if any(p in cleaned for p in ('father', '부', '부친', 'otasi', 'отца')):
+            return ('father_name', 0.90)
+        if any(p in cleaned for p in ('mother', '모', '모친', 'onasi', 'матери')):
+            return ('mother_name', 0.90)
         if 'kor' in cleaned or '국문' in cleaned or '한글' in cleaned:
             return ('korean_name', 0.85)
         return ('full_name', 0.85)
     if 'pass' in cleaned or '여권' in cleaned:
         return ('passport', 0.85)
-    if 'birth' in cleaned or '생년' in cleaned or 'dob' in cleaned:
+    if 'birth' in cleaned or '생년' in cleaned or 'dob' in cleaned or 'рождения' in cleaned:
         return ('birthday', 0.85)
-    if 'phone' in cleaned or 'tel' in cleaned or '연락처' in cleaned:
-        if 'father' in cleaned or '부' in cleaned:
+    if any(k in cleaned for k in ('phone', 'tel', 'mobile', 'cell', 'handphone', '연락처', '전화', '휴대', '핸드폰', 'telefon', 'телефон')):
+        if any(p in cleaned for p in ('father', '부', '부친', 'otasi', 'отца')):
             return ('father_phone', 0.85)
-        if 'mother' in cleaned or '모' in cleaned:
+        if any(p in cleaned for p in ('mother', '모', '모친', 'onasi', 'матери')):
             return ('mother_phone', 0.85)
+        if any(p in cleaned for p in ('emergency', '비상', '2', 'extra', 'alt', 'secondary', 'qo\'shimcha', 'доп')):
+            return ('phone2', 0.85)
         return ('phone1', 0.85)
     if 'mail' in cleaned or '이메일' in cleaned:
         return ('email', 0.85)
-    if 'addr' in cleaned or '주소' in cleaned:
+    if 'addr' in cleaned or '주소' in cleaned or 'manzil' in cleaned or 'адрес' in cleaned:
         return ('address', 0.85)
-    if 'sex' in cleaned or 'gender' in cleaned or '성별' in cleaned:
+    if 'sex' in cleaned or 'gender' in cleaned or '성별' in cleaned or 'пол' in cleaned:
         return ('gender', 0.85)
-    if 'no' in cleaned or '№' in cleaned or '순번' in cleaned:
-        return ('_sequence_no', 0.85)
-    if 'university' in cleaned or 'school' in cleaned or 'college' in cleaned:
+    if any(k in cleaned for k in ('no', '№', '순번', '연번', 'seq', 'номер')):
+        # Ensure not passport number, degree no, etc.
+        if not any(ex in cleaned for ex in ('pass', '여권', 'degree', 'diplom', '학위', 'phone', 'tel', 'mobile', 'cell')):
+            return ('_sequence_no', 0.85)
+    if 'university' in cleaned or 'school' in cleaned or 'college' in cleaned or '학교' in cleaned:
         return ('final_school_name', 0.85)
+    if any(k in cleaned for k in ('sat', 'ielts', 'topik', 'toefl', 'cefr', 'sertifikat', 'certificate')):
+        if 'score' in cleaned or 'bali' in cleaned or 'point' in cleaned or '점수' in cleaned or '급수' in cleaned:
+            return ('certificate_score', 0.85)
+        return ('language_certificate', 0.85)
         
     return ("_skip", 0.1)
 
