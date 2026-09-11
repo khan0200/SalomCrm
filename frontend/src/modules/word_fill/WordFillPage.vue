@@ -30,23 +30,46 @@ import {
   type WordAnalysisResult,
   type WordMappingConfig,
   type WordSlot,
+  type WordScanTagsResult,
+  type WordScannedTag,
 } from '@/api/wordFill'
+import WordPlaceholderCatalog from './components/WordPlaceholderCatalog.vue'
 import { studentsApi } from '@/api/students'
 import type { Student } from '@/types'
 import { ROW_COLOR_MAP } from '@/types'
 
 // ─── Step State ─────────────────────────────────────────────────────────────
 const currentStep = ref<1 | 2 | 3 | 4>(1)
+const showCatalogModal = ref(false)
+
+const downloadExampleTemplate = () => {
+  const link = document.createElement('a')
+  link.href = '/APPFORM.docx'
+  link.setAttribute('download', 'APPFORM.docx')
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+}
 
 // ─── File & Template State ──────────────────────────────────────────────────
 const uploadedFile = ref<File | null>(null)
 const isAnalyzing = ref(false)
 const analysisError = ref<string | null>(null)
 const analysisData = ref<WordAnalysisResult | null>(null)
+const scanResult = ref<WordScanTagsResult | null>(null)
+const customTagMappings = ref<Record<string, string>>({})
 const isDragging = ref(false)
 // AI mapping is always on; the backend falls back to its own dictionary when no
 // API key is configured, so there is nothing here for the user to decide.
 const AI_PROVIDER = 'openai'
+
+// ─── Catalog Fields for Samples & Labels ────────────────────────────────────
+const { data: catalogFieldsData } = useQuery({
+  queryKey: ['word-fill-catalog-fields'],
+  queryFn: () => wordFillApi.getPlaceholderCatalog(),
+  staleTime: 1000 * 60 * 30,
+})
+const catalogFields = computed(() => catalogFieldsData.value || [])
 
 // ─── Mappings State ─────────────────────────────────────────────────────────
 const mappings = ref<WordMappingConfig[]>([])
@@ -387,7 +410,7 @@ onUnmounted(() => {
   window.removeEventListener('click', handleWindowClick)
 })
 
-// ─── File Upload & AI Analysis ──────────────────────────────────────────────
+// ─── File Upload & Tag Scan ──────────────────────────────────────────────
 const handleFileUpload = async (file: File) => {
   if (!file.name.toLowerCase().match(/\.(docx|dotx)$/)) {
     analysisError.value = "Faqat .docx formatidagi Word fayllari qabul qilinadi (eski .doc qo'llab-quvvatlanmaydi)"
@@ -397,19 +420,22 @@ const handleFileUpload = async (file: File) => {
   uploadedFile.value = file
   isAnalyzing.value = true
   analysisError.value = null
-  analysisData.value = null
+  scanResult.value = null
 
   try {
-    const res = await wordFillApi.analyzeTemplate({
-      file,
-      use_ai: true,
-      provider: AI_PROVIDER,
-    })
-    analysisData.value = res
-    initMappings(res)
+    const res = await wordFillApi.scanTags(file)
+    scanResult.value = res
+
+    const mapObj: Record<string, string> = {}
+    for (const t of res.tags) {
+      mapObj[t.tag_name] = t.crm_field || '_skip'
+    }
+    customTagMappings.value = mapObj
+
+    currentStep.value = 2
   } catch (err: any) {
-    console.error('Error analyzing Word template:', err)
-    analysisError.value = err.response?.data?.error || err.message || "Faylni tahlil qilishda xatolik yuz berdi"
+    console.error('Error scanning Word template:', err)
+    analysisError.value = err.response?.data?.error || err.message || "Faylni tekshirishda xatolik yuz berdi"
   } finally {
     isAnalyzing.value = false
   }
@@ -425,109 +451,43 @@ const onFileInputChange = (e: Event) => {
   if (target.files?.length) handleFileUpload(target.files[0])
 }
 
-/** Joins each detected slot with the AI's suggestion into an editable row. */
-const initMappings = (res: WordAnalysisResult) => {
-  const suggestionById = new Map(res.suggested_mappings.map(m => [m.slot_id, m]))
-
-  mappings.value = res.slots.map((slot: WordSlot) => {
-    const suggestion = suggestionById.get(slot.slot_id)
-    const isKorean = /[가-힣]/.test(slot.label || '')
-
-    return {
-      slot_id: slot.slot_id,
-      kind: slot.kind,
-      label: slot.label,
-      field: suggestion?.field || '_skip',
-      options: slot.options || [],
-      existing_placeholder: slot.existing_placeholder,
-      static_value: '',
-      fallback: '',
-      confidence: suggestion?.confidence ?? 0,
-      reason: suggestion?.reason || '',
-      format_rules: {
-        dateFormat: isKorean ? 'YYYY.MM.DD' : 'YYYY-MM-DD',
-        genderFormat: isKorean ? '남/여' : 'MALE/FEMALE',
-        phoneFormat: 'original',
-      },
-    }
-  })
-}
-
-const mappedCount = computed(() => mappings.value.filter(m => m.field !== '_skip').length)
-const skippedCount = computed(() => mappings.value.filter(m => m.field === '_skip').length)
-const checkboxCount = computed(() => mappings.value.filter(m => m.kind === 'checkbox' && m.field !== '_skip').length)
-
-/** Low-confidence rows the head manager should look at before generating. */
-const lowConfidenceCount = computed(
-  () => mappings.value.filter(m => m.field !== '_skip' && (m.confidence ?? 0) < 0.7).length
-)
-
-const visibleMappings = computed(() => {
-  let list = [...mappings.value]
-  if (onlyMappedFilter.value) list = list.filter(m => m.field !== '_skip')
-
-  list.sort((a, b) => {
-    const aSkip = a.field === '_skip' ? 1 : 0
-    const bSkip = b.field === '_skip' ? 1 : 0
-    if (aSkip !== bSkip) return aSkip - bSkip
-    return a.slot_id.localeCompare(b.slot_id, undefined, { numeric: true })
-  })
-  return list
-})
-
-// All supported date fields that should display date format dropdown
-const DATE_FIELDS = [
-  'birthday',
-  'passport_issue_date',
-  'passport_expire_date',
-  'date_of_entry',
-  'date_of_graduation',
-  'today_date',
-  'certificate_test_date',
-  'certificate_valid_date',
-  'certificate_2_test_date',
-  'certificate_2_valid_date',
-  'certificate_3_test_date',
-  'certificate_3_valid_date',
-]
-
 // Category ordering and labels
 const CATEGORY_ORDER: { key: string; label: string }[] = [
-  { key: 'system', label: 'Tizim / Maxsus' },
   { key: 'personal', label: 'Shaxsiy ma\'lumotlar' },
   { key: 'passport', label: 'Pasport ma\'lumotlari' },
   { key: 'contacts', label: 'Aloqa ma\'lumotlari' },
   { key: 'parents', label: 'Ota-ona ma\'lumotlari' },
-  { key: 'education', label: 'Ta\'lim ma\'lumotlari (Educational Background)' },
+  { key: 'education', label: 'Ta\'lim ma\'lumotlari' },
   { key: 'certificates', label: 'Til sertifikatlari' },
   { key: 'university', label: 'Universitet tanlovlari' },
   { key: 'management', label: 'Boshqa / CRM' },
+  { key: 'system', label: 'Tizim / Sanalar' },
 ]
 
 const categorizedCrmFields = computed(() => {
-  if (!analysisData.value?.available_fields) return {}
+  const fields = scanResult.value?.available_fields?.length
+    ? scanResult.value.available_fields
+    : (catalogFields.value || [])
+  if (!fields.length) return {}
+
   const groups: Record<string, { key: string; label: string }[]> = {}
 
-  // Initialize ordered known categories
   CATEGORY_ORDER.forEach(c => {
     groups[c.label] = []
   })
 
-  // Category key to display label mapping
   const categoryLabelMap = new Map(CATEGORY_ORDER.map(c => [c.key, c.label]))
 
-  analysisData.value.available_fields.forEach(f => {
-    let groupLabel = categoryLabelMap.get(f.category)
-    if (!groupLabel) {
-      groupLabel = f.category ? f.category.charAt(0).toUpperCase() + f.category.slice(1) : 'Boshqa'
-      if (!groups[groupLabel]) {
-        groups[groupLabel] = []
-      }
+  fields.forEach((f: any) => {
+    const rawCat = typeof f?.category === 'string' ? f.category : ''
+    const mapped = categoryLabelMap.get(rawCat)
+    const groupLabel: string = mapped || (rawCat ? rawCat.charAt(0).toUpperCase() + rawCat.slice(1) : 'Boshqa')
+    if (!groups[groupLabel]) {
+      groups[groupLabel] = []
     }
-    groups[groupLabel].push(f)
+    groups[groupLabel]!.push({ key: f.key, label: f.label })
   })
 
-  // Filter out empty groups
   const nonEmptyGroups: Record<string, { key: string; label: string }[]> = {}
   for (const [name, items] of Object.entries(groups)) {
     if (items.length > 0) {
@@ -537,6 +497,19 @@ const categorizedCrmFields = computed(() => {
 
   return nonEmptyGroups
 })
+
+const getFieldSample = (fieldKey?: string | null) => {
+  if (!fieldKey || fieldKey === '_skip') return "—"
+  const item = catalogFields.value.find(f => f.key === fieldKey)
+  return item?.sample || ''
+}
+
+const mappedCount = computed(() => {
+  if (!customTagMappings.value) return 0
+  return Object.values(customTagMappings.value).filter(f => f && f !== '_skip').length
+})
+
+const checkboxCount = computed(() => 0)
 
 const confidenceBadge = (conf: number) => {
   if (conf >= 0.9) return { text: 'Yuqori', cls: 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300' }
@@ -625,6 +598,29 @@ const filenamePreview = computed(() => {
 })
 
 // ─── Generate & Download ────────────────────────────────────────────────────
+const downloadedBlob = ref<Blob | null>(null)
+
+const triggerBrowserDownload = (blob: Blob, fileName: string) => {
+  const mimeType = fileName.endsWith('.zip')
+    ? 'application/zip'
+    : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+  const file = new File([blob], fileName, { type: mimeType })
+  const url = window.URL.createObjectURL(file)
+  const link = document.createElement('a')
+  link.href = url
+  link.setAttribute('download', fileName)
+  link.download = fileName
+  link.style.display = 'none'
+  document.body.appendChild(link)
+  link.click()
+  setTimeout(() => {
+    if (document.body.contains(link)) {
+      document.body.removeChild(link)
+    }
+    window.URL.revokeObjectURL(url)
+  }, 2000)
+}
+
 const handleGenerate = async () => {
   if (!uploadedFile.value || selectedStudentIds.value.size === 0) return
 
@@ -635,34 +631,24 @@ const handleGenerate = async () => {
     const blob = await wordFillApi.generateFilledWord({
       file: uploadedFile.value,
       mappings: mappings.value.filter(m => m.field !== '_skip'),
+      custom_tag_mappings: customTagMappings.value,
       student_ids: Array.from(selectedStudentIds.value),
       filename_pattern: filenamePattern.value,
       checkbox_mark: checkboxMark.value,
     })
 
+    downloadedBlob.value = blob
     const count = selectedStudentIds.value.size
+    const baseName = uploadedFile.value.name.replace(/\.[^/.]+$/, '')
     const fileName = count > 1
-      ? `Filled_${uploadedFile.value.name.replace(/\.[^/.]+$/, '')}_${count}ta.zip`
+      ? `Filled_${baseName}_${count}ta.zip`
       : filenamePreview.value
 
-    const mimeType = fileName.endsWith('.zip') ? 'application/zip' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-    const file = new File([blob], fileName, { type: mimeType })
-    const url = window.URL.createObjectURL(file)
-    const link = document.createElement('a')
-    link.href = url
-    link.setAttribute('download', fileName)
-    link.download = fileName
-    link.style.display = 'none'
-    document.body.appendChild(link)
-    link.click()
-    setTimeout(() => {
-      if (document.body.contains(link)) {
-        document.body.removeChild(link)
-      }
-      window.URL.revokeObjectURL(url)
-    }, 2000)
+    downloadedFileName.value = fileName
+    triggerBrowserDownload(blob, fileName)
 
     generationSuccess.value = true
+    currentStep.value = 4
   } catch (err: any) {
     console.error('Error generating Word documents:', err)
     let errMsg = err.message || 'Server error'
@@ -680,10 +666,22 @@ const handleGenerate = async () => {
   }
 }
 
+const downloadAgain = () => {
+  if (downloadedBlob.value && downloadedFileName.value) {
+    triggerBrowserDownload(downloadedBlob.value, downloadedFileName.value)
+  } else {
+    handleGenerate()
+  }
+}
+
 const resetWizard = () => {
   currentStep.value = 1
   uploadedFile.value = null
   analysisData.value = null
+  scanResult.value = null
+  customTagMappings.value = {}
+  downloadedBlob.value = null
+  downloadedFileName.value = ''
   analysisError.value = null
   mappings.value = []
   selectedStudentIds.value.clear()
@@ -699,20 +697,31 @@ const resetWizard = () => {
   <div class="h-full flex flex-col bg-zinc-50 dark:bg-[#0c0d0e] overflow-hidden" @click="closeAllDropdowns">
     <!-- Sub header: the App Form tab bar above already names this engine -->
     <header class="bg-white dark:bg-[#111315] border-b border-zinc-200 dark:border-zinc-800/80 px-6 py-3 flex items-center justify-between gap-4 shrink-0">
-      <p class="text-xs text-zinc-500 dark:text-zinc-400 truncate">
-        Application Form (.docx) shablonlarini AI yordamida tanib, tanlangan talabalar uchun avtomatik to'ldirish
-      </p>
+      <div class="flex items-center gap-3 min-w-0">
+        <p class="text-xs text-zinc-500 dark:text-zinc-400 truncate hidden sm:block">
+          Application Form (.docx) shablonlarini tanlangan talabalar uchun avtomatik to'ldirish
+        </p>
+        <button
+          type="button"
+          @click="showCatalogModal = true"
+          class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 hover:bg-blue-100 dark:hover:bg-blue-900/60 border border-blue-200 dark:border-blue-800 transition-all cursor-pointer shrink-0"
+          title="Barcha mavjud {{...}} teglari ro'yxatini ochish"
+        >
+          <Sparkles class="w-3.5 h-3.5" />
+          <span>Teglar katalogi (&#123;&#123; &#125;&#125;)</span>
+        </button>
+      </div>
 
       <div class="flex items-center gap-2 bg-zinc-100 dark:bg-zinc-800/60 p-1 rounded-xl border border-zinc-200/60 dark:border-zinc-700/60 shrink-0">
         <button
           v-for="s in [
             { num: 1, label: '1. Shablon' },
-            { num: 2, label: '2. AI Mapping' },
+            { num: 2, label: '2. Teglarni tekshirish' },
             { num: 3, label: '3. Talabalar' },
             { num: 4, label: '4. Yuklab olish' }
           ]"
           :key="s.num"
-          :disabled="s.num > 1 && !analysisData"
+          :disabled="(s.num === 2 && !scanResult) || (s.num >= 3 && !uploadedFile)"
           @click="currentStep = s.num as any"
           class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer"
           :class="[
@@ -739,6 +748,10 @@ const resetWizard = () => {
       <div class="w-full max-w-[1800px] mx-auto">
         <!-- ═══════════════════ STEP 1: UPLOAD ═══════════════════ -->
         <div v-if="currentStep === 1" class="space-y-6">
+          <!-- Quick-Copy Demonstration of All Fields & {{field name}} -->
+          <WordPlaceholderCatalog />
+
+          <!-- Word Template Upload Zone -->
           <div
             class="border-2 border-dashed rounded-2xl p-8 text-center transition-all bg-white dark:bg-[#111315]"
             :class="isDragging
@@ -756,7 +769,7 @@ const resetWizard = () => {
                 Universitetning Word application formini yuklang
               </h3>
               <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-5">
-                .docx formatidagi har qanday ariza shakli (Koreyscha, Inglizcha, Ruscha)
+                .docx formatidagi ariza shakli yoki yuqoridagi teglar bilan tayyorlangan shablon (Koreyscha, Inglizcha, Ruscha)
               </p>
 
               <label class="cursor-pointer inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shadow-md shadow-blue-600/20 transition-all">
@@ -770,10 +783,10 @@ const resetWizard = () => {
           <div v-if="isAnalyzing" class="bg-white dark:bg-[#111315] border border-zinc-200 dark:border-zinc-800 rounded-2xl p-8 text-center space-y-3">
             <RefreshCw class="w-8 h-8 text-blue-500 animate-spin mx-auto" />
             <h4 class="text-sm font-bold text-zinc-800 dark:text-zinc-200">
-              AI hujjatni tahlil qilmoqda...
+              Word fayldagi teglarni tekshirish...
             </h4>
             <p class="text-xs text-zinc-500 dark:text-zinc-400">
-              To'ldiriladigan joylar, checkbox maydonlari va CRM mosliklari aniqlanmoqda
+              Hujjatdagi barcha jadvallar, paragraflar va katakchalardagi teglarning to'g'riligi tahlil qilinmoqda
             </p>
           </div>
 
@@ -781,242 +794,172 @@ const resetWizard = () => {
             <AlertTriangle class="w-5 h-5 shrink-0" />
             <span>{{ analysisError }}</span>
           </div>
+        </div>
 
-          <!-- Analysis result -->
-          <div v-if="analysisData && !isAnalyzing" class="bg-white dark:bg-[#111315] border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 space-y-5">
-            <div class="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800/80 pb-4">
-              <div class="flex items-center gap-3">
-                <div class="w-9 h-9 rounded-lg bg-blue-100 dark:bg-blue-950/60 flex items-center justify-center text-blue-600">
-                  <CheckCircle2 class="w-5 h-5" />
-                </div>
-                <div>
-                  <h4 class="text-sm font-bold text-zinc-900 dark:text-zinc-100">{{ uploadedFile?.name }}</h4>
-                  <p class="text-xs text-zinc-500 dark:text-zinc-400">
-                    Hajmi: {{ ((uploadedFile?.size || 0) / 1024).toFixed(1) }} KB •
-                    Jadvallar: {{ analysisData.tables.length }} ta
-                  </p>
-                </div>
+        <!-- ═══════════════════ STEP 2: TAG VERIFICATION & REMAPPING ═══════════════════ -->
+        <div v-if="currentStep === 2 && scanResult" class="space-y-5">
+          <div class="bg-white dark:bg-[#111315] border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 sm:p-6 space-y-5">
+            <!-- Header row -->
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-100 dark:border-zinc-800 pb-4">
+              <div>
+                <h3 class="text-base font-extrabold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                  <CheckCircle2 class="w-5 h-5 text-emerald-500" />
+                  Hujjatdagi teglarni tekshirish
+                </h3>
+                <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+                  <strong>{{ uploadedFile?.name }}</strong> faylidan jami <strong>{{ scanResult.total_tags_count }}</strong> ta teg topildi.
+                  To'g'ri kelgan va begona teglarni tekshiring.
+                </p>
               </div>
-              <span class="text-[10px] font-bold px-2.5 py-1 rounded-full" :class="sourceLabel.cls">
-                {{ sourceLabel.text }}
-              </span>
-            </div>
 
-            <div class="grid grid-cols-3 gap-4">
-              <div class="p-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-100 dark:border-zinc-800">
-                <span class="text-[11px] font-semibold text-zinc-400 block">Topilgan joylar</span>
-                <span class="text-base font-extrabold text-zinc-900 dark:text-zinc-100">{{ analysisData.slots.length }} ta</span>
-              </div>
-              <div class="p-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-100 dark:border-zinc-800">
-                <span class="text-[11px] font-semibold text-zinc-400 block">Moslangan maydonlar</span>
-                <span class="text-base font-extrabold text-blue-600 dark:text-blue-400">{{ mappedCount }} ta</span>
-              </div>
-              <div class="p-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-100 dark:border-zinc-800">
-                <span class="text-[11px] font-semibold text-zinc-400 block">Checkbox maydonlar</span>
-                <span class="text-base font-extrabold text-violet-600 dark:text-violet-400">{{ checkboxCount }} ta</span>
+              <div class="flex items-center gap-2">
+                <button
+                  type="button"
+                  @click="currentStep = 1"
+                  class="px-3.5 py-1.5 rounded-xl border border-zinc-200 dark:border-zinc-700 text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-all cursor-pointer"
+                >
+                  Boshqa fayl tanlash
+                </button>
               </div>
             </div>
 
-            <div class="flex items-center justify-end">
+            <!-- 3 Stat Cards -->
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+              <div class="p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800">
+                <span class="text-xs font-medium text-zinc-500 dark:text-zinc-400 block">Jami topilgan teglar</span>
+                <span class="text-xl font-extrabold text-zinc-900 dark:text-zinc-100 mt-0.5 block">
+                  {{ scanResult.total_tags_count }} <span class="text-xs font-normal text-zinc-400">({{ scanResult.unique_tags_count }} xil teg)</span>
+                </span>
+              </div>
+
+              <div class="p-4 rounded-2xl bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200/80 dark:border-emerald-800/60">
+                <span class="text-xs font-medium text-emerald-700 dark:text-emerald-400 block">To'g'ri moslangan teglar</span>
+                <span class="text-xl font-extrabold text-emerald-700 dark:text-emerald-300 mt-0.5 block">
+                  {{ scanResult.recognized_count }} ta ✅
+                </span>
+              </div>
+
+              <div
+                class="p-4 rounded-2xl border transition-all"
+                :class="scanResult.alien_count > 0
+                  ? 'bg-amber-50/70 dark:bg-amber-950/30 border-amber-300 dark:border-amber-800'
+                  : 'bg-zinc-50 dark:bg-zinc-900/60 border-zinc-200 dark:border-zinc-800'"
+              >
+                <span class="text-xs font-medium block" :class="scanResult.alien_count > 0 ? 'text-amber-800 dark:text-amber-400' : 'text-zinc-500 dark:text-zinc-400'">
+                  Begona / Noma'lum teglar
+                </span>
+                <span class="text-xl font-extrabold mt-0.5 block" :class="scanResult.alien_count > 0 ? 'text-amber-700 dark:text-amber-300' : 'text-zinc-700 dark:text-zinc-300'">
+                  {{ scanResult.alien_count }} ta {{ scanResult.alien_count > 0 ? '⚠️' : '✓' }}
+                </span>
+              </div>
+            </div>
+
+            <!-- Alien tags notice if any -->
+            <div
+              v-if="scanResult.alien_count > 0"
+              class="p-3.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-xs text-amber-900 dark:text-amber-200 flex items-start gap-2.5 leading-relaxed"
+            >
+              <AlertTriangle class="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
+              <div>
+                <strong>Diqqat:</strong> Hujjatda <strong>{{ scanResult.alien_count }} ta noma'lum teg</strong> aniqlandi.
+                Ular arizangizda qaysi ma'lumotga almashtirilishi kerakligini quyidagi jadvaldan tanlang yoki <em>"O'tkazib yuborish"</em> ni belgilang.
+              </div>
+            </div>
+
+            <!-- Tags Table -->
+            <div class="border border-zinc-200 dark:border-zinc-800 rounded-2xl overflow-hidden shadow-2xs">
+              <table class="w-full text-left border-collapse text-xs">
+                <thead class="bg-zinc-50/90 dark:bg-[#151719] border-b border-zinc-200 dark:border-zinc-800 text-[11px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider select-none">
+                  <tr>
+                    <th class="py-3 px-3 w-12 text-center">№</th>
+                    <th class="py-3 px-4 min-w-[200px]">Hujjatdagi Teg</th>
+                    <th class="py-3 px-4 w-40">Holati</th>
+                    <th class="py-3 px-4 min-w-[260px]">CRM Maydoni (Moslash)</th>
+                    <th class="py-3 px-4 min-w-[200px]">Namuna ma'lumot</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-zinc-200/70 dark:divide-zinc-800/70 bg-white dark:bg-[#111315]">
+                  <tr
+                    v-for="(tag, idx) in scanResult.tags"
+                    :key="tag.tag_name"
+                    class="hover:bg-zinc-50/70 dark:hover:bg-zinc-800/30 transition-colors"
+                  >
+                    <td class="py-3 px-3 text-center text-[11px] font-mono font-medium text-zinc-400">
+                      {{ idx + 1 }}
+                    </td>
+                    <td class="py-3 px-4">
+                      <div class="flex items-center gap-2">
+                        <span class="px-2.5 py-1 rounded-lg font-mono font-bold text-xs bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-700">
+                          {{ tag.raw_tag }}
+                        </span>
+                        <span class="text-[10px] text-zinc-400 font-medium">
+                          ({{ tag.occurrences }} marta)
+                        </span>
+                      </div>
+                    </td>
+                    <td class="py-3 px-4">
+                      <span
+                        v-if="tag.is_recognized"
+                        class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300"
+                      >
+                        <CheckCircle2 class="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+                        Moslandi
+                      </span>
+                      <span
+                        v-else
+                        class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300"
+                      >
+                        <AlertTriangle class="w-3 h-3 text-amber-600 dark:text-amber-400" />
+                        Begona teg
+                      </span>
+                    </td>
+                    <td class="py-3 px-4">
+                      <select
+                        v-model="customTagMappings[tag.tag_name]"
+                        class="w-full bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 text-xs font-semibold rounded-xl px-3 py-2 text-zinc-900 dark:text-zinc-100 cursor-pointer focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none transition-all"
+                      >
+                        <option value="_skip">❌ O'tkazib yuborish (Bo'sh qoldirish)</option>
+                        <optgroup
+                          v-for="(fields, groupName) in categorizedCrmFields"
+                          :key="groupName"
+                          :label="groupName"
+                        >
+                          <option v-for="f in fields" :key="f.key" :value="f.key">
+                            {{ f.label }}
+                          </option>
+                        </optgroup>
+                      </select>
+                    </td>
+                    <td class="py-3 px-4 text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                      <span class="px-2 py-1 rounded-md bg-zinc-100/80 dark:bg-zinc-800/80 font-mono text-[11px] text-zinc-700 dark:text-zinc-300 border border-zinc-200/60 dark:border-zinc-700/60 inline-block max-w-[220px] truncate" :title="getFieldSample(customTagMappings[tag.tag_name])">
+                        {{ getFieldSample(customTagMappings[tag.tag_name]) }}
+                      </span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Navigation bottom -->
+            <div class="flex items-center justify-between pt-2">
               <button
-                @click="currentStep = 2"
+                type="button"
+                @click="currentStep = 1"
+                class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-bold transition-all cursor-pointer"
+              >
+                <ArrowLeft class="w-4 h-4" />
+                Ortga (Shablon)
+              </button>
+
+              <button
+                type="button"
+                @click="currentStep = 3"
                 class="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shadow-md shadow-blue-600/20 transition-all cursor-pointer"
               >
-                AI takliflarini tekshirish
+                Talabalarni tanlashga o'tish
                 <ArrowRight class="w-4 h-4" />
               </button>
             </div>
-          </div>
-        </div>
-
-        <!-- ═══════════════════ STEP 2: MAPPING REVIEW ═══════════════════ -->
-        <div v-if="currentStep === 2 && analysisData" class="space-y-5">
-          <div class="bg-white dark:bg-[#111315] border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 space-y-4">
-            <div class="flex items-center justify-between">
-              <div>
-                <h3 class="text-sm font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-                  <Sparkles class="w-4 h-4 text-violet-500" />
-                  AI takliflarini tasdiqlang
-                </h3>
-                <p class="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">
-                  Har bir joy uchun taklif qilingan CRM maydonini tekshiring va kerak bo'lsa o'zgartiring.
-                  Faqat siz tasdiqlagan maydonlar to'ldiriladi.
-                </p>
-              </div>
-              <label class="flex items-center gap-2 text-[11px] font-bold text-zinc-600 dark:text-zinc-300 cursor-pointer shrink-0">
-                <input type="checkbox" v-model="onlyMappedFilter" class="rounded text-blue-600 cursor-pointer" />
-                Faqat moslanganlar
-              </label>
-            </div>
-
-            <div class="flex items-center gap-2 flex-wrap">
-              <span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300">
-                {{ mappedCount }} ta to'ldiriladi
-              </span>
-              <span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-zinc-100 dark:bg-zinc-800 text-zinc-500">
-                {{ skippedCount }} ta o'tkazib yuboriladi
-              </span>
-              <span
-                v-if="lowConfidenceCount > 0"
-                class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 inline-flex items-center gap-1"
-              >
-                <AlertTriangle class="w-3 h-3" />
-                {{ lowConfidenceCount }} ta past ishonchli — tekshiring
-              </span>
-            </div>
-
-            <!-- Mapping rows -->
-            <div class="border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden">
-              <div class="max-h-[28rem] overflow-y-auto scrollbar-thin divide-y divide-zinc-100 dark:divide-zinc-800/60">
-                <div
-                  v-for="m in visibleMappings"
-                  :key="m.slot_id"
-                  class="p-3 flex items-start gap-3 hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors"
-                  :class="m.field === '_skip' ? 'opacity-60' : ''"
-                >
-                  <!-- Slot info -->
-                  <div class="flex-1 min-w-0">
-                    <div class="flex items-center gap-1.5 flex-wrap">
-                      <span
-                        v-if="m.kind === 'checkbox'"
-                        class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-violet-100 dark:bg-violet-950/60 text-violet-700 dark:text-violet-300"
-                      >
-                        <CheckSquare class="w-2.5 h-2.5" />
-                        CHECKBOX
-                      </span>
-                      <span
-                        v-if="m.existing_placeholder"
-                        class="px-1.5 py-0.5 rounded text-[9px] font-bold font-mono bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300"
-                      >
-                        &#123;&#123;{{ m.existing_placeholder }}&#125;&#125;
-                      </span>
-                      <span class="font-mono text-[9px] text-zinc-400">{{ m.slot_id }}</span>
-                    </div>
-                    <div class="text-xs font-bold text-zinc-900 dark:text-zinc-100 mt-0.5 truncate" :title="m.label">
-                      {{ m.label || '(nomsiz joy)' }}
-                    </div>
-                    <div v-if="m.options?.length" class="text-[10px] text-zinc-500 mt-0.5">
-                      Variantlar: {{ m.options.join(' / ') }}
-                    </div>
-                    <div v-if="m.reason && m.field !== '_skip'" class="text-[10px] text-zinc-400 dark:text-zinc-500 mt-0.5 italic truncate" :title="m.reason">
-                      {{ m.reason }}
-                    </div>
-                  </div>
-
-                  <!-- Confidence -->
-                  <span
-                    class="px-2 py-0.5 rounded-full text-[9px] font-bold shrink-0 mt-1"
-                    :class="confidenceBadge(m.confidence ?? 0).cls"
-                  >
-                    {{ confidenceBadge(m.confidence ?? 0).text }}
-                  </span>
-
-                  <!-- Field selector -->
-                  <div class="w-64 shrink-0 space-y-1.5">
-                    <select
-                      v-model="m.field"
-                      @click.stop
-                      class="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-[11px] font-semibold rounded-lg px-2 py-1.5 text-zinc-800 dark:text-zinc-200 cursor-pointer focus:border-blue-500 focus:outline-none"
-                    >
-                      <optgroup v-for="(fields, groupName) in categorizedCrmFields" :key="groupName" :label="groupName">
-                        <option v-for="f in fields" :key="f.key" :value="f.key">{{ f.label }}</option>
-                      </optgroup>
-                    </select>
-
-                    <input
-                      v-if="m.field === '_static_value'"
-                      v-model="m.static_value"
-                      @click.stop
-                      type="text"
-                      placeholder="Barchaga yoziladigan matn..."
-                      class="w-full bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-[11px] rounded-lg px-2 py-1.5 text-zinc-800 dark:text-zinc-200 focus:border-blue-500 focus:outline-none"
-                    />
-
-                    <div v-if="DATE_FIELDS.includes(m.field)">
-                      <select
-                        v-model="m.format_rules.dateFormat"
-                        @click.stop
-                        class="w-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-[10px] rounded-lg px-2 py-1 text-zinc-600 dark:text-zinc-400 cursor-pointer"
-                      >
-                        <option value="YYYY-MM-DD">2003-05-14</option>
-                        <option value="YYYY.MM.DD">2003.05.14</option>
-                        <option value="DD.MM.YYYY">14.05.2003</option>
-                        <option value="DD-MM-YYYY">14-05-2003</option>
-                        <option value="YYYYMMDD">20030514</option>
-                        <option value="YYYY/MM/DD">2003/05/14</option>
-                      </select>
-                    </div>
-
-                    <div v-if="m.field === 'graduation_expected'">
-                      <select
-                        v-model="m.format_rules.boolFormat"
-                        @click.stop
-                        class="w-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-[10px] rounded-lg px-2 py-1 text-zinc-600 dark:text-zinc-400 cursor-pointer"
-                      >
-                        <option value="Yes/No">Yes / No</option>
-                        <option value="예/아니오">예 / 아니오</option>
-                        <option value="졸업예정/졸업">졸업예정 / 졸업</option>
-                        <option value="Y/N">Y / N</option>
-                        <option value="Ha/Yo'q">Ha / Yo'q</option>
-                      </select>
-                    </div>
-
-                    <div v-if="m.field === 'gender' && m.kind === 'text'">
-                      <select
-                        v-model="m.format_rules.genderFormat"
-                        @click.stop
-                        class="w-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-[10px] rounded-lg px-2 py-1 text-zinc-600 dark:text-zinc-400 cursor-pointer"
-                      >
-                        <option value="MALE/FEMALE">MALE / FEMALE</option>
-                        <option value="Male/Female">Male / Female</option>
-                        <option value="M/F">M / F</option>
-                        <option value="남/여">남 / 여</option>
-                        <option value="남성/여성">남성 / 여성</option>
-                      </select>
-                    </div>
-
-                    <div v-if="m.field.includes('phone')">
-                      <select
-                        v-model="m.format_rules.phoneFormat"
-                        @click.stop
-                        class="w-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-[10px] rounded-lg px-2 py-1 text-zinc-600 dark:text-zinc-400 cursor-pointer"
-                      >
-                        <option value="original">Asl holicha</option>
-                        <option value="plus_998">+998901234567</option>
-                        <option value="dashed">90-123-45-67</option>
-                        <option value="digits_only">Faqat raqamlar</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div class="flex items-start gap-2 p-3 rounded-xl bg-blue-50/60 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/50 text-[11px] text-blue-800 dark:text-blue-300">
-              <Info class="w-4 h-4 shrink-0 mt-0.5" />
-              <span>
-                Checkbox maydonlarda tanlangan variant qavs ichiga belgi qo'yiladi (masalan <strong>M (V) / F ( )</strong>).
-                Hujjatning shrifti, ramkalari va joylashuvi butunlay saqlanadi — faqat matn yoziladi.
-              </span>
-            </div>
-          </div>
-
-          <div class="flex items-center justify-between">
-            <button
-              @click="currentStep = 1"
-              class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-bold transition-all cursor-pointer"
-            >
-              <ArrowLeft class="w-4 h-4" />
-              Ortga (Shablon)
-            </button>
-            <button
-              :disabled="mappedCount === 0"
-              @click="currentStep = 3"
-              class="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shadow-md shadow-blue-600/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-            >
-              Talabalarni tanlashga o'tish ({{ mappedCount }} ta maydon)
-              <ArrowRight class="w-4 h-4" />
-            </button>
           </div>
         </div>
 
@@ -1378,27 +1321,105 @@ const resetWizard = () => {
             </div>
           </div>
 
-          <div class="flex items-center justify-between pt-4">
+          <!-- Action Bar bottom -->
+          <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-4">
             <button
+              type="button"
               @click="currentStep = 2"
-              class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-bold transition-all cursor-pointer"
+              class="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-bold transition-all cursor-pointer"
             >
               <ArrowLeft class="w-4 h-4" />
-              Ortga (Mapping)
+              Ortga (Teglar tahlili)
             </button>
-            <button
-              :disabled="selectedStudentIds.size === 0"
-              @click="currentStep = 4"
-              class="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shadow-md shadow-blue-600/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-            >
-              Yuklab olish bosqichiga o'tish ({{ selectedStudentIds.size }} ta tanlandi)
-              <ArrowRight class="w-4 h-4" />
-            </button>
+
+            <div class="flex items-center gap-2.5">
+              <button
+                type="button"
+                :disabled="selectedStudentIds.size === 0"
+                @click="currentStep = 4"
+                class="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-xs font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                title="Fayl nomi shablonini ko'rish va o'zgartirish"
+              >
+                Fayl nomi sozlamasi
+              </button>
+
+              <button
+                type="button"
+                :disabled="isGenerating || selectedStudentIds.size === 0"
+                @click="handleGenerate"
+                class="inline-flex items-center justify-center gap-2 px-7 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-extrabold shadow-md shadow-blue-600/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+              >
+                <RefreshCw v-if="isGenerating" class="w-4 h-4 animate-spin" />
+                <Download v-else class="w-4 h-4" />
+                <span v-if="isGenerating">Hujjatlar tayyorlanmoqda...</span>
+                <span v-else-if="selectedStudentIds.size > 1">
+                  Generate App Form ({{ selectedStudentIds.size }} ta talaba .zip)
+                </span>
+                <span v-else-if="selectedStudentIds.size === 1">
+                  Generate App Form (1 ta talaba .docx)
+                </span>
+                <span v-else>
+                  Generate App Form (Talabalarni tanlang)
+                </span>
+              </button>
+            </div>
           </div>
         </div>
 
-        <!-- ═══════════════════ STEP 4: DOWNLOAD ═══════════════════ -->
+        <!-- ═══════════════════ STEP 4: DOWNLOAD / SUCCESS ═══════════════════ -->
         <div v-if="currentStep === 4" class="space-y-6">
+          <!-- Generation Success Banner -->
+          <div v-if="generationSuccess" class="bg-white dark:bg-[#111315] border-2 border-emerald-500/50 dark:border-emerald-500/40 rounded-2xl p-6 text-center space-y-4 shadow-lg">
+            <div class="w-14 h-14 rounded-full bg-emerald-100 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-700 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mx-auto shadow-sm">
+              <CheckCircle2 class="w-8 h-8 stroke-[2.5]" />
+            </div>
+            <div class="space-y-1">
+              <h4 class="text-lg font-extrabold text-zinc-900 dark:text-zinc-100">
+                App Form muvaffaqiyatli tayyorlandi va yuklab olindi!
+              </h4>
+              <p class="text-xs text-zinc-600 dark:text-zinc-400 max-w-lg mx-auto">
+                <span v-if="selectedStudentIds.size > 1">
+                  Tanlangan <strong>{{ selectedStudentIds.size }} ta talaba</strong> uchun alohida .docx arizalari yaratildi va <strong>.zip</strong> arxiv shaklida yuklab berildi.
+                </span>
+                <span v-else>
+                  Tanlangan talaba uchun .docx arizasi yaratildi va yuklab berildi.
+                </span>
+              </p>
+              <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-xs font-mono font-bold text-zinc-800 dark:text-zinc-200 mt-2 border border-zinc-200 dark:border-zinc-700">
+                <Download class="w-3.5 h-3.5 text-blue-500" />
+                <span>{{ downloadedFileName }}</span>
+              </div>
+            </div>
+
+            <div class="flex flex-wrap items-center justify-center gap-3 pt-2">
+              <button
+                type="button"
+                @click="downloadAgain"
+                class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-md shadow-emerald-600/20 transition-all cursor-pointer"
+              >
+                <Download class="w-4 h-4" />
+                Qayta yuklab olish
+              </button>
+              <button
+                type="button"
+                @click="currentStep = 3"
+                class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-xs font-bold text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors cursor-pointer"
+              >
+                <Users class="w-4 h-4 text-blue-500" />
+                Boshqa talabalarni tanlash
+              </button>
+              <button
+                type="button"
+                @click="resetWizard"
+                class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-xs font-bold text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors cursor-pointer"
+              >
+                <RefreshCw class="w-4 h-4 text-zinc-400" />
+                Yangi fayl yuklash
+              </button>
+            </div>
+          </div>
+
+          <!-- Configuration & Generate Box -->
           <div class="bg-white dark:bg-[#111315] border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 space-y-6">
             <h3 class="text-sm font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
               <FileText class="w-4 h-4 text-blue-500" />
@@ -1442,41 +1463,23 @@ const resetWizard = () => {
 
               <div class="space-y-4">
                 <div class="p-4 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 space-y-3">
-                  <div v-if="checkboxCount > 0" class="flex items-center justify-between">
-                    <div>
-                      <span class="text-xs font-bold text-zinc-900 dark:text-zinc-100 block">Checkbox belgisi</span>
-                      <span class="text-[11px] text-zinc-500 dark:text-zinc-400">Tanlangan variant qavsiga qo'yiladi</span>
-                    </div>
-                    <select
-                      v-model="checkboxMark"
-                      class="bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-xs font-bold rounded-lg px-3 py-1.5 cursor-pointer"
-                    >
-                      <option value="V">V</option>
-                      <option value="O">O</option>
-                      <option value="X">X</option>
-                      <option value="✓">✓</option>
-                    </select>
-                  </div>
-
-                  <hr v-if="checkboxCount > 0" class="border-zinc-200 dark:border-zinc-800" />
-
-                  <div class="text-xs space-y-1.5 text-zinc-600 dark:text-zinc-400">
+                  <div class="text-xs space-y-2 text-zinc-600 dark:text-zinc-400">
                     <div class="flex justify-between">
                       <span>Shablon fayl:</span>
-                      <span class="font-bold text-zinc-900 dark:text-zinc-100 truncate ml-2">{{ uploadedFile?.name }}</span>
+                      <span class="font-bold text-zinc-900 dark:text-zinc-100 truncate ml-2 max-w-[200px]">{{ uploadedFile?.name }}</span>
                     </div>
                     <div class="flex justify-between">
                       <span>Tanlangan talabalar:</span>
                       <span class="font-bold text-blue-600 dark:text-blue-400">{{ selectedStudentIds.size }} nafar</span>
                     </div>
                     <div class="flex justify-between">
-                      <span>To'ldiriladigan maydonlar:</span>
+                      <span>Moslangan teglar:</span>
                       <span class="font-bold text-zinc-900 dark:text-zinc-100">{{ mappedCount }} ta</span>
                     </div>
                     <div class="flex justify-between">
-                      <span>Natija:</span>
+                      <span>Natijaviy format:</span>
                       <span class="font-bold text-zinc-900 dark:text-zinc-100">
-                        {{ selectedStudentIds.size > 1 ? `ZIP arxiv (${selectedStudentIds.size} ta .docx)` : '1 ta .docx fayl' }}
+                        {{ selectedStudentIds.size > 1 ? `ZIP arxiv (${selectedStudentIds.size} ta .docx fayl)` : '1 ta .docx fayl' }}
                       </span>
                     </div>
                   </div>
@@ -1486,6 +1489,7 @@ const resetWizard = () => {
 
             <div class="flex items-center justify-between pt-4 border-t border-zinc-100 dark:border-zinc-800">
               <button
+                type="button"
                 @click="currentStep = 3"
                 class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-bold transition-all cursor-pointer"
               >
@@ -1494,17 +1498,18 @@ const resetWizard = () => {
               </button>
 
               <button
+                type="button"
                 :disabled="isGenerating || selectedStudentIds.size === 0"
                 @click="handleGenerate"
-                class="inline-flex items-center gap-2 px-8 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold shadow-lg shadow-blue-600/25 transition-all disabled:opacity-50 cursor-pointer"
+                class="inline-flex items-center gap-2 px-8 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-extrabold shadow-lg shadow-blue-600/25 transition-all disabled:opacity-50 cursor-pointer"
               >
                 <RefreshCw v-if="isGenerating" class="w-4 h-4 animate-spin" />
                 <Download v-else class="w-4 h-4" />
                 {{ isGenerating
                   ? "Hujjatlar to'ldirilmoqda..."
                   : selectedStudentIds.size > 1
-                    ? `${selectedStudentIds.size} ta hujjatni to'ldirish (.zip)`
-                    : "Hujjatni to'ldirish va yuklab olish (.docx)" }}
+                    ? `Generate App Form (${selectedStudentIds.size} ta .zip)`
+                    : "Generate App Form (1 ta .docx)" }}
               </button>
             </div>
           </div>
@@ -1531,5 +1536,40 @@ const resetWizard = () => {
         </div>
       </div>
     </main>
+
+    <!-- Modal for Catalog when triggered from any step -->
+    <div
+      v-if="showCatalogModal"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto"
+      @click.self="showCatalogModal = false"
+    >
+      <div class="w-full max-w-6xl bg-white dark:bg-[#111315] rounded-2xl shadow-2xl border border-zinc-200 dark:border-zinc-800 max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+        <div class="px-6 py-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between shrink-0 bg-zinc-50/50 dark:bg-zinc-900/50">
+          <div class="flex items-center gap-2.5">
+            <div class="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-950/60 flex items-center justify-center text-blue-600 dark:text-blue-400">
+              <FileText class="w-4 h-4" />
+            </div>
+            <div>
+              <h3 class="text-sm font-bold text-zinc-900 dark:text-zinc-100">
+                Word Mail-Merge Teglari Katalogi (Quick-Copy)
+              </h3>
+              <p class="text-[11px] text-zinc-500 dark:text-zinc-400">
+                Word shabloningizga joylashtirish uchun kerakli tegni 1 marta bosing
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            @click="showCatalogModal = false"
+            class="p-2 rounded-xl text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+          >
+            <X class="w-5 h-5" />
+          </button>
+        </div>
+        <div class="p-6 overflow-y-auto scrollbar-thin">
+          <WordPlaceholderCatalog :is-collapsible="false" />
+        </div>
+      </div>
+    </div>
   </div>
 </template>

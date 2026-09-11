@@ -72,13 +72,72 @@ export interface AnalyzeWordParams {
 
 export interface GenerateWordParams {
   file: File
-  mappings: WordMappingConfig[]
+  mappings?: WordMappingConfig[]
+  custom_tag_mappings?: Record<string, string>
   student_ids: string[]
   filename_pattern?: string
   checkbox_mark?: string
 }
 
+export interface WordScannedTag {
+  tag_name: string
+  raw_tag: string
+  occurrences: number
+  is_recognized: boolean
+  crm_field: string | null
+  field_label: string | null
+  category: string | null
+  category_label: string | null
+  sample: string | null
+  description: string
+}
+
+export interface WordScanTagsResult {
+  total_tags_count: number
+  unique_tags_count: number
+  recognized_count: number
+  alien_count: number
+  tags: WordScannedTag[]
+  available_fields: { key: string; label: string; category: string }[]
+}
+
+export interface WordPlaceholderField {
+  key: string
+  label: string
+  category: string
+  category_label: string
+  icon?: string
+  primary_tag: string
+  aliases: string[]
+  sample: string
+  description: string
+  is_common?: boolean
+}
+
 export const wordFillApi = {
+  getPlaceholderCatalog: async (): Promise<WordPlaceholderField[]> => {
+    const response = await apiClient.get<WordPlaceholderField[]>('/students/word-fill/fields/')
+    return response.data
+  },
+
+  scanTags: async (file: File): Promise<WordScanTagsResult> => {
+    const formData = new FormData()
+    formData.append('file', file)
+    const response = await apiClient.post<WordScanTagsResult>(
+      '/students/word-fill/scan-tags/',
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } }
+    )
+    return response.data
+  },
+
+  downloadExampleTemplate: async (): Promise<Blob> => {
+    const response = await apiClient.get('/students/word-fill/example/', {
+      responseType: 'blob',
+    })
+    return response.data
+  },
+
   analyzeTemplate: async (params: AnalyzeWordParams): Promise<WordAnalysisResult> => {
     const formData = new FormData()
     formData.append('file', params.file)
@@ -98,9 +157,14 @@ export const wordFillApi = {
   generateFilledWord: async (params: GenerateWordParams): Promise<Blob> => {
     const formData = new FormData()
     formData.append('file', params.file)
-    formData.append('mappings', JSON.stringify(params.mappings))
+    if (params.mappings && params.mappings.length > 0) {
+      formData.append('mappings', JSON.stringify(params.mappings))
+    }
+    if (params.custom_tag_mappings && Object.keys(params.custom_tag_mappings).length > 0) {
+      formData.append('custom_tag_mappings', JSON.stringify(params.custom_tag_mappings))
+    }
     formData.append('student_ids', JSON.stringify(params.student_ids))
-    formData.append('filename_pattern', params.filename_pattern || '{full_name}')
+    formData.append('filename_pattern', params.filename_pattern || 'APPFORM_{full_name}')
     formData.append('checkbox_mark', params.checkbox_mark || 'V')
 
     const response = await apiClient.post(
@@ -114,3 +178,4 @@ export const wordFillApi = {
     return response.data
   },
 }
+

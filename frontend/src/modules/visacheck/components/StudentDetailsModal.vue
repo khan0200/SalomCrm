@@ -2,7 +2,8 @@
 import { ref, computed, watch } from 'vue'
 import {
   X, RefreshCw, FileDown, Pencil, Trash2, Globe, Map, Building2,
-  CheckCircle2, XCircle, Clock, AlertCircle, Info, Pin
+  CheckCircle2, XCircle, Clock, AlertCircle, Info, Pin,
+  ChevronDown, Check, Search, AlertTriangle
 } from 'lucide-vue-next'
 import { visaApi, type VisaStudent, type VisaOptions } from '@/api/visa'
 import { useUiStore } from '@/stores/ui'
@@ -10,6 +11,7 @@ import { useAuthStore } from '@/stores/auth'
 import CopyField from './CopyField.vue'
 import StatusBadge from './StatusBadge.vue'
 import VisaTypeBadge from './VisaTypeBadge.vue'
+import { CANCELLATION_REASONS, type CancellationReasonOption } from '../constants/cancellationReasons'
 
 const props = defineProps<{
   isOpen: boolean
@@ -60,6 +62,154 @@ const parsedRejectionReasons = computed<ParsedRejectionReason[]>(() => {
   return parseRejectionReasons(props.student?.rejection_reason)
 })
 
+// ─── Manual Visa Status Assignment Modal ──────────────────────────────────────
+const showAssignStatusModal = ref(false)
+const manualStatus = ref<'APPROVED' | 'CANCELLED' | 'PENDING'>('PENDING')
+const selectedReasons = ref<string[]>([])
+const customReasonText = ref('')
+const reasonsDropdownOpen = ref(false)
+const reasonSearchQuery = ref('')
+const savingStatus = ref(false)
+
+function openAssignStatusModal() {
+  if (!props.student) return
+  const current = (props.student.status || '').toUpperCase()
+  if (current.includes('APPROV') || current.includes('VISA USED') || current.includes('ISSUED') || current.includes('허가') || current.includes('TASDIQLANGAN')) {
+    manualStatus.value = 'APPROVED'
+  } else if (current.includes('CANCEL') || current.includes('REJECT') || current.includes('RETURN') || current.includes('EXPIRED') || current.includes('불허') || current.includes('RAD ETIL') || current.includes('BEKOR')) {
+    manualStatus.value = 'CANCELLED'
+  } else {
+    manualStatus.value = 'PENDING'
+  }
+
+  // Pre-populate reasons if student was cancelled with reasons
+  const existingReasons = parsedRejectionReasons.value
+  const preSelected: string[] = []
+  const customParts: string[] = []
+  for (const r of existingReasons) {
+    if (r.number && CANCELLATION_REASONS.some(c => c.number === r.number)) {
+      if (!preSelected.includes(r.number)) preSelected.push(r.number)
+    } else if (r.text) {
+      customParts.push(r.text)
+    }
+  }
+  selectedReasons.value = preSelected
+  customReasonText.value = customParts.join('; ')
+  reasonsDropdownOpen.value = false
+  reasonSearchQuery.value = ''
+  showAssignStatusModal.value = true
+}
+
+function toggleReason(num: string) {
+  const idx = selectedReasons.value.indexOf(num)
+  if (idx !== -1) {
+    selectedReasons.value.splice(idx, 1)
+  } else {
+    selectedReasons.value.push(num)
+    selectedReasons.value.sort((a, b) => Number(a) - Number(b))
+  }
+}
+
+function removeReason(num: string) {
+  const idx = selectedReasons.value.indexOf(num)
+  if (idx !== -1) {
+    selectedReasons.value.splice(idx, 1)
+  }
+}
+
+function selectAllReasons() {
+  selectedReasons.value = CANCELLATION_REASONS.map(r => r.number)
+}
+
+function clearAllReasons() {
+  selectedReasons.value = []
+}
+
+const filteredReasons = computed(() => {
+  const q = reasonSearchQuery.value.trim().toLowerCase()
+  if (!q) return CANCELLATION_REASONS
+  return CANCELLATION_REASONS.filter(r =>
+    r.number.includes(q) ||
+    r.korean.toLowerCase().includes(q) ||
+    r.uzbek.toLowerCase().includes(q) ||
+    r.english.toLowerCase().includes(q)
+  )
+})
+
+function buildCompiledRejectionReason(): string {
+  const parts: string[] = []
+  const sorted = [...selectedReasons.value].sort((a, b) => Number(a) - Number(b))
+  for (const num of sorted) {
+    const found = CANCELLATION_REASONS.find(c => c.number === num)
+    if (found) {
+      parts.push(`${found.number}. ${found.korean}`)
+    }
+  }
+  if (customReasonText.value.trim()) {
+    parts.push(customReasonText.value.trim())
+  }
+  return parts.join(' ')
+}
+
+const previewParsedReasons = computed<ParsedRejectionReason[]>(() => {
+  const compiled = buildCompiledRejectionReason()
+  return parseRejectionReasons(compiled)
+})
+
+async function saveManualVisaStatus() {
+  if (!props.student) return
+  if (manualStatus.value === 'CANCELLED' && selectedReasons.value.length === 0 && !customReasonText.value.trim()) {
+    uiStore.addToast({
+      type: 'warning',
+      message: 'Iltimos, kamida bitta bekor qilish sababini tanlang yoki kiriting.'
+    })
+    return
+  }
+
+  savingStatus.value = true
+  try {
+    const today = new Date().toISOString().split('T')[0]
+    let payload: Partial<VisaStudent> = {}
+
+    if (manualStatus.value === 'APPROVED') {
+      payload = {
+        status: 'APPROVED',
+        rejection_reason: '',
+        status_date: props.student.status_date || today,
+        batch_selected: false
+      }
+    } else if (manualStatus.value === 'CANCELLED') {
+      const reasonStr = buildCompiledRejectionReason()
+      payload = {
+        status: 'CANCELLED',
+        rejection_reason: reasonStr,
+        status_date: props.student.status_date || today,
+        batch_selected: false
+      }
+    } else {
+      payload = {
+        status: 'PENDING',
+        rejection_reason: ''
+      }
+    }
+
+    const updated = await visaApi.updateVisaStudent(props.student.passport, payload)
+    emit('updated', updated)
+    showAssignStatusModal.value = false
+    uiStore.addToast({
+      type: 'success',
+      message: `Visa holati ${manualStatus.value} ga o'zgartirildi ✓`
+    })
+  } catch (err: any) {
+    uiStore.addToast({
+      type: 'error',
+      message: err.message || 'Visa holatini o\'zgartirishda xatolik yuz berdi'
+    })
+  } finally {
+    savingStatus.value = false
+  }
+}
+
 // ─── Management Dropdown options ──────────────────────────────────────────────
 const options = ref<VisaOptions>({
   tariffs: [],
@@ -77,6 +227,7 @@ async function loadOptions() {
 watch(() => props.isOpen, (open) => {
   if (open) loadOptions()
   showEditFieldModal.value = false
+  showAssignStatusModal.value = false
 })
 
 // ─── Inline Field Editing Modal ───────────────────────────────────────────────
@@ -319,6 +470,39 @@ async function clearField(fieldName: ManagementField) {
                   </p>
 
                   <div class="space-y-3">
+                    <!-- Visa Status (Manual Assignment) -->
+                    <div class="rounded-lg border border-blue-200/80 dark:border-blue-900/50 bg-blue-50/40 dark:bg-blue-950/20 p-3 space-y-2">
+                      <div class="flex items-center justify-between">
+                        <label class="block text-xs font-bold text-slate-800 dark:text-zinc-200">
+                          Visa Status (Manual Assignment)
+                        </label>
+                        <span class="text-[10px] font-semibold text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/60 px-2 py-0.5 rounded-full">
+                          Manual
+                        </span>
+                      </div>
+                      <div class="rounded-md border border-slate-200 dark:border-zinc-800 p-2.5 flex items-center justify-between bg-white dark:bg-zinc-900/70">
+                        <div class="flex items-center gap-2 flex-wrap min-w-0 pr-2">
+                          <StatusBadge :status="student.status" />
+                          <span
+                            v-if="parsedRejectionReasons.length > 0"
+                            class="text-[11px] font-semibold text-rose-600 dark:text-rose-400"
+                          >
+                            ({{ parsedRejectionReasons.length }} ta sabab)
+                          </span>
+                        </div>
+                        <button
+                          v-if="authStore.canEdit"
+                          type="button"
+                          @click="openAssignStatusModal"
+                          class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shadow-xs transition-colors shrink-0 cursor-pointer"
+                          title="Assign Visa Status Manually"
+                        >
+                          <Pencil class="size-3.5" />
+                          <span>Assign Status</span>
+                        </button>
+                      </div>
+                    </div>
+
                     <!-- Tariff -->
                     <div>
                       <label class="block text-xs font-medium text-slate-500 dark:text-zinc-400 mb-1">
@@ -627,6 +811,295 @@ async function clearField(fieldName: ManagementField) {
               </button>
             </div>
           </form>
+        </div>
+      </div>
+    </Transition>
+
+    <!-- Sub-modal for Manual Assignment of Visa Status -->
+    <Transition
+      enter-active-class="transition duration-150 ease-out"
+      enter-from-class="opacity-0 scale-95"
+      enter-to-class="opacity-100 scale-100"
+      leave-active-class="transition duration-100 ease-in"
+      leave-from-class="opacity-100 scale-100"
+      leave-to-class="opacity-0 scale-95"
+    >
+      <div
+        v-if="showAssignStatusModal && student"
+        class="visacheck-page fixed inset-0 z-[75] flex items-center justify-center p-4 bg-black/65 backdrop-blur-xs"
+        @mousedown.self="showAssignStatusModal = false"
+      >
+        <div class="w-full max-w-lg bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl shadow-2xl p-6 space-y-5 max-h-[90vh] flex flex-col">
+          <!-- Modal Header -->
+          <div class="flex items-center justify-between border-b border-slate-100 dark:border-zinc-800 pb-3.5 shrink-0">
+            <div>
+              <h3 class="font-bold text-base text-slate-900 dark:text-white">
+                Manual Assignment of Visa Status
+              </h3>
+              <p class="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">
+                {{ student.full_name }} • <span class="font-mono font-semibold">{{ student.passport }}</span>
+              </p>
+            </div>
+            <button
+              type="button"
+              @click="showAssignStatusModal = false"
+              class="size-8 rounded-md flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors"
+            >
+              <X class="size-4.5" />
+            </button>
+          </div>
+
+          <!-- Modal Scrollable Content -->
+          <div class="flex-1 overflow-y-auto space-y-4 pr-1 scrollbar-thin">
+            <!-- 1. Choose Status (Approved, Cancelled, Pending) -->
+            <div>
+              <label class="block text-xs font-bold text-slate-700 dark:text-zinc-300 mb-2 uppercase tracking-wider">
+                Select Visa Status
+              </label>
+              <div class="grid grid-cols-3 gap-2.5">
+                <!-- Approved -->
+                <button
+                  type="button"
+                  @click="manualStatus = 'APPROVED'"
+                  class="p-3 rounded-lg border-2 text-left transition-all cursor-pointer flex flex-col items-center justify-center text-center gap-1.5"
+                  :class="manualStatus === 'APPROVED'
+                    ? 'border-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 shadow-sm'
+                    : 'border-slate-200 dark:border-zinc-800 hover:border-emerald-300 dark:hover:border-emerald-900/60 bg-white dark:bg-zinc-950 text-slate-700 dark:text-zinc-300'"
+                >
+                  <CheckCircle2 class="size-6 text-emerald-600 dark:text-emerald-400" />
+                  <span class="text-xs font-bold leading-tight">Approved</span>
+                  <span class="text-[10px] text-emerald-600/80 dark:text-emerald-400/80 font-medium">To Approved tab</span>
+                </button>
+
+                <!-- Cancelled -->
+                <button
+                  type="button"
+                  @click="manualStatus = 'CANCELLED'"
+                  class="p-3 rounded-lg border-2 text-left transition-all cursor-pointer flex flex-col items-center justify-center text-center gap-1.5"
+                  :class="manualStatus === 'CANCELLED'
+                    ? 'border-rose-600 bg-rose-50 dark:bg-rose-950/40 text-rose-800 dark:text-rose-300 shadow-sm'
+                    : 'border-slate-200 dark:border-zinc-800 hover:border-rose-300 dark:hover:border-rose-900/60 bg-white dark:bg-zinc-950 text-slate-700 dark:text-zinc-300'"
+                >
+                  <XCircle class="size-6 text-rose-600 dark:text-rose-400" />
+                  <span class="text-xs font-bold leading-tight">Cancelled</span>
+                  <span class="text-[10px] text-rose-600/80 dark:text-rose-400/80 font-medium">With reasons</span>
+                </button>
+
+                <!-- Pending -->
+                <button
+                  type="button"
+                  @click="manualStatus = 'PENDING'"
+                  class="p-3 rounded-lg border-2 text-left transition-all cursor-pointer flex flex-col items-center justify-center text-center gap-1.5"
+                  :class="manualStatus === 'PENDING'
+                    ? 'border-slate-600 bg-slate-100 dark:bg-zinc-800 text-slate-900 dark:text-zinc-100 shadow-sm'
+                    : 'border-slate-200 dark:border-zinc-800 hover:border-slate-300 dark:hover:border-zinc-700 bg-white dark:bg-zinc-950 text-slate-700 dark:text-zinc-300'"
+                >
+                  <Clock class="size-6 text-slate-500 dark:text-zinc-400" />
+                  <span class="text-xs font-bold leading-tight">Pending</span>
+                  <span class="text-[10px] text-slate-500 dark:text-zinc-400 font-medium">To Pending tab</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- 2. Contextual details for Approved / Pending -->
+            <div
+              v-if="manualStatus === 'APPROVED'"
+              class="p-3.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900/50 flex items-start gap-2.5 text-xs text-emerald-900 dark:text-emerald-200 leading-relaxed"
+            >
+              <CheckCircle2 class="size-4.5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+              <div>
+                <p class="font-bold">Student will be marked as APPROVED</p>
+                <p class="text-[11.5px] text-emerald-700 dark:text-emerald-300 mt-0.5">
+                  The student will immediately move to the <strong>Approved</strong> tab. Any existing rejection reasons will be cleared.
+                </p>
+              </div>
+            </div>
+
+            <div
+              v-if="manualStatus === 'PENDING'"
+              class="p-3.5 rounded-lg bg-slate-50 dark:bg-zinc-800/60 border border-slate-200 dark:border-zinc-700 flex items-start gap-2.5 text-xs text-slate-700 dark:text-zinc-300 leading-relaxed"
+            >
+              <Clock class="size-4.5 text-slate-500 dark:text-zinc-400 shrink-0 mt-0.5" />
+              <div>
+                <p class="font-bold">Student will be reset to PENDING</p>
+                <p class="text-[11.5px] text-slate-600 dark:text-zinc-400 mt-0.5">
+                  The student will move to the <strong>Pending</strong> tab. Any previous rejection reasons will be cleared.
+                </p>
+              </div>
+            </div>
+
+            <!-- 3. Cancellation Reasons (When Cancelled is selected) -->
+            <div v-if="manualStatus === 'CANCELLED'" class="space-y-3.5 pt-1">
+              <div>
+                <div class="flex items-center justify-between mb-1.5">
+                  <label class="block text-xs font-bold text-slate-800 dark:text-zinc-200">
+                    Cancellation / Refusal Reasons (Multiple Select)
+                  </label>
+                  <div class="flex items-center gap-2">
+                    <button
+                      type="button"
+                      @click="selectAllReasons"
+                      class="text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                    >
+                      Select all
+                    </button>
+                    <span class="text-slate-300 dark:text-zinc-700">|</span>
+                    <button
+                      type="button"
+                      @click="clearAllReasons"
+                      class="text-[11px] font-semibold text-rose-600 dark:text-rose-400 hover:underline cursor-pointer"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Multi-select Dropdown Container -->
+                <div class="relative">
+                  <!-- Trigger Button -->
+                  <button
+                    type="button"
+                    @click="reasonsDropdownOpen = !reasonsDropdownOpen"
+                    class="w-full min-h-[44px] px-3 py-2 rounded-lg border border-slate-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 text-left text-sm flex items-center justify-between gap-2 focus:outline-none focus:border-blue-500 cursor-pointer shadow-2xs"
+                  >
+                    <div class="flex items-center gap-1.5 flex-wrap min-w-0">
+                      <span v-if="selectedReasons.length === 0" class="text-xs text-slate-400 dark:text-zinc-500">
+                        Select cancellation reasons from dropdown...
+                      </span>
+                      <span
+                        v-for="num in selectedReasons"
+                        :key="num"
+                        class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 text-xs font-semibold"
+                      >
+                        <span class="size-4 rounded-full bg-[#E02424] text-white text-[9px] font-extrabold flex items-center justify-center">
+                          {{ num }}
+                        </span>
+                        <span class="text-[11px]">Reason #{{ num }}</span>
+                        <button
+                          type="button"
+                          @click.stop="removeReason(num)"
+                          class="hover:text-rose-900 dark:hover:text-white"
+                        >
+                          <X class="size-3" />
+                        </button>
+                      </span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-slate-400 shrink-0">
+                      <span v-if="selectedReasons.length > 0" class="text-[11px] font-bold text-rose-600 bg-rose-50 dark:bg-rose-950/50 px-2 py-0.5 rounded-full">
+                        {{ selectedReasons.length }} selected
+                      </span>
+                      <ChevronDown class="size-4.5 transition-transform" :class="{ 'rotate-180': reasonsDropdownOpen }" />
+                    </div>
+                  </button>
+
+                  <!-- Reasons List (Dropdown / collapsible) -->
+                  <div
+                    v-if="reasonsDropdownOpen"
+                    class="mt-1.5 max-h-56 overflow-y-auto rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-xl p-2 space-y-1 scrollbar-thin"
+                  >
+                    <!-- Search inside reasons -->
+                    <div class="sticky top-0 bg-white dark:bg-zinc-900 pb-2 pt-0.5 border-b border-slate-100 dark:border-zinc-800 z-10">
+                      <div class="relative">
+                        <Search class="size-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <input
+                          v-model="reasonSearchQuery"
+                          type="text"
+                          placeholder="Search reasons by number, Korean or Uzbek..."
+                          class="w-full h-8 pl-8 pr-3 text-xs rounded-md border border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-950 text-slate-800 dark:text-zinc-200 focus:outline-none focus:border-blue-500"
+                        />
+                      </div>
+                    </div>
+
+                    <!-- Items -->
+                    <div
+                      v-for="opt in filteredReasons"
+                      :key="opt.number"
+                      @click="toggleReason(opt.number)"
+                      class="flex items-start gap-2.5 p-2 rounded-md hover:bg-slate-100 dark:hover:bg-zinc-800 cursor-pointer transition-colors"
+                      :class="selectedReasons.includes(opt.number) ? 'bg-rose-50/70 dark:bg-rose-950/30' : ''"
+                    >
+                      <input
+                        type="checkbox"
+                        :checked="selectedReasons.includes(opt.number)"
+                        @click.stop="toggleReason(opt.number)"
+                        class="mt-1 size-4 rounded text-rose-600 focus:ring-rose-500 cursor-pointer"
+                      />
+                      <span class="size-5 min-w-[20px] rounded-full bg-[#E02424] text-white text-[10px] font-extrabold flex items-center justify-center shrink-0 mt-0.5">
+                        {{ opt.number }}
+                      </span>
+                      <div class="min-w-0 flex-1">
+                        <p class="text-xs font-bold text-slate-900 dark:text-zinc-100 leading-snug">
+                          {{ opt.korean }}
+                        </p>
+                        <p class="text-[11px] text-slate-500 dark:text-zinc-400 mt-0.5 leading-tight">
+                          {{ opt.uzbek }}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Custom / Extra Reason Text Field -->
+              <div>
+                <label class="block text-xs font-semibold text-slate-600 dark:text-zinc-400 mb-1">
+                  Custom Notes / Extra Reason (Optional)
+                </label>
+                <input
+                  v-model="customReasonText"
+                  type="text"
+                  placeholder="e.g. Qo'shimcha tushuntirish yoki konsullik izohi..."
+                  class="w-full h-9 px-3 rounded-md border border-slate-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <!-- Live Preview Card -->
+              <div
+                v-if="selectedReasons.length > 0 || customReasonText.trim()"
+                class="rounded-xl p-3 bg-[#FFF5F5] dark:bg-rose-950/20 border border-[#FED7D7] dark:border-rose-900/40 space-y-2 text-xs"
+              >
+                <p class="text-[10px] font-bold uppercase tracking-wider text-rose-700 dark:text-rose-400">
+                  Preview in Student Details
+                </p>
+                <div
+                  v-for="(item, idx) in previewParsedReasons"
+                  :key="idx"
+                  class="flex items-start gap-2.5 leading-relaxed"
+                >
+                  <span
+                    v-if="item.number"
+                    class="size-4.5 min-w-[18px] rounded-full bg-[#E02424] text-white text-[10px] font-extrabold flex items-center justify-center shrink-0 mt-0.5"
+                  >
+                    {{ item.number }}
+                  </span>
+                  <XCircle v-else class="size-4 text-[#E02424] shrink-0 mt-0.5" />
+                  <span class="text-[12px] text-zinc-900 dark:text-zinc-100 font-normal leading-snug">
+                    {{ item.text }}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Modal Footer -->
+          <div class="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-zinc-800 shrink-0">
+            <button
+              type="button"
+              @click="showAssignStatusModal = false"
+              class="h-9 px-4 rounded-md text-xs font-semibold text-slate-600 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              :disabled="savingStatus"
+              @click="saveManualVisaStatus"
+              class="h-9 px-5 rounded-md bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-all disabled:opacity-50 flex items-center gap-2 cursor-pointer shadow-sm"
+            >
+              <RefreshCw v-if="savingStatus" class="size-3.5 animate-spin" />
+              <span>{{ savingStatus ? 'Saving...' : 'Save & Apply Status' }}</span>
+            </button>
+          </div>
         </div>
       </div>
     </Transition>

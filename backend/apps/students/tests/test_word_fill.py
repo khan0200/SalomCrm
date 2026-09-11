@@ -20,6 +20,8 @@ from apps.students.word_fill_service import (
     build_output_filename,
     resolve_field_value,
     get_word_crm_fields,
+    get_placeholder_catalog,
+    scan_docx_tags,
 )
 
 
@@ -447,5 +449,128 @@ class TestGenderFormatting(unittest.TestCase):
         self.assertEqual(self._gender('MALE', 'M/F'), 'M')
 
 
+class TestPlaceholderCatalog(unittest.TestCase):
+    def test_catalog_returns_non_empty_list(self):
+        catalog = get_placeholder_catalog()
+        self.assertGreater(len(catalog), 20)
+
+    def test_catalog_contains_key_fields_and_valid_tags(self):
+        catalog = get_placeholder_catalog()
+        by_key = {item['key']: item for item in catalog}
+
+        # Check critical fields
+        self.assertIn('full_name', by_key)
+        self.assertEqual(by_key['full_name']['primary_tag'], '{{fullname}}')
+        self.assertIn('{{full_name}}', by_key['full_name']['aliases'])
+
+        self.assertIn('birthday', by_key)
+        self.assertEqual(by_key['birthday']['primary_tag'], '{{dateofbirth}}')
+
+        self.assertIn('father_name', by_key)
+        self.assertEqual(by_key['father_name']['primary_tag'], '{{fatherfullname}}')
+
+        self.assertIn('passport', by_key)
+        self.assertEqual(by_key['passport']['primary_tag'], '{{passport}}')
+
+        self.assertIn('phone1', by_key)
+        self.assertEqual(by_key['phone1']['primary_tag'], '{{phone1}}')
+
+        self.assertIn('address', by_key)
+        self.assertEqual(by_key['address']['primary_tag'], '{{address}}')
+
+    def test_all_catalog_items_have_required_metadata(self):
+        catalog = get_placeholder_catalog()
+        for item in catalog:
+            self.assertTrue(item.get('key'))
+            self.assertTrue(item.get('label'))
+            self.assertTrue(item.get('category'))
+            self.assertTrue(item.get('category_label'))
+            self.assertTrue(item.get('primary_tag', '').startswith('{{'))
+            self.assertTrue(item.get('primary_tag', '').endswith('}}'))
+            self.assertIn('sample', item)
+
+
+class TestScanDocxTags(unittest.TestCase):
+    def test_scan_identifies_recognized_and_alien_tags(self):
+        doc = Document()
+        p = doc.add_paragraph('Talaba: {{fullname}}, pasport: {{passport}}, begona: {{alien_code}}')
+        t = doc.add_table(rows=2, cols=2)
+        t.cell(0, 0).text = 'Ism'
+        t.cell(0, 1).text = '{{fullname}}'
+        t.cell(1, 0).text = 'Qo\'shimcha'
+        t.cell(1, 1).text = '{{unknown_tag}}'
+
+        buf = io.BytesIO()
+        doc.save(buf)
+        file_bytes = buf.getvalue()
+
+        result = scan_docx_tags(file_bytes)
+
+        self.assertEqual(result['total_tags_count'], 5)
+        self.assertEqual(result['unique_tags_count'], 4)
+        self.assertEqual(result['recognized_count'], 2)  # fullname, passport
+        self.assertEqual(result['alien_count'], 2)  # alien_code, unknown_tag
+
+        tags_by_name = {t['tag_name']: t for t in result['tags']}
+        self.assertTrue(tags_by_name['fullname']['is_recognized'])
+        self.assertEqual(tags_by_name['fullname']['occurrences'], 2)
+        self.assertEqual(tags_by_name['fullname']['crm_field'], 'full_name')
+
+        self.assertFalse(tags_by_name['alien_code']['is_recognized'])
+        self.assertEqual(tags_by_name['alien_code']['crm_field'], '_skip')
+
+        self.assertFalse(tags_by_name['unknown_tag']['is_recognized'])
+
+
+class TestCustomTagMappingsAndZip(unittest.TestCase):
+    def test_custom_remapping_and_zip_batch_generation(self):
+        doc = Document()
+        doc.add_paragraph('Ism: {{fullname}}, Aloqa: {{mysterious_contact}}, Tashlab ket: {{skip_me}}')
+        buf = io.BytesIO()
+        doc.save(buf)
+        template_bytes = buf.getvalue()
+
+        custom_maps = {
+            'fullname': 'full_name',
+            'mysterious_contact': 'phone1',
+            'skip_me': '_skip',
+        }
+
+        students = [
+            dict(STUDENT, id='1', full_name='ALIEV VALI', phone1='+998901112233'),
+            dict(STUDENT, id='2', full_name='KARIMOV AZIZ', phone1='+998904445566'),
+        ]
+
+        stream, kind, count = generate_filled_documents(
+            file_bytes=template_bytes,
+            mappings=[],
+            students_data=students,
+            filename_pattern='APPFORM_{full_name}',
+            custom_tag_mappings=custom_maps,
+        )
+
+        self.assertEqual(kind, 'zip')
+        self.assertEqual(count, 2)
+
+        zf = zipfile.ZipFile(stream)
+        namelist = zf.namelist()
+        self.assertIn('APPFORM_ALIEV VALI.docx', namelist)
+        self.assertIn('APPFORM_KARIMOV AZIZ.docx', namelist)
+
+        doc1 = Document(io.BytesIO(zf.read('APPFORM_ALIEV VALI.docx')))
+        text1 = ' '.join(p.text for p in doc1.paragraphs)
+        self.assertIn('ALIEV VALI', text1)
+        self.assertIn('+998901112233', text1)
+        self.assertNotIn('{{skip_me}}', text1)
+        self.assertNotIn('{{mysterious_contact}}', text1)
+
+        doc2 = Document(io.BytesIO(zf.read('APPFORM_KARIMOV AZIZ.docx')))
+        text2 = ' '.join(p.text for p in doc2.paragraphs)
+        self.assertIn('KARIMOV AZIZ', text2)
+        self.assertIn('+998904445566', text2)
+
+
 if __name__ == '__main__':
     unittest.main()
+
+

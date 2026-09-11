@@ -10,9 +10,10 @@ from .views import (
     VisaStudentLookupView, VisaStudentListCreateView, VisaStudentDetailView,
     VisaStudentBulkDeleteView, VisaOptionsView,
     ExcelFillAnalyzeView, ExcelFillGenerateView,
-    AICommandInterpretView
-    # Word Fill is temporarily disabled -- the views still exist in views.py.
-    # WordFillAnalyzeView, WordFillGenerateView
+    AICommandInterpretView,
+    WordFillAnalyzeView, WordFillGenerateView,
+    WordFillFieldsView, WordFillExampleDownloadView,
+    WordFillScanTagsView
 )
 
 router = DefaultRouter()
@@ -33,9 +34,11 @@ urlpatterns = [
     path('students/export/excel/', StudentExportView.as_view(), name='student-export-excel'),
     path('students/excel-fill/analyze/', ExcelFillAnalyzeView.as_view(), name='student-excel-fill-analyze'),
     path('students/excel-fill/generate/', ExcelFillGenerateView.as_view(), name='student-excel-fill-generate'),
-    # Word Fill is temporarily disabled -- re-enable together with its import above.
-    # path('students/word-fill/analyze/', WordFillAnalyzeView.as_view(), name='student-word-fill-analyze'),
-    # path('students/word-fill/generate/', WordFillGenerateView.as_view(), name='student-word-fill-generate'),
+    path('students/word-fill/fields/', WordFillFieldsView.as_view(), name='student-word-fill-fields'),
+    path('students/word-fill/example/', WordFillExampleDownloadView.as_view(), name='student-word-fill-example'),
+    path('students/word-fill/scan-tags/', WordFillScanTagsView.as_view(), name='student-word-fill-scan-tags'),
+    path('students/word-fill/analyze/', WordFillAnalyzeView.as_view(), name='student-word-fill-analyze'),
+    path('students/word-fill/generate/', WordFillGenerateView.as_view(), name='student-word-fill-generate'),
     path('students/extract-document/', ExtractDocumentView.as_view(), name='student-extract-document'),
     path('students/visa/check/', VisaCheckView.as_view(), name='student-visa-check'),
     path('students/visa/download-pdf/', VisaDownloadPdfView.as_view(), name='student-visa-download-pdf'),

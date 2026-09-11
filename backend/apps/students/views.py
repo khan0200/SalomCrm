@@ -1799,6 +1799,56 @@ def _parse_json_list(raw) -> list:
     return []
 
 
+def _parse_json_dict(raw) -> dict:
+    """Accepts either an already-parsed dict or a JSON string from multipart form data."""
+    if isinstance(raw, str):
+        try:
+            parsed = json.loads(raw)
+        except Exception:
+            return {}
+        return parsed if isinstance(parsed, dict) else {}
+    if isinstance(raw, dict):
+        return raw
+    return {}
+
+
+class WordFillScanTagsView(APIView):
+    """
+    Scans an uploaded Word (.docx) application form for all {{...}} mail-merge tags.
+    Returns:
+      - total_tags_count
+      - unique_tags_count
+      - recognized_count
+      - alien_count
+      - tags: list of detected tags with occurrences, CRM mapping and recognition status
+      - available_fields: all CRM fields for manual remapping of alien tags
+    """
+    permission_classes = [IsTenantHeadManager]
+
+    def post(self, request: Request) -> Response:
+        file_obj = request.FILES.get('file')
+        if not file_obj:
+            return Response({'error': 'Word fayl yuklanmadi (file is required)'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not file_obj.name.lower().endswith(('.docx', '.dotx')):
+            return Response(
+                {'error': 'Faqat .docx formatidagi Word fayllari qabul qilinadi (eski .doc qo\'llab-quvvatlanmaydi)'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            from .word_fill_service import scan_docx_tags
+            file_bytes = file_obj.read()
+            result = scan_docx_tags(file_bytes)
+            return Response(result)
+        except Exception as e:
+            logger.exception("Error scanning Word template tags")
+            return Response(
+                {'error': f"Word fayl teglarni skaner qilishda xatolik yuz berdi: {str(e)}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+
 class WordFillAnalyzeView(APIView):
     """
     Analyzes an uploaded Word (.docx) application form: finds every fillable slot
@@ -1861,6 +1911,7 @@ class WordFillGenerateView(APIView):
             return HttpResponse(json.dumps({'error': 'Word fayl yuklanmadi'}), content_type='application/json', status=400)
 
         mappings = _parse_json_list(request.data.get('mappings'))
+        custom_tag_mappings = _parse_json_dict(request.data.get('custom_tag_mappings'))
         student_ids = _parse_json_list(request.data.get('student_ids'))
         filename_pattern = request.data.get('filename_pattern') or '{full_name}'
         checkbox_mark = request.data.get('checkbox_mark') or 'V'
@@ -1888,6 +1939,7 @@ class WordFillGenerateView(APIView):
                 students_data=students_data,
                 filename_pattern=filename_pattern,
                 checkbox_mark=checkbox_mark,
+                custom_tag_mappings=custom_tag_mappings,
             )
 
             original_name = os.path.splitext(file_obj.name)[0]
@@ -1913,6 +1965,58 @@ class WordFillGenerateView(APIView):
                 json.dumps({'error': f"Word faylni to'ldirishda xatolik yuz berdi: {str(e)}"}),
                 content_type='application/json', status=500,
             )
+
+
+class WordFillFieldsView(APIView):
+    """
+    Returns the comprehensive catalog of CRM student fields and their
+    mail-merge {{...}} placeholder tags for quick reference.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request: Request) -> Response:
+        from .word_fill_service import get_placeholder_catalog
+        return Response(get_placeholder_catalog())
+
+
+class WordFillExampleDownloadView(APIView):
+    """
+    Downloads APPFORM.docx as an example template for Word mail-merge.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request: Request) -> HttpResponse:
+        from django.conf import settings
+        base_dir = getattr(settings, 'BASE_DIR', '')
+        candidates = [
+            os.path.join(base_dir, '..', 'APPFORM.docx'),
+            os.path.join(base_dir, 'APPFORM.docx'),
+            os.path.abspath('APPFORM.docx'),
+            r"c:\Users\abdur\OneDrive\Ishchi stol\Uniapp3\APPFORM.docx",
+        ]
+        doc_path = None
+        for p in candidates:
+            if os.path.exists(p):
+                doc_path = p
+                break
+
+        if not doc_path:
+            return HttpResponse(
+                json.dumps({'error': 'APPFORM.docx namunaviy fayli topilmadi'}),
+                content_type='application/json',
+                status=404,
+            )
+
+        with open(doc_path, 'rb') as f:
+            data = f.read()
+
+        response = HttpResponse(
+            data,
+            content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        )
+        response['Content-Disposition'] = 'attachment; filename="APPFORM.docx"'
+        response['Access-Control-Expose-Headers'] = 'Content-Disposition'
+        return response
 
 
 class AICommandInterpretView(APIView):
