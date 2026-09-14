@@ -7,6 +7,7 @@ import {
   Rows,
 } from 'lucide-vue-next'
 import type { TableCanvasElement, TableCellModel } from '../../types/contractCanvas'
+import { cleanClipboardContent } from '../../utils/clipboardUtils'
 
 const props = defineProps<{
   element: TableCanvasElement
@@ -85,6 +86,36 @@ function onCellBlur(r: number, c: number, e: FocusEvent) {
   const target = e.target as HTMLElement
   emit('update:cell', r, c, target.innerHTML)
   editingCellCoord.value = null
+}
+
+function onCellPaste(r: number, c: number, e: ClipboardEvent) {
+  e.preventDefault()
+  const clipboardData = e.clipboardData
+  if (!clipboardData) return
+
+  const cleanHtml = cleanClipboardContent(clipboardData, props.element.cells[r]?.[c]?.color || '#000000')
+  if (!cleanHtml) return
+
+  const target = e.target as HTMLElement
+  if (target) {
+    const sel = window.getSelection()
+    if (sel && sel.rangeCount > 0) {
+      const range = sel.getRangeAt(0)
+      range.deleteContents()
+      const fragment = range.createContextualFragment(cleanHtml)
+      const lastNode = fragment.lastChild
+      range.insertNode(fragment)
+      if (lastNode) {
+        range.setStartAfter(lastNode)
+        range.collapse(true)
+        sel.removeAllRanges()
+        sel.addRange(range)
+      }
+    } else {
+      target.innerHTML = cleanHtml
+    }
+    emit('update:cell', r, c, target.innerHTML)
+  }
 }
 
 // Row & Column Operations
@@ -272,6 +303,7 @@ function renderCellContent(content: string): string {
               contenteditable="true"
               class="w-full h-full min-h-[18px] outline-none select-text cursor-text bg-white dark:bg-zinc-800 p-0.5 rounded-xs"
               @blur="onCellBlur(rIdx, cIdx, $event)"
+              @paste="onCellPaste(rIdx, cIdx, $event)"
               v-html="cell.content"
             ></div>
             <div

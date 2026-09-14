@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, onMounted } from 'vue'
 import type { TextCanvasElement } from '../../types/contractCanvas'
+import { cleanClipboardContent } from '../../utils/clipboardUtils'
 
 const props = defineProps<{
   element: TextCanvasElement
@@ -33,7 +34,7 @@ const elementStyle = computed(() => {
     fontWeight: st.fontWeight || (props.element.type === 'heading' ? 'bold' : 'normal'),
     fontStyle: st.fontStyle || 'normal',
     textDecoration: st.textDecoration || 'none',
-    color: st.color || '#111827',
+    color: st.color || '#000000',
     backgroundColor: st.backgroundColor || 'transparent',
     textAlign: st.textAlign || (props.element.type === 'heading' ? 'center' : 'left'),
     lineHeight: st.lineHeight || 1.5,
@@ -79,7 +80,7 @@ watch(displayContent, newVal => {
   }
 })
 
-// Autofocus and place cursor at end when editing begins; clear selection when editing ends
+// Autofocus and place cursor when editing begins; clear selection when editing ends
 watch(
   () => props.isEditing,
   (isEdit, oldEdit) => {
@@ -89,11 +90,19 @@ watch(
         editableRef.value.innerHTML = props.element.content || ''
         lastEmittedHtml = editableRef.value.innerHTML
         editableRef.value.focus()
-        // Place caret at end of text
+
         const range = window.document.createRange()
         const sel = window.getSelection()
         range.selectNodeContents(editableRef.value)
-        range.collapse(false)
+
+        // If it's the initial placeholder text, leave the entire content selected
+        // so typing or pasting immediately replaces the placeholder cleanly!
+        const currentText = editableRef.value.innerText.trim()
+        const isPlaceholder = currentText === 'Yangi matn bloki...' || currentText === 'Shartnoma matnini bu yerga yozing...'
+        if (!isPlaceholder) {
+          range.collapse(false)
+        }
+
         sel?.removeAllRanges()
         sel?.addRange(range)
       })
@@ -136,6 +145,47 @@ function onKeyDown(e: KeyboardEvent) {
     } catch {}
   }
 }
+
+function onPaste(e: ClipboardEvent) {
+  e.preventDefault()
+  const clipboardData = e.clipboardData
+  if (!clipboardData) return
+
+  // Sanitize clipboard HTML/text, stripping Telegram white fonts and dark backgrounds
+  const cleanHtml = cleanClipboardContent(clipboardData, props.element.style?.color || '#000000')
+  if (!cleanHtml) return
+
+  const currentText = editableRef.value?.innerText?.trim() || ''
+  const isPlaceholder =
+    currentText === 'Yangi matn bloki...' ||
+    currentText === 'Shartnoma matnini bu yerga yozing...' ||
+    currentText === ''
+
+  if (isPlaceholder && editableRef.value) {
+    // Completely overwrite placeholder with the pasted text
+    editableRef.value.innerHTML = cleanHtml
+  } else {
+    // Insert at current selection / caret
+    const sel = window.getSelection()
+    if (sel && sel.rangeCount > 0) {
+      const range = sel.getRangeAt(0)
+      range.deleteContents()
+      const fragment = range.createContextualFragment(cleanHtml)
+      const lastNode = fragment.lastChild
+      range.insertNode(fragment)
+      if (lastNode) {
+        range.setStartAfter(lastNode)
+        range.collapse(true)
+        sel.removeAllRanges()
+        sel.addRange(range)
+      }
+    } else if (editableRef.value) {
+      editableRef.value.innerHTML = cleanHtml
+    }
+  }
+
+  onInput()
+}
 </script>
 
 <template>
@@ -152,6 +202,7 @@ function onKeyDown(e: KeyboardEvent) {
     @blur="onBlur"
     @input="onInput"
     @keydown="onKeyDown"
+    @paste="onPaste"
   ></div>
 </template>
 
@@ -166,6 +217,26 @@ function onKeyDown(e: KeyboardEvent) {
 .canvas-text-element * {
   font-family: var(--canvas-element-font, 'Times New Roman', Times, Georgia, serif) !important;
 }
+
+/* Guard against clipboard HTML carrying white text from Telegram dark mode */
+.canvas-text-element [style*="color: rgb(255, 255, 255)"],
+.canvas-text-element [style*="color: #fff"],
+.canvas-text-element [style*="color: #ffffff"],
+.canvas-text-element [style*="color: white"],
+.canvas-text-element [style*="color:white"],
+.canvas-text-element font[color="#ffffff"],
+.canvas-text-element font[color="white"],
+.canvas-text-element font[color="#fff"] {
+  color: inherit !important;
+}
+
+/* Guard against dark background from Telegram clipboard */
+.canvas-text-element [style*="background-color: rgb(33, 33, 33)"],
+.canvas-text-element [style*="background-color: #212121"],
+.canvas-text-element [style*="background-color"] {
+  background-color: transparent !important;
+}
+
 .canvas-text-element:focus,
 .canvas-text-element:focus-visible {
   outline: none !important;

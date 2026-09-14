@@ -70,6 +70,13 @@ import {
   deserializeCanvasDocument,
   isCanvasDocumentJson,
 } from '../utils/contractCanvasConverter'
+import {
+  cleanClipboardContent,
+  formatPlainTextToHtml,
+  estimateTextHeightMm,
+  CANVAS_ELEMENT_CLIPBOARD_KEY,
+  CANVAS_ELEMENT_CLIPBOARD_VALUE,
+} from '../utils/clipboardUtils'
 import { useContractCanvas } from '../composables/useContractCanvas'
 import CanvasA4Page from './canvas/CanvasA4Page.vue'
 
@@ -268,7 +275,9 @@ function onKeyDown(e: KeyboardEvent) {
     activeEl &&
     (activeEl.tagName === 'INPUT' ||
       activeEl.tagName === 'TEXTAREA' ||
-      (activeEl as HTMLElement).getAttribute('contenteditable') === 'true')
+      (activeEl as HTMLElement).getAttribute('contenteditable') === 'true' ||
+      Boolean((activeEl as HTMLElement).closest('.canvas-text-element')) ||
+      Boolean((activeEl as HTMLElement).closest('[contenteditable="true"]')))
 
   // ── Ctrl+S → Save (always, even in text edit) ────────────────
   if (isMod && (e.key === 's' || e.key === 'S') && !e.shiftKey) {
@@ -415,6 +424,7 @@ function onDragResizeEnd() {
 
 onMounted(() => {
   window.addEventListener('keydown', onKeyDown)
+  window.addEventListener('paste', onGlobalPaste)
   // Document-level click → close all open dropdowns
   document.addEventListener('click', closeAllDropdowns)
   // Use passive:false so we can preventDefault on Ctrl+Wheel
@@ -424,6 +434,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKeyDown)
+  window.removeEventListener('paste', onGlobalPaste)
   document.removeEventListener('click', closeAllDropdowns)
   canvasWorkspaceRef.value?.removeEventListener('wheel', onCanvasWheel)
   canvasWorkspaceRef.value?.removeEventListener('scroll', onWorkspaceScroll)
@@ -528,6 +539,96 @@ function setHighlightColor(color: string) {
   showHighlightPicker.value = false
 }
 
+// Automatically create and paste a new Text element from system clipboard (Times New Roman, 14pt, black)
+function handlePasteNewText(clipboardData: DataTransfer) {
+  closeAllDropdowns()
+  const contentWidth = printableContentWidthMm.value || (210 - canvas.document.value.margins.left - canvas.document.value.margins.right)
+  const page = canvas.activePage.value
+  let targetY = canvas.document.value.margins.top + 5
+
+  if (page && page.elements.length > 0) {
+    const maxY = page.elements.reduce((max, el) => Math.max(max, (el.y || 0) + (el.height || 0)), 0)
+    if (maxY + 15 < (297 - canvas.document.value.margins.bottom)) {
+      targetY = maxY + 4
+    }
+  }
+
+  // Clean HTML/text, stripping Telegram white fonts and dark backgrounds
+  const cleanHtml = cleanClipboardContent(clipboardData, '#000000')
+  if (!cleanHtml || !cleanHtml.trim()) return
+
+  // Calculate dynamic element height so bounding box fits the pasted text
+  const calculatedHeight = estimateTextHeightMm(cleanHtml, contentWidth, 14)
+
+  const newElement: TextCanvasElement = {
+    id: `text_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+    type: 'text',
+    x: canvas.document.value.margins.left,
+    y: targetY,
+    width: contentWidth,
+    height: calculatedHeight,
+    zIndex: (page?.elements.length || 0) + 1,
+    content: cleanHtml,
+    style: {
+      fontFamily: 'Times New Roman',
+      fontSize: 14,
+      fontWeight: 'normal',
+      fontStyle: 'normal',
+      textAlign: 'justify',
+      color: '#000000',
+      lineHeight: 1.5,
+      backgroundColor: 'transparent',
+    },
+  }
+
+  canvas.addElement(newElement)
+  canvas.selectedElementIds.value = [newElement.id]
+  canvas.history.recordSnapshot(canvas.document.value)
+}
+
+function onGlobalPaste(e: ClipboardEvent) {
+  const activeEl = window.document.activeElement
+  const isInTextEdit =
+    activeEl &&
+    (activeEl.tagName === 'INPUT' ||
+      activeEl.tagName === 'TEXTAREA' ||
+      (activeEl as HTMLElement).getAttribute('contenteditable') === 'true' ||
+      Boolean((activeEl as HTMLElement).closest('.canvas-text-element')) ||
+      Boolean((activeEl as HTMLElement).closest('[contenteditable="true"]')))
+
+  // If user is actively typing in an input, textarea, or contenteditable, let it handle paste
+  if (isInTextEdit) return
+
+  const clipboardData = e.clipboardData
+  if (!clipboardData) return
+
+  e.preventDefault()
+
+  const plainText = clipboardData.getData('text/plain') || ''
+
+  // 1. Check if user copied canvas elements (internal canvas elements)
+  if (plainText.includes(CANVAS_ELEMENT_CLIPBOARD_KEY) && plainText.includes(CANVAS_ELEMENT_CLIPBOARD_VALUE)) {
+    try {
+      const data = JSON.parse(plainText)
+      if (data[CANVAS_ELEMENT_CLIPBOARD_KEY] === CANVAS_ELEMENT_CLIPBOARD_VALUE && Array.isArray(data.elements) && data.elements.length > 0) {
+        canvas.pasteElements(data.elements)
+        return
+      }
+    } catch {}
+  }
+
+  // 2. If system clipboard has text or HTML (e.g. copied from Telegram, Word, Web):
+  if (plainText.trim().length > 0 || clipboardData.getData('text/html').trim().length > 0) {
+    handlePasteNewText(clipboardData)
+    return
+  }
+
+  // 3. Fallback: if internal clipboard has elements and OS clipboard has no text
+  if (canvas.clipboard.value && canvas.clipboard.value.length > 0) {
+    canvas.pasteElements()
+  }
+}
+
 // Insert directly a new Text block (Times New Roman, 14pt)
 function handleAddText() {
   closeAllDropdowns()
@@ -557,7 +658,7 @@ function handleAddText() {
       fontWeight: 'normal',
       fontStyle: 'normal',
       textAlign: 'justify',
-      color: '#111827',
+      color: '#000000',
       lineHeight: 1.5,
     },
   }

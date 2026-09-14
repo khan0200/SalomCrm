@@ -11,6 +11,8 @@ import type {
   ResizeHandle,
 } from '../types/contractCanvas'
 import { useCanvasHistory } from './useCanvasHistory'
+import { CANVAS_ELEMENT_CLIPBOARD_KEY, CANVAS_ELEMENT_CLIPBOARD_VALUE } from '../utils/clipboardUtils'
+
 
 const MM_TO_PX_BASE = 3.779527559 // 96 DPI standard: 1mm ≈ 3.7795px
 const PAGE_WIDTH_MM = 210
@@ -644,38 +646,59 @@ export function useContractCanvas(initialDoc?: ContractDocumentModel) {
       }
       // ── Copy ──────────────────────────────────────
       else if ((e.key === 'c' || e.key === 'C') && !e.shiftKey) {
-        e.preventDefault()
-        clipboard.value = JSON.parse(JSON.stringify(selectedElements.value))
+        if (selectedElements.value.length > 0) {
+          clipboard.value = JSON.parse(JSON.stringify(selectedElements.value))
+          try {
+            const payload = JSON.stringify({
+              [CANVAS_ELEMENT_CLIPBOARD_KEY]: CANVAS_ELEMENT_CLIPBOARD_VALUE,
+              elements: selectedElements.value,
+            })
+            navigator.clipboard.writeText(payload)
+          } catch {}
+        }
       }
       // ── Cut ───────────────────────────────────────
       else if ((e.key === 'x' || e.key === 'X') && !e.shiftKey) {
-        e.preventDefault()
         if (selectedElements.value.length > 0) {
           clipboard.value = JSON.parse(JSON.stringify(selectedElements.value))
+          try {
+            const payload = JSON.stringify({
+              [CANVAS_ELEMENT_CLIPBOARD_KEY]: CANVAS_ELEMENT_CLIPBOARD_VALUE,
+              elements: selectedElements.value,
+            })
+            navigator.clipboard.writeText(payload)
+          } catch {}
           deleteSelectedElements()
         }
       }
       // ── Paste ─────────────────────────────────────
       else if (e.key === 'v' || e.key === 'V') {
-        e.preventDefault()
-        if (clipboard.value.length > 0) {
-          const newIds: string[] = []
-          const page = activePage.value
-          clipboard.value.forEach(item => {
-            const pasted: CanvasElement = JSON.parse(JSON.stringify(item))
-            pasted.id = `${item.type}_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`
-            pasted.x = Math.min(PAGE_WIDTH_MM - pasted.width, pasted.x + 8)
-            pasted.y = Math.min(PAGE_HEIGHT_MM - pasted.height, pasted.y + 8)
-            pasted.zIndex = page.elements.length + 1
-            page.elements.push(pasted)
-            newIds.push(pasted.id)
-          })
-          selectedElementIds.value = newIds
-          history.recordSnapshot(document.value)
-        }
+        // Do NOT preventDefault! Allow the native 'paste' event to fire so e.clipboardData
+        // can be read synchronously by the document editor.
       }
     }
   }
+
+  // Paste canvas elements (from internal copy or system clipboard JSON)
+  function pasteElements(elementsToPaste?: CanvasElement[]): string[] {
+    const list = elementsToPaste || clipboard.value
+    if (!list || list.length === 0) return []
+    const newIds: string[] = []
+    const page = activePage.value
+    list.forEach(item => {
+      const pasted: CanvasElement = JSON.parse(JSON.stringify(item))
+      pasted.id = `${item.type}_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`
+      pasted.x = Math.min(PAGE_WIDTH_MM - pasted.width, (pasted.x || 0) + 8)
+      pasted.y = Math.min(PAGE_HEIGHT_MM - pasted.height, (pasted.y || 0) + 8)
+      pasted.zIndex = page.elements.length + 1
+      page.elements.push(pasted)
+      newIds.push(pasted.id)
+    })
+    selectedElementIds.value = newIds
+    history.recordSnapshot(document.value)
+    return newIds
+  }
+
 
   // Zoom helpers
   function zoomIn() {
@@ -733,6 +756,8 @@ export function useContractCanvas(initialDoc?: ContractDocumentModel) {
     calculateSnapping,
     nudgeSelected,
     handleKeyDown,
+    clipboard,
+    pasteElements,
     zoomIn,
     zoomOut,
     setZoom,

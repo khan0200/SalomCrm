@@ -109,8 +109,8 @@ export function convertHtmlToCanvasDocument(
               content: '<p>Shartnoma matnini bu yerga yozing...</p>',
               style: {
                 fontFamily: 'Times New Roman',
-                fontSize: 12,
-                color: '#111827',
+                fontSize: 14,
+                color: '#000000',
                 textAlign: 'left',
                 lineHeight: 1.5,
               },

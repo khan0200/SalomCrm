@@ -92,6 +92,7 @@ function onCanvasClick(e: MouseEvent) {
   // If clicked directly on the page background (not on an element)
   if ((e.target as HTMLElement).classList.contains('canvas-sheet-background')) {
     emit('clear-selection')
+    ;(e.target as HTMLElement).focus()
   }
 }
 
@@ -203,7 +204,8 @@ function confirmDeletePage() {
 
         <!-- The Physical A4 Sheet -->
         <div
-          class="canvas-sheet-background relative bg-white text-zinc-900 shadow-2xl border border-zinc-300/80 dark:border-zinc-700/60 transition-shadow overflow-hidden"
+          class="canvas-sheet-background relative bg-white text-zinc-900 shadow-2xl border border-zinc-300/80 dark:border-zinc-700/60 transition-shadow overflow-hidden outline-none focus:outline-none"
+          tabindex="0"
           :style="{
             width: `${scaledPageWidthPx}px`,
             height: `${scaledPageHeightPx}px`,
