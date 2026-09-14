@@ -483,8 +483,13 @@ function confirmDeletePage() {
             <CanvasCheckboxElement
               v-else-if="el.type === 'checkbox'"
               :element="el as any"
+              :is-editing="!readonly && editingElementId === el.id"
+              :readonly="readonly"
               :zoom-level="zoomLevel"
               @update:checked="emit('update-element', el.id, { checked: $event })"
+              @update:label="emit('update-element', el.id, { label: $event })"
+              @finish-edit="emit('finish-edit', el.id)"
+              @auto-resize-width="emit('update-element-bounds', el.id, { x: el.x, y: el.y, width: $event, height: el.height })"
             />
           </CanvasElementWrapper>
         </div>

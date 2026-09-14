@@ -8,6 +8,7 @@ import {
   ArrowUp,
   ArrowDown,
   RotateCw,
+  Type,
 } from 'lucide-vue-next'
 import type { CanvasElement, ResizeHandle, AlignmentGuide } from '../../types/contractCanvas'
 
@@ -326,6 +327,17 @@ function onDoubleClick(e: MouseEvent) {
         <span class="px-1.5 py-0.5 font-mono text-[10px] text-zinc-400 font-bold border-r border-zinc-200 dark:border-zinc-700 mr-0.5">
           {{ Math.round(element.x) }}×{{ Math.round(element.y) }}mm
         </span>
+
+        <!-- Edit Text / Label (for Text and Checkbox) -->
+        <button
+          v-if="element.type === 'text' || element.type === 'checkbox'"
+          type="button"
+          @click.stop="emit('double-click')"
+          class="p-1 hover:bg-blue-50 dark:hover:bg-blue-950/60 rounded-lg text-blue-600 dark:text-blue-400"
+          title="Matnni tahrirlash (Double-click)"
+        >
+          <Type class="w-3.5 h-3.5" />
+        </button>
 
         <!-- Duplicate -->
         <button

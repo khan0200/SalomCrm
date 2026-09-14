@@ -142,13 +142,15 @@ const customTableCols = ref(3)
 // Available font sizes (pt)
 const fontSizes = [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 18, 20, 22, 24, 28, 32]
 const currentFontSize = computed(() => {
-  const el = canvas.selectedElement.value as TextCanvasElement
+  const el = canvas.selectedElement.value as any
+  if (el?.type === 'checkbox') return el.fontSize || 12
   return el?.style?.fontSize || 14
 })
 
 // Current font color
 const currentFontColor = computed(() => {
-  const el = canvas.selectedElement.value as TextCanvasElement
+  const el = canvas.selectedElement.value as any
+  if (el?.type === 'checkbox') return el.color || '#000000'
   return el?.style?.color || '#000000'
 })
 
@@ -770,10 +772,14 @@ onBeforeUnmount(() => {
 // --- Toolbar Element Styling Helpers ---
 function setFontSize(sizePt: number | string) {
   const num = typeof sizePt === 'string' ? parseInt(sizePt, 10) : sizePt
-  const el = canvas.selectedElement.value as TextCanvasElement
+  const el = canvas.selectedElement.value as any
   if (el) {
-    if (!el.style) el.style = {}
-    el.style.fontSize = num
+    if (el.type === 'checkbox') {
+      canvas.updateElement(el.id, { fontSize: num })
+    } else {
+      if (!el.style) el.style = {}
+      el.style.fontSize = num
+    }
   }
 }
 
@@ -849,10 +855,14 @@ function toggleMarginMenu() {
 }
 
 function setFontColor(color: string) {
-  const el = canvas.selectedElement.value as TextCanvasElement
+  const el = canvas.selectedElement.value as any
   if (!el) return
-  if (!el.style) el.style = {}
-  el.style.color = color
+  if (el.type === 'checkbox') {
+    canvas.updateElement(el.id, { color })
+  } else {
+    if (!el.style) el.style = {}
+    el.style.color = color
+  }
   showColorPicker.value = false
 }
 
@@ -1065,10 +1075,11 @@ function insertVariable(vKey: string) {
   showVariablePicker.value = false
 }
 
-// Checkbox insertion
+// Checkbox insertion & management
 function insertCheckboxElement(checked: boolean) {
+  const newId = `checkbox_${Date.now()}`
   canvas.addElement({
-    id: `checkbox_${Date.now()}`,
+    id: newId,
     type: 'checkbox',
     checked,
     label: 'Tanlov varianti',
@@ -1079,6 +1090,25 @@ function insertCheckboxElement(checked: boolean) {
     zIndex: 1,
     fontSize: 12,
   })
+  canvas.editingElementId.value = newId
+}
+
+function updateSelectedCheckboxLabel(newLabel: string) {
+  const el = canvas.selectedElement.value as any
+  if (el && el.type === 'checkbox') {
+    const fontSize = el.fontSize || 12
+    const charWidthMm = (fontSize / 12) * 2.3
+    const neededWidthMm = Math.max(35, Math.ceil(newLabel.length * charWidthMm + 14))
+    const finalWidth = neededWidthMm > el.width ? Math.min(printableContentWidthMm.value, neededWidthMm) : el.width
+    canvas.updateElement(el.id, { label: newLabel, width: finalWidth })
+  }
+}
+
+function toggleSelectedCheckboxState() {
+  const el = canvas.selectedElement.value as any
+  if (el && el.type === 'checkbox') {
+    canvas.updateElement(el.id, { checked: !el.checked })
+  }
 }
 
 // Downloads
@@ -1547,6 +1577,43 @@ const shortcutCategories = computed(() => ({
         >
           <Square class="w-3.5 h-3.5" />
         </button>
+      </div>
+
+      <!-- Selected Checkbox Controls (Text label editor and Checked state toggle) -->
+      <div
+        v-if="canvas.selectedElement.value?.type === 'checkbox'"
+        class="flex items-center gap-1.5 px-2 py-0.5 bg-blue-50/90 dark:bg-blue-950/50 border border-blue-300/80 dark:border-blue-800 rounded-xl shadow-2xs border-r pr-2"
+      >
+        <!-- Toggle checked state -->
+        <button
+          type="button"
+          @click="toggleSelectedCheckboxState"
+          class="flex items-center gap-1.5 px-2 py-1 text-xs font-semibold rounded-lg transition-all cursor-pointer"
+          :class="(canvas.selectedElement.value as any).checked
+            ? 'bg-blue-600 text-white shadow-xs hover:bg-blue-700'
+            : 'bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-700'"
+          :title="(canvas.selectedElement.value as any).checked ? 'Holat: Belgilangan (o\'zgartirish uchun bosing)' : 'Holat: Belgilanmagan (o\'zgartirish uchun bosing)'"
+        >
+          <CheckSquare v-if="(canvas.selectedElement.value as any).checked" class="w-3.5 h-3.5 text-white" />
+          <Square v-else class="w-3.5 h-3.5 text-zinc-400" />
+          <span>{{ (canvas.selectedElement.value as any).checked ? 'Belgilangan' : 'Belgilanmagan' }}</span>
+        </button>
+
+        <div class="w-px h-4 bg-blue-200 dark:bg-blue-800"></div>
+
+        <!-- Label text input -->
+        <div class="flex items-center gap-1.5">
+          <label class="text-[11px] font-bold text-blue-900 dark:text-blue-200 whitespace-nowrap">
+            Checkbox matni:
+          </label>
+          <input
+            type="text"
+            :value="(canvas.selectedElement.value as any).label || ''"
+            @input="updateSelectedCheckboxLabel(($event.target as HTMLInputElement).value)"
+            placeholder="Tanlov varianti matni..."
+            class="h-7 px-2.5 py-1 text-xs font-serif rounded-lg border border-blue-300 dark:border-blue-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500 w-48 sm:w-64 shadow-2xs"
+          />
+        </div>
       </div>
 
       <!-- Table Inserter Dropdown -->
