@@ -37,6 +37,11 @@ import {
   Filter,
 } from 'lucide-vue-next'
 import { downloadContractAsPdf } from './utils/contractPdf'
+import {
+  isCanvasDocumentJson,
+  deserializeCanvasDocument,
+  convertCanvasDocumentToHtml,
+} from './utils/contractCanvasConverter'
 import { settingsApi, type TariffOption } from '@/api/settings'
 import { getContractTemplate } from './contractTemplates'
 import { contractsApi, type Contract } from '@/api/contracts'
@@ -113,10 +118,6 @@ watch(
 )
 
 function selectTariff(tariff: TariffOption) {
-  // If we were editing previously, save in background
-  if (tariffViewMode.value === 'edit' && activeTariff.value && tariffEditingContent.value) {
-    handleSaveTariffTemplate()
-  }
   selectedTariffId.value = String(tariff.id)
   showTemplatePreview.value = true
   tariffViewMode.value = 'preview' // Always reset to preview mode on entry!
@@ -126,17 +127,11 @@ function selectTariff(tariff: TariffOption) {
 }
 
 function switchToTariffPreview() {
-  if (tariffViewMode.value === 'edit' && activeTariff.value && tariffEditingContent.value) {
-    handleSaveTariffTemplate()
-  }
   tariffViewMode.value = 'preview'
   isSidebarCollapsed.value = false
 }
 
 function closeTariffView() {
-  if (tariffViewMode.value === 'edit' && activeTariff.value && tariffEditingContent.value) {
-    handleSaveTariffTemplate()
-  }
   tariffViewMode.value = 'preview' // Always reset to preview mode on exit!
   isSidebarCollapsed.value = false
   showTemplatePreview.value = false
@@ -320,6 +315,10 @@ function formatPrice(val: number | string | undefined | null): string {
 
 function renderFormattedContractHtml(raw: string | undefined | null): string {
   if (!raw) return ''
+  if (isCanvasDocumentJson(raw)) {
+    const doc = deserializeCanvasDocument(raw)
+    if (doc) return convertCanvasDocumentToHtml(doc)
+  }
   // Clean raw ASCII markers
   let html = raw.replace(/═{10,}\s*(\d+-BET)\s*═{10,}/g, '<hr data-page-break="true" />')
   
@@ -344,6 +343,17 @@ function renderFormattedContractHtml(raw: string | undefined | null): string {
 
 function splitContractPages(rawOrHtml: string | undefined | null): string[] {
   if (!rawOrHtml) return []
+  if (isCanvasDocumentJson(rawOrHtml)) {
+    const doc = deserializeCanvasDocument(rawOrHtml)
+    if (doc) {
+      return doc.pages.map(p => {
+        return convertCanvasDocumentToHtml({
+          ...doc,
+          pages: [p],
+        })
+      })
+    }
+  }
   // Standardize any ASCII page markers to <hr data-page-break="true" />
   let cleaned = rawOrHtml
     .replace(/^[\s\S]*?(?:1-BET\s*═{5,}|1-BET\s*={5,}|={10,}\s*1-BET\s*={10,}|═{10,}\s*1-BET\s*═{10,})/i, '')
@@ -696,21 +706,9 @@ function handleOpenEditor(contract: Contract) {
 }
 
 function handleBackToList() {
-  if (editingContractId.value && editingContent.value) {
-    handleSaveContract()
-  }
   editingContractId.value = null
   refetchContracts()
 }
-
-onBeforeUnmount(() => {
-  if (tariffViewMode.value === 'edit' && activeTariff.value && tariffEditingContent.value) {
-    handleSaveTariffTemplate()
-  }
-  if (editingContractId.value && editingContent.value) {
-    handleSaveContract()
-  }
-})
 
 function handleContractCreated(contract: Contract) {
   queryClient.setQueryData(['contract-detail', contract.id], contract)
@@ -746,7 +744,7 @@ async function confirmDelete() {
 </script>
 
 <template>
-  <div class="space-y-5 animate-page-in">
+  <div :class="[editingContractId ? 'h-[calc(100vh-90px)] flex flex-col min-h-0 overflow-hidden' : 'space-y-5 animate-page-in']">
 
     <!-- VIEW A: FULL-SCREEN A4 DOCUMENT EDITOR -->
     <template v-if="editingContractId">
@@ -762,6 +760,7 @@ async function confirmDelete() {
         :student-name="currentEditingContract.student_name || undefined"
         :save-status="saveStatus"
         :last-saved-at="lastSavedAt"
+        class="flex-1 h-full min-h-0"
         @save="handleSaveContract"
         @preview="previewContract = currentEditingContract"
         @back="handleBackToList"
@@ -988,51 +987,18 @@ async function confirmDelete() {
 
                   <!-- PREVIEW MODE ACTIONS -->
                   <template v-else>
-                    <!-- Download PDF Button & Format Menu -->
-                    <div class="relative flex items-center">
-                      <button
-                        type="button"
-                        @click="handleDownloadTariff('pdf')"
-                        :disabled="isDownloadingPdf"
-                        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-l-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-750 text-xs font-semibold text-zinc-700 dark:text-zinc-300 transition-colors cursor-pointer shadow-2xs"
-                        title="Download PDF"
-                      >
-                        <Loader2 v-if="isDownloadingPdf" class="w-3.5 h-3.5 animate-spin text-blue-500" />
-                        <Download v-else class="w-3.5 h-3.5 text-blue-500" />
-                        <span>PDF</span>
-                      </button>
-                      <button
-                        type="button"
-                        @click="showDownloadMenu = !showDownloadMenu"
-                        class="px-1.5 py-1.5 rounded-r-xl border-y border-r border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-750 hover:bg-zinc-100 text-zinc-500 cursor-pointer"
-                        title="Format"
-                      >
-                        <ChevronDown class="w-3 h-3" />
-                      </button>
-
-                      <div
-                        v-if="showDownloadMenu"
-                        class="absolute right-0 top-full mt-1 w-44 bg-white dark:bg-zinc-800 rounded-xl border border-zinc-200 dark:border-zinc-700 shadow-xl p-1 z-40 space-y-0.5"
-                        @click.stop
-                      >
-                        <button
-                          type="button"
-                          @click="handleDownloadTariff('pdf'); showDownloadMenu = false"
-                          class="w-full text-left px-2.5 py-1.5 rounded-lg text-xs hover:bg-zinc-100 dark:hover:bg-zinc-700 flex items-center gap-2 font-bold text-blue-600 cursor-pointer"
-                        >
-                          <FileText class="w-3.5 h-3.5" />
-                          <span>PDF (.pdf)</span>
-                        </button>
-                        <button
-                          type="button"
-                          @click="handleDownloadTariff('doc'); showDownloadMenu = false"
-                          class="w-full text-left px-2.5 py-1.5 rounded-lg text-xs hover:bg-zinc-100 dark:hover:bg-zinc-700 flex items-center gap-2 text-zinc-700 dark:text-zinc-300 cursor-pointer"
-                        >
-                          <FileText class="w-3.5 h-3.5 text-amber-500" />
-                          <span>Word (.doc)</span>
-                        </button>
-                      </div>
-                    </div>
+                    <!-- Download PDF Button (Direct) -->
+                    <button
+                      type="button"
+                      @click="handleDownloadTariff('pdf')"
+                      :disabled="isDownloadingPdf"
+                      class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-750 text-xs font-semibold text-zinc-700 dark:text-zinc-300 transition-colors cursor-pointer shadow-2xs"
+                      title="PDF yuklab olish"
+                    >
+                      <Loader2 v-if="isDownloadingPdf" class="w-3.5 h-3.5 animate-spin text-blue-500" />
+                      <Download v-else class="w-3.5 h-3.5 text-blue-500" />
+                      <span>PDF</span>
+                    </button>
                   </template>
 
                   <!-- Divider -->
@@ -1050,63 +1016,18 @@ async function confirmDelete() {
                 </div>
               </div>
 
-              <!-- VIEW 1: PREVIEW MODE (Multi-Page A4 Paper Sheets) -->
-              <div v-if="tariffViewMode === 'preview'" class="bg-zinc-100/80 dark:bg-zinc-950 px-2 sm:px-4 py-8 overflow-y-auto" style="max-height: calc(100vh - 210px);">
-                <div class="flex flex-col items-center gap-8 max-w-4xl mx-auto">
-                  <div
-                    v-if="!tariffEditingContent && !activeTemplate?.fullText"
-                    class="w-full max-w-[820px] bg-white dark:bg-[#18191c] rounded-2xl border border-zinc-200 dark:border-zinc-800 p-12 flex flex-col items-center justify-center text-zinc-400"
-                  >
-                    <BookOpen class="w-12 h-12 mb-3 opacity-30" />
-                    <p class="text-sm font-semibold">No template found for this tariff</p>
-                    <p class="text-xs mt-1 mb-3">Switch to Edit mode to write contract text</p>
-                    <button
-                      type="button"
-                      @click="tariffViewMode = 'edit'"
-                      class="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
-                    >
-                      Edit Template
-                    </button>
-                  </div>
-
-                  <template v-else>
-                    <div
-                      v-for="(pageHtml, pageIndex) in splitContractPages(tariffEditingContent || activeTemplate?.fullText)"
-                      :key="pageIndex"
-                      class="tariff-preview-sheet relative bg-white text-zinc-900 shadow-xl border border-zinc-200/90 rounded-xs"
-                      style="width: 210mm; min-height: 297mm; padding: 22mm 24mm 26mm 24mm; box-sizing: border-box;"
-                    >
-                      <!-- Top subtle page badge -->
-                      <div class="absolute top-4 right-6 text-[10.5px] uppercase font-bold tracking-widest text-zinc-400 select-none">
-                        Page {{ pageIndex + 1 }} / {{ splitContractPages(tariffEditingContent || activeTemplate?.fullText).length }}
-                      </div>
-
-                      <!-- Page Content -->
-                      <div
-                        class="prose prose-sm max-w-none text-[13px] leading-relaxed select-text"
-                        style="font-family: 'Times New Roman', Georgia, serif;"
-                        v-html="pageHtml"
-                      />
-
-                      <!-- Bottom page footer -->
-                      <div class="absolute bottom-5 inset-x-0 text-center text-[11px] text-zinc-400 select-none font-serif tracking-widest">
-                        — {{ pageIndex + 1 }} —
-                      </div>
-                    </div>
-                  </template>
-                </div>
-              </div>
-
-              <!-- VIEW 2: EDIT MODE (Integrated Full Document Editor) -->
-              <div v-else-if="tariffViewMode === 'edit'" class="overflow-hidden">
+              <!-- UNIFIED CANVAS DOCUMENT VIEW: PREVIEW & EDIT (Pixel-Perfect Fidelity) -->
+              <div class="h-[calc(100vh-175px)] min-h-0 flex flex-col overflow-hidden">
                 <ContractDocumentEditor
                   v-model:content="tariffEditingContent"
                   :contract-number="activeTariff.name"
                   :title="activeTariff.name + ' Contract Template'"
+                  :readonly="tariffViewMode === 'preview'"
                   :save-status="tariffSaveStatus"
                   :last-saved-at="tariffLastSavedAt"
                   :hide-top-bar="true"
                   back-label="Preview"
+                  class="flex-1 h-full min-h-0"
                   @save="handleSaveTariffTemplate"
                   @preview="switchToTariffPreview"
                   @back="switchToTariffPreview"

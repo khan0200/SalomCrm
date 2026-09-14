@@ -299,6 +299,13 @@ function onKeyDown(e: KeyboardEvent) {
     return
   }
 
+  // ── Spacebar for Canvas Pan (Hand tool) ────────────────────
+  if (e.code === 'Space' && !isInTextEdit && !isSpacePressed.value) {
+    e.preventDefault()
+    isSpacePressed.value = true
+    return
+  }
+
   // ── Text formatting (only when element selected, not in text edit) ──
   if (isMod && !isInTextEdit && canvas.selectedElement.value) {
     // Ctrl+B → Bold
@@ -346,20 +353,332 @@ function onKeyDown(e: KeyboardEvent) {
     }
   }
 
+  // ── Document Zoom: Ctrl+= / Ctrl+- / Ctrl+0 ──────────────────
+  if (isMod && !isInTextEdit) {
+    if (e.key === '=' || e.key === '+') {
+      e.preventDefault()
+      zoomInAroundCenter()
+      return
+    }
+    if (e.key === '-' || e.key === '_') {
+      e.preventDefault()
+      zoomOutAroundCenter()
+      return
+    }
+    if (e.key === '0') {
+      e.preventDefault()
+      zoomResetAroundCenter()
+      return
+    }
+  }
+
   // ── Delegate remaining shortcuts to canvas handler ──────────
   canvas.handleKeyDown(e)
 }
 
-// Canvas workspace ref for wheel events
+// Canvas workspace ref for wheel events, scrolling, and anchoring
 const canvasWorkspaceRef = ref<HTMLElement | null>(null)
 
-// Ctrl + MouseWheel = zoom (Canva/Figma style)
-function onCanvasWheel(e: WheelEvent) {
-  if (!e.ctrlKey) return
+// Physical mm-to-px factor (zoom-independent base)
+const MM_TO_PX_BASE = 3.779527559
+
+// Re-entrancy guard & queue for zoom animations (avoids race conditions on rapid wheel/slider)
+let isZooming = false
+let pendingZoomAction: { zoom: number; anchor?: { x: number; y: number } } | null = null
+
+/**
+ * Core zoom engine: zooms the document while preserving the exact viewport position
+ * of the document anchor point.
+ *
+ * @param newZoom Target zoom percentage (25-500)
+ * @param viewportAnchor Optional pixel offset { x, y } inside the scroll container.
+ *                       If omitted, anchors around the VISIBLE CENTER of the viewport.
+ */
+async function performZoom(newZoom: number, viewportAnchor?: { x: number; y: number }) {
+  const ws = canvasWorkspaceRef.value
+  if (!ws) {
+    canvas.setZoom(newZoom)
+    return
+  }
+
+  const oldZoom = canvas.zoomLevel.value
+  if (oldZoom === newZoom) return
+
+  const wsRect = ws.getBoundingClientRect()
+  // Determine anchor in viewport pixels relative to scroll container viewport
+  const vAnchorX = viewportAnchor !== undefined ? viewportAnchor.x : ws.clientWidth / 2
+  const vAnchorY = viewportAnchor !== undefined ? viewportAnchor.y : ws.clientHeight / 2
+
+  const anchorClientX = wsRect.left + vAnchorX
+  const anchorClientY = wsRect.top + vAnchorY
+
+  // Find the page sheet closest to the anchor point (supports multi-page seamlessly)
+  const sheets = Array.from(ws.querySelectorAll<HTMLElement>('.canvas-sheet-background'))
+  let targetPageIndex = 0
+  let chosenSheet = sheets[0]
+
+  if (sheets.length > 1) {
+    let minDistance = Infinity
+    sheets.forEach((sheet, idx) => {
+      const rect = sheet.getBoundingClientRect()
+      const cx = rect.left + rect.width / 2
+      const cy = rect.top + rect.height / 2
+      const dist = Math.hypot(anchorClientX - cx, anchorClientY - cy)
+      if (dist < minDistance) {
+        minDistance = dist
+        targetPageIndex = idx
+        chosenSheet = sheet
+      }
+    })
+  }
+
+  const oldScale = oldZoom / 100
+  let anchorMmX = 105 // default center of A4 width
+  let anchorMmY = 148.5 // default center of A4 height
+
+  if (chosenSheet) {
+    const sheetRect = chosenSheet.getBoundingClientRect()
+    const relX = anchorClientX - sheetRect.left
+    const relY = anchorClientY - sheetRect.top
+    anchorMmX = relX / (MM_TO_PX_BASE * oldScale)
+    anchorMmY = relY / (MM_TO_PX_BASE * oldScale)
+  }
+
+  // Update zoom reactive state
+  canvas.setZoom(newZoom)
+
+  // Wait for DOM to re-render with new layout dimensions
+  await nextTick()
+
+  const currentWs = canvasWorkspaceRef.value
+  if (!currentWs) return
+
+  const currentWsRect = currentWs.getBoundingClientRect()
+  const sheetsAfter = currentWs.querySelectorAll<HTMLElement>('.canvas-sheet-background')
+  const newSheet = sheetsAfter[targetPageIndex] || sheetsAfter[0]
+
+  if (newSheet) {
+    const newSheetRect = newSheet.getBoundingClientRect()
+    const sheetContentLeft = newSheetRect.left - currentWsRect.left + currentWs.scrollLeft
+    const sheetContentTop = newSheetRect.top - currentWsRect.top + currentWs.scrollTop
+
+    const newScale = newZoom / 100
+    const newAnchorContentX = sheetContentLeft + anchorMmX * (MM_TO_PX_BASE * newScale)
+    const newAnchorContentY = sheetContentTop + anchorMmY * (MM_TO_PX_BASE * newScale)
+
+    const targetScrollLeft = newAnchorContentX - vAnchorX
+    const targetScrollTop = newAnchorContentY - vAnchorY
+
+    currentWs.scrollLeft = Math.max(0, targetScrollLeft)
+    currentWs.scrollTop = Math.max(0, targetScrollTop)
+  }
+}
+
+/**
+ * Public anchor zoom entry point with queue protection against rapid events.
+ */
+async function zoomWithAnchor(newZoom: number, viewportAnchor?: { x: number; y: number }) {
+  const clampedZoom = Math.max(25, Math.min(500, newZoom))
+  if (isZooming) {
+    pendingZoomAction = { zoom: clampedZoom, anchor: viewportAnchor }
+    return
+  }
+  isZooming = true
+  try {
+    await performZoom(clampedZoom, viewportAnchor)
+    while (pendingZoomAction) {
+      const next = pendingZoomAction
+      pendingZoomAction = null
+      await performZoom(next.zoom, next.anchor)
+    }
+  } finally {
+    isZooming = false
+  }
+}
+
+function zoomInAroundCenter() {
+  const cur = canvas.zoomLevel.value
+  zoomWithAnchor(Math.min(500, cur + 15))
+}
+
+function zoomOutAroundCenter() {
+  const cur = canvas.zoomLevel.value
+  zoomWithAnchor(Math.max(25, cur - 15))
+}
+
+function zoomResetAroundCenter() {
+  canvas.setZoom(100)
+  nextTick(() => {
+    const ws = canvasWorkspaceRef.value
+    if (!ws) return
+    ws.scrollLeft = 0
+    const activePageEl = ws.querySelector<HTMLElement>(`[data-page-index="${canvas.activePageIndex.value}"]`)
+    if (activePageEl) {
+      const wsRect = ws.getBoundingClientRect()
+      const elRect = activePageEl.getBoundingClientRect()
+      const offsetTop = elRect.top - wsRect.top + ws.scrollTop - 24
+      ws.scrollTop = Math.max(0, offsetTop)
+    }
+  })
+}
+
+// ─── Custom Vertical Zoom Slider (Pointer-captured, direct clientY) ───
+const zoomSliderTrackRef = ref<HTMLElement | null>(null)
+let isDraggingSlider = false
+
+const sliderPercent = computed(() => {
+  const cur = canvas.zoomLevel.value
+  const clamped = Math.max(25, Math.min(500, cur))
+  return (((clamped - 25) / 475) * 100).toFixed(1)
+})
+
+function updateZoomFromPointer(clientY: number) {
+  const track = zoomSliderTrackRef.value
+  if (!track) return
+  const rect = track.getBoundingClientRect()
+  // Bottom of track is min (25%), top is max (500%)
+  const ratio = Math.max(0, Math.min(1, (rect.bottom - clientY) / rect.height))
+  let target = Math.round(25 + ratio * 475)
+  // Step in 5s
+  target = Math.round(target / 5) * 5
+  // Magnetic notch: cleanly snap to 100% when near it
+  if (target >= 92 && target <= 108) {
+    target = 100
+  }
+  target = Math.max(25, Math.min(500, target))
+  zoomWithAnchor(target)
+}
+
+function onSliderPointerDown(e: PointerEvent) {
+  if (e.button !== 0) return
   e.preventDefault()
   e.stopPropagation()
-  const delta = e.deltaY > 0 ? -10 : 10
-  canvas.setZoom(canvas.zoomLevel.value + delta)
+  isDraggingSlider = true
+  try {
+    ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+  } catch {
+    // ignore
+  }
+  updateZoomFromPointer(e.clientY)
+}
+
+function onSliderPointerMove(e: PointerEvent) {
+  if (!isDraggingSlider) return
+  e.preventDefault()
+  updateZoomFromPointer(e.clientY)
+}
+
+function onSliderPointerUp(e: PointerEvent) {
+  if (isDraggingSlider) {
+    isDraggingSlider = false
+    try {
+      ;(e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId)
+    } catch {
+      // ignore
+    }
+  }
+}
+
+// ─── Canvas Panning (Spacebar + Drag / Middle Mouse Button) ───
+const isSpacePressed = ref(false)
+const isPanning = ref(false)
+let panStartX = 0
+let panStartY = 0
+let panStartScrollLeft = 0
+let panStartScrollTop = 0
+
+function onKeyUp(e: KeyboardEvent) {
+  if (e.code === 'Space') {
+    isSpacePressed.value = false
+    if (isPanning.value) {
+      onWorkspacePointerUp()
+    }
+  }
+}
+
+function onWindowBlur() {
+  isSpacePressed.value = false
+  if (isPanning.value) {
+    onWorkspacePointerUp()
+  }
+}
+
+function onGlobalPointerDown(e: PointerEvent) {
+  // Middle click (button 1) OR Left click (button 0) when Spacebar is held
+  if (e.button === 1 || (e.button === 0 && isSpacePressed.value)) {
+    const ws = canvasWorkspaceRef.value
+    if (!ws || !ws.contains(e.target as Node)) return
+
+    e.preventDefault()
+    e.stopPropagation()
+
+    isPanning.value = true
+    panStartX = e.clientX
+    panStartY = e.clientY
+    panStartScrollLeft = ws.scrollLeft
+    panStartScrollTop = ws.scrollTop
+
+    window.addEventListener('pointermove', onWorkspacePointerMove, { passive: false })
+    window.addEventListener('pointerup', onWorkspacePointerUp, { passive: false })
+  }
+}
+
+function onWorkspacePointerMove(e: PointerEvent) {
+  if (!isPanning.value) return
+  const ws = canvasWorkspaceRef.value
+  if (!ws) return
+
+  e.preventDefault()
+  const dx = e.clientX - panStartX
+  const dy = e.clientY - panStartY
+
+  ws.scrollLeft = panStartScrollLeft - dx
+  ws.scrollTop = panStartScrollTop - dy
+}
+
+function onWorkspacePointerUp(e?: PointerEvent) {
+  if (isPanning.value) {
+    isPanning.value = false
+    window.removeEventListener('pointermove', onWorkspacePointerMove)
+    window.removeEventListener('pointerup', onWorkspacePointerUp)
+  }
+}
+
+/**
+ * MouseWheel handler:
+ * - Ctrl + Wheel or Trackpad Pinch = zoom anchored to mouse cursor (Figma/Canva style)
+ * - Shift + Wheel = smooth horizontal scroll
+ */
+function onCanvasWheel(e: WheelEvent) {
+  const ws = canvasWorkspaceRef.value
+  if (!ws) return
+
+  // 1. Ctrl + Wheel = Zoom
+  if (e.ctrlKey || e.metaKey) {
+    e.preventDefault()
+    e.stopPropagation()
+
+    const wsRect = ws.getBoundingClientRect()
+    const mouseViewX = e.clientX - wsRect.left
+    const mouseViewY = e.clientY - wsRect.top
+
+    // Calculate delta: positive deltaY means zoom out, negative means zoom in
+    const delta = e.deltaY < 0 ? 10 : -10
+    const currentZoom = canvas.zoomLevel.value
+    const targetZoom = Math.max(25, Math.min(500, currentZoom + delta))
+
+    if (targetZoom !== currentZoom) {
+      zoomWithAnchor(targetZoom, { x: mouseViewX, y: mouseViewY })
+    }
+    return
+  }
+
+  // 2. Shift + Wheel = Horizontal Scroll
+  if (e.shiftKey) {
+    e.preventDefault()
+    ws.scrollLeft += e.deltaY
+    return
+  }
 }
 
 // Track active page as user scrolls through the multi-page canvas
@@ -424,17 +743,24 @@ function onDragResizeEnd() {
 
 onMounted(() => {
   window.addEventListener('keydown', onKeyDown)
+  window.addEventListener('keyup', onKeyUp)
+  window.addEventListener('blur', onWindowBlur)
   window.addEventListener('paste', onGlobalPaste)
+  window.addEventListener('pointerdown', onGlobalPointerDown, { capture: true })
   // Document-level click → close all open dropdowns
   document.addEventListener('click', closeAllDropdowns)
-  // Use passive:false so we can preventDefault on Ctrl+Wheel
+  // Use passive:false so we can preventDefault on Ctrl+Wheel and Shift+Wheel
   canvasWorkspaceRef.value?.addEventListener('wheel', onCanvasWheel, { passive: false })
   canvasWorkspaceRef.value?.addEventListener('scroll', onWorkspaceScroll, { passive: true })
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKeyDown)
+  window.removeEventListener('keyup', onKeyUp)
+  window.removeEventListener('blur', onWindowBlur)
   window.removeEventListener('paste', onGlobalPaste)
+  window.removeEventListener('pointerdown', onGlobalPointerDown, { capture: true })
+  onWorkspacePointerUp()
   document.removeEventListener('click', closeAllDropdowns)
   canvasWorkspaceRef.value?.removeEventListener('wheel', onCanvasWheel)
   canvasWorkspaceRef.value?.removeEventListener('scroll', onWorkspaceScroll)
@@ -469,14 +795,24 @@ function toggleUnderline() {
   const el = canvas.selectedElement.value as TextCanvasElement
   if (!el) return
   if (!el.style) el.style = {}
-  el.style.textDecoration = el.style.textDecoration === 'underline' ? 'none' : 'underline'
+  const current = el.style.textDecoration || ''
+  if (current.includes('underline')) {
+    el.style.textDecoration = current.replace('underline', '').trim() || 'none'
+  } else {
+    el.style.textDecoration = current === 'none' || !current ? 'underline' : `${current} underline`
+  }
 }
 
 function toggleStrike() {
   const el = canvas.selectedElement.value as TextCanvasElement
   if (!el) return
   if (!el.style) el.style = {}
-  el.style.textDecoration = el.style.textDecoration === 'line-through' ? 'none' : 'line-through'
+  const current = el.style.textDecoration || ''
+  if (current.includes('line-through')) {
+    el.style.textDecoration = current.replace('line-through', '').trim() || 'none'
+  } else {
+    el.style.textDecoration = current === 'none' || !current ? 'line-through' : `${current} line-through`
+  }
 }
 
 function setTextAlign(align: 'left' | 'center' | 'right' | 'justify') {
@@ -822,8 +1158,7 @@ const shortcutCategories = computed(() => ({
 
 <template>
   <div
-    class="contract-editor-wrapper flex flex-col flex-1 bg-zinc-100 dark:bg-zinc-950 font-sans"
-    :class="hideTopBar ? '' : 'min-h-screen'"
+    class="contract-editor-wrapper flex flex-col flex-1 h-full min-h-0 bg-zinc-100 dark:bg-zinc-950 font-sans relative overflow-hidden"
   >
     <!-- Top Action & Status Bar -->
     <div
@@ -894,51 +1229,18 @@ const shortcutCategories = computed(() => ({
           <span class="hidden sm:inline">Preview</span>
         </button>
 
-        <!-- Download PDF Button & Format Menu -->
-        <div class="relative flex items-center editor-dropdown-container">
-          <button
-            type="button"
-            @click="downloadDocument('pdf')"
-            :disabled="isDownloadingPdf"
-            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-l-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-800 text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-750 transition-colors cursor-pointer shadow-2xs"
-            title="Download PDF"
-          >
-            <Loader2 v-if="isDownloadingPdf" class="w-3.5 h-3.5 animate-spin text-blue-500" />
-            <Download v-else class="w-3.5 h-3.5 text-blue-500" />
-            <span>PDF</span>
-          </button>
-          <button
-            type="button"
-            @click.stop="showEditorDownloadMenu = !showEditorDownloadMenu"
-            class="px-1.5 py-1.5 rounded-r-xl border-y border-r border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-750 hover:bg-zinc-100 text-zinc-500 cursor-pointer"
-            title="Format"
-          >
-            <ChevronDown class="w-3 h-3" />
-          </button>
-
-          <div
-            v-if="showEditorDownloadMenu"
-            class="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-zinc-800 rounded-xl border border-zinc-200 dark:border-zinc-700 shadow-xl p-1 z-[200] space-y-0.5"
-            @click.stop
-          >
-            <button
-              type="button"
-              @click="downloadDocument('pdf'); showEditorDownloadMenu = false"
-              class="w-full text-left px-2.5 py-1.5 rounded-lg text-xs hover:bg-zinc-100 dark:hover:bg-zinc-700 flex items-center gap-2 font-bold text-blue-600 cursor-pointer"
-            >
-              <FileText class="w-3.5 h-3.5" />
-              <span>PDF (.pdf)</span>
-            </button>
-            <button
-              type="button"
-              @click="downloadDocument('print'); showEditorDownloadMenu = false"
-              class="w-full text-left px-2.5 py-1.5 rounded-lg text-xs hover:bg-zinc-100 dark:hover:bg-zinc-700 flex items-center gap-2 text-zinc-700 dark:text-zinc-300 cursor-pointer border-t border-zinc-100 dark:border-zinc-750 pt-1.5"
-            >
-              <Eye class="w-3.5 h-3.5 text-emerald-500" />
-              <span>Print</span>
-            </button>
-          </div>
-        </div>
+        <!-- Download PDF Button (Direct) -->
+        <button
+          type="button"
+          @click="downloadDocument('pdf')"
+          :disabled="isDownloadingPdf"
+          class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-800 text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-750 transition-colors cursor-pointer shadow-2xs"
+          title="PDF yuklab olish"
+        >
+          <Loader2 v-if="isDownloadingPdf" class="w-3.5 h-3.5 animate-spin text-blue-500" />
+          <Download v-else class="w-3.5 h-3.5 text-blue-500" />
+          <span>PDF</span>
+        </button>
 
         <!-- Manual Save Button -->
         <button
@@ -1001,11 +1303,11 @@ const shortcutCategories = computed(() => ({
         </select>
       </div>
 
-      <!-- Document Zoom Level (25% - 200%) -->
+      <!-- Document Zoom Level (25% - 500%) -->
       <div class="flex items-center gap-0.5 px-1.5 border-r border-zinc-200 dark:border-zinc-700/60" title="Zoom">
         <button
           type="button"
-          @click="canvas.zoomOut()"
+          @click="zoomOutAroundCenter"
           :disabled="canvas.zoomLevel.value <= 25"
           class="toolbar-btn text-xs font-bold w-6 h-6 p-0 disabled:opacity-40"
           title="Zoom -"
@@ -1017,8 +1319,8 @@ const shortcutCategories = computed(() => ({
         </span>
         <button
           type="button"
-          @click="canvas.zoomIn()"
-          :disabled="canvas.zoomLevel.value >= 200"
+          @click="zoomInAroundCenter"
+          :disabled="canvas.zoomLevel.value >= 500"
           class="toolbar-btn text-xs font-bold w-6 h-6 p-0 disabled:opacity-40"
           title="Zoom +"
         >
@@ -1050,7 +1352,7 @@ const shortcutCategories = computed(() => ({
           type="button"
           @click="toggleUnderline"
           class="toolbar-btn underline"
-          :class="{ 'bg-blue-100 dark:bg-blue-950/60 text-blue-700 font-bold': (canvas.selectedElement.value as any)?.style?.textDecoration === 'underline' }"
+          :class="{ 'bg-blue-100 dark:bg-blue-950/60 text-blue-700 font-bold': ((canvas.selectedElement.value as any)?.style?.textDecoration || '').includes('underline') }"
           title="Underline (Ctrl+U)"
         >
           <UnderlineIcon class="w-3.5 h-3.5" />
@@ -1059,7 +1361,7 @@ const shortcutCategories = computed(() => ({
           type="button"
           @click="toggleStrike"
           class="toolbar-btn line-through"
-          :class="{ 'bg-blue-100 dark:bg-blue-950/60 text-blue-700 font-bold': (canvas.selectedElement.value as any)?.style?.textDecoration === 'line-through' }"
+          :class="{ 'bg-blue-100 dark:bg-blue-950/60 text-blue-700 font-bold': ((canvas.selectedElement.value as any)?.style?.textDecoration || '').includes('line-through') }"
           title="Strikethrough"
         >
           <Strikethrough class="w-3.5 h-3.5" />
@@ -1345,11 +1647,24 @@ const shortcutCategories = computed(() => ({
     </div>
 
     <!-- Free-Positioning Multi-Page A4 Canvas Workspace -->
-    <div class="canvas-outer-wrapper relative flex flex-1 overflow-hidden" style="isolation: isolate">
+    <!--
+      Layout Architecture:
+      - canvasWorkspaceRef is the SINGLE unified scroll container owning BOTH X and Y scrollbars (overflow: auto).
+      - Inner stage has width: max-content; min-width: 100%; display: flex; flex-direction: column; align-items: center;
+        * When content < viewport (low zoom), min-width: 100% and items-center keep the page centered.
+        * When content > viewport (high zoom), max-content expands to fit the scaled sheets,
+          horizontal/vertical scrollbars appear automatically, and the user can scroll from the leftmost edge
+          (with padding) all the way to the rightmost edge.
+    -->
+    <div
+      ref="canvasWorkspaceRef"
+      class="canvas-workspace flex-1 h-0 min-h-0 overflow-auto relative select-none"
+      :class="{ 'cursor-grab': isSpacePressed && !isPanning, 'cursor-grabbing': isPanning }"
+      @click.self="canvas.clearSelection()"
+    >
       <div
-        ref="canvasWorkspaceRef"
-        class="document-workspace flex-1 flex flex-col items-center p-4 sm:p-8 overflow-y-auto overflow-x-auto relative"
-        :style="hideTopBar ? 'height: calc(100vh - 170px);' : 'height: calc(100vh - 130px);'"
+        class="canvas-stage flex flex-col items-center pt-6 pb-36 px-8 sm:px-16"
+        style="width: max-content; min-width: 100%;"
         @click.self="canvas.clearSelection()"
       >
         <!-- Loop through every A4 sheet in the document -->
@@ -1358,6 +1673,7 @@ const shortcutCategories = computed(() => ({
           :key="page.id"
           :page="page"
           :page-index="pageIdx"
+          :readonly="readonly"
           :is-active-page="canvas.activePageIndex.value === pageIdx"
           :total-pages="canvas.document.value.pages.length"
           :margins="canvas.document.value.margins"
@@ -1372,6 +1688,7 @@ const shortcutCategories = computed(() => ({
           :calculate-snapping="canvas.calculateSnapping"
           @set-active-page="canvas.setActivePageIndex($event)"
           @select-element="(id, multi) => canvas.selectElement(id, multi, pageIdx)"
+          @select-elements="(ids) => { canvas.setActivePageIndex(pageIdx); canvas.selectedElementIds.value = ids }"
           @clear-selection="canvas.clearSelection()"
           @double-click-element="canvas.editingElementId.value = $event"
           @update-element="(id, updates) => canvas.updateElement(id, updates)"
@@ -1389,62 +1706,75 @@ const shortcutCategories = computed(() => ({
           @delete-page="canvas.deletePage($event)"
         />
       </div>
+    </div>
 
-      <!-- ─── Vertical Zoom Slider (Right Rail) ─── -->
-      <div
-        class="zoom-rail no-print"
-        @click.stop
+    <!-- ─── Vertical Zoom Slider (Right Rail) ─── -->
+    <!-- Placed OUTSIDE canvasWorkspaceRef so it stays fixed to the editor
+         corner and doesn't scroll with the canvas content. -->
+    <div
+      class="zoom-rail no-print"
+      @click.stop
+    >
+      <!-- Zoom In (+) -->
+      <button
+        type="button"
+        class="zoom-rail-btn"
+        :disabled="canvas.zoomLevel.value >= 500"
+        title="Zoom in (Ctrl + Scroll)"
+        @click="zoomInAroundCenter"
       >
-        <!-- Zoom In (+) -->
-        <button
-          type="button"
-          class="zoom-rail-btn"
-          :disabled="canvas.zoomLevel.value >= 200"
-          title="Zoom in (Ctrl + Scroll)"
-          @click="canvas.zoomIn()"
-        >
-          <ZoomIn class="w-3.5 h-3.5" />
-        </button>
+        <ZoomIn class="w-3.5 h-3.5" />
+      </button>
 
-        <!-- Vertical Slider Track -->
-        <div class="zoom-slider-track">
-          <input
-            type="range"
-            class="zoom-slider-input"
-            min="25"
-            max="200"
-            step="5"
-            :value="canvas.zoomLevel.value"
-            :style="`--v: ${(((canvas.zoomLevel.value - 25) / 175) * 100).toFixed(1)}`"
-            @input="canvas.setZoom(+($event.target as HTMLInputElement).value)"
-            title="Zoom level"
+      <!-- Vertical Slider Track (Custom Pointer-Driven) -->
+      <div
+        ref="zoomSliderTrackRef"
+        class="zoom-custom-track-container"
+        title="Zoom level (Drag or Click to adjust)"
+        @pointerdown="onSliderPointerDown"
+        @pointermove="onSliderPointerMove"
+        @pointerup="onSliderPointerUp"
+        @pointercancel="onSliderPointerUp"
+      >
+        <!-- Background Track Bar -->
+        <div class="zoom-custom-track-bar">
+          <!-- Active Fill Bar (bottom-up) -->
+          <div
+            class="zoom-custom-fill-bar"
+            :style="{ height: `${sliderPercent}%` }"
           />
         </div>
 
-        <!-- Percentage Label -->
-        <span class="zoom-rail-label">{{ canvas.zoomLevel.value }}%</span>
-
-        <!-- Zoom Out (-) -->
-        <button
-          type="button"
-          class="zoom-rail-btn"
-          :disabled="canvas.zoomLevel.value <= 25"
-          title="Zoom out"
-          @click="canvas.zoomOut()"
-        >
-          <ZoomOut class="w-3.5 h-3.5" />
-        </button>
-
-        <!-- Reset to 100% -->
-        <button
-          type="button"
-          class="zoom-rail-btn zoom-rail-reset"
-          title="Reset zoom to 100%"
-          @click="canvas.setZoom(100)"
-        >
-          <span class="text-[9px] font-bold font-mono leading-none">1:1</span>
-        </button>
+        <!-- Draggable Thumb Knob -->
+        <div
+          class="zoom-custom-thumb"
+          :style="{ bottom: `calc(${sliderPercent}% - 7px)` }"
+        />
       </div>
+
+      <!-- Percentage Label -->
+      <span class="zoom-rail-label">{{ canvas.zoomLevel.value }}%</span>
+
+      <!-- Zoom Out (-) -->
+      <button
+        type="button"
+        class="zoom-rail-btn"
+        :disabled="canvas.zoomLevel.value <= 25"
+        title="Zoom out"
+        @click="zoomOutAroundCenter"
+      >
+        <ZoomOut class="w-3.5 h-3.5" />
+      </button>
+
+      <!-- Reset to 100% -->
+      <button
+        type="button"
+        class="zoom-rail-btn zoom-rail-reset"
+        title="Reset zoom to 100% (Ctrl+0)"
+        @click="zoomResetAroundCenter"
+      >
+        <span class="text-[9px] font-bold font-mono leading-none">1:1</span>
+      </button>
     </div>
 
     <!-- ─── Keyboard Shortcut Help Modal ─── -->
@@ -1561,16 +1891,31 @@ const shortcutCategories = computed(() => ({
   }
 }
 
+/* Panning grab cursor classes */
+.cursor-grab,
+.cursor-grab * {
+  cursor: grab !important;
+}
+.cursor-grabbing,
+.cursor-grabbing * {
+  cursor: grabbing !important;
+}
+
 /* ─── Vertical Zoom Rail ─── */
-.canvas-outer-wrapper {
+/* Pinned to the bottom-right corner of the visible editor frame */
+.contract-editor-wrapper {
+  position: relative;
+}
+
+.canvas-workspace {
   position: relative;
 }
 
 .zoom-rail {
   position: absolute;
-  right: 12px;
+  right: 16px;
   bottom: 24px;
-  z-index: 20;
+  z-index: 50;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1651,76 +1996,66 @@ const shortcutCategories = computed(() => ({
   color: #d4d4d8;
 }
 
-/* Vertical slider track container */
-.zoom-slider-track {
+/* ─── Custom Vertical Slider Track ─── */
+.zoom-custom-track-container {
+  width: 24px;
+  height: 110px;
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 120px;
-  width: 26px;
-}
-
-/* The actual range input – rotated to vertical */
-.zoom-slider-input {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 120px;
-  height: 4px;
-  border-radius: 2px;
-  background: linear-gradient(
-    to right,
-    #3b82f6 0%,
-    #3b82f6 calc((var(--v,50)) * 1%),
-    #d4d4d8 calc((var(--v,50)) * 1%),
-    #d4d4d8 100%
-  );
-  outline: none;
+  position: relative;
   cursor: pointer;
-  transform: rotate(-90deg);
-  transform-origin: center center;
+  user-select: none;
+  touch-action: none;
 }
 
-.zoom-slider-input::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
+.zoom-custom-track-bar {
+  width: 4px;
+  height: 100%;
+  border-radius: 9999px;
+  background: #e4e4e7;
+  position: relative;
+}
+
+.dark .zoom-custom-track-bar {
+  background: #3f3f46;
+}
+
+.zoom-custom-fill-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  background: #2563eb;
+  border-radius: 9999px;
+}
+
+.dark .zoom-custom-fill-bar {
+  background: #60a5fa;
+}
+
+.zoom-custom-thumb {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
   width: 14px;
   height: 14px;
   border-radius: 50%;
   background: #2563eb;
-  border: 2px solid #fff;
-  box-shadow: 0 1px 4px rgba(37,99,235,0.35);
-  cursor: pointer;
+  border: 2px solid #ffffff;
+  box-shadow: 0 1px 4px rgba(37,99,235,0.4);
+  cursor: grab;
   transition: transform 0.1s, box-shadow 0.1s;
 }
 
-.zoom-slider-input::-webkit-slider-thumb:hover {
-  transform: scale(1.2);
-  box-shadow: 0 2px 8px rgba(37,99,235,0.5);
-}
-
-.zoom-slider-input::-moz-range-thumb {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: #2563eb;
-  border: 2px solid #fff;
-  box-shadow: 0 1px 4px rgba(37,99,235,0.35);
-  cursor: pointer;
-}
-
-.dark .zoom-slider-input {
-  background: linear-gradient(
-    to right,
-    #60a5fa 0%,
-    #60a5fa calc((var(--v,50)) * 1%),
-    #3f3f46 calc((var(--v,50)) * 1%),
-    #3f3f46 100%
-  );
-}
-
-.dark .zoom-slider-input::-webkit-slider-thumb {
+.dark .zoom-custom-thumb {
   background: #60a5fa;
   border-color: #18181b;
+}
+
+.zoom-custom-track-container:hover .zoom-custom-thumb {
+  transform: translateX(-50%) scale(1.2);
+  box-shadow: 0 2px 8px rgba(37,99,235,0.5);
 }
 
 /* ─── Shortcut Help Modal ─── */

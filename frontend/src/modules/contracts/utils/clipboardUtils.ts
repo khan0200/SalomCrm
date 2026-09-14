@@ -87,6 +87,20 @@ export function cleanClipboardContent(
       const dangerousTags = doc.querySelectorAll('script, style, link, meta, title, head')
       dangerousTags.forEach(el => el.remove())
 
+      // Unwrap semantic formatting tags (<b>, <strong>, <em>, <i>, <u>, <s>, <strike>)
+      // so they don't visually override the element-level toolbar bold/italic/underline state.
+      // Their text content is kept; only the tag itself is removed.
+      const semanticFormatTags = doc.body.querySelectorAll('b, strong, em, i, u, s, strike')
+      semanticFormatTags.forEach(el => {
+        const parent = el.parentNode
+        if (!parent) return
+        // Move all children before the tag, then remove the tag itself
+        while (el.firstChild) {
+          parent.insertBefore(el.firstChild, el)
+        }
+        parent.removeChild(el)
+      })
+
       // Clean all elements
       const elements = doc.body.querySelectorAll('*')
       elements.forEach(el => {
@@ -110,11 +124,16 @@ export function cleanClipboardContent(
             hEl.style.removeProperty('color')
           }
 
-          // Strip backgrounds and fonts
+          // Strip backgrounds, fonts, and inline text-style overrides so that the
+          // element-level toolbar controls (bold / italic / underline) remain the
+          // single source of truth and the toolbar state always matches what renders.
           hEl.style.removeProperty('background')
           hEl.style.removeProperty('background-color')
           hEl.style.removeProperty('font-family')
           hEl.style.removeProperty('font-size')
+          hEl.style.removeProperty('font-weight')
+          hEl.style.removeProperty('font-style')
+          hEl.style.removeProperty('text-decoration')
           hEl.style.removeProperty('line-height')
           hEl.style.removeProperty('letter-spacing')
           hEl.style.removeProperty('white-space')

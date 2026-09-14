@@ -365,10 +365,14 @@ export function useContractCanvas(initialDoc?: ContractDocumentModel) {
     const targetBottom = targetY + targetH
 
     // 1. Page Bounds & Margin Snaps (X Axis)
+    // Snap targets: absolute page edges, margin guides, and page horizontal center.
+    // ALL coordinates are in mm in the same document space as element.x/width.
     const xSnaps = [
-      { pos: margins.left, label: 'Left Margin' },
+      { pos: 0,                             label: 'Page Left' },
+      { pos: margins.left,                  label: 'Left Margin' },
+      { pos: pageCenterHoriz,               label: 'Center Page (X)' },
       { pos: PAGE_WIDTH_MM - margins.right, label: 'Right Margin' },
-      { pos: pageCenterHoriz, label: 'Center Page (X)' },
+      { pos: PAGE_WIDTH_MM,                 label: 'Page Right' },
     ]
 
     for (const snap of xSnaps) {
@@ -411,10 +415,13 @@ export function useContractCanvas(initialDoc?: ContractDocumentModel) {
     }
 
     // 2. Page Bounds & Margin Snaps (Y Axis)
+    // Same approach: absolute page edges, margin guides, vertical center.
     const ySnaps = [
-      { pos: margins.top, label: 'Top Margin' },
+      { pos: 0,                              label: 'Page Top' },
+      { pos: margins.top,                    label: 'Top Margin' },
+      { pos: pageCenterVert,                 label: 'Center Page (Y)' },
       { pos: PAGE_HEIGHT_MM - margins.bottom, label: 'Bottom Margin' },
-      { pos: pageCenterVert, label: 'Center Page (Y)' },
+      { pos: PAGE_HEIGHT_MM,                  label: 'Page Bottom' },
     ]
 
     for (const snap of ySnaps) {
@@ -469,58 +476,60 @@ export function useContractCanvas(initialDoc?: ContractDocumentModel) {
       const otherCenterY = other.y + other.height / 2
       const otherBottom = other.y + other.height
 
-      // Horizontal element alignments
+      // Horizontal element alignments — same-edge and cross-edge
       if (Math.abs(targetX - other.x) < SNAP_THRESHOLD_MM) {
+        // Left → Left
         snappedX = other.x
-        guides.push({
-          type: 'vertical',
-          position: other.x,
-          start: Math.min(targetY, other.y),
-          end: Math.max(targetBottom, otherBottom),
-        })
+        guides.push({ type: 'vertical', position: other.x,
+          start: Math.min(targetY, other.y), end: Math.max(targetBottom, otherBottom) })
       } else if (Math.abs(targetCenterX - otherCenterX) < SNAP_THRESHOLD_MM) {
+        // Center → Center
         snappedX = otherCenterX - targetW / 2
-        guides.push({
-          type: 'vertical',
-          position: otherCenterX,
-          start: Math.min(targetY, other.y),
-          end: Math.max(targetBottom, otherBottom),
-        })
+        guides.push({ type: 'vertical', position: otherCenterX,
+          start: Math.min(targetY, other.y), end: Math.max(targetBottom, otherBottom) })
       } else if (Math.abs(targetRight - otherRight) < SNAP_THRESHOLD_MM) {
+        // Right → Right
         snappedX = otherRight - targetW
-        guides.push({
-          type: 'vertical',
-          position: otherRight,
-          start: Math.min(targetY, other.y),
-          end: Math.max(targetBottom, otherBottom),
-        })
+        guides.push({ type: 'vertical', position: otherRight,
+          start: Math.min(targetY, other.y), end: Math.max(targetBottom, otherBottom) })
+      } else if (Math.abs(targetRight - other.x) < SNAP_THRESHOLD_MM) {
+        // Target right edge → Other left edge (adjacent snap)
+        snappedX = other.x - targetW
+        guides.push({ type: 'vertical', position: other.x,
+          start: Math.min(targetY, other.y), end: Math.max(targetBottom, otherBottom) })
+      } else if (Math.abs(targetX - otherRight) < SNAP_THRESHOLD_MM) {
+        // Target left edge → Other right edge (adjacent snap)
+        snappedX = otherRight
+        guides.push({ type: 'vertical', position: otherRight,
+          start: Math.min(targetY, other.y), end: Math.max(targetBottom, otherBottom) })
       }
 
-      // Vertical element alignments
+      // Vertical element alignments — same-edge and cross-edge
       if (Math.abs(targetY - other.y) < SNAP_THRESHOLD_MM) {
+        // Top → Top
         snappedY = other.y
-        guides.push({
-          type: 'horizontal',
-          position: other.y,
-          start: Math.min(targetX, other.x),
-          end: Math.max(targetRight, otherRight),
-        })
+        guides.push({ type: 'horizontal', position: other.y,
+          start: Math.min(targetX, other.x), end: Math.max(targetRight, otherRight) })
       } else if (Math.abs(targetCenterY - otherCenterY) < SNAP_THRESHOLD_MM) {
+        // Center → Center
         snappedY = otherCenterY - targetH / 2
-        guides.push({
-          type: 'horizontal',
-          position: otherCenterY,
-          start: Math.min(targetX, other.x),
-          end: Math.max(targetRight, otherRight),
-        })
+        guides.push({ type: 'horizontal', position: otherCenterY,
+          start: Math.min(targetX, other.x), end: Math.max(targetRight, otherRight) })
       } else if (Math.abs(targetBottom - otherBottom) < SNAP_THRESHOLD_MM) {
+        // Bottom → Bottom
         snappedY = otherBottom - targetH
-        guides.push({
-          type: 'horizontal',
-          position: otherBottom,
-          start: Math.min(targetX, other.x),
-          end: Math.max(targetRight, otherRight),
-        })
+        guides.push({ type: 'horizontal', position: otherBottom,
+          start: Math.min(targetX, other.x), end: Math.max(targetRight, otherRight) })
+      } else if (Math.abs(targetBottom - other.y) < SNAP_THRESHOLD_MM) {
+        // Target bottom edge → Other top edge (adjacent snap)
+        snappedY = other.y - targetH
+        guides.push({ type: 'horizontal', position: other.y,
+          start: Math.min(targetX, other.x), end: Math.max(targetRight, otherRight) })
+      } else if (Math.abs(targetY - otherBottom) < SNAP_THRESHOLD_MM) {
+        // Target top edge → Other bottom edge (adjacent snap)
+        snappedY = otherBottom
+        guides.push({ type: 'horizontal', position: otherBottom,
+          start: Math.min(targetX, other.x), end: Math.max(targetRight, otherRight) })
       }
     }
 
@@ -702,7 +711,7 @@ export function useContractCanvas(initialDoc?: ContractDocumentModel) {
 
   // Zoom helpers
   function zoomIn() {
-    zoomLevel.value = Math.min(200, zoomLevel.value + 15)
+    zoomLevel.value = Math.min(500, zoomLevel.value + 15)
   }
 
   function zoomOut() {
@@ -710,7 +719,7 @@ export function useContractCanvas(initialDoc?: ContractDocumentModel) {
   }
 
   function setZoom(level: number) {
-    zoomLevel.value = Math.max(25, Math.min(200, level))
+    zoomLevel.value = Math.max(25, Math.min(500, level))
   }
 
   return {

@@ -11,19 +11,25 @@ import {
 } from 'lucide-vue-next'
 import type { CanvasElement, ResizeHandle, AlignmentGuide } from '../../types/contractCanvas'
 
-const props = defineProps<{
-  element: CanvasElement
-  isSelected: boolean
-  isEditing: boolean
-  zoomLevel: number
-  calculateSnapping?: (
-    x: number,
-    y: number,
-    w: number,
-    h: number,
-    id: string
-  ) => { x: number; y: number; guides: AlignmentGuide[] }
-}>()
+const props = withDefaults(
+  defineProps<{
+    element: CanvasElement
+    isSelected: boolean
+    isEditing: boolean
+    zoomLevel: number
+    readonly?: boolean
+    calculateSnapping?: (
+      x: number,
+      y: number,
+      w: number,
+      h: number,
+      id: string
+    ) => { x: number; y: number; guides: AlignmentGuide[] }
+  }>(),
+  {
+    readonly: false,
+  }
+)
 
 const emit = defineEmits<{
   select: [e: MouseEvent]
@@ -71,8 +77,8 @@ const isDraggingLocal = ref(false)
 const hasDragged = ref(false)
 
 function onPointerDown(e: PointerEvent) {
-  // Ignore right clicks or events when in text-edit mode
-  if (props.isEditing || e.button !== 0) return
+  // Ignore when in readonly mode, right clicks, or events when in text-edit mode
+  if (props.readonly || props.isEditing || e.button !== 0) return
 
   // Prevent default (text selection) and stop propagation so the scroll
   // workspace does NOT steal pointer capture away from us.
@@ -127,8 +133,8 @@ function onPointerDown(e: PointerEvent) {
     }
 
     emit('update:bounds', {
-      x: Math.round(finalX * 10) / 10,
-      y: Math.round(finalY * 10) / 10,
+      x: Math.round(finalX * 100) / 100,
+      y: Math.round(finalY * 100) / 100,
       width: props.element.width,
       height: props.element.height,
       rotation: props.element.rotation,
@@ -208,6 +214,7 @@ function onResizePointerDown(handle: ResizeHandle, e: PointerEvent) {
       const PROBE = 0.001 // mm — effectively a point probe
 
       // East handle: snap right edge → adjust width (x stays fixed)
+      // Pass actual height (not PROBE) so the guide spans the full element height.
       if (handle.includes('e') && !handle.includes('w')) {
         const r = props.calculateSnapping(newX + newW, newY, PROBE, newH, id)
         newW = Math.max(MIN_SIZE_MM, r.x - newX)
@@ -241,10 +248,10 @@ function onResizePointerDown(handle: ResizeHandle, e: PointerEvent) {
     }
 
     emit('update:bounds', {
-      x: Math.round(newX * 10) / 10,
-      y: Math.round(newY * 10) / 10,
-      width: Math.round(newW * 10) / 10,
-      height: Math.round(newH * 10) / 10,
+      x: Math.round(newX * 100) / 100,
+      y: Math.round(newY * 100) / 100,
+      width: Math.round(newW * 100) / 100,
+      height: Math.round(newH * 100) / 100,
       rotation: props.element.rotation,
     })
   }
@@ -261,7 +268,7 @@ function onResizePointerDown(handle: ResizeHandle, e: PointerEvent) {
 }
 
 function onDoubleClick(e: MouseEvent) {
-  if (props.element.locked) return
+  if (props.readonly || props.element.locked) return
   e.stopPropagation()
   emit('double-click')
 }
@@ -271,8 +278,8 @@ function onDoubleClick(e: MouseEvent) {
   <div
     class="canvas-element-wrapper absolute top-0 left-0 select-none group"
     :class="[
-      isEditing ? 'cursor-text' : element.locked ? 'cursor-not-allowed' : 'cursor-move',
-      !isSelected && !isEditing ? 'hover:outline hover:outline-1 hover:outline-[#7c3aed]/40' : ''
+      readonly ? 'cursor-default' : isEditing ? 'cursor-text' : element.locked ? 'cursor-not-allowed' : 'cursor-move',
+      !readonly && !isSelected && !isEditing ? 'hover:outline hover:outline-1 hover:outline-[#7c3aed]/40' : ''
     ]"
     :style="wrapperStyle"
     @pointerdown="onPointerDown"
@@ -282,13 +289,13 @@ function onDoubleClick(e: MouseEvent) {
     <!-- Element Body Content Slot -->
     <div
       class="canvas-element-content w-full h-full relative"
-      :class="{ 'pointer-events-auto': isEditing, 'pointer-events-none': !isEditing && isSelected }"
+      :class="{ 'pointer-events-auto': isEditing, 'pointer-events-none': !readonly && !isEditing && isSelected }"
     >
       <slot />
     </div>
 
     <!-- Canva Single Bounding Box & Handles (Only ONE transform box, matching Canva 1-to-1) -->
-    <template v-if="isSelected || isEditing">
+    <template v-if="!readonly && (isSelected || isEditing)">
       <!-- Canva Signature Single Bounding Line (#7c3aed) -->
       <div
         class="absolute -inset-0.5 border-[1.5px] border-[#7c3aed] pointer-events-none rounded-[1px] z-30"
