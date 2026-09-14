@@ -205,8 +205,8 @@ function renderCellContent(content: string): string {
     <!-- Floating Table Quick Toolbar (when a cell or table is selected) -->
     <div
       v-if="isSelected && activeCellCoord"
-      class="absolute -top-8 right-0 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 shadow-lg rounded-xl px-1.5 py-0.5 flex items-center gap-1 z-30 text-[11px] pointer-events-auto"
-      @pointerdown.stop
+      class="absolute -top-8 right-0 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 shadow-xl rounded-xl px-1.5 py-0.5 flex items-center gap-1 z-50 text-[11px] pointer-events-auto opacity-100 ring-1 ring-black/5 dark:ring-white/10"
+      @pointerdown.stop.prevent
     >
       <button
         type="button"

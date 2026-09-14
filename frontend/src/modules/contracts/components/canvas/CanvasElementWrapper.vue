@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import {
   Copy,
   Trash2,
@@ -63,6 +63,24 @@ const isTextType = computed(() => {
   return t === 'text' || t === 'heading' || t === 'paragraph' || t === 'date' || t === 'variable'
 })
 
+const isNearTop = computed(() => {
+  return props.element.y < 14
+})
+
+const toolbarPositionClass = computed(() => {
+  // If element is near top edge (< 14mm), place toolbar below to avoid being clipped by sheet boundaries
+  const vClass = isNearTop.value ? 'top-[calc(100%+8px)]' : '-top-9'
+
+  // Clamp horizontal position so toolbar stays within page bounds
+  if (props.element.x < 15) {
+    return `${vClass} left-0`
+  }
+  if (props.element.x + props.element.width > 195) {
+    return `${vClass} right-0`
+  }
+  return `${vClass} left-1/2 -translate-x-1/2`
+})
+
 const wrapperStyle = computed(() => {
   const leftPx = mmToPx(props.element.x)
   const topPx = mmToPx(props.element.y)
@@ -78,9 +96,42 @@ const wrapperStyle = computed(() => {
     ...(isTextType.value
       ? { height: `${heightPx}px` }
       : { minHeight: `${heightPx}px` }),
-    zIndex: props.element.zIndex || 1,
+    // Elevate z-index when selected or editing so toolbar and selection handles
+    // are ALWAYS on top of all other elements and guides
+    zIndex: (props.isSelected || props.isEditing) ? 900 + (props.element.zIndex || 1) : (props.element.zIndex || 1),
   }
 })
+
+// --- Spacing Popover (Line Spacing & Letter Spacing — Canva Style) ---
+const showSpacingPopover = ref(false)
+
+watch(() => props.isSelected, (val) => {
+  if (!val) showSpacingPopover.value = false
+})
+
+const currentLineHeight = computed(() => {
+  return (props.element as any)?.style?.lineHeight ?? 1.5
+})
+
+const currentLetterSpacing = computed(() => {
+  return (props.element as any)?.style?.letterSpacing ?? 0
+})
+
+function setLineHeight(val: number | string) {
+  const num = typeof val === 'string' ? parseFloat(val) : val
+  if (isNaN(num)) return
+  const el = props.element as any
+  if (!el.style) el.style = {}
+  el.style.lineHeight = Math.max(0.5, Math.min(3.5, Math.round(num * 100) / 100))
+}
+
+function setLetterSpacing(val: number | string) {
+  const num = typeof val === 'string' ? parseFloat(val) : val
+  if (isNaN(num)) return
+  const el = props.element as any
+  if (!el.style) el.style = {}
+  el.style.letterSpacing = Math.max(-5, Math.min(30, Math.round(num * 10) / 10))
+}
 
 // --- Drag & Move Logic ---
 const isDraggingLocal = ref(false)
@@ -317,11 +368,11 @@ function onDoubleClick(e: MouseEvent) {
         :class="{ 'border-dashed border-amber-500': element.locked }"
       ></div>
 
-      <!-- Quick Floating Action Bar (Only shown when selected and NOT in active text typing) -->
+      <!-- Quick Floating Action Bar (Always visible when selected or editing) -->
       <div
-        v-if="!isEditing"
-        class="absolute -top-9 left-1/2 -translate-x-1/2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 shadow-xl rounded-xl px-1 py-0.5 flex items-center gap-0.5 z-40 text-zinc-600 dark:text-zinc-300 text-xs pointer-events-auto whitespace-nowrap animate-scale-in"
-        @pointerdown.stop
+        class="absolute bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 shadow-xl rounded-xl px-1.5 py-0.5 flex items-center gap-0.5 z-[100] text-zinc-600 dark:text-zinc-300 text-xs pointer-events-auto whitespace-nowrap opacity-100 select-none ring-1 ring-black/5 dark:ring-white/10"
+        :class="toolbarPositionClass"
+        @pointerdown.stop.prevent
       >
         <!-- Coordinates & Dimensions Badge -->
         <span class="px-1.5 py-0.5 font-mono text-[10px] text-zinc-400 font-bold border-r border-zinc-200 dark:border-zinc-700 mr-0.5">
@@ -333,11 +384,129 @@ function onDoubleClick(e: MouseEvent) {
           v-if="element.type === 'text' || element.type === 'checkbox'"
           type="button"
           @click.stop="emit('double-click')"
-          class="p-1 hover:bg-blue-50 dark:hover:bg-blue-950/60 rounded-lg text-blue-600 dark:text-blue-400"
-          title="Matnni tahrirlash (Double-click)"
+          class="p-1 rounded-lg text-xs transition-colors"
+          :class="isEditing ? 'bg-blue-600 text-white shadow-xs' : 'hover:bg-blue-50 dark:hover:bg-blue-950/60 text-blue-600 dark:text-blue-400'"
+          :title="isEditing ? 'Tahrirlashni yakunlash (Double-click)' : 'Matnni tahrirlash (Double-click)'"
         >
           <Type class="w-3.5 h-3.5" />
         </button>
+
+        <!-- Canva Spacing Button & Popover (Letter Spacing & Line Spacing) -->
+        <div v-if="isTextType" class="relative">
+          <button
+            type="button"
+            @click.stop="showSpacingPopover = !showSpacingPopover"
+            class="p-1 rounded-lg text-xs transition-colors"
+            :class="showSpacingPopover ? 'bg-blue-100 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400' : 'hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-300'"
+            title="Oraliqlar: Qatorlar va Harflar oralig'i (Canva Spacing)"
+          >
+            <!-- Canva Spacing Icon -->
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M4 6h11" />
+              <path d="M4 12h11" />
+              <path d="M4 18h11" />
+              <path d="M19 6v12" />
+              <path d="m16.5 8.5 2.5-2.5 2.5 2.5" />
+              <path d="m16.5 15.5 2.5 2.5 2.5 2.5" />
+            </svg>
+          </button>
+
+          <!-- Floating Spacing Popover -->
+          <div
+            v-if="showSpacingPopover"
+            class="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-64 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 shadow-2xl rounded-2xl p-3.5 z-[150] space-y-3.5 select-none ring-1 ring-black/5 dark:ring-white/10"
+            @pointerdown.stop.prevent
+            @click.stop
+          >
+            <div class="flex items-center justify-between pb-1.5 border-b border-zinc-100 dark:border-zinc-800">
+              <span class="text-xs font-bold text-zinc-800 dark:text-zinc-100">Oraliqlar (Spacing)</span>
+              <span class="text-[10px] text-zinc-400 font-mono font-semibold">Canva</span>
+            </div>
+
+            <!-- Letter Spacing -->
+            <div class="space-y-1.5">
+              <div class="flex items-center justify-between text-xs">
+                <span class="font-medium text-zinc-700 dark:text-zinc-300">Harflar oralig'i</span>
+                <div class="flex items-center gap-1">
+                  <input
+                    type="number"
+                    step="0.5"
+                    min="-3"
+                    max="25"
+                    :value="currentLetterSpacing"
+                    @input="setLetterSpacing(($event.target as HTMLInputElement).value)"
+                    class="w-14 h-6 px-1 text-right text-xs font-mono font-bold bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                  <span class="text-[10px] text-zinc-400">px</span>
+                </div>
+              </div>
+              <input
+                type="range"
+                min="-2"
+                max="20"
+                step="0.5"
+                :value="currentLetterSpacing"
+                @input="setLetterSpacing(($event.target as HTMLInputElement).value)"
+                class="w-full accent-blue-600 h-1.5 bg-zinc-200 dark:bg-zinc-700 rounded-lg cursor-pointer"
+              />
+            </div>
+
+            <!-- Line Spacing -->
+            <div class="space-y-1.5">
+              <div class="flex items-center justify-between text-xs">
+                <span class="font-medium text-zinc-700 dark:text-zinc-300">Qatorlar oralig'i</span>
+                <div class="flex items-center gap-1">
+                  <input
+                    type="number"
+                    step="0.05"
+                    min="0.8"
+                    max="3.0"
+                    :value="currentLineHeight"
+                    @input="setLineHeight(($event.target as HTMLInputElement).value)"
+                    class="w-14 h-6 px-1 text-right text-xs font-mono font-bold bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+              <input
+                type="range"
+                min="0.8"
+                max="2.8"
+                step="0.05"
+                :value="currentLineHeight"
+                @input="setLineHeight(($event.target as HTMLInputElement).value)"
+                class="w-full accent-blue-600 h-1.5 bg-zinc-200 dark:bg-zinc-700 rounded-lg cursor-pointer"
+              />
+            </div>
+
+            <!-- Presets -->
+            <div class="pt-2 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between text-[10px]">
+              <span class="text-zinc-400">Shablon:</span>
+              <div class="flex items-center gap-1">
+                <button
+                  type="button"
+                  @click="setLineHeight(1.15); setLetterSpacing(0)"
+                  class="px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-600 dark:text-zinc-300 font-medium"
+                >
+                  Zich (1.15)
+                </button>
+                <button
+                  type="button"
+                  @click="setLineHeight(1.5); setLetterSpacing(0)"
+                  class="px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-600 dark:text-zinc-300 font-medium"
+                >
+                  Standart (1.5)
+                </button>
+                <button
+                  type="button"
+                  @click="setLineHeight(1.8); setLetterSpacing(0.5)"
+                  class="px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-600 dark:text-zinc-300 font-medium"
+                >
+                  Keng (1.8)
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
 
         <!-- Duplicate -->
         <button

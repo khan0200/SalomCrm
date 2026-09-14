@@ -130,6 +130,7 @@ const showColorPicker = ref(false)
 const showHighlightPicker = ref(false)
 const showTableInsertMenu = ref(false)
 const showMarginMenu = ref(false)
+const showSpacingMenu = ref(false)
 const showVariablePicker = ref(false)
 const showEditorDownloadMenu = ref(false)
 const showShortcutHelp = ref(false)
@@ -724,6 +725,7 @@ function closeAllDropdowns() {
   showColorPicker.value = false
   showHighlightPicker.value = false
   showMarginMenu.value = false
+  showSpacingMenu.value = false
   showEditorDownloadMenu.value = false
 }
 
@@ -850,8 +852,60 @@ function toggleMarginMenu() {
     showVariablePicker.value = false
     showColorPicker.value = false
     showHighlightPicker.value = false
+    showSpacingMenu.value = false
     showEditorDownloadMenu.value = false
   }
+}
+
+// Spacing dropdown toggle (Canva style)
+function toggleSpacingMenu() {
+  showSpacingMenu.value = !showSpacingMenu.value
+  if (showSpacingMenu.value) {
+    showTableInsertMenu.value = false
+    showVariablePicker.value = false
+    showColorPicker.value = false
+    showHighlightPicker.value = false
+    showMarginMenu.value = false
+    showEditorDownloadMenu.value = false
+  }
+}
+
+const isTextSelected = computed(() => {
+  const el = canvas.selectedElement.value
+  if (!el) return false
+  return el.type === 'text' || el.type === 'heading' || el.type === 'paragraph' || el.type === 'date' || el.type === 'variable'
+})
+
+const currentLineHeight = computed(() => {
+  const el = canvas.selectedElement.value as TextCanvasElement
+  return el?.style?.lineHeight ?? 1.5
+})
+
+const currentLetterSpacing = computed(() => {
+  const el = canvas.selectedElement.value as TextCanvasElement
+  return el?.style?.letterSpacing ?? 0
+})
+
+function setLineHeight(val: number | string) {
+  const num = typeof val === 'string' ? parseFloat(val) : val
+  if (isNaN(num)) return
+  const el = canvas.selectedElement.value as TextCanvasElement
+  if (!el) return
+  if (!el.style) el.style = {}
+  el.style.lineHeight = Math.max(0.5, Math.min(3.5, Math.round(num * 100) / 100))
+}
+
+function setLetterSpacing(val: number | string) {
+  const num = typeof val === 'string' ? parseFloat(val) : val
+  if (isNaN(num)) return
+  const el = canvas.selectedElement.value as TextCanvasElement
+  if (!el) return
+  if (!el.style) el.style = {}
+  el.style.letterSpacing = Math.max(-5, Math.min(30, Math.round(num * 10) / 10))
+}
+
+function commitSpacingChange() {
+  canvas.history.recordSnapshot(canvas.document.value)
 }
 
 function setFontColor(color: string) {
@@ -1483,6 +1537,131 @@ const shortcutCategories = computed(() => ({
         </button>
       </div>
 
+      <!-- Text Spacing: Letter Spacing & Line Spacing (Canva Style) -->
+      <div class="relative px-1 border-r border-zinc-200 dark:border-zinc-700/60 editor-dropdown-container">
+        <button
+          type="button"
+          @click.stop="toggleSpacingMenu()"
+          class="toolbar-btn flex items-center gap-1 h-7 px-1.5"
+          :class="[
+            showSpacingMenu ? 'bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-400' : '',
+            !isTextSelected ? 'opacity-50 cursor-not-allowed' : ''
+          ]"
+          :disabled="!isTextSelected"
+          title="Oraliqlar: Qatorlar va Harflar oralig'i (Canva Spacing)"
+        >
+          <!-- Canva Spacing Icon -->
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 6h11" />
+            <path d="M4 12h11" />
+            <path d="M4 18h11" />
+            <path d="M19 6v12" />
+            <path d="m16.5 8.5 2.5-2.5 2.5 2.5" />
+            <path d="m16.5 15.5 2.5 2.5 2.5 2.5" />
+          </svg>
+          <span class="text-[11px] font-medium hidden md:inline">Spacing</span>
+        </button>
+
+        <!-- Canva Style Spacing Popover -->
+        <div
+          v-if="showSpacingMenu && isTextSelected"
+          class="absolute top-full left-0 mt-1.5 w-64 bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-700 shadow-2xl p-3.5 z-[250] space-y-3.5 select-none"
+          @click.stop
+        >
+          <div class="flex items-center justify-between pb-1 border-b border-zinc-100 dark:border-zinc-800">
+            <span class="text-[11px] font-bold text-zinc-700 dark:text-zinc-200 uppercase tracking-wider">Spacing</span>
+            <span class="text-[10px] text-zinc-400 font-mono font-semibold">Canva</span>
+          </div>
+
+          <!-- Letter Spacing Control -->
+          <div class="space-y-1.5">
+            <div class="flex items-center justify-between text-xs">
+              <span class="font-medium text-zinc-700 dark:text-zinc-300">Letter spacing</span>
+              <div class="flex items-center gap-1">
+                <input
+                  type="number"
+                  step="0.5"
+                  min="-3"
+                  max="25"
+                  :value="currentLetterSpacing"
+                  @input="setLetterSpacing(($event.target as HTMLInputElement).value)"
+                  @change="commitSpacingChange"
+                  class="w-14 h-6 px-1 text-right text-xs font-mono font-bold bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+                <span class="text-[10px] text-zinc-400">px</span>
+              </div>
+            </div>
+            <input
+              type="range"
+              min="-2"
+              max="20"
+              step="0.5"
+              :value="currentLetterSpacing"
+              @input="setLetterSpacing(($event.target as HTMLInputElement).value)"
+              @change="commitSpacingChange"
+              class="w-full accent-blue-600 h-1.5 bg-zinc-200 dark:bg-zinc-700 rounded-lg cursor-pointer"
+            />
+          </div>
+
+          <!-- Line Spacing Control -->
+          <div class="space-y-1.5">
+            <div class="flex items-center justify-between text-xs">
+              <span class="font-medium text-zinc-700 dark:text-zinc-300">Line spacing</span>
+              <div class="flex items-center gap-1">
+                <input
+                  type="number"
+                  step="0.05"
+                  min="0.8"
+                  max="3.0"
+                  :value="currentLineHeight"
+                  @input="setLineHeight(($event.target as HTMLInputElement).value)"
+                  @change="commitSpacingChange"
+                  class="w-14 h-6 px-1 text-right text-xs font-mono font-bold bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+            <input
+              type="range"
+              min="0.8"
+              max="2.8"
+              step="0.05"
+              :value="currentLineHeight"
+              @input="setLineHeight(($event.target as HTMLInputElement).value)"
+              @change="commitSpacingChange"
+              class="w-full accent-blue-600 h-1.5 bg-zinc-200 dark:bg-zinc-700 rounded-lg cursor-pointer"
+            />
+          </div>
+
+          <!-- Quick Presets -->
+          <div class="pt-2 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between text-[10px]">
+            <span class="text-zinc-400">Presets:</span>
+            <div class="flex items-center gap-1">
+              <button
+                type="button"
+                @click="setLineHeight(1.15); setLetterSpacing(0); commitSpacingChange()"
+                class="px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-600 dark:text-zinc-300 font-medium"
+              >
+                Tight (1.15)
+              </button>
+              <button
+                type="button"
+                @click="setLineHeight(1.5); setLetterSpacing(0); commitSpacingChange()"
+                class="px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-600 dark:text-zinc-300 font-medium"
+              >
+                Normal (1.5)
+              </button>
+              <button
+                type="button"
+                @click="setLineHeight(1.8); setLetterSpacing(0.5); commitSpacingChange()"
+                class="px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-600 dark:text-zinc-300 font-medium"
+              >
+                Loose (1.8)
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Page Addition Button -->
       <div class="flex items-center px-1.5 border-r border-zinc-200 dark:border-zinc-700/60">
         <button
@@ -1757,7 +1936,7 @@ const shortcutCategories = computed(() => ({
           @select-element="(id, multi) => canvas.selectElement(id, multi, pageIdx)"
           @select-elements="(ids) => { canvas.setActivePageIndex(pageIdx); canvas.selectedElementIds.value = ids }"
           @clear-selection="canvas.clearSelection()"
-          @double-click-element="canvas.editingElementId.value = $event"
+          @double-click-element="canvas.editingElementId.value = (canvas.editingElementId.value === $event ? null : $event)"
           @update-element="(id, updates) => canvas.updateElement(id, updates)"
           @update-element-bounds="(id, bounds) => canvas.updateElement(id, bounds, false)"
           @duplicate-element="canvas.duplicateSelectedElements($event)"

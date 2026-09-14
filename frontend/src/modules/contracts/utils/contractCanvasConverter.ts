@@ -445,6 +445,7 @@ export function convertCanvasDocumentToHtml(
           background-color: ${st.backgroundColor || 'transparent'};
           text-align: ${st.textAlign || 'left'};
           line-height: ${st.lineHeight || 1.5};
+          letter-spacing: ${typeof st.letterSpacing === 'number' && st.letterSpacing !== 0 ? `${st.letterSpacing}px` : 'normal'};
           padding: ${st.padding || 0}mm;
         `
         innerContent = `<div style="${fontStyle}">${content}</div>`
