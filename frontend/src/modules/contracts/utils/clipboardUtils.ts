@@ -113,6 +113,7 @@ export function cleanClipboardContent(
         hEl.removeAttribute('size')
         hEl.removeAttribute('class')
         hEl.removeAttribute('id')
+        hEl.removeAttribute('align')
 
         // Clean inline styles
         if (hEl.style) {
@@ -134,11 +135,32 @@ export function cleanClipboardContent(
           hEl.style.removeProperty('font-weight')
           hEl.style.removeProperty('font-style')
           hEl.style.removeProperty('text-decoration')
+          hEl.style.removeProperty('text-align')
+          hEl.style.removeProperty('text-indent')
           hEl.style.removeProperty('line-height')
           hEl.style.removeProperty('letter-spacing')
           hEl.style.removeProperty('white-space')
           hEl.style.removeProperty('display')
           hEl.style.removeProperty('float')
+          hEl.style.removeProperty('margin')
+          hEl.style.removeProperty('margin-left')
+          hEl.style.removeProperty('margin-right')
+          hEl.style.removeProperty('margin-top')
+          hEl.style.removeProperty('margin-bottom')
+          hEl.style.removeProperty('padding')
+          hEl.style.removeProperty('padding-left')
+          hEl.style.removeProperty('padding-right')
+          hEl.style.removeProperty('padding-top')
+          hEl.style.removeProperty('padding-bottom')
+          hEl.style.removeProperty('width')
+          hEl.style.removeProperty('height')
+          hEl.style.removeProperty('max-width')
+          hEl.style.removeProperty('min-width')
+          hEl.style.removeProperty('border')
+          hEl.style.removeProperty('border-bottom')
+          hEl.style.removeProperty('border-top')
+          hEl.style.removeProperty('border-left')
+          hEl.style.removeProperty('border-right')
 
           // If style attribute is now empty, remove it completely
           if (!hEl.getAttribute('style') || hEl.getAttribute('style')?.trim() === '') {
