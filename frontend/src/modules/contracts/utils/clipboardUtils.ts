@@ -237,8 +237,8 @@ export function estimateTextHeightMm(
   totalLines = Math.max(1, Math.ceil(totalLines))
   // At 14pt (approx 4.9mm font height) with 1.5 line height, each line is ~7.4mm
   const mmPerLine = (fontSizePt * 0.352778) * 1.5
-  const estimatedMm = Math.ceil(totalLines * mmPerLine + 6)
+  const estimatedMm = Math.ceil(totalLines * mmPerLine + 1.5)
 
-  // Clamp height between 16mm and 260mm (leaving room for A4 margins)
-  return Math.max(16, Math.min(260, estimatedMm))
+  // Clamp height between 6mm and 260mm (leaving room for A4 margins)
+  return Math.max(6, Math.min(260, estimatedMm))
 }

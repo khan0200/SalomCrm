@@ -444,6 +444,7 @@ function confirmDeletePage() {
               :variable-values="variableValues"
               @update:content="emit('update-element', el.id, { content: $event })"
               @finish-edit="emit('finish-edit', el.id)"
+              @auto-resize-height="emit('update-element-bounds', el.id, { x: el.x, y: el.y, width: el.width, height: $event })"
             />
 
             <!-- Table -->

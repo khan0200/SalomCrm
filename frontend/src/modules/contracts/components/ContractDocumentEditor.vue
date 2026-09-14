@@ -985,7 +985,7 @@ function handleAddText() {
     x: canvas.document.value.margins.left,
     y: targetY,
     width: contentWidth,
-    height: 14,
+    height: 8,
     zIndex: 1,
     content: '<p>Yangi matn bloki...</p>',
     style: {

@@ -3,6 +3,8 @@ import { ref, computed, watch, nextTick, onMounted } from 'vue'
 import type { TextCanvasElement } from '../../types/contractCanvas'
 import { cleanClipboardContent } from '../../utils/clipboardUtils'
 
+const MM_TO_PX_BASE = 3.779527559
+
 const props = defineProps<{
   element: TextCanvasElement
   isEditing: boolean
@@ -13,6 +15,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   'update:content': [val: string]
   'finish-edit': []
+  'auto-resize-height': [heightMm: number]
 }>()
 
 const editableRef = ref<HTMLDivElement | null>(null)
@@ -54,22 +57,73 @@ const displayContent = computed(() => {
   return text
 })
 
+function measureAndEmitHeight() {
+  if (!editableRef.value) return
+
+  let contentHeightPx = 0
+
+  // 1. Primary: Measure the Range of the actual content inside the editable container
+  try {
+    const range = window.document.createRange()
+    range.selectNodeContents(editableRef.value)
+    const rangeRect = range.getBoundingClientRect()
+    if (rangeRect.height > 0) {
+      contentHeightPx = rangeRect.height
+    }
+  } catch {}
+
+  // 2. Secondary fallback: Check children bounding rect or scrollHeight
+  if (contentHeightPx <= 0) {
+    const firstChild = editableRef.value.firstElementChild as HTMLElement | null
+    if (firstChild) {
+      contentHeightPx = firstChild.getBoundingClientRect().height
+    }
+  }
+
+  // 3. Fallback: computed line-height for empty content
+  if (contentHeightPx <= 0) {
+    const computedStyle = window.getComputedStyle(editableRef.value)
+    const fs = parseFloat(computedStyle.fontSize) || 16
+    const lh = parseFloat(computedStyle.lineHeight) || (fs * 1.5)
+    contentHeightPx = lh
+  }
+
+  // Convert px to mm at current zoom level
+  const zoomFactor = MM_TO_PX_BASE * (props.zoomLevel / 100)
+  const heightMm = contentHeightPx / zoomFactor
+
+  // Add a small 0.8mm padding buffer for descenders (g, y, p, q, j) so bounding box fits cleanly
+  const finalMm = Math.max(4, Math.round((heightMm + 0.8) * 10) / 10)
+
+  // Only emit if there is a noticeable difference (> 0.3mm)
+  if (Math.abs(finalMm - props.element.height) > 0.3) {
+    emit('auto-resize-height', finalMm)
+  }
+}
+
 // Sync initial DOM content without triggering reactivity reset
 onMounted(() => {
   if (editableRef.value) {
     editableRef.value.innerHTML = props.isEditing ? (props.element.content || '') : displayContent.value
   }
+  // Auto-fit height to actual text content on mount
+  nextTick(() => {
+    measureAndEmitHeight()
+    if (typeof document !== 'undefined' && 'fonts' in document) {
+      document.fonts.ready.then(() => measureAndEmitHeight())
+    }
+  })
 })
 
 // Watch external content changes (e.g. Undo/Redo or Variable insertion from outside)
 watch(
   () => props.element.content,
   newContent => {
-    // If this update was emitted from our own active typing, DO NOT overwrite DOM
     if (newContent === lastEmittedHtml) return
     if (editableRef.value && editableRef.value.innerHTML !== newContent) {
       editableRef.value.innerHTML = newContent || ''
     }
+    nextTick(() => measureAndEmitHeight())
   }
 )
 
@@ -78,7 +132,24 @@ watch(displayContent, newVal => {
   if (!props.isEditing && editableRef.value) {
     editableRef.value.innerHTML = newVal || ''
   }
+  nextTick(() => measureAndEmitHeight())
 })
+
+// Watch width changes (e.g. resizing text box width triggers text re-flow and height change)
+watch(
+  () => props.element.width,
+  () => {
+    nextTick(() => measureAndEmitHeight())
+  }
+)
+
+// Watch font size and line height styling changes
+watch(
+  () => [props.element.style?.fontSize, props.element.style?.lineHeight, props.element.style?.fontFamily],
+  () => {
+    nextTick(() => measureAndEmitHeight())
+  }
+)
 
 // Autofocus and place cursor when editing begins; clear selection when editing ends
 watch(
@@ -105,6 +176,7 @@ watch(
 
         sel?.removeAllRanges()
         sel?.addRange(range)
+        measureAndEmitHeight()
       })
     } else if (oldEdit && !isEdit) {
       // Exiting edit mode
@@ -115,6 +187,7 @@ watch(
       try {
         window.getSelection()?.removeAllRanges()
       } catch {}
+      nextTick(() => measureAndEmitHeight())
     }
   }
 )
@@ -124,6 +197,7 @@ function onBlur() {
   const newHtml = editableRef.value.innerHTML
   lastEmittedHtml = newHtml
   emit('update:content', newHtml)
+  measureAndEmitHeight()
   emit('finish-edit')
   try {
     window.getSelection()?.removeAllRanges()
@@ -135,6 +209,7 @@ function onInput() {
   const newHtml = editableRef.value.innerHTML
   lastEmittedHtml = newHtml
   emit('update:content', newHtml)
+  measureAndEmitHeight()
 }
 
 function onKeyDown(e: KeyboardEvent) {
@@ -246,6 +321,18 @@ function onPaste(e: ClipboardEvent) {
 .canvas-text-element p {
   margin: 0.25em 0;
   font-family: inherit !important;
+}
+.canvas-text-element p:first-child,
+.canvas-text-element h1:first-child,
+.canvas-text-element h2:first-child,
+.canvas-text-element h3:first-child {
+  margin-top: 0 !important;
+}
+.canvas-text-element p:last-child,
+.canvas-text-element h1:last-child,
+.canvas-text-element h2:last-child,
+.canvas-text-element h3:last-child {
+  margin-bottom: 0 !important;
 }
 .canvas-text-element span,
 .canvas-text-element div {

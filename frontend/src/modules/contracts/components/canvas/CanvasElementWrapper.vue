@@ -57,6 +57,11 @@ function pxToMm(px: number): number {
   return px / (MM_TO_PX_BASE * (props.zoomLevel / 100))
 }
 
+const isTextType = computed(() => {
+  const t = props.element.type
+  return t === 'text' || t === 'heading' || t === 'paragraph' || t === 'date' || t === 'variable'
+})
+
 const wrapperStyle = computed(() => {
   const leftPx = mmToPx(props.element.x)
   const topPx = mmToPx(props.element.y)
@@ -67,7 +72,11 @@ const wrapperStyle = computed(() => {
   return {
     transform: `translate3d(${leftPx}px, ${topPx}px, 0) rotate(${rot}deg)`,
     width: `${widthPx}px`,
-    minHeight: `${heightPx}px`,
+    // Text elements use exact height (auto-resized to fit content),
+    // other elements use minHeight so content can expand them
+    ...(isTextType.value
+      ? { height: `${heightPx}px` }
+      : { minHeight: `${heightPx}px` }),
     zIndex: props.element.zIndex || 1,
   }
 })
@@ -188,19 +197,24 @@ function onResizePointerDown(handle: ResizeHandle, e: PointerEvent) {
     const MIN_SIZE_MM = 5
 
     if (handle.includes('e')) newW = Math.max(MIN_SIZE_MM, startW + deltaXmm)
-    if (handle.includes('s')) newH = Math.max(MIN_SIZE_MM, startH + deltaYmm)
     if (handle.includes('w')) {
       const candidateW = startW - deltaXmm
       if (candidateW >= MIN_SIZE_MM) { newW = candidateW; newX = startX + deltaXmm }
     }
-    if (handle.includes('n')) {
-      const candidateH = startH - deltaYmm
-      if (candidateH >= MIN_SIZE_MM) { newH = candidateH; newY = startY + deltaYmm }
-    }
 
-    // Proportional resize when Shift held on corner handles
-    if (moveEvent.shiftKey && (handle === 'nw' || handle === 'ne' || handle === 'se' || handle === 'sw')) {
-      newH = newW / aspectRatio
+    // Only non-text elements (tables, signatures, lines) allow manual height stretching.
+    // Text elements automatically hug text height; width changes reflow text and update height dynamically.
+    if (!isTextType.value) {
+      if (handle.includes('s')) newH = Math.max(MIN_SIZE_MM, startH + deltaYmm)
+      if (handle.includes('n')) {
+        const candidateH = startH - deltaYmm
+        if (candidateH >= MIN_SIZE_MM) { newH = candidateH; newY = startY + deltaYmm }
+      }
+
+      // Proportional resize when Shift held on corner handles
+      if (moveEvent.shiftKey && (handle === 'nw' || handle === 'ne' || handle === 'se' || handle === 'sw')) {
+        newH = newW / aspectRatio
+      }
     }
 
     // --- Resize Snapping ---
@@ -230,14 +244,14 @@ function onResizePointerDown(handle: ResizeHandle, e: PointerEvent) {
       }
 
       // South handle: snap bottom edge → adjust height (y stays fixed)
-      if (handle.includes('s') && !handle.includes('n')) {
+      if (!isTextType.value && handle.includes('s') && !handle.includes('n')) {
         const r = props.calculateSnapping(newX, newY + newH, newW, PROBE, id)
         newH = Math.max(MIN_SIZE_MM, r.y - newY)
         snapGuides.push(...r.guides)
       }
 
       // North handle: snap top edge → adjust y and height (bottom edge stays fixed)
-      if (handle.includes('n') && !handle.includes('s')) {
+      if (!isTextType.value && handle.includes('n') && !handle.includes('s')) {
         const r = props.calculateSnapping(newX, newY, newW, PROBE, id)
         newY = r.y
         newH = Math.max(MIN_SIZE_MM, (startY + startH) - r.y)

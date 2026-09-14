@@ -42,7 +42,7 @@ function insertText(type: 'heading1' | 'heading2' | 'paragraph') {
       x: props.margins.left,
       y: props.margins.top + 10,
       width: contentWidth,
-      height: 14,
+      height: 9,
       zIndex: 1,
       content: '<h1><strong>Sarlavha 1</strong></h1>',
       style: {
@@ -61,7 +61,7 @@ function insertText(type: 'heading1' | 'heading2' | 'paragraph') {
       x: props.margins.left,
       y: props.margins.top + 10,
       width: contentWidth,
-      height: 12,
+      height: 8,
       zIndex: 1,
       content: '<h2><strong>Bo\'lim sarlavhasi</strong></h2>',
       style: {
@@ -79,7 +79,7 @@ function insertText(type: 'heading1' | 'heading2' | 'paragraph') {
       x: props.margins.left,
       y: props.margins.top + 10,
       width: contentWidth,
-      height: 20,
+      height: 8,
       zIndex: 1,
       content: '<p>Yangi matn bloki. Tahrirlash uchun ikki marta bosing.</p>',
       style: {
