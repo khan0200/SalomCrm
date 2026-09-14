@@ -160,7 +160,7 @@ watch(
         if (!editableRef.value) return
         editableRef.value.innerHTML = props.element.content || ''
         lastEmittedHtml = editableRef.value.innerHTML
-        editableRef.value.focus()
+        editableRef.value.focus({ preventScroll: true })
 
         const range = window.document.createRange()
         const sel = window.getSelection()

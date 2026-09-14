@@ -254,11 +254,12 @@ function onCanvasClick(e: MouseEvent) {
     // and must NOT wipe them immediately.
     if (marqueeJustFinished) {
       marqueeJustFinished = false
-      ;(e.target as HTMLElement).focus()
       return
     }
     emit('clear-selection')
-    ;(e.target as HTMLElement).focus()
+    if (document.activeElement instanceof HTMLElement && document.activeElement !== document.body) {
+      document.activeElement.blur()
+    }
   }
 }
 
@@ -356,8 +357,7 @@ function confirmDeletePage() {
         <!-- The Physical A4 Sheet -->
         <div
           ref="sheetRef"
-          class="canvas-sheet-background relative bg-white text-zinc-900 shadow-2xl border border-zinc-300/80 dark:border-zinc-700/60 transition-shadow overflow-hidden outline-none focus:outline-none"
-          tabindex="0"
+          class="canvas-sheet-background relative bg-white text-zinc-900 shadow-2xl border border-zinc-300/80 dark:border-zinc-700/60 transition-shadow overflow-hidden outline-none"
           :style="{
             width: `${scaledPageWidthPx}px`,
             height: `${scaledPageHeightPx}px`,
