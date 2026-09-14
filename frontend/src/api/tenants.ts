@@ -14,6 +14,11 @@ export const tenantsApi = {
     return response.data.results || response.data
   },
 
+  getTenant: async (id: string): Promise<Tenant> => {
+    const response = await apiClient.get(`/tenants/${id}/`)
+    return response.data
+  },
+
   createTenant: async (data: {
     name: string
     slug: string
@@ -29,10 +34,7 @@ export const tenantsApi = {
   updateTenant: async (id: string, data: {
     name?: string
     description?: string
-    settings?: {
-      telegram_bot_token?: string
-      telegram_chat_id?: string
-    }
+    settings?: Record<string, any>
   }): Promise<Tenant> => {
     const response = await apiClient.patch(`/tenants/${id}/`, data)
     return response.data

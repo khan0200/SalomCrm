@@ -13,12 +13,27 @@ from .views import (
     AICommandInterpretView,
     WordFillAnalyzeView, WordFillGenerateView,
     WordFillFieldsView, WordFillExampleDownloadView,
-    WordFillScanTagsView
+    WordFillScanTagsView,
+    ContractViewSet
+)
+from .online_contract_views import (
+    TenantInfoView,
+    SendOtpView,
+    StudentSignUpView,
+    StudentSignInView,
+    StudentProfileView,
+    SubmitContractView,
+    VerifyContractView,
+    ResubmitContractView,
+    LogContractViewAuditView,
+    PublicContractDetailView,
+    CancelOnlineContractView,
 )
 
 router = DefaultRouter()
 router.register(r'students', StudentViewSet, basename='student')
 router.register(r'folders', FolderViewSet, basename='folder')
+router.register(r'contracts', ContractViewSet, basename='contract')
 router.register(r'tariffs', TariffOptionViewSet, basename='tariff')
 router.register(r'education-levels', EducationLevelOptionViewSet, basename='education-level')
 router.register(r'student-groups', StudentGroupOptionViewSet, basename='student-group')
@@ -50,6 +65,23 @@ urlpatterns = [
     path('students/visa/options/', VisaOptionsView.as_view(), name='student-visa-options'),
     path('students/ai-command/', AICommandInterpretView.as_view(), name='student-ai-command'),
     path('student-options/', StudentOptionsViewSet.as_view({'get': 'list'}), name='student-options'),
+
+    # Online Student Contracts API
+    path('contracts/online/tenant-info/<slug:slug>/', TenantInfoView.as_view(), name='online-contract-tenant-info'),
+    path('contracts/online/send-otp/', SendOtpView.as_view(), name='online-contract-send-otp'),
+    path('contracts/online/send-otp/<slug:tenant_slug>/', SendOtpView.as_view(), name='online-contract-send-otp-slug'),
+    path('contracts/online/sign-up/', StudentSignUpView.as_view(), name='online-contract-sign-up'),
+    path('contracts/online/sign-up/<slug:tenant_slug>/', StudentSignUpView.as_view(), name='online-contract-sign-up-slug'),
+    path('contracts/online/sign-in/', StudentSignInView.as_view(), name='online-contract-sign-in'),
+    path('contracts/online/sign-in/<slug:tenant_slug>/', StudentSignInView.as_view(), name='online-contract-sign-in-slug'),
+    path('contracts/online/profile/', StudentProfileView.as_view(), name='online-contract-profile'),
+    path('contracts/online/submit-contract/', SubmitContractView.as_view(), name='online-contract-submit'),
+    path('contracts/online/<uuid:contract_id>/verify-code/', VerifyContractView.as_view(), name='online-contract-verify-code'),
+    path('contracts/online/<uuid:contract_id>/resubmit/', ResubmitContractView.as_view(), name='online-contract-resubmit'),
+    path('contracts/online/<uuid:contract_id>/audit-view/', LogContractViewAuditView.as_view(), name='online-contract-audit-view'),
+    path('contracts/online/<uuid:contract_id>/detail/', PublicContractDetailView.as_view(), name='online-contract-detail'),
+    path('contracts/online/<uuid:contract_id>/cancel/', CancelOnlineContractView.as_view(), name='online-contract-cancel'),
+
     path('', include(router.urls)),
 ]
 

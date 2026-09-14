@@ -33,6 +33,12 @@ const routes = [
         meta: { title: 'Fill By Document' }
       },
       {
+        path: 'contracts',
+        name: 'contracts',
+        component: () => import('@/modules/contracts/ContractsPage.vue'),
+        meta: { title: 'Contracts' }
+      },
+      {
         path: 'payments',
         name: 'payments',
         component: PaymentsPage,
@@ -91,6 +97,43 @@ const routes = [
       }
     ]
   },
+  // ── Online Contracts System (Multi-tenant) ─────────────────────────────────
+  {
+    path: '/contracts/online/:tenantname',
+    name: 'online-landing',
+    component: () => import('@/modules/online_contracts/pages/OnlineLandingPage.vue'),
+    meta: { public: true, title: 'Onlayn Shartnomalar' }
+  },
+  {
+    path: '/contracts/online/:tenantname/sign-up',
+    name: 'online-sign-up',
+    component: () => import('@/modules/online_contracts/pages/OnlineSignUpPage.vue'),
+    meta: { public: true, title: "Ro'yxatdan o'tish" }
+  },
+  {
+    path: '/contracts/online/:tenantname/sign-in',
+    name: 'online-sign-in',
+    component: () => import('@/modules/online_contracts/pages/OnlineSignInPage.vue'),
+    meta: { public: true, title: 'Kirish' }
+  },
+  {
+    path: '/contracts/online/:tenantname/profile',
+    name: 'online-profile',
+    component: () => import('@/modules/online_contracts/pages/OnlineProfilePage.vue'),
+    meta: { studentOnly: true, title: 'Mening Shartnomalarim' }
+  },
+  {
+    path: '/contracts/online/:tenantname/contracts/sign',
+    name: 'online-contract-sign',
+    component: () => import('@/modules/online_contracts/pages/OnlineContractSignPage.vue'),
+    meta: { studentOnly: true, title: 'Shartnomani Imzolash' }
+  },
+  {
+    path: '/contracts/online/:tenantname/contracts/:contractId/sign',
+    name: 'online-contract-sign-direct',
+    component: () => import('@/modules/online_contracts/pages/OnlineContractSignPage.vue'),
+    meta: { studentOnly: true, title: 'Shartnomani Imzolash' }
+  },
   {
     path: '/:pathMatch(.*)*',
     redirect: '/students'
@@ -104,6 +147,27 @@ const router = createRouter({
 
 router.beforeEach((to, from, next) => {
   const authStore = useAuthStore()
+
+  // Student portal guard
+  if (to.meta.studentOnly) {
+    if (!authStore.isAuthenticated) {
+      next({
+        name: 'online-sign-in',
+        params: { tenantname: to.params.tenantname || 'unibridge' },
+        query: { redirect: to.fullPath }
+      })
+      return
+    }
+    next()
+    return
+  }
+
+  // Prevent student accounts from accessing internal CRM dashboards
+  if (authStore.isAuthenticated && authStore.user?.role === 'STUDENT' && !to.path.startsWith('/contracts/online/')) {
+    const tenantSlug = authStore.user.tenant?.slug || 'unibridge'
+    next({ name: 'online-profile', params: { tenantname: tenantSlug } })
+    return
+  }
 
   if (!to.meta.public && !authStore.isAuthenticated) {
     next({ name: 'login' })

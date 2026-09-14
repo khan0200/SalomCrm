@@ -39,6 +39,20 @@ apiClient.interceptors.response.use(
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true
       const refreshToken = localStorage.getItem('refresh_token')
+
+      const handleLogoutRedirect = () => {
+        localStorage.removeItem('access_token')
+        localStorage.removeItem('refresh_token')
+        localStorage.removeItem('user_profile')
+        const path = window.location.pathname
+        const match = path.match(/^\/contracts\/online\/([^/]+)/)
+        if (match && match[1]) {
+          window.location.href = `/contracts/online/${match[1]}/sign-in`
+        } else {
+          window.location.href = '/login'
+        }
+      }
+
       if (refreshToken) {
         try {
           const res = await axios.post('/api/auth/refresh/', { refresh: refreshToken })
@@ -48,16 +62,10 @@ apiClient.interceptors.response.use(
             return apiClient(originalRequest)
           }
         } catch (refreshErr) {
-          localStorage.removeItem('access_token')
-          localStorage.removeItem('refresh_token')
-          localStorage.removeItem('user_profile')
-          window.location.href = '/login'
+          handleLogoutRedirect()
         }
       } else {
-        localStorage.removeItem('access_token')
-        localStorage.removeItem('refresh_token')
-        localStorage.removeItem('user_profile')
-        window.location.href = '/login'
+        handleLogoutRedirect()
       }
     }
     return Promise.reject(error)

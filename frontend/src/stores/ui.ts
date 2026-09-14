@@ -66,6 +66,8 @@ export const useUiStore = defineStore('ui', () => {
     toasts.value = toasts.value.filter(t => t.id !== id)
   }
 
+  const isCreateContractModalOpen = ref<boolean>(false)
+
   return {
     isDark,
     toggleTheme,
@@ -74,5 +76,6 @@ export const useUiStore = defineStore('ui', () => {
     toasts,
     addToast,
     removeToast,
+    isCreateContractModalOpen,
   }
 })

@@ -260,3 +260,7 @@ USE_X_FORWARDED_PORT = True
 TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN', '8628603817:AAFHkSqHnKwO2L2O2W4XbgKM6AV29sId6gk')
 TELEGRAM_BOT_USERNAME = os.getenv('TELEGRAM_BOT_USERNAME', 'Koreavizabot')
 
+# Resend Email Settings
+RESEND_API_KEY = os.getenv('RESEND_API_KEY', '')
+RESEND_FROM_EMAIL = os.getenv('RESEND_FROM_EMAIL', 'Salom Korea <shartnomalar@salomkorea.uz>')
+

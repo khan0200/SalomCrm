@@ -8,6 +8,7 @@ class UserRole(models.TextChoices):
     HEAD_MANAGER = 'HEAD_MANAGER', 'Tenant Head Manager'
     MANAGER = 'MANAGER', 'Tenant Manager'
     STAFF = 'STAFF', 'Tenant Staff'
+    STUDENT = 'STUDENT', 'Online Student'
 
 
 class CustomUserManager(BaseUserManager):

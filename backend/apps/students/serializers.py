@@ -2,7 +2,8 @@ import logging
 from rest_framework import serializers
 from .models import (
     Student, Folder, TariffOption, EducationLevelOption,
-    StudentGroupOption, LeadSourceOption, CoordinatorOption, StudentUserPreference
+    StudentGroupOption, LeadSourceOption, CoordinatorOption, StudentUserPreference,
+    Contract
 )
 from .korean_translation_service import translate_name_to_korean
 
@@ -247,10 +248,16 @@ class StudentSetFoldersSerializer(serializers.Serializer):
 
 
 class TariffOptionSerializer(serializers.ModelSerializer):
+    student_count = serializers.SerializerMethodField()
+
     class Meta:
         model = TariffOption
-        fields = ('id', 'name', 'price', 'created_at')
+        fields = ('id', 'name', 'price', 'contract_text', 'created_at', 'student_count')
         read_only_fields = ('id', 'created_at')
+
+    def get_student_count(self, obj):
+        from apps.students.models import Student
+        return Student.objects.filter(tenant=obj.tenant, tariff=obj.name).count()
 
 
 class EducationLevelOptionSerializer(serializers.ModelSerializer):
@@ -342,4 +349,104 @@ class VisaStudentSerializer(serializers.ModelSerializer):
             'is_deleted', 'created_at', 'updated_at'
         )
         read_only_fields = ('id', 'created_at', 'updated_at')
+
+
+class ContractListSerializer(serializers.ModelSerializer):
+    student_id = serializers.SerializerMethodField()
+    student_name = serializers.SerializerMethodField()
+    student_passport = serializers.SerializerMethodField()
+    created_by_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Contract
+        fields = (
+            'id', 'contract_number', 'title', 'template_name',
+            'student', 'student_id', 'student_name', 'student_passport',
+            'status', 'version', 'is_deleted',
+            'tariff_name', 'tariff_price', 'office', 'phone1', 'phone2',
+            'education_level', 'date_of_birth',
+            'student_id_assigned', 'verification_code', 'verification_code_expires_at',
+            'verification_code_used', 'verified_at', 'rejection_reason',
+            'created_at', 'updated_at', 'signed_at', 'created_by_name'
+        )
+        read_only_fields = ('id', 'version', 'created_at', 'updated_at')
+
+    def get_student_id(self, obj):
+        return obj.student_id_assigned or (obj.student.id if obj.student else None)
+
+    def get_student_name(self, obj):
+        return obj.full_name or (obj.student.full_name if obj.student else None)
+
+    def get_student_passport(self, obj):
+        return obj.passport_number or (obj.student.passport if obj.student else None)
+
+    def get_created_by_name(self, obj):
+        if obj.created_by:
+            return getattr(obj.created_by, 'full_name', None) or getattr(obj.created_by, 'email', None) or str(obj.created_by)
+        return None
+
+
+class ContractDetailSerializer(serializers.ModelSerializer):
+    student_id = serializers.SerializerMethodField()
+    student_name = serializers.SerializerMethodField()
+    student_passport = serializers.SerializerMethodField()
+    student_phone = serializers.SerializerMethodField()
+    student_tariff = serializers.SerializerMethodField()
+    student_university = serializers.CharField(source='student.university_1', read_only=True)
+    created_by_name = serializers.SerializerMethodField()
+    updated_by_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Contract
+        fields = (
+            'id', 'contract_number', 'title', 'template_name',
+            'content', 'status', 'version', 'is_deleted',
+            'student', 'student_id', 'student_name', 'student_passport',
+            'student_phone', 'student_tariff', 'student_university',
+            'tariff_name', 'tariff_price', 'passport_number', 'full_name',
+            'education_level', 'date_of_birth', 'office', 'phone1', 'phone2',
+            'signature_data', 'declarations_accepted', 'agreement_confirmations',
+            'contract_hash', 'student_id_assigned', 'verification_code',
+            'verification_code_expires_at', 'verification_code_generated_at',
+            'verification_code_used', 'verified_at', 'rejection_reason',
+            'rejected_at', 'sign_token', 'signed_at', 'signer_ip', 'signer_user_agent',
+            'created_at', 'updated_at', 'created_by_name', 'updated_by_name'
+        )
+        read_only_fields = ('id', 'version', 'created_at', 'updated_at')
+
+    def get_student_id(self, obj):
+        return obj.student_id_assigned or (obj.student.id if obj.student else None)
+
+    def get_student_name(self, obj):
+        return obj.full_name or (obj.student.full_name if obj.student else None)
+
+    def get_student_passport(self, obj):
+        return obj.passport_number or (obj.student.passport if obj.student else None)
+
+    def get_student_phone(self, obj):
+        return obj.phone1 or (obj.student.phone1 if obj.student else None)
+
+    def get_student_tariff(self, obj):
+        return obj.tariff_name or (obj.student.tariff if obj.student else None)
+
+    def get_created_by_name(self, obj):
+        if obj.created_by:
+            return getattr(obj.created_by, 'full_name', None) or getattr(obj.created_by, 'email', None) or str(obj.created_by)
+        return None
+
+    def get_updated_by_name(self, obj):
+        if obj.updated_by:
+            return getattr(obj.updated_by, 'full_name', None) or getattr(obj.updated_by, 'email', None) or str(obj.updated_by)
+        return None
+
+
+class ContractCreateUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Contract
+        fields = (
+            'id', 'student', 'contract_number', 'title',
+            'template_name', 'content', 'status', 'version'
+        )
+        read_only_fields = ('id', 'version')
+
 

@@ -9,6 +9,7 @@ import {
   CreditCard,
   ClipboardList,
   FileText,
+  FileSignature,
   ShieldCheck,
   FilePenLine,
   Settings,
@@ -36,6 +37,9 @@ const navItems = computed<NavItem[]>(() => {
     { name: 'STATUS', path: '/status', icon: ClipboardList },
     { name: 'DOCUMENTS', path: '/documents', icon: FileText },
   ]
+
+  // CONTRACTS added right before PAYMENTS
+  items.push({ name: 'CONTRACTS', path: '/contracts', icon: FileSignature })
 
   if (authStore.canAccessPayments) {
     items.push({ name: 'PAYMENTS', path: '/payments', icon: CreditCard })

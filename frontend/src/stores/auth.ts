@@ -30,7 +30,22 @@ export const useAuthStore = defineStore('auth', () => {
   const canAccessSettings = computed(() => isManager.value)
 
   const currentTenant = computed<Tenant | null>(() => {
-    return user.value?.tenant || null
+    if (!user.value) return null
+    if (user.value.tenant && typeof user.value.tenant === 'object') {
+      return user.value.tenant as Tenant
+    }
+    const rawUser = user.value as any
+    const tName = rawUser.tenant_name || (typeof rawUser.tenant === 'string' ? rawUser.tenant : null)
+    if (tName) {
+      return {
+        id: String(rawUser.tenant || tName),
+        name: rawUser.tenant_name || String(rawUser.tenant || tName),
+        slug: String(rawUser.tenant || tName),
+        is_active: true,
+        created_at: ''
+      }
+    }
+    return null
   })
 
   const login = async (credentials: { email: string; password: string }) => {
@@ -90,6 +105,11 @@ export const useAuthStore = defineStore('auth', () => {
       const data = await authApi.getMe()
       user.value = data
       localStorage.setItem('user_profile', JSON.stringify(data))
+      const tenantId = (data.tenant as any)?.id || (typeof data.tenant === 'string' ? data.tenant : null)
+      if (tenantId && !activeTenantId.value) {
+        activeTenantId.value = tenantId
+        localStorage.setItem('active_tenant_id', tenantId)
+      }
     } catch (err) {
       logout()
     }

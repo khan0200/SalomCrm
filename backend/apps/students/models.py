@@ -304,6 +304,7 @@ class TariffOption(SimpleTenantModel):
     id = models.BigAutoField(primary_key=True)
     name = models.CharField(max_length=100)
     price = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal('0.00'))
+    contract_text = models.TextField(blank=True, null=True)
 
     class Meta:
         db_table = 'tariff_options'
@@ -564,6 +565,209 @@ class VisaStudent(TenantAwareModel):
             self.full_name = self.full_name.strip().upper()
         if self.student_id:
             self.student_id = self.student_id.strip().upper()
-        if self.application_no:
-            self.application_no = self.application_no.strip().upper()
         super().save(*args, **kwargs)
+
+
+class StudentProfile(TimeStampedModel):
+    """
+    Online Student Profile linked to an authentication User account.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='student_profile'
+    )
+    tenant = models.ForeignKey(
+        'tenants.Tenant',
+        on_delete=models.CASCADE,
+        related_name='student_profiles'
+    )
+    passport_number = models.CharField(max_length=50, blank=True, null=True, db_index=True)
+    date_of_birth = models.CharField(max_length=50, blank=True, null=True)
+    phone1 = models.CharField(max_length=50, blank=True, null=True)
+    phone2 = models.CharField(max_length=50, blank=True, null=True)
+    education_level = models.CharField(max_length=100, blank=True, null=True)
+    office = models.CharField(max_length=100, blank=True, null=True)
+
+    class Meta:
+        db_table = 'crm_student_profiles'
+        verbose_name = 'Student Profile'
+        verbose_name_plural = 'Student Profiles'
+
+    def __str__(self):
+        return f"Profile of {self.user.email} ({self.passport_number or 'No Passport'})"
+
+
+class EmailVerificationCode(TimeStampedModel):
+    """
+    Stores single-use OTP codes for online student registration / verification.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    email = models.EmailField(db_index=True)
+    tenant = models.ForeignKey(
+        'tenants.Tenant',
+        on_delete=models.CASCADE,
+        related_name='email_verification_codes'
+    )
+    code_hash = models.CharField(max_length=128)
+    expires_at = models.DateTimeField()
+    attempts = models.IntegerField(default=0)
+    is_used = models.BooleanField(default=False)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'crm_email_verification_codes'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"OTP for {self.email} (used={self.is_used})"
+
+
+class Contract(TenantAwareModel):
+    """
+    Multi-tenant Contract model.
+    Stores structured document content directly in database (no permanent PDF on server).
+    Source of truth for A4 document editor, autosave, and print/export.
+    Extends support for online contract signing and verification lifecycle.
+    """
+    STATUS_CHOICES = [
+        ('draft', 'Qoralama'),
+        ('pending', 'Kutilmoqda'),
+        ('verified', 'Tasdiqlangan'),
+        ('rejected', 'Rad etilgan'),
+        ('sent', 'Yuborilgan'),
+        ('viewed', "Ko'rildi"),
+        ('signed', 'Imzolangan'),
+        ('completed', 'Yakunlangan'),
+        ('cancelled', 'Bekor qilingan'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    student = models.ForeignKey(
+        Student,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='contracts',
+        db_column='student_id'
+    )
+    student_account = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='online_contracts'
+    )
+    contract_number = models.CharField(max_length=100, db_index=True)
+    title = models.CharField(max_length=255)
+    template_name = models.CharField(max_length=100, blank=True, default='')
+    content = models.TextField(help_text="Structured HTML document content")
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft', db_index=True)
+    version = models.PositiveIntegerField(default=1)
+    is_deleted = models.BooleanField(default=False, db_index=True)
+
+    # Tariff & Student form data snapshots
+    tariff_option = models.ForeignKey(
+        'students.TariffOption',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='contracts'
+    )
+    tariff_name = models.CharField(max_length=255, blank=True, default='')
+    tariff_price = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal('0.00'))
+    passport_number = models.CharField(max_length=50, blank=True, default='', db_index=True)
+    full_name = models.CharField(max_length=255, blank=True, default='')
+    education_level = models.CharField(max_length=100, blank=True, default='')
+    date_of_birth = models.CharField(max_length=50, blank=True, default='')
+    office = models.CharField(max_length=100, blank=True, default='')
+    phone1 = models.CharField(max_length=50, blank=True, default='')
+    phone2 = models.CharField(max_length=50, blank=True, default='')
+
+    # Electronic Signature & Snapshot Integrity
+    signature_data = models.TextField(blank=True, default='', help_text="Base64 data URL of student signature")
+    declarations_accepted = models.BooleanField(default=False)
+    agreement_confirmations = models.JSONField(default=dict, blank=True)
+    contract_hash = models.CharField(max_length=64, blank=True, default='', help_text="SHA-256 hash of immutable snapshot")
+    snapshot_data = models.JSONField(default=dict, blank=True, help_text="Immutable snapshot of tariff, template, student data at signing")
+
+    # Agency Verification Flow
+    student_id_assigned = models.CharField(max_length=50, blank=True, default='', db_index=True)
+    verification_code = models.CharField(max_length=64, blank=True, default='', db_index=True)
+    verification_code_expires_at = models.DateTimeField(null=True, blank=True)
+    verification_code_generated_at = models.DateTimeField(null=True, blank=True)
+    verification_code_used = models.BooleanField(default=False)
+    verified_at = models.DateTimeField(null=True, blank=True)
+
+    # Rejection Flow
+    rejection_reason = models.TextField(blank=True, default='')
+    rejected_at = models.DateTimeField(null=True, blank=True)
+    rejected_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='contracts_rejected'
+    )
+
+    # Tracking & Sign audit
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='contracts_updated',
+        db_column='updated_by_id'
+    )
+    sign_token = models.CharField(max_length=100, unique=True, null=True, blank=True, db_index=True)
+    signed_at = models.DateTimeField(null=True, blank=True)
+    signer_ip = models.GenericIPAddressField(null=True, blank=True)
+    signer_user_agent = models.TextField(blank=True, null=True)
+
+    class Meta:
+        db_table = 'contracts'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['tenant', 'status']),
+            models.Index(fields=['tenant', 'is_deleted']),
+            models.Index(fields=['tenant', 'contract_number']),
+            models.Index(fields=['student_account', 'status']),
+        ]
+
+    def __str__(self):
+        return f"{self.contract_number} - {self.title} ({self.status})"
+
+
+class ContractAuditEvent(TimeStampedModel):
+    """
+    Dedicated audit history for contract lifecycle events:
+    student view, signature, password submission, agency assignment, verification, rejection.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    contract = models.ForeignKey(
+        Contract,
+        on_delete=models.CASCADE,
+        related_name='audit_events'
+    )
+    tenant = models.ForeignKey(
+        'tenants.Tenant',
+        on_delete=models.CASCADE,
+        related_name='contract_audit_events'
+    )
+    action = models.CharField(max_length=100, db_index=True)
+    actor_type = models.CharField(max_length=50)  # 'STUDENT', 'STAFF', 'SYSTEM'
+    actor_id = models.CharField(max_length=100, blank=True, default='')
+    actor_email = models.CharField(max_length=255, blank=True, default='')
+    description = models.TextField(blank=True, default='')
+    metadata = models.JSONField(default=dict, blank=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.TextField(blank=True, default='')
+
+    class Meta:
+        db_table = 'crm_contract_audit_events'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"[{self.action}] Contract {self.contract_id} by {self.actor_email or self.actor_type}"
+

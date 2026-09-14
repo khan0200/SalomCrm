@@ -14,16 +14,22 @@ import {
   Map,
   ChevronDown,
   Check,
-  FileText
+  FileText,
+  Copy,
+  ExternalLink
 } from 'lucide-vue-next'
 import { useStudentDashboardStore } from '@/stores/studentDashboard'
 import { useAuthStore } from '@/stores/auth'
+import { useUiStore } from '@/stores/ui'
 import { PICK_NEEDED_LIST } from '@/composables/useDocumentHelpers'
+import AgencyRequisitesModal from '@/modules/contracts/components/AgencyRequisitesModal.vue'
 
 const route = useRoute()
 const dashboardStore = useStudentDashboardStore()
 const authStore = useAuthStore()
+const uiStore = useUiStore()
 const searchInputRef = ref<HTMLInputElement | null>(null)
+const isRequisitesModalOpen = ref(false)
 
 const pathname = computed(() => route.path)
 
@@ -74,6 +80,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/students': 'Students',
   '/status': 'Status Board',
   '/documents': 'Documents',
+  '/contracts': 'Contracts',
   '/visacheck': 'Visa Check',
   '/excel-fill': 'Excel Fill',
   '/payments': 'Payments',
@@ -84,6 +91,60 @@ const PAGE_TITLES: Record<string, string> = {
 const pageTitle = computed(() => {
   return PAGE_TITLES[pathname.value] || 'Dashboard'
 })
+
+const tenantName = computed(() => {
+  return (
+    authStore.currentTenant?.name ||
+    (authStore.user as any)?.tenant_name ||
+    (typeof authStore.user?.tenant === 'string' ? authStore.user.tenant : '') ||
+    'Unibridge'
+  )
+})
+
+const tenantSlug = computed(() => {
+  return (
+    authStore.currentTenant?.slug ||
+    (authStore.user?.tenant as any)?.slug ||
+    (authStore.user as any)?.tenant_slug ||
+    authStore.currentTenant?.name?.toLowerCase().replace(/\s+/g, '') ||
+    'unibridge'
+  )
+})
+
+const onlineContractUrl = computed(() => {
+  const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'
+  return `${origin}/contracts/online/${tenantSlug.value}`
+})
+
+const isCopiedContractLink = ref(false)
+
+async function copyOnlineContractLink() {
+  const url = onlineContractUrl.value
+  try {
+    if (navigator?.clipboard?.writeText) {
+      await navigator.clipboard.writeText(url)
+    } else {
+      const textArea = document.createElement('textarea')
+      textArea.value = url
+      document.body.appendChild(textArea)
+      textArea.select()
+      document.execCommand('copy')
+      document.body.removeChild(textArea)
+    }
+    isCopiedContractLink.value = true
+    uiStore.addToast({
+      type: 'success',
+      title: 'Havola nusxalandi!',
+      message: `${url} buferga nusxalandi. Talabaga yuborishingiz mumkin.`,
+      duration: 4000
+    })
+    setTimeout(() => {
+      isCopiedContractLink.value = false
+    }, 2500)
+  } catch (err) {
+    console.error('Failed to copy online contract link:', err)
+  }
+}
 
 const currentDateFormatted = computed(() => {
   return new Date().toLocaleDateString('en-US', {
@@ -413,7 +474,7 @@ onUnmounted(() => {
     </div>
   </header>
 
-  <!-- Clean Title Header for Other Pages (/payments, /settings, /tenants) - Hidden on /extract -->
+  <!-- Clean Title Header for Other Pages (/payments, /settings, /tenants, /contracts) - Hidden on /extract -->
   <header
     v-else-if="!pathname.includes('/extract')"
     class="flex h-14 flex-shrink-0 items-center justify-between gap-4 px-6 border-b border-zinc-200 dark:border-zinc-800 bg-white/80 dark:bg-[#111315]/80 backdrop-blur-md sticky top-0 z-20 shadow-2xs"
@@ -422,5 +483,50 @@ onUnmounted(() => {
       <h1 class="text-base font-bold text-zinc-900 dark:text-zinc-100">{{ pageTitle }}</h1>
       <p class="text-[11px] text-zinc-400 dark:text-zinc-500">{{ currentDateFormatted }}</p>
     </div>
+
+    <!-- Right Column: Action Buttons & Active Tenant Badge -->
+    <div class="flex items-center gap-2.5">
+      <!-- On /contracts: New Contract Quick Copy button -->
+      <button
+        v-if="pathname === '/contracts'"
+        type="button"
+        @click="copyOnlineContractLink"
+        class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all shadow-xs cursor-pointer select-none"
+        :class="{ '!bg-emerald-600 hover:!bg-emerald-700': isCopiedContractLink }"
+        :title="`Havolani nusxalash: ${onlineContractUrl}`"
+      >
+        <Check v-if="isCopiedContractLink" class="w-3.5 h-3.5 text-emerald-100" />
+        <Plus v-else class="w-3.5 h-3.5" />
+        <span>{{ isCopiedContractLink ? 'Nusxalandi!' : 'New Contract' }}</span>
+      </button>
+
+      <!-- On /contracts: Rekvizitlar button -->
+      <button
+        v-if="pathname === '/contracts'"
+        type="button"
+        @click="isRequisitesModalOpen = true"
+        class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200/80 dark:bg-zinc-800/90 dark:hover:bg-zinc-750 text-zinc-700 dark:text-zinc-200 border border-zinc-200/80 dark:border-zinc-700/60 text-xs font-semibold transition-all shadow-xs cursor-pointer select-none"
+        title="Agentlik rekvizitlarini ko'rish va tahrirlash"
+      >
+        <FileText class="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+        <span>Rekvizitlar</span>
+      </button>
+
+      <div
+        class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-zinc-100 dark:bg-zinc-800/80 border border-zinc-200/80 dark:border-zinc-700/60 text-xs font-semibold text-zinc-700 dark:text-zinc-200 shadow-xs cursor-pointer hover:bg-zinc-200/60 dark:hover:bg-zinc-750 transition-colors"
+        @click="isRequisitesModalOpen = true"
+        title="Agentlik rekvizitlarini ko'rish"
+      >
+        <Building2 class="w-3.5 h-3.5 text-blue-500 dark:text-blue-400" />
+        <span>Agentlik:</span>
+        <span class="text-blue-600 dark:text-blue-400 font-bold">{{ tenantName }}</span>
+      </div>
+    </div>
   </header>
+
+  <!-- Agency Requisites Modal -->
+  <AgencyRequisitesModal
+    :is-open="isRequisitesModalOpen"
+    @close="isRequisitesModalOpen = false"
+  />
 </template>

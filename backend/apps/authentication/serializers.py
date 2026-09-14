@@ -57,6 +57,17 @@ class UserSerializer(serializers.ModelSerializer):
         )
         read_only_fields = ('id', 'date_joined')
 
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if instance.tenant:
+            data['tenant'] = {
+                'id': str(instance.tenant.id),
+                'name': instance.tenant.name,
+                'slug': instance.tenant.slug,
+                'logo_url': instance.tenant.logo_url
+            }
+        return data
+
 
 class UserCreateUpdateSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=False, min_length=6)

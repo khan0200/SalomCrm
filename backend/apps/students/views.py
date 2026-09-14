@@ -1,6 +1,6 @@
 import os
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 import re
 import io
 import uuid
@@ -10,6 +10,8 @@ import openpyxl
 from openpyxl.utils import get_column_letter
 from openpyxl.styles import Font, PatternFill, Alignment
 from django.http import HttpResponse
+from django.db import transaction
+from django.utils import timezone
 from rest_framework import viewsets, permissions, status
 from rest_framework.views import APIView
 from rest_framework.decorators import action
@@ -22,7 +24,7 @@ from .models import (
     Student, Folder, TariffOption, EducationLevelOption,
     StudentGroupOption, LeadSourceOption, CoordinatorOption,
     UniversityOption, UniversityStatusOption, TagOption, SchoolDirectory, MajorOption,
-    StudentUserPreference
+    StudentUserPreference, Contract, ContractAuditEvent
 )
 from .serializers import (
     StudentListSerializer, StudentDetailSerializer, StudentCreateUpdateSerializer,
@@ -30,7 +32,8 @@ from .serializers import (
     TariffOptionSerializer, EducationLevelOptionSerializer, StudentGroupOptionSerializer,
     LeadSourceOptionSerializer, CoordinatorOptionSerializer,
     UniversityOptionSerializer, UniversityStatusOptionSerializer,
-    TagOptionSerializer, SchoolDirectorySerializer, MajorOptionSerializer
+    TagOptionSerializer, SchoolDirectorySerializer, MajorOptionSerializer,
+    ContractListSerializer, ContractDetailSerializer, ContractCreateUpdateSerializer
 )
 from .services import archive_student, restore_student, permanent_delete_student
 from .korean_translation_service import translate_name_to_korean
@@ -2047,3 +2050,313 @@ class AICommandInterpretView(APIView):
             available_folders=available_folders,
         )
         return Response(result)
+
+
+class ContractViewSet(viewsets.ModelViewSet):
+    """
+    Multi-tenant Contract Management ViewSet.
+    Enforces strict tenant scoping.
+    Supports list, retrieve, create, update, delete (soft), duplicate, and finalize.
+    """
+    permission_classes = [IsTenantUser]
+    pagination_class = None
+
+    def get_queryset(self):
+        req: Any = self.request
+        user = req.user
+        tenant = getattr(req, 'tenant', None) or getattr(user, 'tenant', None)
+        if not tenant:
+            from apps.tenants.models import Tenant
+            tenant = Tenant.objects.first()
+        if not tenant:
+            return Contract.objects.none()
+
+        qs = Contract.objects.filter(tenant=tenant)
+
+        # Soft delete handling
+        include_deleted = str(self.request.query_params.get('include_deleted', 'false')).lower() == 'true'
+        if not include_deleted:
+            qs = qs.filter(is_deleted=False)
+
+        # Status filter
+        status_filter = self.request.query_params.get('status', '').strip()
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+
+        # Student filter
+        student_id = self.request.query_params.get('student_id', '').strip()
+        if student_id:
+            qs = qs.filter(student_id=student_id)
+
+        # Search filter
+        search = self.request.query_params.get('search', '').strip()
+        if search:
+            qs = qs.filter(
+                Q(contract_number__icontains=search) |
+                Q(title__icontains=search) |
+                Q(template_name__icontains=search) |
+                Q(student__full_name__icontains=search) |
+                Q(student__passport__icontains=search)
+            )
+
+        return qs.select_related('student', 'created_by', 'updated_by').order_by('-created_at')
+
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return ContractListSerializer
+        elif self.action in ['create', 'update', 'partial_update']:
+            return ContractCreateUpdateSerializer
+        return ContractDetailSerializer
+
+    def perform_create(self, serializer):
+        req: Any = self.request
+        user = req.user
+        tenant = getattr(req, 'tenant', None) or getattr(user, 'tenant', None)
+        if not tenant:
+            from apps.tenants.models import Tenant
+            tenant = Tenant.objects.first()
+
+        # Auto-generate contract number if not provided
+        contract_number = serializer.validated_data.get('contract_number', '').strip()
+        if not contract_number:
+            current_year = datetime.now().year
+            count = Contract.objects.filter(tenant=tenant, created_at__year=current_year).count() + 1
+            contract_number = f"SH-{current_year}-{count:04d}"
+
+        serializer.save(
+            tenant=tenant,
+            created_by=user if user.is_authenticated else None,
+            contract_number=contract_number,
+            version=1
+        )
+
+    def perform_update(self, serializer):
+        req: Any = self.request
+        user = req.user
+        instance = self.get_object()
+        serializer.save(
+            updated_by=user if user.is_authenticated else None,
+            version=instance.version + 1
+        )
+
+    def destroy(self, request, *args, **kwargs):
+        """Soft-delete contract with audit."""
+        contract = self.get_object()
+        contract.is_deleted = True
+        contract.updated_by = request.user if request.user.is_authenticated else None
+        contract.save(update_fields=['is_deleted', 'updated_by', 'updated_at'])
+        return Response({'detail': 'Shartnoma muvaffaqiyatli o\'chirildi'}, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'])
+    def duplicate(self, request, pk=None):
+        """Duplicate an existing contract into a new draft."""
+        original = self.get_object()
+        current_year = datetime.now().year
+        count = Contract.objects.filter(tenant=original.tenant, created_at__year=current_year).count() + 1
+        new_number = f"SH-{current_year}-{count:04d}"
+
+        new_contract = Contract.objects.create(
+            tenant=original.tenant,
+            student=original.student,
+            contract_number=new_number,
+            title=f"{original.title} (Nusxa)",
+            template_name=original.template_name,
+            content=original.content,
+            status='draft',
+            version=1,
+            created_by=request.user if request.user.is_authenticated else None
+        )
+        return Response(ContractDetailSerializer(new_contract).data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=['post'])
+    def finalize(self, request, pk=None):
+        """Mark contract as finalized/completed."""
+        contract = self.get_object()
+        contract.status = 'completed'
+        contract.updated_by = request.user if request.user.is_authenticated else None
+        contract.save(update_fields=['status', 'updated_by', 'updated_at'])
+        return Response({'detail': 'Shartnoma yakunlandi', 'status': contract.status}, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'], url_path='assign-student-id')
+    @transaction.atomic
+    def assign_student_id(self, request, pk=None):
+        """
+        Agency Action: Assign Student ID and Generate Verification Code.
+        1. Validates Student ID.
+        2. Links contract to CRM student (creates in CRM Students table if not present).
+        3. Sets public Contract Number = Student ID.
+        4. Generates Verification Code: format XXXX-XXXX-STUDENTID with exactly 24-hour expiration.
+        5. Records complete audit log.
+        """
+        contract = self.get_object()
+        student_id = (request.data.get('student_id') or '').strip().upper()
+        if not student_id:
+            return Response({'detail': 'Student ID is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        tenant = contract.tenant
+
+        # 1. Link or Create CRM Student (Only Student ID, Full Name, Phone 1 & 2, and Email; NO passport)
+        student_email = ''
+        if contract.student_account and contract.student_account.email:
+            student_email = contract.student_account.email
+        elif contract.snapshot_data and isinstance(contract.snapshot_data, dict) and contract.snapshot_data.get('email'):
+            student_email = contract.snapshot_data.get('email')
+
+        crm_student = Student.objects.filter(tenant=tenant, id=student_id).first()
+        if not crm_student:
+            crm_student = Student.objects.create(
+                id=student_id,
+                tenant=tenant,
+                full_name=contract.full_name or f"Student {student_id}",
+                phone1=contract.phone1 or '',
+                phone2=contract.phone2 or '',
+                email=student_email or '',
+                office=contract.office or '',
+                tariff=contract.tariff_name or '',
+                created_by=request.user if request.user.is_authenticated else None
+            )
+        else:
+            # Sync contact info if CRM student was missing them (DO NOT auto-fill passport)
+            updates = []
+            if not crm_student.phone1 and contract.phone1:
+                crm_student.phone1 = contract.phone1
+                updates.append('phone1')
+            if not crm_student.phone2 and contract.phone2:
+                crm_student.phone2 = contract.phone2
+                updates.append('phone2')
+            if not crm_student.email and student_email:
+                crm_student.email = student_email
+                updates.append('email')
+            if updates:
+                crm_student.save(update_fields=updates)
+
+        # 2. Link contract & Set public Contract Number = Student ID
+        contract.student = crm_student
+        contract.student_id_assigned = student_id
+        contract.contract_number = student_id
+
+        # 3. Generate Verification Code: XXXX-XXXX-STUDENTID
+        from apps.core.email_service import generate_verification_code
+        verif_code = generate_verification_code(student_id)
+        now = timezone.now()
+        expires_at = now + timedelta(days=1)  # Exactly 24 hours
+
+        contract.verification_code = verif_code
+        contract.verification_code_generated_at = now
+        contract.verification_code_expires_at = expires_at
+        contract.verification_code_used = False
+        contract.updated_by = request.user if request.user.is_authenticated else None
+        contract.save()
+
+        # 4. Audit Log
+        ContractAuditEvent.objects.create(
+            contract=contract,
+            tenant=tenant,
+            action='AGENCY_ASSIGNED_STUDENT_ID_CODE_GENERATED',
+            actor_type='STAFF',
+            actor_id=str(request.user.id) if request.user.is_authenticated else '',
+            actor_email=request.user.email if request.user.is_authenticated else '',
+            description=f"Staff assigned Student ID '{student_id}' (Contract Number set to '{student_id}') and generated Verification Code '{verif_code}'.",
+            metadata={'student_id': student_id, 'expires_at': expires_at.isoformat()},
+            ip_address=request.META.get('REMOTE_ADDR'),
+            user_agent=request.META.get('HTTP_USER_AGENT', '')
+        )
+
+        return Response({
+            'detail': 'Student ID assigned and Verification Code generated.',
+            'student_id': student_id,
+            'contract_number': student_id,
+            'verification_code': verif_code,
+            'expires_at': expires_at.isoformat(),
+        }, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'], url_path='regenerate-code')
+    def regenerate_code(self, request, pk=None):
+        """
+        Agency Action: Regenerate Verification Code (with fresh 24-hour expiration).
+        Invalidates previous code.
+        """
+        contract = self.get_object()
+        if not contract.student_id_assigned:
+            return Response({'detail': 'Student ID must be assigned before generating a code.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if contract.status == 'verified':
+            return Response({'detail': 'Verified contracts cannot have verification codes regenerated.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        from apps.core.email_service import generate_verification_code
+        verif_code = generate_verification_code(contract.student_id_assigned)
+        now = timezone.now()
+        expires_at = now + timedelta(days=1)
+
+        contract.verification_code = verif_code
+        contract.verification_code_generated_at = now
+        contract.verification_code_expires_at = expires_at
+        contract.verification_code_used = False
+        contract.updated_by = request.user if request.user.is_authenticated else None
+        contract.save(update_fields=[
+            'verification_code', 'verification_code_generated_at',
+            'verification_code_expires_at', 'verification_code_used',
+            'updated_by', 'updated_at'
+        ])
+
+        ContractAuditEvent.objects.create(
+            contract=contract,
+            tenant=contract.tenant,
+            action='VERIFICATION_CODE_REGENERATED',
+            actor_type='STAFF',
+            actor_id=str(request.user.id) if request.user.is_authenticated else '',
+            actor_email=request.user.email if request.user.is_authenticated else '',
+            description=f"Staff regenerated verification code '{verif_code}' with new 24h expiration.",
+            metadata={'student_id': contract.student_id_assigned, 'expires_at': expires_at.isoformat()},
+            ip_address=request.META.get('REMOTE_ADDR'),
+            user_agent=request.META.get('HTTP_USER_AGENT', '')
+        )
+
+        return Response({
+            'detail': 'New Verification Code generated successfully.',
+            'student_id': contract.student_id_assigned,
+            'contract_number': contract.contract_number,
+            'verification_code': verif_code,
+            'expires_at': expires_at.isoformat(),
+        }, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'], url_path='reject')
+    def reject_contract(self, request, pk=None):
+        """
+        Agency Action: Reject Contract with mandatory reason.
+        """
+        contract = self.get_object()
+        reason = (request.data.get('reason') or '').strip()
+        if not reason:
+            return Response({'detail': 'Rejection reason is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if contract.status == 'verified':
+            return Response({'detail': 'Verified contracts cannot be rejected.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        now = timezone.now()
+        contract.status = 'rejected'
+        contract.rejection_reason = reason
+        contract.rejected_at = now
+        contract.rejected_by = request.user if request.user.is_authenticated else None
+        contract.updated_by = request.user if request.user.is_authenticated else None
+        contract.save(update_fields=['status', 'rejection_reason', 'rejected_at', 'rejected_by', 'updated_by', 'updated_at'])
+
+        ContractAuditEvent.objects.create(
+            contract=contract,
+            tenant=contract.tenant,
+            action='CONTRACT_REJECTED',
+            actor_type='STAFF',
+            actor_id=str(request.user.id) if request.user.is_authenticated else '',
+            actor_email=request.user.email if request.user.is_authenticated else '',
+            description=f"Staff rejected contract {contract.id}. Reason: {reason}",
+            metadata={'reason': reason},
+            ip_address=request.META.get('REMOTE_ADDR'),
+            user_agent=request.META.get('HTTP_USER_AGENT', '')
+        )
+
+        return Response({
+            'detail': 'Contract has been rejected.',
+            'status': 'rejected',
+            'rejection_reason': reason
+        }, status=status.HTTP_200_OK)
+

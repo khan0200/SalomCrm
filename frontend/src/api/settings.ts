@@ -4,7 +4,9 @@ export interface TariffOption {
   id: string
   name: string
   price: number
+  contract_text?: string
   created_at?: string
+  student_count?: number
 }
 
 export interface GeneralOption {
@@ -56,7 +58,7 @@ export const settingsApi = {
     const res = await apiClient.post('/tariffs/', data)
     return res.data
   },
-  updateTariff: async (id: string, data: { name: string; price: number }): Promise<TariffOption> => {
+  updateTariff: async (id: string, data: Partial<{ name: string; price: number; contract_text: string }>): Promise<TariffOption> => {
     const res = await apiClient.patch(`/tariffs/${id}/`, data)
     return res.data
   },

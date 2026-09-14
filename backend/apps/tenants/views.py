@@ -1,7 +1,7 @@
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from apps.core.permissions import IsPlatformSuperAdmin, IsTenantHeadManager, IsTenantUser
+from apps.core.permissions import IsPlatformSuperAdmin, IsTenantHeadManager, IsTenantManager, IsTenantUser
 from .models import Tenant, Branch
 from .serializers import TenantSerializer, TenantCreateWithAdminSerializer, BranchSerializer
 
@@ -15,7 +15,7 @@ class TenantViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         if self.action in ('list', 'create', 'destroy', 'deactivate', 'activate'):
             return [IsPlatformSuperAdmin()]
-        return [IsTenantHeadManager()]
+        return [IsTenantManager()]
 
     def get_serializer_class(self):
         if self.action == 'create':
