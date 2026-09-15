@@ -403,9 +403,9 @@ function handleResubmit(contract: OnlineContractSummary) {
                 </span>
                 <span
                   v-else-if="contract.status === 'cancelled'"
-                  class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 border border-zinc-300 dark:border-zinc-750"
+                  class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-violet-100 text-violet-900 dark:bg-violet-950/60 dark:text-violet-300 border border-violet-500/30"
                 >
-                  <XCircle class="w-3.5 h-3.5 text-zinc-500" />
+                  <XCircle class="w-3.5 h-3.5 text-violet-600 dark:text-violet-400" />
                   <span>Bekor qilingan</span>
                 </span>
                 <span
@@ -544,13 +544,13 @@ function handleResubmit(contract: OnlineContractSummary) {
             <!-- Cancelled Banner -->
             <div
               v-if="contract.status === 'cancelled'"
-              class="p-3.5 rounded-xl bg-zinc-100 dark:bg-zinc-850 border border-zinc-300 dark:border-zinc-700 text-xs text-zinc-700 dark:text-zinc-300 space-y-1"
+              class="p-3.5 rounded-xl bg-violet-50/80 dark:bg-violet-950/30 border border-violet-500/20 text-xs text-violet-900 dark:text-violet-200 space-y-1"
             >
-              <div class="font-bold flex items-center gap-1.5 text-zinc-900 dark:text-zinc-100">
-                <XCircle class="w-4 h-4 text-zinc-500" />
+              <div class="font-bold flex items-center gap-1.5 text-violet-900 dark:text-violet-100">
+                <XCircle class="w-4 h-4 text-violet-600 dark:text-violet-400" />
                 <span>Ushbu shartnoma bekor qilingan</span>
               </div>
-              <p class="text-xs text-zinc-600 dark:text-zinc-400 pl-5.5 font-medium">
+              <p class="text-xs text-violet-800/90 dark:text-violet-300/90 pl-5.5 font-medium">
                 {{ contract.rejection_reason || "Shartnoma siz tomoningizdan bekor qilindi. Agar yangi shartnoma tuzmoqchi bo'lsangiz, yangi ariza topshirishingiz mumkin." }}
               </p>
             </div>

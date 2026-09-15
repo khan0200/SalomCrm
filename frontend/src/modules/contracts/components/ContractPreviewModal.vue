@@ -253,7 +253,7 @@ function formatRejectionDate(dateStr?: string | null): string {
           class="px-2.5 py-0.5 rounded-full text-[11px] font-medium border uppercase tracking-wider"
           :class="[
             activeContract.status === 'completed'
-              ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20'
+              ? 'bg-teal-500/10 text-teal-700 dark:text-teal-400 border-teal-500/20'
               : activeContract.status === 'verified'
               ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20'
               : activeContract.status === 'signed'
@@ -262,6 +262,8 @@ function formatRejectionDate(dateStr?: string | null): string {
               ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20'
               : activeContract.status === 'rejected'
               ? 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/20'
+              : activeContract.status === 'cancelled'
+              ? 'bg-violet-500/10 text-violet-700 dark:text-violet-400 border-violet-500/20'
               : 'bg-zinc-500/10 text-zinc-600 dark:text-zinc-400 border-zinc-500/20'
           ]"
         >

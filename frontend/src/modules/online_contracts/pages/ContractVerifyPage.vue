@@ -41,7 +41,7 @@ const statusInfo = computed(() => {
   if (s === 'verified') return { label: 'Rasman tasdiqlangan', icon: CheckCircle2, cls: 'bg-emerald-100 text-emerald-900 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-500/30' }
   if (s === 'pending') return { label: 'Agentlik ko\'rib chiqmoqda', icon: Clock, cls: 'bg-amber-100 text-amber-900 dark:bg-amber-950/60 dark:text-amber-300 border-amber-500/30' }
   if (s === 'rejected') return { label: 'Rad etilgan', icon: AlertCircle, cls: 'bg-red-100 text-red-900 dark:bg-red-950/60 dark:text-red-300 border-red-500/30' }
-  if (s === 'cancelled') return { label: 'Bekor qilingan', icon: XCircle, cls: 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 border-zinc-300 dark:border-zinc-700' }
+  if (s === 'cancelled') return { label: 'Bekor qilingan', icon: XCircle, cls: 'bg-violet-100 text-violet-900 dark:bg-violet-950/60 dark:text-violet-300 border-violet-500/30' }
   return { label: s || 'Noma\'lum', icon: ShieldQuestion, cls: 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 border-zinc-300 dark:border-zinc-700' }
 })
 
@@ -182,7 +182,7 @@ onMounted(() => {
           <div v-if="data.status === 'rejected'" class="p-3.5 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 text-xs text-red-700 dark:text-red-300">
             Ushbu shartnoma agentlik tomonidan rad etilgan. Batafsil ma'lumot uchun konsalting kompaniyasiga murojaat qiling.
           </div>
-          <div v-else-if="data.status === 'cancelled'" class="p-3.5 rounded-xl bg-zinc-100 dark:bg-zinc-850 border border-zinc-300 dark:border-zinc-700 text-xs text-zinc-600 dark:text-zinc-400">
+          <div v-else-if="data.status === 'cancelled'" class="p-3.5 rounded-xl bg-violet-50/80 dark:bg-violet-950/30 border border-violet-500/20 text-xs text-violet-800 dark:text-violet-300">
             Ushbu shartnoma bekor qilingan.
           </div>
 

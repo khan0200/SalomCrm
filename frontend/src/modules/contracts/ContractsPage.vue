@@ -485,7 +485,7 @@ function getStatusBadgeClass(status?: string): string {
     case 'rejected':
       return 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/20'
     case 'cancelled':
-      return 'bg-zinc-500/10 text-zinc-600 dark:text-zinc-400 border-zinc-500/20'
+      return 'bg-violet-500/10 text-violet-700 dark:text-violet-400 border-violet-500/20'
     default:
       return 'bg-zinc-500/10 text-zinc-600 dark:text-zinc-400 border-zinc-500/20'
   }
@@ -506,7 +506,7 @@ function getStatusDotClass(status?: string): string {
     case 'rejected':
       return 'bg-rose-500'
     case 'cancelled':
-      return 'bg-zinc-400'
+      return 'bg-violet-500'
     default:
       return 'bg-zinc-400'
   }
@@ -1117,12 +1117,8 @@ async function confirmDelete() {
                 <button
                   v-for="st in [
                     { key: 'all', label: 'All' },
-                    { key: 'pending', label: 'Pending Online' },
+                    { key: 'pending', label: 'Pending' },
                     { key: 'verified', label: 'Verified' },
-                    { key: 'draft', label: 'Draft' },
-                    { key: 'signed', label: 'Signed' },
-                    { key: 'completed', label: 'Completed' },
-                    { key: 'rejected', label: 'Rejected' },
                     { key: 'cancelled', label: 'Cancelled' }
                   ]"
                   :key="st.key"
