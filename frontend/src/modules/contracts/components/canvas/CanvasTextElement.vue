@@ -7,12 +7,18 @@ import { replaceVariablesInHtml } from '../../utils/contractVariables'
 
 const MM_TO_PX_BASE = 3.779527559
 
-const props = defineProps<{
-  element: TextCanvasElement
-  isEditing: boolean
-  zoomLevel: number
-  variableValues?: Record<string, string>
-}>()
+const props = withDefaults(
+  defineProps<{
+    element: TextCanvasElement
+    isEditing: boolean
+    readonly?: boolean
+    zoomLevel: number
+    variableValues?: Record<string, string>
+  }>(),
+  {
+    readonly: false,
+  }
+)
 
 const emit = defineEmits<{
   'update:content': [val: string]
@@ -54,8 +60,8 @@ const elementStyle = computed(() => {
 // Replace variables in preview mode and scale inline styles proportionally with zoom
 const displayContent = computed(() => {
   let text = props.element.content || ''
-  if (!props.isEditing && props.variableValues && Object.keys(props.variableValues).length > 0) {
-    text = replaceVariablesInHtml(text, props.variableValues)
+  if (!props.isEditing && (props.readonly || (props.variableValues && Object.keys(props.variableValues).length > 0))) {
+    text = replaceVariablesInHtml(text, props.variableValues || {})
   }
   if (!props.isEditing) {
     text = scaleInlineStyles(text, props.zoomLevel)

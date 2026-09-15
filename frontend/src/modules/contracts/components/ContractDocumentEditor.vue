@@ -124,10 +124,11 @@ const initialCanvasDoc = convertHtmlToCanvasDocument(initialRaw)
 const canvas = useContractCanvas(initialCanvasDoc)
 const uiStore = useUiStore()
 
-// Compute dynamic variable replacements from studentData
+// Compute dynamic variable replacements from studentData or contract metadata
 const variableValues = computed(() => {
-  if (!props.studentData) return undefined
-  return buildVariableValues(props.studentData, {
+  const student = props.studentData || (props.studentName ? { full_name: props.studentName } : undefined)
+  if (!student && !props.readonly) return undefined
+  return buildVariableValues(student, {
     contractNumber: props.contractNumber,
     templateName: props.title,
   })

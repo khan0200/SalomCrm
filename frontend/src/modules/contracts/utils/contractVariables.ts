@@ -403,13 +403,13 @@ export function buildVariableValues(
   const req = resolveTenantRequisites()
   const isSodiq = (req.inn === SODIQ_REQUISITES.inn) || (req.company_name === SODIQ_REQUISITES.company_name)
 
-  const rawFullName = (student?.full_name || student?.fullName || student?.student_name || '').toUpperCase().trim()
-  const rawPassport = (student?.passport || student?.passport_number || student?.passportNumber || '').toUpperCase().trim()
+  const rawFullName = (student?.full_name || student?.fullName || student?.student_name || student?.client_name || '').toUpperCase().trim()
+  const rawPassport = (student?.passport || student?.passport_number || student?.student_passport || student?.passportNumber || '').toUpperCase().trim()
   const rawDob = student?.birthday || student?.date_of_birth || student?.dateOfBirth || ''
-  const rawPhone1 = student?.phone1 || student?.phone || student?.phone_1 || ''
+  const rawPhone1 = student?.phone1 || student?.student_phone || student?.phone || student?.phone_1 || ''
   const rawPhone2 = student?.phone2 || student?.phone_2 || ''
   const rawLevel = student?.level || student?.education_level || student?.educationLevel || student?.level_to_study || contractMeta?.educationLevel || 'Bakalavr'
-  const rawBranch = student?.office || student?.branch || student?.office_name || contractMeta?.office || ''
+  const rawBranch = student?.office || student?.tenant_office_name || student?.branch || student?.office_name || contractMeta?.office || ''
   const rawEmail = student?.email || student?.student_email || ''
 
   const rawSignature = contractMeta?.signatureData || student?.signature_data || student?.signatureData || ''
@@ -553,12 +553,86 @@ export function buildVariableValues(
   return result
 }
 
+export const VARIABLE_FALLBACK_PLACEHOLDERS: Record<string, string> = {
+  fullname: '_________________________',
+  full_name: '_________________________',
+  student_name: '_________________________',
+  client_name: '_________________________',
+  fio: '_________________________',
+
+  passportnumber: '____ _________',
+  passport_number: '____ _________',
+  passport: '____ _________',
+  student_passport: '____ _________',
+  passport_issue_date: '____.__.__',
+  passport_expire_date: '____.__.__',
+
+  dateofbirth: '__.__.____',
+  date_of_birth: '__.__.____',
+  birthday: '__.__.____',
+  birth_date: '__.__.____',
+
+  phone1: '+998 __ ___ __ __',
+  phone_1: '+998 __ ___ __ __',
+  phone: '+998 __ ___ __ __',
+  student_phone: '+998 __ ___ __ __',
+  phone2: '+998 __ ___ __ __',
+  phone_2: '+998 __ ___ __ __',
+
+  studentid: '______',
+  student_id: '______',
+  contract_number: '______',
+  contract_no: '______',
+  shartnoma_raqami: '______',
+  talaba_id: '______',
+
+  date: '"___" _________ 2026 YIL',
+  contract_date: '"___" _________ 2026 YIL',
+  signed_date: '"___" _________ 2026 YIL',
+  sana: '"___" _________ 2026 YIL',
+  imzolangan_sana: '"___" _________ 2026 YIL',
+
+  signature: '______________',
+  imzo: '______________',
+  e_signature: '______________',
+  student_signature: '______________',
+  signature_data: '______________',
+
+  verification_code: '____-____-____',
+  tasdiqlash_kodi: '____-____-____',
+  confirmation_code: '____-____-____',
+
+  leveltostudy: '________________',
+  level_to_study: '________________',
+  education_level: '________________',
+  level: '________________',
+
+  branch: '________________',
+  office: '________________',
+  filial: '________________',
+  office_name: '________________',
+
+  address: '_________________________________',
+  email: '_____________________',
+  nationality: 'O\'zbekiston Respublikasi',
+  university: '_____________________',
+  major: '_____________________',
+
+  discount: '________________ so\'m',
+  chegirma: '________________ so\'m',
+}
+
+export function getVariablePlaceholder(key: string): string {
+  const lower = key.toLowerCase()
+  return VARIABLE_FALLBACK_PLACEHOLDERS[lower] || '_________________________'
+}
+
 /**
  * Universal Contract Variable Replacer
  * Replaces:
  * - {{var}} tokens (case-insensitive, optional whitespace)
  * - [[var]] and %var% tokens
- * - Blue canvas variable preview spans: <span class="...bg-blue-50...">{{var}}</span>
+ * - Blue canvas variable preview spans: <span class="...bg-blue-50...">{{var}}</span> or color: #2563eb
  * - Standard MIJOZ requisites table (F.I.O, PASSPORT RAQAMI, TUG'ILGAN SANA, EMAIL, TEL, TA'LIM BOSQICHI, TASDIQLASH KODI (IMZO))
  * - Plain text "TASDIQLASH KODI (IMZO): ______"
  */
@@ -568,59 +642,51 @@ export function replaceVariablesInHtml(html: string, values: Record<string, stri
 
   // 1. Normalize values map: ensure every key is stripped of {{, }}, [[, ]], %
   const cleanMap: Record<string, string> = {}
-  for (const [k, v] of Object.entries(values)) {
+  for (const [k, v] of Object.entries(values || {})) {
     const rawKey = k.replace(/^\{\{|\}\}$|^\[\[|\]\]$|^%|%$/g, '').trim().toLowerCase()
     cleanMap[rawKey] = v !== undefined && v !== null ? String(v) : ''
   }
 
-  // 2. Replace any variable wrapper spans from canvas editor
+  const resolveTokenValue = (key: string): string => {
+    const lower = key.toLowerCase()
+    if (cleanMap[lower] !== undefined && cleanMap[lower] !== '') {
+      return cleanMap[lower]
+    }
+    return getVariablePlaceholder(lower)
+  }
+
+  // 2. Replace any variable wrapper spans from canvas editor (both bg-blue-50 and color: #2563eb)
+  result = result.replace(
+    /<span[^>]*style="[^"]*color:\s*(?:#2563eb|rgb\(37,\s*99,\s*235\))[^"]*"[^>]*>\s*(?:\{\{)?\s*([a-zA-Z0-9_]+)\s*(?:\}\})?\s*<\/span>/gi,
+    (_, key) => resolveTokenValue(key)
+  )
+  result = result.replace(
+    /<p[^>]*style="[^"]*color:\s*(?:#2563eb|rgb\(37,\s*99,\s*235\))[^"]*"[^>]*>\s*(?:\{\{)?\s*([a-zA-Z0-9_]+)\s*(?:\}\})?\s*<\/p>/gi,
+    (_, key) => `<p>${resolveTokenValue(key)}</p>`
+  )
   result = result.replace(
     /<span[^>]*class="[^"]*bg-blue-50[^"]*"[^>]*>\s*(?:\{\{)?\s*([a-zA-Z0-9_]+)\s*(?:\}\})?\s*<\/span>/gi,
-    (match, key) => {
-      const lower = key.toLowerCase()
-      if (cleanMap[lower] !== undefined && cleanMap[lower] !== '') {
-        return cleanMap[lower]
-      }
-      return match
-    }
+    (_, key) => resolveTokenValue(key)
   )
 
   // 3. Replace mustache {{var}}, brackets [[var]], and %var%
   result = result.replace(
     /\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/gi,
-    (match, key) => {
-      const lower = key.toLowerCase()
-      if (cleanMap[lower] !== undefined && cleanMap[lower] !== '') {
-        return cleanMap[lower]
-      }
-      return match
-    }
+    (_, key) => resolveTokenValue(key)
   )
 
   result = result.replace(
     /\[\[\s*([a-zA-Z0-9_]+)\s*\]\]/gi,
-    (match, key) => {
-      const lower = key.toLowerCase()
-      if (cleanMap[lower] !== undefined && cleanMap[lower] !== '') {
-        return cleanMap[lower]
-      }
-      return match
-    }
+    (_, key) => resolveTokenValue(key)
   )
 
   result = result.replace(
     /%\s*([a-zA-Z0-9_]+)\s*%/gi,
-    (match, key) => {
-      const lower = key.toLowerCase()
-      if (cleanMap[lower] !== undefined && cleanMap[lower] !== '') {
-        return cleanMap[lower]
-      }
-      return match
-    }
+    (_, key) => resolveTokenValue(key)
   )
 
   // Direct string replacements for any specific bracket keys in cleanMap
-  for (const [k, v] of Object.entries(values)) {
+  for (const [k, v] of Object.entries(values || {})) {
     if (k.startsWith('{{') && k.endsWith('}}') && v) {
       result = result.split(k).join(v)
     }
@@ -648,6 +714,14 @@ export function replaceVariablesInHtml(html: string, values: Record<string, stri
     result = result.replace(
       /FUQARO:\s*<\/p>\s*<p[^>]*>\(O‘quvchining \(Mijozning\) F\.I\.SH\)/gi,
       `FUQARO: <strong>${studentName}</strong></p><p style="text-align:center;font-size:11px;color:#555;margin:2px 0 12px;">(O‘quvchining (Mijozning) F.I.SH)`
+    )
+    result = result.replace(
+      /FUQARO:\s*_{2,}/gi,
+      `FUQARO: <strong>${studentName}</strong>`
+    )
+    result = result.replace(
+      /Fuqaro:\s*_{2,}/gi,
+      `Fuqaro: <strong>${studentName}</strong>`
     )
 
     // F.I.O: <span ...>&nbsp;</span>

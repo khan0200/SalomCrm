@@ -33,6 +33,22 @@ const dateDisplay = computed(() => {
   return props.element.signedDate || '«___» ____________ 2026 Yil'
 })
 
+const addressDisplay = computed(() => {
+  if (props.variableValues) {
+    const val = props.variableValues['{{address}}'] || props.variableValues['address']
+    if (val) return val
+  }
+  return props.element.clientAddress || '_________________________________'
+})
+
+const phoneDisplay = computed(() => {
+  if (props.variableValues) {
+    const val = props.variableValues['{{phone1}}'] || props.variableValues['phone1'] || props.variableValues['{{phone}}'] || props.variableValues['phone']
+    if (val) return val
+  }
+  return props.element.clientPhone || '_________________________________'
+})
+
 const scaledFontSizePx = computed(() => {
   return Math.max(5, Math.round(12 * (props.zoomLevel / 100) * 10) / 10)
 })
@@ -97,10 +113,10 @@ const borderTopWidthPx = computed(() => {
             <strong>Passport:</strong> {{ passportDisplay }}
           </p>
           <p class="text-[0.83em] text-zinc-600">
-            <strong>Manzil:</strong> {{ element.clientAddress || '_________________________________' }}
+            <strong>Manzil:</strong> {{ addressDisplay }}
           </p>
           <p class="text-[0.83em] text-zinc-600">
-            <strong>Tel:</strong> {{ element.clientPhone || '_________________________________' }}
+            <strong>Tel:</strong> {{ phoneDisplay }}
           </p>
           <p class="text-[0.83em] text-zinc-600">
             <strong>Sana:</strong> {{ dateDisplay }}

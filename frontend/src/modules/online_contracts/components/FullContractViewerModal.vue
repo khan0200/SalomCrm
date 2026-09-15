@@ -55,10 +55,8 @@ const renderedPages = computed<string[]>(() => {
     .replace(/^[\s\S]*?(?:1-BET\s*═{5,}|1-BET\s*={5,}|={10,}\s*1-BET\s*={10,}|═{10,}\s*1-BET\s*═{10,})/i, '')
     .replace(/(?:═{5,}\s*\d+-BET\s*═{5,}|={5,}\s*\d+-BET\s*={5,}|_{10,}\s*\d+-BET\s*_{10,})/gi, '<hr data-page-break="true" />')
 
-  // Substitute variable values if passed
-  if (props.variableValues) {
-    cleaned = replaceVariablesInHtml(cleaned, props.variableValues)
-  }
+  // Substitute variable values (or fallback placeholders)
+  cleaned = replaceVariablesInHtml(cleaned, props.variableValues || {})
 
   const parts = cleaned.split(/<hr[^>]*\/?>/i).map(p => p.trim()).filter(p => p.length > 0)
   return parts.length > 0 ? parts : [cleaned]

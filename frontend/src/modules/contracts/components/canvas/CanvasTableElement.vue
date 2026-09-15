@@ -11,13 +11,19 @@ import { cleanClipboardContent } from '../../utils/clipboardUtils'
 import { scaleInlineStyles } from '../../utils/canvasZoomUtils'
 import { replaceVariablesInHtml } from '../../utils/contractVariables'
 
-const props = defineProps<{
-  element: TableCanvasElement
-  isSelected: boolean
-  isEditing: boolean
-  zoomLevel: number
-  variableValues?: Record<string, string>
-}>()
+const props = withDefaults(
+  defineProps<{
+    element: TableCanvasElement
+    isSelected: boolean
+    isEditing: boolean
+    readonly?: boolean
+    zoomLevel: number
+    variableValues?: Record<string, string>
+  }>(),
+  {
+    readonly: false,
+  }
+)
 
 const emit = defineEmits<{
   'update:element': [updates: Partial<TableCanvasElement>]
@@ -203,8 +209,8 @@ function deleteRowAt(rowIdx: number) {
 // Variable replacement helper
 function renderCellContent(content: string): string {
   let text = content || ''
-  if (props.variableValues && Object.keys(props.variableValues).length > 0) {
-    text = replaceVariablesInHtml(text, props.variableValues)
+  if (props.readonly || (props.variableValues && Object.keys(props.variableValues).length > 0)) {
+    text = replaceVariablesInHtml(text, props.variableValues || {})
   }
   if (props.zoomLevel !== 100) {
     text = scaleInlineStyles(text, props.zoomLevel)

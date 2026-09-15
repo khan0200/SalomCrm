@@ -44,7 +44,7 @@ import {
 } from './utils/contractCanvasConverter'
 import { settingsApi, type TariffOption } from '@/api/settings'
 import { getContractTemplate } from './contractTemplates'
-import { formatDateIso } from './utils/contractVariables'
+import { formatDateIso, buildVariableValues } from './utils/contractVariables'
 import { contractsApi, type Contract } from '@/api/contracts'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
@@ -255,7 +255,11 @@ async function handleDownloadTariff(format: 'pdf' | 'doc' = 'pdf') {
   } else {
     isDownloadingPdf.value = true
     try {
-      await downloadContractAsPdf(title, content)
+      const variableValues = buildVariableValues(undefined, {
+        templateName: activeTariff.value.name,
+        price: activeTariff.value.price,
+      })
+      await downloadContractAsPdf(title, content, { top: 20, right: 15, bottom: 20, left: 25 }, variableValues)
     } catch (e) {
       console.error('PDF download error:', e)
       downloadContractDoc(title, content)
@@ -769,7 +773,8 @@ async function confirmDelete() {
         v-model:content="editingContent"
         :contract-number="currentEditingContract.contract_number"
         :title="currentEditingContract.title"
-        :student-name="currentEditingContract.student_name || undefined"
+        :student-name="currentEditingContract.student_name || currentEditingContract.full_name || undefined"
+        :student-data="currentEditingContract"
         :save-status="saveStatus"
         :last-saved-at="lastSavedAt"
         class="flex-1 h-full min-h-0"

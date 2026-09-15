@@ -401,10 +401,7 @@ export function convertCanvasDocumentToHtml(
         table.cells.forEach(row => {
           let colsHtml = ''
           row.forEach(cell => {
-            let cellContent = cell.content
-            if (variableValues) {
-              cellContent = replaceVariablesInHtml(cellContent, variableValues)
-            }
+            let cellContent = replaceVariablesInHtml(cell.content || '', variableValues || {})
             const bg = cell.backgroundColor ? `background-color: ${cell.backgroundColor};` : ''
             const align = cell.textAlign ? `text-align: ${cell.textAlign};` : ''
             const vAlign = cell.verticalAlign ? `vertical-align: ${cell.verticalAlign};` : ''
@@ -436,10 +433,7 @@ export function convertCanvasDocumentToHtml(
       } else {
         // Text / Heading / Paragraph
         const textEl = el as TextCanvasElement
-        let content = textEl.content
-        if (variableValues) {
-          content = replaceVariablesInHtml(content, variableValues)
-        }
+        let content = replaceVariablesInHtml(textEl.content || '', variableValues || {})
         const st = textEl.style || {}
         const fontStyle = `
           font-family: ${st.fontFamily || 'Times New Roman'}, Times, serif;

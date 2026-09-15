@@ -22,6 +22,7 @@ import {
   deserializeCanvasDocument,
   convertCanvasDocumentToHtml,
 } from '@/modules/contracts/utils/contractCanvasConverter'
+import { buildVariableValues, replaceVariablesInHtml } from '@/modules/contracts/utils/contractVariables'
 
 const props = defineProps<{
   isOpen: boolean
@@ -56,6 +57,20 @@ const showDownloadMenu = ref(false)
 
 const isCanvas = computed(() => isCanvasDocumentJson(props.contract?.content || ''))
 
+const contractVariables = computed<Record<string, string>>(() => {
+  if (!props.contract) return {}
+  return buildVariableValues(props.contract, {
+    contractNumber: props.contract.student_id_assigned || props.contract.contract_number,
+    templateName: props.contract.tariff_name || props.contract.title,
+    price: props.contract.tariff_price ?? undefined,
+    discount: props.contract.discount ?? undefined,
+    signatureData: props.contract.signature_data || undefined,
+    verificationCode: props.contract.verification_code || undefined,
+    office: props.contract.office || props.contract.tenant_office_name || undefined,
+    educationLevel: props.contract.education_level || undefined,
+  })
+})
+
 const splitPages = computed<string[]>(() => {
   const raw = props.contract?.content
   if (!raw) return []
@@ -67,23 +82,24 @@ const splitPages = computed<string[]>(() => {
         return convertCanvasDocumentToHtml({
           ...doc,
           pages: [p],
-        })
+        }, contractVariables.value)
       })
     }
   }
 
   // Standardize any ASCII page markers
-  const cleaned = raw
+  let cleaned = raw
     .replace(/^[\s\S]*?(?:1-BET\s*═{5,}|1-BET\s*={5,}|={10,}\s*1-BET\s*={10,}|═{10,}\s*1-BET\s*═{10,})/i, '')
     .replace(/(?:═{5,}\s*\d+-BET\s*═{5,}|={5,}\s*\d+-BET\s*={5,}|_{10,}\s*\d+-BET\s*_{10,})/gi, '<hr data-page-break="true" />')
   
+  cleaned = replaceVariablesInHtml(cleaned, contractVariables.value)
   const parts = cleaned.split(/<hr[^>]*\/?>/i).map(p => p.trim()).filter(p => p.length > 0)
   return parts.length > 0 ? parts : [cleaned]
 })
 
 async function handleDownload(format: 'pdf' | 'doc' = 'pdf') {
   if (!props.contract || isDownloadingPdf.value) return
-  const safeTitle = `${props.contract.contract_number}_${props.contract.student_name || props.contract.title}`.replace(/[/\\?%*:|"<>]/g, '_')
+  const safeTitle = `${props.contract.contract_number}_${props.contract.student_name || props.contract.full_name || props.contract.title}`.replace(/[/\\?%*:|"<>]/g, '_')
   const rawContent = props.contract.content || ''
 
   if (format === 'doc') {
@@ -93,7 +109,21 @@ async function handleDownload(format: 'pdf' | 'doc' = 'pdf') {
 
   isDownloadingPdf.value = true
   try {
-    await downloadContractAsPdf(safeTitle, rawContent)
+    const verificationMeta = {
+      contractNumber: props.contract.contract_number || props.contract.student_id_assigned || undefined,
+      studentId: props.contract.student_id_assigned || undefined,
+      studentName: props.contract.full_name || props.contract.student_name || undefined,
+      verifiedAt: props.contract.verified_at ? new Date(props.contract.verified_at).toLocaleDateString('uz-UZ') : undefined,
+      status: props.contract.status,
+    }
+    await downloadContractAsPdf(
+      safeTitle,
+      rawContent,
+      { top: 20, right: 15, bottom: 20, left: 25 },
+      contractVariables.value,
+      props.contract.signature_data || undefined,
+      verificationMeta
+    )
   } catch (err) {
     console.error('Failed to download PDF:', err)
     downloadWordDoc(safeTitle, rawContent)
