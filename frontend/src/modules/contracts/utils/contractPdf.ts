@@ -201,6 +201,39 @@ export async function downloadContractAsPdf(
         font-weight: bold;
         margin: 10px 0 4px;
       }
+      .contract-pdf-content ol {
+        list-style-type: decimal !important;
+        padding-left: 1.8em !important;
+        margin: 4px 0 !important;
+      }
+      .contract-pdf-content ol ol {
+        list-style-type: lower-alpha !important;
+        padding-left: 1.6em !important;
+        margin: 2px 0 !important;
+      }
+      .contract-pdf-content ol ol ol {
+        list-style-type: lower-roman !important;
+        padding-left: 1.6em !important;
+        margin: 2px 0 !important;
+      }
+      .contract-pdf-content ul {
+        list-style-type: disc !important;
+        padding-left: 1.8em !important;
+        margin: 4px 0 !important;
+      }
+      .contract-pdf-content ul ul {
+        list-style-type: circle !important;
+        padding-left: 1.6em !important;
+        margin: 2px 0 !important;
+      }
+      .contract-pdf-content ul ul ul {
+        list-style-type: square !important;
+        padding-left: 1.6em !important;
+        margin: 2px 0 !important;
+      }
+      .contract-pdf-content li {
+        margin: 2px 0 !important;
+      }
       .contract-pdf-content table {
         width: 100% !important;
         border-collapse: collapse !important;
@@ -347,6 +380,13 @@ export function printContractAsPdf(
         h1 { font-size: 18px; text-align: center; margin: 12px 0 6px; }
         h2 { font-size: 16px; margin: 10px 0 5px; }
         h3 { font-size: 14px; margin: 8px 0 4px; }
+        ol { list-style-type: decimal !important; padding-left: 1.8em !important; margin: 4px 0 !important; }
+        ol ol { list-style-type: lower-alpha !important; padding-left: 1.6em !important; margin: 2px 0 !important; }
+        ol ol ol { list-style-type: lower-roman !important; padding-left: 1.6em !important; margin: 2px 0 !important; }
+        ul { list-style-type: disc !important; padding-left: 1.8em !important; margin: 4px 0 !important; }
+        ul ul { list-style-type: circle !important; padding-left: 1.6em !important; margin: 2px 0 !important; }
+        ul ul ul { list-style-type: square !important; padding-left: 1.6em !important; margin: 2px 0 !important; }
+        li { margin: 2px 0 !important; }
         table { width: 100%; border-collapse: collapse; margin: 10px 0; page-break-inside: avoid; }
         td, th { border: 1px solid #333; padding: 6px 10px; font-size: 12px; }
         th { background: #f4f4f5; }

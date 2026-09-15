@@ -134,6 +134,8 @@ const showHighlightPicker = ref(false)
 const showTableInsertMenu = ref(false)
 const showMarginMenu = ref(false)
 const showSpacingMenu = ref(false)
+const showListMenu = ref(false)
+const activeListType = ref<'ordered' | 'unordered' | null>(null)
 const showVariablePicker = ref(false)
 const showEditorDownloadMenu = ref(false)
 const showShortcutHelp = ref(false)
@@ -752,6 +754,7 @@ function closeAllDropdowns() {
   showHighlightPicker.value = false
   showMarginMenu.value = false
   showSpacingMenu.value = false
+  showListMenu.value = false
   showEditorDownloadMenu.value = false
 }
 
@@ -779,6 +782,7 @@ onMounted(() => {
   window.addEventListener('pointerdown', onGlobalPointerDown, { capture: true })
   // Document-level click → close all open dropdowns
   document.addEventListener('click', closeAllDropdowns)
+  document.addEventListener('selectionchange', updateActiveListState)
   // Use passive:false so we can preventDefault on Ctrl+Wheel and Shift+Wheel
   canvasWorkspaceRef.value?.addEventListener('wheel', onCanvasWheel, { passive: false })
   canvasWorkspaceRef.value?.addEventListener('scroll', onWorkspaceScroll, { passive: true })
@@ -792,6 +796,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('pointerdown', onGlobalPointerDown, { capture: true })
   onWorkspacePointerUp()
   document.removeEventListener('click', closeAllDropdowns)
+  document.removeEventListener('selectionchange', updateActiveListState)
   canvasWorkspaceRef.value?.removeEventListener('wheel', onCanvasWheel)
   canvasWorkspaceRef.value?.removeEventListener('scroll', onWorkspaceScroll)
   if (scrollRafId) cancelAnimationFrame(scrollRafId)
@@ -895,6 +900,182 @@ function toggleSpacingMenu() {
   const next = !showSpacingMenu.value
   closeAllDropdowns()
   showSpacingMenu.value = next
+}
+
+// List dropdown toggle & active state (Canva / Word Style)
+function toggleListMenu() {
+  const next = !showListMenu.value
+  closeAllDropdowns()
+  showListMenu.value = next
+  if (next) updateActiveListState()
+}
+
+function updateActiveListState() {
+  const sel = window.document.getSelection()
+  if (sel && sel.rangeCount > 0) {
+    let node: Node | null = sel.anchorNode
+    if (node && node.nodeType === Node.TEXT_NODE) node = node.parentNode
+    const li = (node as HTMLElement)?.closest?.('li')
+    if (li) {
+      const list = li.closest('ol, ul')
+      if (list) {
+        activeListType.value = list.tagName.toLowerCase() === 'ol' ? 'ordered' : 'unordered'
+        return
+      }
+    }
+  }
+
+  // Fallback: check selected canvas element content
+  const el = canvas.selectedElement.value as TextCanvasElement | null
+  if (el && el.content) {
+    const trimmed = el.content.trim().toLowerCase()
+    if (trimmed.startsWith('<ol') || trimmed.includes('<ol>') || trimmed.includes('<ol ')) {
+      activeListType.value = 'ordered'
+      return
+    }
+    if (trimmed.startsWith('<ul') || trimmed.includes('<ul>') || trimmed.includes('<ul ')) {
+      activeListType.value = 'unordered'
+      return
+    }
+  }
+  activeListType.value = null
+}
+
+function formatHtmlAsList(html: string, type: 'ordered' | 'unordered'): string {
+  const parser = new DOMParser()
+  const doc = parser.parseFromString(`<body>${html}</body>`, 'text/html')
+  const body = doc.body
+
+  const targetTag = type === 'ordered' ? 'ol' : 'ul'
+  const otherTag = type === 'ordered' ? 'ul' : 'ol'
+
+  // 1. If body already contains exclusively the TARGET list type -> unwrap back to <p>
+  if (body.children.length === 1 && body.firstElementChild?.tagName.toLowerCase() === targetTag) {
+    const list = body.firstElementChild
+    const items: string[] = []
+    Array.from(list.children).forEach(li => {
+      items.push(`<p>${li.innerHTML || '<br>'}</p>`)
+    })
+    return items.join('') || '<p><br></p>'
+  }
+
+  // 2. If body contains the OPPOSITE list type -> switch tag (<ol> <-> <ul>)
+  if (body.children.length === 1 && body.firstElementChild?.tagName.toLowerCase() === otherTag) {
+    const list = body.firstElementChild
+    const newList = doc.createElement(targetTag)
+    newList.innerHTML = list.innerHTML
+    return newList.outerHTML
+  }
+
+  // 3. Convert paragraphs or raw text lines into list items
+  const list = doc.createElement(targetTag)
+  if (body.children.length > 0) {
+    Array.from(body.children).forEach(child => {
+      const tag = child.tagName.toLowerCase()
+      if (tag === 'p' || tag === 'div') {
+        const li = doc.createElement('li')
+        li.innerHTML = child.innerHTML || '<br>'
+        list.appendChild(li)
+      } else if (tag === 'ol' || tag === 'ul') {
+        Array.from(child.children).forEach(li => list.appendChild(li.cloneNode(true)))
+      } else {
+        const li = doc.createElement('li')
+        li.innerHTML = child.outerHTML
+        list.appendChild(li)
+      }
+    })
+  } else {
+    const raw = body.textContent || ''
+    const lines = raw.split('\n').map(l => l.trim()).filter(Boolean)
+    if (lines.length > 0) {
+      lines.forEach(line => {
+        const li = doc.createElement('li')
+        li.textContent = line
+        list.appendChild(li)
+      })
+    } else {
+      const li = doc.createElement('li')
+      li.innerHTML = '<br>'
+      list.appendChild(li)
+    }
+  }
+
+  return list.outerHTML
+}
+
+function applyListFormat(type: 'ordered' | 'unordered') {
+  closeAllDropdowns()
+  const selected = canvas.selectedElement.value as TextCanvasElement | null
+  if (!selected || !isTextSelected.value) return
+
+  const activeEl = window.document.activeElement as HTMLElement | null
+  const isInsideEditable = activeEl && (
+    activeEl.getAttribute('contenteditable') === 'true' ||
+    Boolean(activeEl.closest('.canvas-text-element')) ||
+    Boolean(activeEl.closest('[contenteditable="true"]'))
+  )
+
+  if (isInsideEditable) {
+    const cmd = type === 'ordered' ? 'insertOrderedList' : 'insertUnorderedList'
+    window.document.execCommand(cmd, false)
+    const container = (activeEl.closest('.canvas-text-element') || activeEl) as HTMLElement
+    if (container) {
+      selected.content = container.innerHTML
+    }
+  } else {
+    selected.content = formatHtmlAsList(selected.content || '', type)
+  }
+
+  nextTick(() => {
+    updateActiveListState()
+    canvas.history.recordSnapshot(canvas.document.value)
+  })
+}
+
+function increaseIndent() {
+  const selected = canvas.selectedElement.value as TextCanvasElement | null
+  if (!selected || !isTextSelected.value) return
+
+  const activeEl = window.document.activeElement as HTMLElement | null
+  const isInsideEditable = activeEl && (
+    activeEl.getAttribute('contenteditable') === 'true' ||
+    Boolean(activeEl.closest('.canvas-text-element'))
+  )
+
+  if (isInsideEditable) {
+    window.document.execCommand('indent', false)
+    const container = (activeEl.closest('.canvas-text-element') || activeEl) as HTMLElement
+    if (container) {
+      selected.content = container.innerHTML
+    }
+  }
+  nextTick(() => {
+    updateActiveListState()
+    canvas.history.recordSnapshot(canvas.document.value)
+  })
+}
+
+function decreaseIndent() {
+  const selected = canvas.selectedElement.value as TextCanvasElement | null
+  if (!selected || !isTextSelected.value) return
+
+  const activeEl = window.document.activeElement as HTMLElement | null
+  const isInsideEditable = activeEl && (
+    activeEl.getAttribute('contenteditable') === 'true' ||
+    Boolean(activeEl.closest('.canvas-text-element'))
+  )
+
+  if (isInsideEditable) {
+    window.document.execCommand('outdent', false)
+    const container = (activeEl.closest('.canvas-text-element') || activeEl) as HTMLElement
+    if (container) {
+      selected.content = container.innerHTML
+    }
+  }
+  nextTick(() => {
+    updateActiveListState()
+    canvas.history.recordSnapshot(canvas.document.value)
+  })
 }
 
 function toggleTableInsertMenu() {
@@ -1365,6 +1546,10 @@ const shortcutCategories = computed(() => ({
     { label: 'Font Size -', keys: `${mod}+Shift+,` },
     { label: 'Copy Style', keys: `${mod}+Alt+C` },
     { label: 'Paste Style', keys: `${mod}+Alt+V` },
+    { label: 'Numbered List', keys: 'Toolbar / 1. 2. 3.' },
+    { label: 'Bulleted List', keys: 'Toolbar / • • •' },
+    { label: 'Indent (List)', keys: 'Tab' },
+    { label: 'Outdent (List)', keys: 'Shift+Tab' },
     { label: 'Edit Text (Enter)', keys: 'F2 / Enter' },
   ],
   elements: [
@@ -1685,6 +1870,103 @@ const shortcutCategories = computed(() => ({
           <AlignCenter   v-else-if="currentTextAlign === 'center'"  class="w-3.5 h-3.5" />
           <AlignRight    v-else-if="currentTextAlign === 'right'"   class="w-3.5 h-3.5" />
           <AlignJustify  v-else                                class="w-3.5 h-3.5" />
+        </button>
+      </div>
+
+      <!-- List Dropdown & Indent Group (Canva / Word Style) -->
+      <div class="flex items-center gap-0.5 px-1.5 border-r border-zinc-200 dark:border-zinc-700/60">
+        <!-- List Dropdown Button -->
+        <div
+          class="relative editor-dropdown-container"
+          :class="{ 'z-50': showListMenu }"
+        >
+          <button
+            type="button"
+            @mousedown.prevent
+            @click.stop="toggleListMenu()"
+            class="toolbar-btn flex items-center gap-1 h-7 px-1.5"
+            :class="[
+              showListMenu || activeListType ? 'bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-400 font-bold shadow-2xs' : '',
+              !isTextSelected ? 'opacity-40 cursor-not-allowed' : ''
+            ]"
+            :disabled="!isTextSelected"
+            :title="activeListType ? `Ro'yxat faol: ${activeListType === 'ordered' ? 'Numbered' : 'Bulleted'} (Tanlash uchun bosing)` : 'Ro\'yxat (List): Raqamlangan yoki Nuqtali'"
+          >
+            <ListOrdered v-if="activeListType === 'ordered'" class="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+            <List v-else class="w-3.5 h-3.5" />
+            <ChevronDown class="w-2.5 h-2.5 opacity-60" />
+          </button>
+
+          <!-- List Options Popover -->
+          <div
+            v-if="showListMenu && isTextSelected"
+            class="absolute top-full left-0 mt-1.5 w-52 bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-700 shadow-2xl p-1.5 z-[250] space-y-1 select-none animate-scale-in"
+            @click.stop
+          >
+            <div class="text-[10px] font-bold text-zinc-400 uppercase tracking-wider px-2 py-1">Ro'yxat turi (List)</div>
+            
+            <!-- 1. Numbered List Option -->
+            <button
+              type="button"
+              @mousedown.prevent
+              @click="applyListFormat('ordered')"
+              class="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-xs font-medium transition-colors hover:bg-blue-50 dark:hover:bg-zinc-800 cursor-pointer"
+              :class="activeListType === 'ordered' ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 font-bold border border-blue-200 dark:border-blue-900' : 'text-zinc-700 dark:text-zinc-200'"
+            >
+              <div class="w-6 h-6 rounded-lg bg-blue-100 dark:bg-blue-900/60 flex items-center justify-center shrink-0">
+                <ListOrdered class="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+              </div>
+              <div class="text-left flex-1">
+                <div class="font-bold text-xs">Numbered List</div>
+                <div class="text-[10px] text-zinc-400 font-mono">1. 2. 3. (a. b. c.)</div>
+              </div>
+              <Check v-if="activeListType === 'ordered'" class="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
+            </button>
+
+            <!-- 2. Bulleted List Option -->
+            <button
+              type="button"
+              @mousedown.prevent
+              @click="applyListFormat('unordered')"
+              class="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-xs font-medium transition-colors hover:bg-blue-50 dark:hover:bg-zinc-800 cursor-pointer"
+              :class="activeListType === 'unordered' ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 font-bold border border-blue-200 dark:border-blue-900' : 'text-zinc-700 dark:text-zinc-200'"
+            >
+              <div class="w-6 h-6 rounded-lg bg-blue-100 dark:bg-blue-900/60 flex items-center justify-center shrink-0">
+                <List class="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+              </div>
+              <div class="text-left flex-1">
+                <div class="font-bold text-xs">Bulleted List</div>
+                <div class="text-[10px] text-zinc-400 font-mono">• • • (○ ▪)</div>
+              </div>
+              <Check v-if="activeListType === 'unordered'" class="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
+            </button>
+          </div>
+        </div>
+
+        <!-- Decrease Indent Button -->
+        <button
+          type="button"
+          @mousedown.prevent
+          @click="decreaseIndent()"
+          class="toolbar-btn"
+          :class="!isTextSelected ? 'opacity-40 cursor-not-allowed' : ''"
+          :disabled="!isTextSelected"
+          title="Indentni kamaytirish (Shift+Tab)"
+        >
+          <IndentDecrease class="w-3.5 h-3.5" />
+        </button>
+
+        <!-- Increase Indent Button -->
+        <button
+          type="button"
+          @mousedown.prevent
+          @click="increaseIndent()"
+          class="toolbar-btn"
+          :class="!isTextSelected ? 'opacity-40 cursor-not-allowed' : ''"
+          :disabled="!isTextSelected"
+          title="Indentni oshirish (Tab)"
+        >
+          <IndentIncrease class="w-3.5 h-3.5" />
         </button>
       </div>
 

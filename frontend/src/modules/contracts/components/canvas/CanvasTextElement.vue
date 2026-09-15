@@ -227,6 +227,83 @@ function onKeyDown(e: KeyboardEvent) {
     try {
       window.getSelection()?.removeAllRanges()
     } catch {}
+    return
+  }
+
+  // Handle Tab / Shift+Tab inside lists for Indent / Outdent (Nested Lists)
+  if (e.key === 'Tab') {
+    const sel = window.getSelection()
+    if (sel && sel.rangeCount > 0) {
+      const range = sel.getRangeAt(0)
+      let node: Node | null = range.startContainer
+      if (node.nodeType === Node.TEXT_NODE) node = node.parentNode
+      const li = (node as HTMLElement)?.closest('li')
+      if (li) {
+        e.preventDefault()
+        if (e.shiftKey) {
+          document.execCommand('outdent', false)
+        } else {
+          document.execCommand('indent', false)
+        }
+        onInput()
+        return
+      }
+    }
+  }
+
+  // Handle Enter on empty list item (double Enter -> exit list or outdent nested list)
+  if (e.key === 'Enter' && !e.shiftKey) {
+    const sel = window.getSelection()
+    if (sel && sel.rangeCount > 0) {
+      const range = sel.getRangeAt(0)
+      let node: Node | null = range.startContainer
+      if (node.nodeType === Node.TEXT_NODE) node = node.parentNode
+      const li = (node as HTMLElement)?.closest('li')
+      if (li) {
+        const text = li.textContent?.replace(/\u200B/g, '').trim() || ''
+        const isEffectivelyEmpty = text === '' && !li.querySelector('img, table, input')
+        if (isEffectivelyEmpty) {
+          e.preventDefault()
+          const parentList = li.closest('ol, ul')
+          const grandParentList = parentList?.parentElement?.closest('ol, ul')
+          if (grandParentList) {
+            document.execCommand('outdent', false)
+          } else {
+            const listCommand = parentList?.tagName.toLowerCase() === 'ol' ? 'insertOrderedList' : 'insertUnorderedList'
+            document.execCommand(listCommand, false)
+          }
+          onInput()
+          return
+        }
+      }
+    }
+  }
+
+  // Handle Backspace at start of empty list item -> exit list formatting
+  if (e.key === 'Backspace') {
+    const sel = window.getSelection()
+    if (sel && sel.rangeCount > 0 && sel.isCollapsed) {
+      const range = sel.getRangeAt(0)
+      let node: Node | null = range.startContainer
+      if (node.nodeType === Node.TEXT_NODE) node = node.parentNode
+      const li = (node as HTMLElement)?.closest('li')
+      if (li) {
+        const text = li.textContent?.replace(/\u200B/g, '').trim() || ''
+        if (text === '') {
+          e.preventDefault()
+          const parentList = li.closest('ol, ul')
+          const grandParentList = parentList?.parentElement?.closest('ol, ul')
+          if (grandParentList) {
+            document.execCommand('outdent', false)
+          } else {
+            const listCommand = parentList?.tagName.toLowerCase() === 'ol' ? 'insertOrderedList' : 'insertUnorderedList'
+            document.execCommand(listCommand, false)
+          }
+          onInput()
+          return
+        }
+      }
+    }
   }
 }
 
@@ -353,14 +430,41 @@ function onPaste(e: ClipboardEvent) {
   margin: 0.35em 0;
   font-family: inherit !important;
 }
-.canvas-text-element ul,
 .canvas-text-element ol {
-  padding-left: 1.5em;
-  margin: 0.3em 0;
+  list-style-type: decimal !important;
+  padding-left: 1.8em !important;
+  margin: 0.3em 0 !important;
   font-family: inherit !important;
 }
-.canvas-text-element li {
-  margin: 0.15em 0;
+.canvas-text-element ol ol {
+  list-style-type: lower-alpha !important;
+  padding-left: 1.6em !important;
+  margin: 0.15em 0 !important;
+}
+.canvas-text-element ol ol ol {
+  list-style-type: lower-roman !important;
+  padding-left: 1.6em !important;
+  margin: 0.15em 0 !important;
+}
+.canvas-text-element ul {
+  list-style-type: disc !important;
+  padding-left: 1.8em !important;
+  margin: 0.3em 0 !important;
   font-family: inherit !important;
+}
+.canvas-text-element ul ul {
+  list-style-type: circle !important;
+  padding-left: 1.6em !important;
+  margin: 0.15em 0 !important;
+}
+.canvas-text-element ul ul ul {
+  list-style-type: square !important;
+  padding-left: 1.6em !important;
+  margin: 0.15em 0 !important;
+}
+.canvas-text-element li {
+  margin: 0.15em 0 !important;
+  font-family: inherit !important;
+  line-height: inherit !important;
 }
 </style>
