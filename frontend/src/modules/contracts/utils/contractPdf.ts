@@ -1,11 +1,33 @@
-import { jsPDF } from 'jspdf'
-import html2canvas from 'html2canvas'
+import type { jsPDF as JsPdfType } from 'jspdf'
 import {
   isCanvasDocumentJson,
   deserializeCanvasDocument,
   convertCanvasDocumentToHtml,
 } from './contractCanvasConverter'
 import { replaceVariablesInHtml } from './contractVariables'
+
+/**
+ * jsPDF and html2canvas together weigh ~600 KB. They are only needed at the
+ * moment a PDF is actually generated, so they are pulled in on demand instead
+ * of being bundled into every route that merely imports this module.
+ */
+let pdfLibsPromise: Promise<{
+  jsPDF: typeof JsPdfType
+  html2canvas: typeof import('html2canvas').default
+}> | null = null
+
+function loadPdfLibs() {
+  if (!pdfLibsPromise) {
+    pdfLibsPromise = Promise.all([
+      import('jspdf'),
+      import('html2canvas'),
+    ]).then(([jspdfMod, html2canvasMod]) => ({
+      jsPDF: jspdfMod.jsPDF,
+      html2canvas: html2canvasMod.default,
+    }))
+  }
+  return pdfLibsPromise
+}
 
 export interface PdfMarginOptions {
   top?: number // in mm
@@ -144,6 +166,7 @@ export async function downloadContractAsPdf(
     status?: string
   }
 ): Promise<void> {
+  const { jsPDF, html2canvas } = await loadPdfLibs()
   const safeTitle = (title || 'shartnoma').replace(/[/\\?%*:|"<>]/g, '_')
   const mergedVars: Record<string, string> = { ...(variableValues || {}) }
 

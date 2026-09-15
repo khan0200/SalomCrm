@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, onBeforeUnmount, defineAsyncComponent } from 'vue'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import {
   FileSignature,
@@ -48,7 +48,8 @@ import { formatDateIso, buildVariableValues } from './utils/contractVariables'
 import { contractsApi, type Contract } from '@/api/contracts'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
-import ContractDocumentEditor from './components/ContractDocumentEditor.vue'
+// TipTap + the canvas editor add ~450 KB; only load them once an editor is opened.
+const ContractDocumentEditor = defineAsyncComponent(() => import('./components/ContractDocumentEditor.vue'))
 import ContractCreateDialog from './components/ContractCreateDialog.vue'
 import ContractPreviewModal from './components/ContractPreviewModal.vue'
 import BaseModal from '@/components/common/BaseModal.vue'
