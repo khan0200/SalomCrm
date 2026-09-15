@@ -311,10 +311,10 @@ export function buildClientRequisitesHtml(): string {
   // 7. TEL:
   parts.push('<p style="display: flex; align-items: flex-end; margin: 0.28em 0;"><span style="font-weight: bold; white-space: nowrap;">TEL:</span><span style="flex: 1; border-bottom: 1px solid #000; margin-left: 6px; min-height: 1.1em; padding-bottom: 2px; color: #2563eb; font-weight: bold;">&nbsp;{{phone2}}</span></p>')
 
-  // 8. TA\'LIM BOSQICHI:
-  parts.push('<p style="display: flex; align-items: flex-end; margin: 0.28em 0;"><span style="font-weight: bold; white-space: nowrap;">TA\'LIM BOSQICHI:</span><span style="flex: 1; border-bottom: 1px solid #000; margin-left: 6px; min-height: 1.1em; padding-bottom: 2px; color: #2563eb; font-weight: bold;">&nbsp;{{leveltostudy}}</span></p>')
+  // 8. TA'LIM BOSQICHI:
+  parts.push('<p style="display: flex; align-items: flex-end; margin: 0.28em 0;"><span style="font-weight: bold; white-space: nowrap;">TA\'LIM BOSQICHI:</span><span style="flex: 1; border-bottom: 1px solid #000; margin-left: 6px; min-height: 1.1em; padding-bottom: 2px;">&nbsp;</span></p>')
   // Extra line
-  parts.push('<p style="border-bottom: 1px solid #000; margin: 0.28em 0; min-height: 1.1em; padding-bottom: 2px;">&nbsp;</p>')
+  parts.push('<p style="border-bottom: 1px solid #000; margin: 0.28em 0; min-height: 1.1em; padding-bottom: 2px; color: #2563eb; font-weight: bold;">&nbsp;{{leveltostudy}}</p>')
 
   // 9. TASDIQLASH KODI (IMZO):
   parts.push('<p style="display: flex; align-items: flex-end; margin: 0.28em 0;"><span style="font-weight: bold; white-space: nowrap;">TASDIQLASH KODI (IMZO):</span><span style="flex: 1; border-bottom: 1px solid #000; margin-left: 6px; min-height: 1.1em; padding-bottom: 2px; color: #2563eb; font-weight: bold;">&nbsp;{{signature}}</span></p>')
@@ -636,13 +636,13 @@ export function replaceVariablesInHtml(
     return getVariablePlaceholder(lower)
   }
 
-  // 2. Replace any variable wrapper spans from canvas editor (bg-blue-50, #2563eb, #1d4ed8)
+  // 2. Replace any standalone variable wrapper spans/paragraphs from canvas editor (bg-blue-50, #2563eb, #1d4ed8)
   result = result.replace(
-    /<span[^>]*style="[^"]*color:\s*(?:#2563eb|#1d4ed8|rgb\(37,\s*99,\s*235\)|rgb\(29,\s*78,\s*216\))[^"]*"[^>]*>\s*(?:\{\{)?\s*([a-zA-Z0-9_]+)\s*(?:\}\})?\s*<\/span>/gi,
+    /<span(?![^>]*border-bottom)[^>]*style="[^"]*color:\s*(?:#2563eb|#1d4ed8|rgb\(37,\s*99,\s*235\)|rgb\(29,\s*78,\s*216\))[^"]*"[^>]*>\s*(?:&nbsp;)?\s*(?:\{\{)?\s*([a-zA-Z0-9_]+)\s*(?:\}\})?\s*<\/span>/gi,
     (_, key) => resolveTokenValue(key)
   )
   result = result.replace(
-    /<p[^>]*style="[^"]*color:\s*(?:#2563eb|#1d4ed8|rgb\(37,\s*99,\s*235\)|rgb\(29,\s*78,\s*216\))[^"]*"[^>]*>\s*(?:\{\{)?\s*([a-zA-Z0-9_]+)\s*(?:\}\})?\s*<\/p>/gi,
+    /<p(?![^>]*border-bottom)[^>]*style="[^"]*color:\s*(?:#2563eb|#1d4ed8|rgb\(37,\s*99,\s*235\)|rgb\(29,\s*78,\s*216\))[^"]*"[^>]*>\s*(?:&nbsp;)?\s*(?:\{\{)?\s*([a-zA-Z0-9_]+)\s*(?:\}\})?\s*<\/p>/gi,
     (_, key) => {
       const val = resolveTokenValue(key)
       return `<p>${val || '&nbsp;'}</p>`
@@ -674,6 +674,12 @@ export function replaceVariablesInHtml(
     if (k.startsWith('{{') && k.endsWith('}}') && v) {
       result = result.split(k).join(v)
     }
+  }
+
+  // If variables have been populated, reset blue editor preview colors (#2563eb / #1d4ed8) to #000000
+  const hasPopulatedValues = Object.values(cleanMap).some(v => v && v.trim() !== '')
+  if (hasPopulatedValues) {
+    result = result.replace(/color:\s*(?:#2563eb|#1d4ed8|rgb\(37,\s*99,\s*235\)|rgb\(29,\s*78,\s*216\));?/gi, 'color: #000000;')
   }
 
   // 4. Intelligent substitution for MIJOZ requisites block & standard contract lines
