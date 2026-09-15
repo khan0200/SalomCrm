@@ -256,9 +256,15 @@ export async function downloadContractAsPdf(
           box-sizing: border-box;
           padding: 0;
           margin: 0;
+          -webkit-text-size-adjust: 100%;
+          text-size-adjust: 100%;
         `
         pageContainer.innerHTML = `
           <style>
+            .canvas-a4-page-print, .canvas-a4-page-print * {
+              -webkit-text-size-adjust: 100% !important;
+              text-size-adjust: 100% !important;
+            }
             .canvas-a4-page-print p { margin: 0.2em 0; }
             .canvas-a4-page-print p:first-child { margin-top: 0 !important; }
             .canvas-a4-page-print p:last-child { margin-bottom: 0 !important; }
@@ -294,6 +300,10 @@ export async function downloadContractAsPdf(
             onclone: (clonedDoc: Document) => {
               const fixStyle = clonedDoc.createElement('style')
               fixStyle.textContent = `
+                html, body, * {
+                  -webkit-text-size-adjust: 100% !important;
+                  text-size-adjust: 100% !important;
+                }
                 img {
                   display: inline-block !important;
                   vertical-align: baseline !important;
@@ -352,9 +362,15 @@ export async function downloadContractAsPdf(
     margin: 0;
     z-index: -99999;
     pointer-events: none;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
   `
   container.innerHTML = `
     <style>
+      .contract-pdf-content, .contract-pdf-content * {
+        -webkit-text-size-adjust: 100% !important;
+        text-size-adjust: 100% !important;
+      }
       .contract-pdf-content {
         font-family: 'Times New Roman', Times, serif !important;
         font-size: 13.5px;
@@ -496,6 +512,10 @@ export async function downloadContractAsPdf(
       onclone: (clonedDoc: Document) => {
         const fixStyle = clonedDoc.createElement('style')
         fixStyle.textContent = `
+          html, body, * {
+            -webkit-text-size-adjust: 100% !important;
+            text-size-adjust: 100% !important;
+          }
           img {
             display: inline-block !important;
             vertical-align: baseline !important;
