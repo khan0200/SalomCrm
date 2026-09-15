@@ -12,7 +12,8 @@ import {
   RotateCcw,
   Ban,
   Trash2,
-  Check
+  Check,
+  AlertCircle
 } from 'lucide-vue-next'
 import BaseModal from '@/components/common/BaseModal.vue'
 import { contractsApi, type Contract } from '@/api/contracts'
@@ -217,6 +218,22 @@ ${htmlBody}
   document.body.removeChild(a)
   URL.revokeObjectURL(url)
 }
+
+function formatRejectionDate(dateStr?: string | null): string {
+  if (!dateStr) return ''
+  try {
+    const d = new Date(dateStr)
+    return d.toLocaleString('uz-UZ', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+  } catch {
+    return dateStr
+  }
+}
 </script>
 
 <template>
@@ -262,7 +279,7 @@ ${htmlBody}
 
       <!-- Right: Actions Toolbar -->
       <div class="flex items-center gap-2 flex-wrap" v-if="activeContract">
-        <!-- Bekor qilish (Reject) -->
+        <!-- Bekor qilish (Reject - Faqat Pending holatida) -->
         <button
           v-if="activeContract.status === 'pending'"
           type="button"
@@ -272,6 +289,18 @@ ${htmlBody}
         >
           <Ban class="w-3.5 h-3.5" />
           <span>Bekor qilish</span>
+        </button>
+
+        <!-- Shartnomani butunlay o'chirish (Permanently Delete - Faqat Rejected holatida) -->
+        <button
+          v-if="activeContract.status === 'rejected'"
+          type="button"
+          @click="emit('delete', activeContract)"
+          class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-rose-200 dark:border-rose-900/60 bg-rose-50/80 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/60 text-xs font-medium transition-all shadow-2xs cursor-pointer active:scale-95"
+          title="Rad etilgan shartnomani bazadan butunlay o'chirib yuborish"
+        >
+          <Trash2 class="w-3.5 h-3.5" />
+          <span>O'chirib yuborish</span>
         </button>
 
         <!-- Yuklab olish (Faqat PDF) -->
@@ -286,6 +315,32 @@ ${htmlBody}
           <Download v-else class="w-3.5 h-3.5 text-zinc-500" />
           <span>Yuklab olish (PDF)</span>
         </button>
+      </div>
+    </div>
+
+    <!-- Rejection Reason Note Banner (Preview oynasida sabab note) -->
+    <div
+      v-if="activeContract?.status === 'rejected' || activeContract?.rejection_reason"
+      class="mx-4 sm:mx-6 my-3 p-3.5 bg-rose-50/95 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 rounded-xl flex items-start gap-3 text-xs text-rose-900 dark:text-rose-200 shadow-2xs no-print"
+    >
+      <div class="p-1.5 rounded-lg bg-rose-100 dark:bg-rose-900/50 text-rose-600 dark:text-rose-400 shrink-0 mt-0.5">
+        <AlertCircle class="w-4 h-4" />
+      </div>
+      <div class="flex-1 min-w-0 space-y-1.5">
+        <div class="flex items-center justify-between gap-2 flex-wrap">
+          <span class="font-semibold text-rose-800 dark:text-rose-200 text-xs">
+            Rad etish sababi:
+          </span>
+          <span v-if="activeContract.rejected_at" class="font-mono text-[11px] text-rose-600/90 dark:text-rose-400/90">
+            {{ formatRejectionDate(activeContract.rejected_at) }}
+          </span>
+        </div>
+        <div class="text-rose-700 dark:text-rose-300 font-sans text-xs leading-relaxed whitespace-pre-wrap bg-white/70 dark:bg-black/30 p-2.5 rounded-lg border border-rose-200/60 dark:border-rose-900/40 font-medium">
+          {{ activeContract.rejection_reason || "Sabab ko'rsatilmagan." }}
+        </div>
+        <div v-if="activeContract.rejected_by_name" class="text-[11px] text-rose-600/90 dark:text-rose-400/90">
+          Rad etgan xodim: <strong class="font-semibold text-rose-900 dark:text-rose-200">{{ activeContract.rejected_by_name }}</strong>
+        </div>
       </div>
     </div>
 

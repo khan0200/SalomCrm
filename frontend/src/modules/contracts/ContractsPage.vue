@@ -708,6 +708,10 @@ watch(
 // ── 2. Autosave & Manual Save Handler ────────────────────────────────────────
 async function handleSaveContract() {
   if (!editingContractId.value) return
+  if (currentEditingContract.value?.status === 'verified' || currentEditingContract.value?.status === 'pending') {
+    alert("Tasdiqlangan (Verified) yoki Kutilayotgan (Pending) holatidagi shartnomalarni o'zgartirib bo'lmaydi.")
+    return
+  }
   saveStatus.value = 'saving'
 
   try {
@@ -717,14 +721,20 @@ async function handleSaveContract() {
     saveStatus.value = 'saved'
     lastSavedAt.value = new Date()
     queryClient.invalidateQueries({ queryKey: ['contracts-list'] })
-  } catch (err) {
+  } catch (err: any) {
     console.error('Failed to save contract:', err)
     saveStatus.value = 'error'
+    const errorMsg = err?.response?.data?.detail || "Shartnomani saqlashda xatolik yuz berdi"
+    alert(errorMsg)
   }
 }
 
 // ── 3. Contract Actions ──────────────────────────────────────────────────────
 function handleOpenEditor(contract: Contract) {
+  if (contract.status === 'verified' || contract.status === 'pending') {
+    alert("Tasdiqlangan (Verified) yoki Kutilayotgan (Pending) holatidagi shartnomalarni tahrirlab bo'lmaydi.")
+    return
+  }
   queryClient.setQueryData(['contract-detail', contract.id], contract)
   editingContent.value = contract.content || ''
   editingContractId.value = contract.id
@@ -754,13 +764,22 @@ async function handleDuplicate(contract: Contract) {
 
 async function confirmDelete() {
   if (!deletingContract.value) return
+  if (deletingContract.value.status === 'verified' || deletingContract.value.status === 'pending') {
+    alert("Tasdiqlangan (Verified) yoki Kutilayotgan (Pending) holatidagi shartnomalarni o'chirib bo'lmaydi.")
+    deletingContract.value = null
+    return
+  }
   isDeleting.value = true
   try {
-    await contractsApi.deleteContract(deletingContract.value.id)
+    const isPermanent = deletingContract.value.status === 'rejected'
+    await contractsApi.deleteContract(deletingContract.value.id, isPermanent)
     deletingContract.value = null
     queryClient.invalidateQueries({ queryKey: ['contracts-list'] })
-  } catch (err) {
+    queryClient.invalidateQueries({ queryKey: ['contracts-all-metrics'] })
+  } catch (err: any) {
     console.error('Failed to delete contract:', err)
+    const errorMsg = err?.response?.data?.detail || "Shartnomani o'chirishda xatolik yuz berdi"
+    alert(errorMsg)
   } finally {
     isDeleting.value = false
   }
@@ -1360,6 +1379,31 @@ async function confirmDelete() {
                           </template>
                         </div>
 
+                        <!-- Rejected status: shows badge + permanent delete button -->
+                        <div v-else-if="contract.status === 'rejected'" class="flex items-center justify-end gap-2.5 flex-nowrap whitespace-nowrap">
+                          <div class="flex flex-col items-end gap-0.5">
+                            <span
+                              class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium border leading-none"
+                              :class="getStatusBadgeClass(contract.status)"
+                            >
+                              <span class="w-1.5 h-1.5 rounded-full shrink-0" :class="getStatusDotClass(contract.status)" />
+                              <span>{{ getStatusLabel(contract.status) }}</span>
+                            </span>
+                            <span class="font-mono text-[10px] text-zinc-400 dark:text-zinc-500 pr-0.5 whitespace-nowrap">
+                              {{ formatContractDate(contract.created_at) }}
+                            </span>
+                          </div>
+
+                          <button
+                            type="button"
+                            @click.stop="deletingContract = contract"
+                            class="p-1.5 rounded-lg border border-rose-200 dark:border-rose-900/60 bg-rose-50/70 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/60 transition-all cursor-pointer shadow-2xs active:scale-95"
+                            title="Rad etilgan shartnomani bazadan butunlay o'chirib yuborish"
+                          >
+                            <Trash2 class="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+
                         <!-- All other statuses (verified, signed, etc.): Flush right status badge + date -->
                         <div v-else class="flex flex-col items-end gap-1">
                           <span
@@ -1411,20 +1455,32 @@ async function confirmDelete() {
     <!-- DELETE MODAL -->
     <BaseModal
       :is-open="!!deletingContract"
-      title="Delete Contract"
-      subtitle="This action will archive the contract"
+      :title="deletingContract?.status === 'rejected' ? 'Shartnomani butunlay o\'chirish' : 'Shartnomani o\'chirish'"
+      :subtitle="deletingContract?.status === 'rejected' ? 'Ushbu amal shartnomani bazadan mutlaqo o\'chirib yuboradi' : 'Ushbu amal shartnomani arxivlaydi'"
       max-width="max-w-md"
       @close="deletingContract = null"
     >
       <div class="p-6 space-y-4">
-        <div class="flex items-center gap-3 p-3 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 rounded-xl text-xs text-rose-700 dark:text-rose-300">
-          <AlertTriangle class="w-5 h-5 text-rose-500 shrink-0" />
-          <span>Are you sure you want to delete <strong>{{ deletingContract?.title }}</strong>?</span>
+        <div class="flex items-start gap-3 p-3.5 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 rounded-xl text-xs text-rose-700 dark:text-rose-300">
+          <AlertTriangle class="w-5 h-5 text-rose-500 shrink-0 mt-0.5" />
+          <div class="space-y-1.5">
+            <span v-if="deletingContract?.status === 'rejected'">
+              Rostdan ham rad etilgan <strong>{{ deletingContract?.contract_number !== 'Pending Student ID' ? deletingContract?.contract_number : (deletingContract?.student_name || deletingContract?.title) }}</strong> shartnomasini bazadan <strong>butunlay (permanently)</strong> o'chirib yubormoqchimisiz?
+            </span>
+            <span v-else>
+              Rostdan ham <strong>{{ deletingContract?.title }}</strong> shartnomasini o'chirmoqchimisiz?
+            </span>
+            <p v-if="deletingContract?.status === 'rejected'" class="text-[11px] text-rose-600/90 dark:text-rose-400/90 font-medium">
+              Eslatma: Ushbu amalni ortga qaytarib bo'lmaydi!
+            </p>
+          </div>
         </div>
         <div class="flex items-center justify-end gap-3 pt-2">
-          <button type="button" @click="deletingContract = null" class="px-4 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer">Cancel</button>
+          <button type="button" @click="deletingContract = null" class="px-4 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer">
+            Bekor qilish
+          </button>
           <button type="button" @click="confirmDelete" :disabled="isDeleting" class="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-all shadow-xs cursor-pointer disabled:opacity-50">
-            {{ isDeleting ? "Deleting..." : "Delete" }}
+            {{ isDeleting ? "O'chirilmoqda..." : (deletingContract?.status === 'rejected' ? "Butunlay o'chirish" : "O'chirish") }}
           </button>
         </div>
       </div>

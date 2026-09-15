@@ -2130,6 +2130,15 @@ class ContractViewSet(viewsets.ModelViewSet):
             version=1
         )
 
+    def update(self, request, *args, **kwargs):
+        contract = self.get_object()
+        if contract.status in ['verified', 'pending']:
+            return Response(
+                {'detail': 'Tasdiqlangan (Verified) yoki Kutilayotgan (Pending) holatidagi shartnomalarni o\'zgartirib bo\'lmaydi.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        return super().update(request, *args, **kwargs)
+
     def perform_update(self, serializer):
         req: Any = self.request
         user = req.user
@@ -2140,12 +2149,32 @@ class ContractViewSet(viewsets.ModelViewSet):
         )
 
     def destroy(self, request, *args, **kwargs):
-        """Soft-delete contract with audit."""
+        """
+        Delete contract handler:
+        - 'verified' and 'pending' contracts CANNOT be deleted.
+        - 'rejected' contracts (or when ?permanent=true) are permanently deleted from the database.
+        - 'draft' contracts are soft-deleted by default.
+        """
         contract = self.get_object()
+        if contract.status in ['verified', 'pending']:
+            return Response(
+                {'detail': 'Tasdiqlangan (Verified) yoki Kutilayotgan (Pending) holatidagi shartnomalarni o\'chirib bo\'lmaydi.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        is_permanent = contract.status == 'rejected' or str(request.query_params.get('permanent', '')).lower() == 'true'
+        if is_permanent:
+            contract_num = contract.contract_number or str(contract.id)
+            contract.delete()
+            return Response(
+                {'detail': f"Shartnoma ({contract_num}) bazadan butunlay o'chirildi.", 'permanent': True},
+                status=status.HTTP_200_OK
+            )
+
         contract.is_deleted = True
         contract.updated_by = request.user if request.user.is_authenticated else None
         contract.save(update_fields=['is_deleted', 'updated_by', 'updated_at'])
-        return Response({'detail': 'Shartnoma muvaffaqiyatli o\'chirildi'}, status=status.HTTP_200_OK)
+        return Response({'detail': 'Shartnoma muvaffaqiyatli arxivlandi'}, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=['post'])
     def duplicate(self, request, pk=None):

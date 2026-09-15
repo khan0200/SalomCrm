@@ -38,6 +38,7 @@ export interface Contract {
   verified_at?: string | null
   rejection_reason?: string | null
   rejected_at?: string | null
+  rejected_by_name?: string | null
   signed_at?: string | null
   created_at: string
   updated_at: string
@@ -91,8 +92,11 @@ export const contractsApi = {
     return data
   },
 
-  async deleteContract(id: string): Promise<void> {
-    await apiClient.delete(`/contracts/${id}/`)
+  async deleteContract(id: string, permanent?: boolean): Promise<{ detail?: string; permanent?: boolean }> {
+    const { data } = await apiClient.delete(`/contracts/${id}/`, {
+      params: permanent ? { permanent: true } : undefined
+    })
+    return data
   },
 
   async duplicateContract(id: string): Promise<Contract> {

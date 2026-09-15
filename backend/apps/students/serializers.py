@@ -356,6 +356,7 @@ class ContractListSerializer(serializers.ModelSerializer):
     student_name = serializers.SerializerMethodField()
     student_passport = serializers.SerializerMethodField()
     created_by_name = serializers.SerializerMethodField()
+    rejected_by_name = serializers.SerializerMethodField()
     email = serializers.SerializerMethodField()
 
     class Meta:
@@ -369,6 +370,7 @@ class ContractListSerializer(serializers.ModelSerializer):
             'education_level', 'date_of_birth', 'full_name', 'passport_number',
             'student_id_assigned', 'verification_code', 'verification_code_expires_at',
             'verification_code_used', 'verified_at', 'rejection_reason',
+            'rejected_at', 'rejected_by_name',
             'created_at', 'updated_at', 'signed_at', 'created_by_name'
         )
         read_only_fields = ('id', 'version', 'created_at', 'updated_at')
@@ -385,6 +387,11 @@ class ContractListSerializer(serializers.ModelSerializer):
     def get_created_by_name(self, obj):
         if obj.created_by:
             return getattr(obj.created_by, 'full_name', None) or getattr(obj.created_by, 'email', None) or str(obj.created_by)
+        return None
+
+    def get_rejected_by_name(self, obj):
+        if obj.rejected_by:
+            return getattr(obj.rejected_by, 'full_name', None) or getattr(obj.rejected_by, 'email', None) or str(obj.rejected_by)
         return None
 
     def get_email(self, obj):
@@ -406,6 +413,7 @@ class ContractDetailSerializer(serializers.ModelSerializer):
     student_university = serializers.CharField(source='student.university_1', read_only=True)
     created_by_name = serializers.SerializerMethodField()
     updated_by_name = serializers.SerializerMethodField()
+    rejected_by_name = serializers.SerializerMethodField()
     email = serializers.SerializerMethodField()
 
     class Meta:
@@ -421,7 +429,7 @@ class ContractDetailSerializer(serializers.ModelSerializer):
             'contract_hash', 'student_id_assigned', 'verification_code',
             'verification_code_expires_at', 'verification_code_generated_at',
             'verification_code_used', 'verified_at', 'rejection_reason',
-            'rejected_at', 'sign_token', 'signed_at', 'signer_ip', 'signer_user_agent',
+            'rejected_at', 'rejected_by_name', 'sign_token', 'signed_at', 'signer_ip', 'signer_user_agent',
             'created_at', 'updated_at', 'created_by_name', 'updated_by_name'
         )
         read_only_fields = ('id', 'version', 'created_at', 'updated_at')
@@ -449,6 +457,11 @@ class ContractDetailSerializer(serializers.ModelSerializer):
     def get_updated_by_name(self, obj):
         if obj.updated_by:
             return getattr(obj.updated_by, 'full_name', None) or getattr(obj.updated_by, 'email', None) or str(obj.updated_by)
+        return None
+
+    def get_rejected_by_name(self, obj):
+        if obj.rejected_by:
+            return getattr(obj.rejected_by, 'full_name', None) or getattr(obj.rejected_by, 'email', None) or str(obj.rejected_by)
         return None
 
     def get_email(self, obj):
