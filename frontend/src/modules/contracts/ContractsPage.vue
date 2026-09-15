@@ -395,6 +395,20 @@ const previewContract = ref<Contract | null>(null)
 const deletingContract = ref<Contract | null>(null)
 const isDeleting = ref(false)
 
+async function openContractPreview(contract: Contract) {
+  previewContract.value = contract
+  if (!contract.content) {
+    try {
+      const full = await contractsApi.getContract(contract.id)
+      if (full) {
+        previewContract.value = full
+      }
+    } catch (err) {
+      console.error('Failed to load contract detail for preview:', err)
+    }
+  }
+}
+
 // ── 1. Fetch Contracts List ──────────────────────────────────────────────────
 const {
   data: contractsData,
@@ -1249,7 +1263,7 @@ async function confirmDelete() {
                       v-for="contract in contracts"
                       :key="contract.id"
                       class="hover:bg-zinc-50/70 dark:hover:bg-zinc-850/40 transition-colors group cursor-pointer"
-                      @click="previewContract = contract"
+                      @click="openContractPreview(contract)"
                     >
                       <!-- Column 1: Contract Number / ID -->
                       <td class="py-3 px-4 align-middle">

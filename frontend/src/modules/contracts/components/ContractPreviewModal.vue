@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import {
   Edit3,
   X,
@@ -15,7 +15,7 @@ import {
   Check
 } from 'lucide-vue-next'
 import BaseModal from '@/components/common/BaseModal.vue'
-import type { Contract } from '@/api/contracts'
+import { contractsApi, type Contract } from '@/api/contracts'
 import { downloadContractAsPdf } from '@/modules/contracts/utils/contractPdf'
 import {
   isCanvasDocumentJson,
@@ -39,6 +39,39 @@ const emit = defineEmits<{
   delete: [contract: Contract]
 }>()
 
+const detailedContract = ref<Contract | null>(null)
+const isLoadingDetail = ref(false)
+
+watch(
+  () => [props.isOpen, props.contract?.id],
+  async ([isOpen, contractId]) => {
+    if (!isOpen || !contractId) {
+      detailedContract.value = null
+      return
+    }
+    const current = props.contract
+    if (current && current.content) {
+      detailedContract.value = current
+      return
+    }
+    isLoadingDetail.value = true
+    try {
+      const full = await contractsApi.getContract(String(contractId))
+      detailedContract.value = full
+    } catch (err) {
+      console.error('Failed to load contract detail for preview:', err)
+      detailedContract.value = current
+    } finally {
+      isLoadingDetail.value = false
+    }
+  },
+  { immediate: true }
+)
+
+const activeContract = computed<Contract | null>(() => {
+  return detailedContract.value || props.contract
+})
+
 const copyFeedback = ref(false)
 async function copyCodeToClipboard(code: string) {
   try {
@@ -55,24 +88,27 @@ async function copyCodeToClipboard(code: string) {
 const isDownloadingPdf = ref(false)
 const showDownloadMenu = ref(false)
 
-const isCanvas = computed(() => isCanvasDocumentJson(props.contract?.content || ''))
+const isCanvas = computed(() => isCanvasDocumentJson(activeContract.value?.content || ''))
 
 const contractVariables = computed<Record<string, string>>(() => {
-  if (!props.contract) return {}
-  return buildVariableValues(props.contract, {
-    contractNumber: props.contract.student_id_assigned || props.contract.contract_number,
-    templateName: props.contract.tariff_name || props.contract.title,
-    price: props.contract.tariff_price ?? undefined,
-    discount: props.contract.discount ?? undefined,
-    signatureData: props.contract.signature_data || undefined,
-    verificationCode: props.contract.verification_code || undefined,
-    office: props.contract.office || props.contract.tenant_office_name || undefined,
-    educationLevel: props.contract.education_level || undefined,
+  const c = activeContract.value
+  if (!c) return {}
+  return buildVariableValues(c, {
+    contractNumber: c.student_id_assigned || c.contract_number,
+    templateName: c.tariff_name || c.title,
+    price: c.tariff_price ?? undefined,
+    discount: c.discount ?? undefined,
+    signatureData: c.signature_data || undefined,
+    verificationCode: c.verification_code || undefined,
+    office: c.office || c.tenant_office_name || undefined,
+    educationLevel: c.education_level || undefined,
+    email: c.email || undefined,
   })
 })
 
 const splitPages = computed<string[]>(() => {
-  const raw = props.contract?.content
+  const c = activeContract.value
+  const raw = c?.content
   if (!raw) return []
 
   if (isCanvasDocumentJson(raw)) {
@@ -98,9 +134,10 @@ const splitPages = computed<string[]>(() => {
 })
 
 async function handleDownload(format: 'pdf' | 'doc' = 'pdf') {
-  if (!props.contract || isDownloadingPdf.value) return
-  const safeTitle = `${props.contract.contract_number}_${props.contract.student_name || props.contract.full_name || props.contract.title}`.replace(/[/\\?%*:|"<>]/g, '_')
-  const rawContent = props.contract.content || ''
+  const c = activeContract.value
+  if (!c || isDownloadingPdf.value) return
+  const safeTitle = `${c.contract_number}_${c.student_name || c.full_name || c.title}`.replace(/[/\\?%*:|"<>]/g, '_')
+  const rawContent = c.content || ''
 
   if (format === 'doc') {
     downloadWordDoc(safeTitle, rawContent)
@@ -110,18 +147,18 @@ async function handleDownload(format: 'pdf' | 'doc' = 'pdf') {
   isDownloadingPdf.value = true
   try {
     const verificationMeta = {
-      contractNumber: props.contract.contract_number || props.contract.student_id_assigned || undefined,
-      studentId: props.contract.student_id_assigned || undefined,
-      studentName: props.contract.full_name || props.contract.student_name || undefined,
-      verifiedAt: props.contract.verified_at ? new Date(props.contract.verified_at).toLocaleDateString('uz-UZ') : undefined,
-      status: props.contract.status,
+      contractNumber: c.contract_number || c.student_id_assigned || undefined,
+      studentId: c.student_id_assigned || undefined,
+      studentName: c.full_name || c.student_name || undefined,
+      verifiedAt: c.verified_at ? new Date(c.verified_at).toLocaleDateString('uz-UZ') : undefined,
+      status: c.status,
     }
     await downloadContractAsPdf(
       safeTitle,
       rawContent,
       { top: 20, right: 15, bottom: 20, left: 25 },
       contractVariables.value,
-      props.contract.signature_data || undefined,
+      c.signature_data || undefined,
       verificationMeta
     )
   } catch (err) {
@@ -186,7 +223,7 @@ ${htmlBody}
   <BaseModal
     :is-open="isOpen"
     title="Contract Preview"
-    :subtitle="contract ? `${contract.contract_number} — ${contract.title}` : ''"
+    :subtitle="activeContract ? `${activeContract.contract_number} — ${activeContract.title}` : ''"
     max-width="max-w-4xl"
     @close="emit('close')"
   >
@@ -195,41 +232,41 @@ ${htmlBody}
       <!-- Left: Status & Metadata -->
       <div class="flex items-center gap-2.5 flex-wrap">
         <span
-          v-if="contract?.status"
+          v-if="activeContract?.status"
           class="px-2.5 py-0.5 rounded-full text-[11px] font-medium border uppercase tracking-wider"
           :class="[
-            contract.status === 'completed'
+            activeContract.status === 'completed'
               ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20'
-              : contract.status === 'verified'
+              : activeContract.status === 'verified'
               ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20'
-              : contract.status === 'signed'
+              : activeContract.status === 'signed'
               ? 'bg-sky-500/10 text-sky-700 dark:text-sky-400 border-sky-500/20'
-              : contract.status === 'pending'
+              : activeContract.status === 'pending'
               ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20'
-              : contract.status === 'rejected'
+              : activeContract.status === 'rejected'
               ? 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/20'
               : 'bg-zinc-500/10 text-zinc-600 dark:text-zinc-400 border-zinc-500/20'
           ]"
         >
-          {{ contract.status }}
+          {{ activeContract.status }}
         </span>
 
-        <span v-if="contract?.student_id_assigned" class="text-xs font-mono text-zinc-500 dark:text-zinc-400">
-          ID: <strong class="text-zinc-800 dark:text-zinc-200">{{ contract.student_id_assigned }}</strong>
+        <span v-if="activeContract?.student_id_assigned" class="text-xs font-mono text-zinc-500 dark:text-zinc-400">
+          ID: <strong class="text-zinc-800 dark:text-zinc-200">{{ activeContract.student_id_assigned }}</strong>
         </span>
 
         <span class="text-xs text-zinc-400">
-          v{{ contract?.version || 1 }}
+          v{{ activeContract?.version || 1 }}
         </span>
       </div>
 
       <!-- Right: Actions Toolbar -->
-      <div class="flex items-center gap-2 flex-wrap" v-if="contract">
+      <div class="flex items-center gap-2 flex-wrap" v-if="activeContract">
         <!-- Bekor qilish (Reject) -->
         <button
-          v-if="contract.status === 'pending'"
+          v-if="activeContract.status === 'pending'"
           type="button"
-          @click="emit('reject', contract)"
+          @click="emit('reject', activeContract)"
           class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-rose-200 dark:border-rose-900/60 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-xs font-medium transition-colors cursor-pointer"
           title="Arizani bekor qilish"
         >
@@ -241,7 +278,7 @@ ${htmlBody}
         <button
           type="button"
           @click="handleDownload('pdf')"
-          :disabled="isDownloadingPdf"
+          :disabled="isDownloadingPdf || isLoadingDetail"
           class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-xs font-medium text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-750 transition-colors shadow-2xs cursor-pointer"
           title="PDF yuklab olish"
         >
@@ -254,23 +291,27 @@ ${htmlBody}
 
     <!-- Scrollable Multi-Page A4 Document Sheet View -->
     <div class="p-4 sm:p-8 bg-zinc-100 dark:bg-zinc-950 max-h-[78vh] overflow-y-auto flex flex-col items-center gap-8">
-      <template v-if="splitPages.length > 0">
+      <div v-if="isLoadingDetail" class="py-16 flex flex-col items-center justify-center text-zinc-400 gap-2">
+        <Loader2 class="w-7 h-7 animate-spin text-blue-600 mb-2" />
+        <span class="text-xs font-mono">Shartnoma ma'lumotlari yuklanmoqda...</span>
+      </div>
+      <template v-else-if="splitPages.length > 0">
         <div
           v-for="(pageHtml, pageIndex) in splitPages"
           :key="pageIndex"
-          class="preview-a4-sheet relative w-full max-w-[794px] bg-white text-zinc-900 shadow-xl border border-zinc-200/90 font-serif rounded-xs"
-          :class="isCanvas ? 'p-0 min-h-[1123px] overflow-hidden' : 'p-8 sm:p-14 min-h-[1050px]'"
+          class="preview-a4-sheet relative bg-white text-zinc-900 shadow-xl border border-zinc-200/90 font-serif rounded-xs"
+          :class="isCanvas ? 'p-0 overflow-hidden w-[210mm] min-h-[297mm] shrink-0' : 'p-8 sm:p-14 min-h-[1050px] w-full max-w-[794px]'"
           style="font-family: 'Times New Roman', Times, serif;"
         >
-          <!-- Top Page badge -->
-          <div class="absolute top-4 right-6 text-[10.5px] uppercase font-bold tracking-widest text-zinc-400 select-none no-print">
+          <!-- Top Page badge (non-canvas only) -->
+          <div v-if="!isCanvas" class="absolute top-4 right-6 text-[10.5px] uppercase font-bold tracking-widest text-zinc-400 select-none no-print">
             Page {{ pageIndex + 1 }} / {{ splitPages.length }}
           </div>
 
           <div v-html="pageHtml" />
 
-          <!-- Bottom page footer -->
-          <div class="absolute bottom-5 inset-x-0 text-center text-[11px] text-zinc-400 select-none font-serif tracking-widest no-print">
+          <!-- Bottom page footer (non-canvas only) -->
+          <div v-if="!isCanvas" class="absolute bottom-5 inset-x-0 text-center text-[11px] text-zinc-400 select-none font-serif tracking-widest no-print">
             — {{ pageIndex + 1 }} —
           </div>
         </div>

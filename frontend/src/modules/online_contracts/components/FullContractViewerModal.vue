@@ -20,19 +20,21 @@ const emit = defineEmits<{
   confirmRead: []
 }>()
 
-const zoom = ref(1)
+const zoom = ref(0.85)
 
 function zoomIn() {
-  if (zoom.value < 1.6) zoom.value += 0.1
+  if (zoom.value < 1.6) zoom.value = Math.round((zoom.value + 0.1) * 100) / 100
 }
 
 function zoomOut() {
-  if (zoom.value > 0.6) zoom.value -= 0.1
+  if (zoom.value > 0.4) zoom.value = Math.round((zoom.value - 0.1) * 100) / 100
 }
 
 function resetZoom() {
-  zoom.value = 1
+  zoom.value = 0.85
 }
+
+const isCanvas = computed(() => isCanvasDocumentJson(props.content || ''))
 
 const renderedPages = computed<string[]>(() => {
   const raw = props.content || ''
@@ -140,26 +142,37 @@ function handleConfirm() {
         <div
           v-for="(pageHtml, idx) in renderedPages"
           :key="idx"
-          class="relative bg-white text-zinc-900 shadow-xl rounded-xs transition-transform origin-top"
+          class="flex justify-center shrink-0"
           :style="{
-            width: '210mm',
-            minHeight: '297mm',
-            padding: '20mm 20mm',
-            transform: `scale(${zoom})`,
-            marginBottom: zoom > 1 ? `${(zoom - 1) * 320}px` : '0px',
-            fontFamily: 'Times New Roman, serif',
-            fontSize: '13px',
-            lineHeight: '1.6',
-            boxSizing: 'border-box'
+            width: `calc(210mm * ${zoom})`,
+            height: isCanvas ? `calc(297mm * ${zoom})` : 'auto',
+            minHeight: `calc(297mm * ${zoom})`,
           }"
         >
-          <!-- Page Number Indicator -->
-          <div class="absolute right-4 bottom-3 text-[11px] text-zinc-400">
-            Sahifa {{ idx + 1 }} / {{ renderedPages.length }}
-          </div>
+          <div
+            class="relative bg-white text-zinc-900 shadow-2xl rounded-xs origin-top-left"
+            :style="{
+              width: '210mm',
+              height: isCanvas ? '297mm' : 'auto',
+              minHeight: '297mm',
+              padding: isCanvas ? '0' : '20mm 20mm',
+              transform: `scale(${zoom})`,
+              transformOrigin: '0 0',
+              fontFamily: 'Times New Roman, serif',
+              fontSize: '13px',
+              lineHeight: '1.6',
+              boxSizing: 'border-box',
+              overflow: isCanvas ? 'hidden' : 'visible'
+            }"
+          >
+            <!-- Page Number Indicator (only for non-canvas) -->
+            <div v-if="!isCanvas" class="absolute right-4 bottom-3 text-[11px] text-zinc-400 select-none">
+              Sahifa {{ idx + 1 }} / {{ renderedPages.length }}
+            </div>
 
-          <!-- Page HTML Content -->
-          <div v-html="pageHtml" class="contract-page-content text-justify" />
+            <!-- Page HTML Content -->
+            <div v-html="pageHtml" class="contract-page-content" :class="{ 'text-justify': !isCanvas }" />
+          </div>
         </div>
       </div>
 
