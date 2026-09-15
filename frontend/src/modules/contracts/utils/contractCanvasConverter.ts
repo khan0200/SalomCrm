@@ -380,6 +380,37 @@ export function convertCanvasDocumentToHtml(
 
     let elementsHtml = ''
 
+    // Collect all variables used explicitly on this page
+    const pageVars = new Set<string>()
+    page.elements.forEach(el => {
+      if (el.hidden) return
+      const anyEl = el as any
+      if (anyEl.variableKey) {
+        pageVars.add(String(anyEl.variableKey).replace(/^\{\{|\}\}$/g, '').trim().toLowerCase())
+      }
+      if (typeof anyEl.content === 'string') {
+        const matches = anyEl.content.match(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g)
+        if (matches) {
+          matches.forEach((m: string) => {
+            pageVars.add(m.replace(/[\{\}\s]/g, '').toLowerCase())
+          })
+        }
+      }
+      if (el.type === 'table') {
+        const tbl = el as TableCanvasElement
+        tbl.cells?.forEach(row => {
+          row?.forEach(cell => {
+            if (cell.content) {
+              const cMatches = cell.content.match(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g)
+              if (cMatches) {
+                cMatches.forEach((m: string) => pageVars.add(m.replace(/[\{\}\s]/g, '').toLowerCase()))
+              }
+            }
+          })
+        })
+      }
+    })
+
     // Sort elements by zIndex
     const sorted = [...page.elements].sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0))
 
@@ -401,7 +432,10 @@ export function convertCanvasDocumentToHtml(
         table.cells.forEach(row => {
           let colsHtml = ''
           row.forEach(cell => {
-            let cellContent = replaceVariablesInHtml(cell.content || '', variableValues || {})
+            let cellContent = replaceVariablesInHtml(cell.content || '', variableValues || {}, {
+              skipHeuristics: pageVars.size > 0,
+              excludedVariables: pageVars,
+            })
             const bg = cell.backgroundColor ? `background-color: ${cell.backgroundColor};` : ''
             const align = cell.textAlign ? `text-align: ${cell.textAlign};` : ''
             const vAlign = cell.verticalAlign ? `vertical-align: ${cell.verticalAlign};` : ''
@@ -433,15 +467,24 @@ export function convertCanvasDocumentToHtml(
       } else {
         // Text / Heading / Paragraph
         const textEl = el as TextCanvasElement
-        let content = replaceVariablesInHtml(textEl.content || '', variableValues || {})
+        let content = replaceVariablesInHtml(textEl.content || '', variableValues || {}, {
+          skipHeuristics: pageVars.size > 0,
+          excludedVariables: pageVars,
+        })
         const st = textEl.style || {}
+        let textColor = st.color || '#111827'
+        if (variableValues && Object.keys(variableValues).length > 0) {
+          if (textColor === '#2563eb' || textColor === '#1d4ed8' || textColor === 'rgb(37, 99, 235)' || textColor === 'rgb(29, 78, 216)') {
+            textColor = '#000000'
+          }
+        }
         const fontStyle = `
           font-family: ${st.fontFamily || 'Times New Roman'}, Times, serif;
           font-size: ${st.fontSize || 12}pt;
           font-weight: ${st.fontWeight || 'normal'};
           font-style: ${st.fontStyle || 'normal'};
           text-decoration: ${st.textDecoration || 'none'};
-          color: ${st.color || '#111827'};
+          color: ${textColor};
           background-color: ${st.backgroundColor || 'transparent'};
           text-align: ${st.textAlign || 'left'};
           line-height: ${st.lineHeight || 1.5};

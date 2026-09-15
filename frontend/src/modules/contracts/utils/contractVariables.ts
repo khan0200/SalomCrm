@@ -584,16 +584,25 @@ export function getVariablePlaceholder(key: string): string {
   return VARIABLE_FALLBACK_PLACEHOLDERS[lower] || '_________________________'
 }
 
+export interface ReplaceVariablesOptions {
+  skipHeuristics?: boolean
+  excludedVariables?: Set<string> | string[]
+}
+
 /**
  * Universal Contract Variable Replacer
  * Replaces:
  * - {{var}} tokens (case-insensitive, optional whitespace)
  * - [[var]] and %var% tokens
- * - Blue canvas variable preview spans: <span class="...bg-blue-50...">{{var}}</span> or color: #2563eb
+ * - Blue canvas variable preview spans: <span class="...bg-blue-50...">{{var}}</span> or color: #2563eb / #1d4ed8
  * - Standard MIJOZ requisites table (F.I.O, PASSPORT RAQAMI, TUG'ILGAN SANA, EMAIL, TEL, TA'LIM BOSQICHI, TASDIQLASH KODI (IMZO))
  * - Plain text "TASDIQLASH KODI (IMZO): ______"
  */
-export function replaceVariablesInHtml(html: string, values: Record<string, string>): string {
+export function replaceVariablesInHtml(
+  html: string,
+  values: Record<string, string>,
+  options?: ReplaceVariablesOptions
+): string {
   if (!html) return ''
   let result = html
 
@@ -612,13 +621,13 @@ export function replaceVariablesInHtml(html: string, values: Record<string, stri
     return getVariablePlaceholder(lower)
   }
 
-  // 2. Replace any variable wrapper spans from canvas editor (both bg-blue-50 and color: #2563eb)
+  // 2. Replace any variable wrapper spans from canvas editor (bg-blue-50, #2563eb, #1d4ed8)
   result = result.replace(
-    /<span[^>]*style="[^"]*color:\s*(?:#2563eb|rgb\(37,\s*99,\s*235\))[^"]*"[^>]*>\s*(?:\{\{)?\s*([a-zA-Z0-9_]+)\s*(?:\}\})?\s*<\/span>/gi,
+    /<span[^>]*style="[^"]*color:\s*(?:#2563eb|#1d4ed8|rgb\(37,\s*99,\s*235\)|rgb\(29,\s*78,\s*216\))[^"]*"[^>]*>\s*(?:\{\{)?\s*([a-zA-Z0-9_]+)\s*(?:\}\})?\s*<\/span>/gi,
     (_, key) => resolveTokenValue(key)
   )
   result = result.replace(
-    /<p[^>]*style="[^"]*color:\s*(?:#2563eb|rgb\(37,\s*99,\s*235\))[^"]*"[^>]*>\s*(?:\{\{)?\s*([a-zA-Z0-9_]+)\s*(?:\}\})?\s*<\/p>/gi,
+    /<p[^>]*style="[^"]*color:\s*(?:#2563eb|#1d4ed8|rgb\(37,\s*99,\s*235\)|rgb\(29,\s*78,\s*216\))[^"]*"[^>]*>\s*(?:\{\{)?\s*([a-zA-Z0-9_]+)\s*(?:\}\})?\s*<\/p>/gi,
     (_, key) => `<p>${resolveTokenValue(key)}</p>`
   )
   result = result.replace(
@@ -650,6 +659,23 @@ export function replaceVariablesInHtml(html: string, values: Record<string, stri
   }
 
   // 4. Intelligent substitution for MIJOZ requisites block & standard contract lines
+  // Skip heuristics if:
+  // - options.skipHeuristics is explicitly true, OR
+  // - the input snippet itself contains dynamic variable tokens ({{...}}, [[...]], %...%)
+  const hasVariableTokens = /\{\{\s*[a-zA-Z0-9_]+\s*\}\}|\[\[\s*[a-zA-Z0-9_]+\s*\]\]|%\s*[a-zA-Z0-9_]+\s*%/i.test(html)
+  const shouldSkipHeuristics = Boolean(options?.skipHeuristics) || hasVariableTokens
+
+  const excluded = new Set<string>()
+  if (options?.excludedVariables) {
+    for (const item of options.excludedVariables) {
+      if (item) excluded.add(item.toLowerCase().trim())
+    }
+  }
+
+  const isExcluded = (...keys: string[]): boolean => {
+    return shouldSkipHeuristics || keys.some(k => excluded.has(k.toLowerCase()))
+  }
+
   const studentName = cleanMap['fullname'] || cleanMap['full_name'] || cleanMap['student_name']
   const passportNum = cleanMap['passportnumber'] || cleanMap['passport_number'] || cleanMap['passport']
   const dob = cleanMap['dateofbirth'] || cleanMap['date_of_birth'] || cleanMap['birthday']
@@ -662,7 +688,7 @@ export function replaceVariablesInHtml(html: string, values: Record<string, stri
   const studentId = cleanMap['studentid'] || cleanMap['student_id'] || cleanMap['contract_number'] || cleanMap['contract_no'] || cleanMap['talaba_id']
   const dateVal = cleanMap['date'] || cleanMap['contract_date'] || cleanMap['signed_date'] || cleanMap['sana'] || cleanMap['imzolangan_sana']
 
-  if (studentName) {
+  if (studentName && !isExcluded('fullname', 'full_name', 'student_name', 'fio', 'client_name')) {
     // Header FUQARO line
     result = result.replace(
       /FUQARO:&nbsp;/gi,
@@ -696,7 +722,7 @@ export function replaceVariablesInHtml(html: string, values: Record<string, stri
     )
   }
 
-  if (passportNum) {
+  if (passportNum && !isExcluded('passportnumber', 'passport_number', 'passport')) {
     result = result.replace(
       /(<span[^>]*>\s*PASSPORT(?:\s+RAQAMI)?:\s*<\/span>\s*<span[^>]*>)(?:&nbsp;|\s*)(<\/span>)/gi,
       `$1<u>&nbsp;<strong>${passportNum}</strong>&nbsp;</u>$2`
@@ -711,7 +737,7 @@ export function replaceVariablesInHtml(html: string, values: Record<string, stri
     )
   }
 
-  if (dob) {
+  if (dob && !isExcluded('dateofbirth', 'date_of_birth', 'birthday', 'birth_date')) {
     result = result.replace(
       /(<span[^>]*>\s*TUG[‘'']ILGAN\s+SANA:\s*<\/span>\s*<span[^>]*>)(?:&nbsp;|\s*)(<\/span>)/gi,
       `$1<u>&nbsp;<strong>${dob}</strong>&nbsp;</u>$2`
@@ -722,7 +748,7 @@ export function replaceVariablesInHtml(html: string, values: Record<string, stri
     )
   }
 
-  if (email) {
+  if (email && !isExcluded('email')) {
     result = result.replace(
       /(<span[^>]*>\s*EMAIL:\s*<\/span>\s*<span[^>]*>)(?:&nbsp;|\s*)(<\/span>)/gi,
       `$1<u>&nbsp;${email}&nbsp;</u>$2`
@@ -733,7 +759,7 @@ export function replaceVariablesInHtml(html: string, values: Record<string, stri
     )
   }
 
-  if (phone1) {
+  if (phone1 && !isExcluded('phone1', 'phone_1', 'phone')) {
     result = result.replace(
       /(<span[^>]*>\s*TEL:\s*<\/span>\s*<span[^>]*>)(?:&nbsp;|\s*)(<\/span>)/i,
       `$1<u>&nbsp;${phone1}&nbsp;</u>$2`
@@ -744,7 +770,7 @@ export function replaceVariablesInHtml(html: string, values: Record<string, stri
     )
   }
 
-  if (phone2) {
+  if (phone2 && !isExcluded('phone2', 'phone_2')) {
     result = result.replace(
       /(<span[^>]*>\s*TEL:\s*<\/span>\s*<span[^>]*>)(?:&nbsp;|\s*)(<\/span>)/i,
       `$1<u>&nbsp;${phone2}&nbsp;</u>$2`
@@ -755,7 +781,7 @@ export function replaceVariablesInHtml(html: string, values: Record<string, stri
     )
   }
 
-  if (level) {
+  if (level && !isExcluded('leveltostudy', 'level_to_study', 'education_level', 'level')) {
     result = result.replace(
       /(<span[^>]*>\s*TA['’]LIM\s+BOSQICHI:\s*<\/span>\s*<span[^>]*>)(?:&nbsp;|\s*)(<\/span>)/gi,
       `$1<u>&nbsp;<strong>${level}</strong>&nbsp;</u>$2`
@@ -766,7 +792,7 @@ export function replaceVariablesInHtml(html: string, values: Record<string, stri
     )
   }
 
-  if (studentId) {
+  if (studentId && !isExcluded('studentid', 'student_id', 'contract_number', 'contract_no', 'talaba_id', 'shartnoma_raqami')) {
     result = result.replace(
       /SHARTNOMA\s+(?:N|№):\s*<span[^>]*>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<\/span>/gi,
       `SHARTNOMA N: <u>&nbsp;<strong>${studentId}</strong>&nbsp;</u>`
@@ -774,7 +800,7 @@ export function replaceVariablesInHtml(html: string, values: Record<string, stri
     result = result.replace(/SHARTNOMA\s+(?:N|№):\s*_{1,}/gi, `SHARTNOMA N: <strong>${studentId}</strong>`)
   }
 
-  if (dateVal) {
+  if (dateVal && !isExcluded('date', 'contract_date', 'signed_date', 'sana', 'imzolangan_sana')) {
     result = result.replace(
       /SANA:\s*(?:&ldquo;|“|"|«)\s*_{1,}\s*(?:&rdquo;|”|"|»)\s*_{1,}\s*20\d\d\s*(?:YIL|yil)?/gi,
       `SANA: <strong>${dateVal}</strong>`
@@ -794,7 +820,7 @@ export function replaceVariablesInHtml(html: string, values: Record<string, stri
   }
 
   // 5. Signature & Verification Code in TASDIQLASH KODI (IMZO):
-  if (signature || verifCode) {
+  if (!isExcluded('signature', 'imzo', 'student_signature', 'signature_data', 'verification_code', 'tasdiqlash_kodi') && (signature || verifCode)) {
     let sigSnippet = ''
     if (signature && signature.startsWith('data:image/')) {
       sigSnippet += `<img src="${signature}" style="max-height: 38px; max-width: 140px; object-fit: contain; vertical-align: middle; display: inline-block; margin-right: 8px;" alt="Imzo" />`

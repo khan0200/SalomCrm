@@ -38,6 +38,13 @@ const elementStyle = computed(() => {
     ? `"${st.fontFamily}", 'Times New Roman', Times, Georgia, serif`
     : "'Times New Roman', Times, Georgia, serif"
 
+  let fontColor = st.color || '#000000'
+  if (!props.isEditing && (props.readonly || (props.variableValues && Object.keys(props.variableValues).length > 0))) {
+    if (fontColor === '#2563eb' || fontColor === '#1d4ed8' || fontColor === 'rgb(37, 99, 235)' || fontColor === 'rgb(29, 78, 216)') {
+      fontColor = '#000000'
+    }
+  }
+
   return {
     '--canvas-element-font': resolvedFont,
     fontFamily: resolvedFont,
@@ -45,7 +52,7 @@ const elementStyle = computed(() => {
     fontWeight: st.fontWeight || (props.element.type === 'heading' ? 'bold' : 'normal'),
     fontStyle: st.fontStyle || 'normal',
     textDecoration: st.textDecoration || 'none',
-    color: st.color || '#000000',
+    color: fontColor,
     backgroundColor: st.backgroundColor || 'transparent',
     textAlign: st.textAlign || (props.element.type === 'heading' ? 'center' : 'left'),
     lineHeight: st.lineHeight || 1.5,
@@ -61,7 +68,7 @@ const elementStyle = computed(() => {
 const displayContent = computed(() => {
   let text = props.element.content || ''
   if (!props.isEditing && (props.readonly || (props.variableValues && Object.keys(props.variableValues).length > 0))) {
-    text = replaceVariablesInHtml(text, props.variableValues || {})
+    text = replaceVariablesInHtml(text, props.variableValues || {}, { skipHeuristics: true })
   }
   if (!props.isEditing) {
     text = scaleInlineStyles(text, props.zoomLevel)

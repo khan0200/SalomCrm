@@ -210,7 +210,7 @@ function deleteRowAt(rowIdx: number) {
 function renderCellContent(content: string): string {
   let text = content || ''
   if (props.readonly || (props.variableValues && Object.keys(props.variableValues).length > 0)) {
-    text = replaceVariablesInHtml(text, props.variableValues || {})
+    text = replaceVariablesInHtml(text, props.variableValues || {}, { skipHeuristics: true })
   }
   if (props.zoomLevel !== 100) {
     text = scaleInlineStyles(text, props.zoomLevel)
