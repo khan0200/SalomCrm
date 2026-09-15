@@ -33,6 +33,8 @@ const props = withDefaults(
     readonly?: boolean
     variableValues?: Record<string, string>
     isActivePage?: boolean
+    isCopyStyleActive?: boolean
+    copyStyleMode?: 'single' | 'persistent' | null
     calculateSnapping?: (
       x: number,
       y: number,
@@ -43,6 +45,8 @@ const props = withDefaults(
   }>(),
   {
     readonly: false,
+    isCopyStyleActive: false,
+    copyStyleMode: null,
   }
 )
 
@@ -65,6 +69,7 @@ const emit = defineEmits<{
   'resize-end': []
   'duplicate-page': [pageIndex: number]
   'delete-page': [pageIndex: number]
+  'copy-style': [e: MouseEvent]
 }>()
 
 const MM_TO_PX_BASE = 3.779527559
@@ -422,8 +427,11 @@ function confirmDeletePage() {
             :is-selected="!readonly && selectedElementIds.includes(el.id)"
             :is-editing="!readonly && editingElementId === el.id"
             :zoom-level="zoomLevel"
+            :is-copy-style-active="isCopyStyleActive"
+            :copy-style-mode="copyStyleMode"
             :calculate-snapping="calculateSnapping"
             @select="emit('set-active-page', pageIndex); emit('select-element', el.id, $event.shiftKey)"
+            @copy-style="emit('copy-style', $event)"
             @double-click="emit('double-click-element', el.id)"
             @update:bounds="emit('update-element-bounds', el.id, $event)"
             @duplicate="emit('duplicate-element', el.id)"

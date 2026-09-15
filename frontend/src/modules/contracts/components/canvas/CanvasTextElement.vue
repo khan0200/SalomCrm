@@ -44,6 +44,7 @@ const elementStyle = computed(() => {
     letterSpacing: typeof st.letterSpacing === 'number' && st.letterSpacing !== 0
       ? `${st.letterSpacing * (props.zoomLevel / 100)}px`
       : 'normal',
+    textTransform: st.textTransform || 'none',
     padding: st.padding ? `${st.padding * 3.78 * (props.zoomLevel / 100)}px` : '0px',
   }
 })
@@ -145,9 +146,15 @@ watch(
   }
 )
 
-// Watch font size, line height, and letter spacing styling changes
+// Watch font size, line height, letter spacing, font family, and text transform styling changes
 watch(
-  () => [props.element.style?.fontSize, props.element.style?.lineHeight, props.element.style?.letterSpacing, props.element.style?.fontFamily],
+  () => [
+    props.element.style?.fontSize,
+    props.element.style?.lineHeight,
+    props.element.style?.letterSpacing,
+    props.element.style?.fontFamily,
+    props.element.style?.textTransform,
+  ],
   () => {
     nextTick(() => measureAndEmitHeight())
   }

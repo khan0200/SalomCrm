@@ -310,7 +310,7 @@ function formatPrice(val: number | string | undefined | null): string {
   if (!val) return ''
   const num = typeof val === 'number' ? val : parseFloat(String(val))
   if (isNaN(num) || num === 0) return ''
-  return num.toLocaleString('uz-UZ') + ' UZS'
+  return Math.round(num).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' UZS'
 }
 
 function renderFormattedContractHtml(raw: string | undefined | null): string {
@@ -897,7 +897,7 @@ async function confirmDelete() {
                         class="font-extrabold text-zinc-900 dark:text-white truncate"
                         :class="tariffViewMode === 'edit' ? 'text-xs sm:text-sm' : 'text-sm sm:text-base'"
                       >
-                        {{ activeTariff.name }} Contract
+                        {{ activeTariff.name }}
                       </h2>
                       <span
                         v-if="activeTariff.contract_text"
@@ -912,11 +912,8 @@ async function confirmDelete() {
                         Standard
                       </span>
                     </div>
-                    <div v-if="tariffViewMode !== 'edit'" class="text-[11.5px] text-zinc-400 mt-0.5 flex items-center gap-2 flex-wrap">
-                      <span>{{ activeTemplate?.subtitle || "Contract template" }}</span>
-                      <span v-if="formatPrice(activeTariff.price)" class="font-bold text-blue-600 dark:text-blue-400 font-mono">
-                        {{ formatPrice(activeTariff.price) }}
-                      </span>
+                    <div v-if="formatPrice(activeTariff.price)" class="text-[11.5px] font-bold text-blue-600 dark:text-blue-400 font-mono mt-0.5">
+                      {{ formatPrice(activeTariff.price) }}
                     </div>
                   </div>
                 </div>

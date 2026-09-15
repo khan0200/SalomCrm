@@ -9,6 +9,7 @@ import {
   ArrowDown,
   RotateCw,
   Type,
+  PaintRoller,
 } from 'lucide-vue-next'
 import type { CanvasElement, ResizeHandle, AlignmentGuide } from '../../types/contractCanvas'
 
@@ -19,6 +20,8 @@ const props = withDefaults(
     isEditing: boolean
     zoomLevel: number
     readonly?: boolean
+    isCopyStyleActive?: boolean
+    copyStyleMode?: 'single' | 'persistent' | null
     calculateSnapping?: (
       x: number,
       y: number,
@@ -29,6 +32,8 @@ const props = withDefaults(
   }>(),
   {
     readonly: false,
+    isCopyStyleActive: false,
+    copyStyleMode: null,
   }
 )
 
@@ -43,6 +48,7 @@ const emit = defineEmits<{
   'set-guides': [guides: AlignmentGuide[]]
   duplicate: []
   delete: []
+  'copy-style': [e: MouseEvent]
   'toggle-lock': []
   'bring-forward': []
   'send-backward': []
@@ -145,6 +151,11 @@ function onPointerDown(e: PointerEvent) {
   // workspace does NOT steal pointer capture away from us.
   e.preventDefault()
   e.stopPropagation()
+
+  if (props.isCopyStyleActive) {
+    emit('select', e)
+    return
+  }
 
   if (props.element.locked) {
     emit('select', e)
@@ -389,6 +400,19 @@ function onDoubleClick(e: MouseEvent) {
           :title="isEditing ? 'Tahrirlashni yakunlash (Double-click)' : 'Matnni tahrirlash (Double-click)'"
         >
           <Type class="w-3.5 h-3.5" />
+        </button>
+
+        <!-- Canva Copy Style Button -->
+        <button
+          v-if="isTextType"
+          type="button"
+          @click.stop="emit('copy-style', $event)"
+          class="p-1 rounded-lg text-xs transition-colors relative"
+          :class="isCopyStyleActive ? 'bg-blue-600 text-white shadow-xs' : 'hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-300'"
+          title="Uslubdan nusxa olish (Copy Style) — 1 marta bosish (bitta uchun) yoki 2 marta bosish (ko'p martalik) • Ctrl+Alt+C"
+        >
+          <PaintRoller class="w-3.5 h-3.5" />
+          <span v-if="copyStyleMode === 'persistent'" class="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-amber-400"></span>
         </button>
 
         <!-- Canva Spacing Button & Popover (Letter Spacing & Line Spacing) -->

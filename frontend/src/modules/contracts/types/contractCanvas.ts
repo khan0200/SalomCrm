@@ -28,6 +28,7 @@ export interface TextStyleProps {
   textAlign?: 'left' | 'center' | 'right' | 'justify'
   lineHeight?: number
   letterSpacing?: number // pt or mm
+  textTransform?: 'none' | 'uppercase' | 'lowercase' | 'capitalize'
   padding?: number // mm
 }
 

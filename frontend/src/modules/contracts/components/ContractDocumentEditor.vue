@@ -52,6 +52,8 @@ import {
   Copy,
   Lock,
   Unlock,
+  PaintRoller,
+  X,
 } from 'lucide-vue-next'
 import { CONTRACT_VARIABLES, type ContractVariableDef, buildVariableValues } from '../utils/contractVariables'
 import { downloadContractAsPdf, printContractAsPdf } from '../utils/contractPdf'
@@ -63,6 +65,7 @@ import type {
   TableCanvasElement,
   PageMargins,
   AlignmentGuide,
+  TextStyleProps,
 } from '../types/contractCanvas'
 import {
   convertHtmlToCanvasDocument,
@@ -296,9 +299,32 @@ function onKeyDown(e: KeyboardEvent) {
     return
   }
 
-  // ── Escape → close help modal if open ───────────────────────
-  if (e.key === 'Escape' && showShortcutHelp.value) {
-    showShortcutHelp.value = false
+  // ── Escape → exit copy style mode or close help modal ─────────
+  if (e.key === 'Escape') {
+    if (copyStyleMode.value) {
+      e.preventDefault()
+      deactivateCopyStyle()
+      return
+    }
+    if (showShortcutHelp.value) {
+      showShortcutHelp.value = false
+      return
+    }
+  }
+
+  // ── Canva Copy Style: Ctrl+Alt+C / Cmd+Option+C ────────────
+  if (isMod && e.altKey && (e.key === 'c' || e.key === 'C')) {
+    e.preventDefault()
+    if (isTextSelected.value) {
+      activateCopyStyle('single')
+    }
+    return
+  }
+
+  // ── Canva Paste Style: Ctrl+Alt+V / Cmd+Option+V ───────────
+  if (isMod && e.altKey && (e.key === 'v' || e.key === 'V')) {
+    e.preventDefault()
+    pasteCopiedStyleToSelected()
     return
   }
 
@@ -844,30 +870,43 @@ function cycleTextAlign() {
   setTextAlign(ALIGN_CYCLE[(idx + 1) % ALIGN_CYCLE.length])
 }
 
+// Dropdown toggles (with clean mutual exclusivity)
+function toggleColorPicker() {
+  const next = !showColorPicker.value
+  closeAllDropdowns()
+  showColorPicker.value = next
+}
+
+function toggleHighlightPicker() {
+  const next = !showHighlightPicker.value
+  closeAllDropdowns()
+  showHighlightPicker.value = next
+}
+
 // Margins dropdown toggle
 function toggleMarginMenu() {
-  showMarginMenu.value = !showMarginMenu.value
-  if (showMarginMenu.value) {
-    showTableInsertMenu.value = false
-    showVariablePicker.value = false
-    showColorPicker.value = false
-    showHighlightPicker.value = false
-    showSpacingMenu.value = false
-    showEditorDownloadMenu.value = false
-  }
+  const next = !showMarginMenu.value
+  closeAllDropdowns()
+  showMarginMenu.value = next
 }
 
 // Spacing dropdown toggle (Canva style)
 function toggleSpacingMenu() {
-  showSpacingMenu.value = !showSpacingMenu.value
-  if (showSpacingMenu.value) {
-    showTableInsertMenu.value = false
-    showVariablePicker.value = false
-    showColorPicker.value = false
-    showHighlightPicker.value = false
-    showMarginMenu.value = false
-    showEditorDownloadMenu.value = false
-  }
+  const next = !showSpacingMenu.value
+  closeAllDropdowns()
+  showSpacingMenu.value = next
+}
+
+function toggleTableInsertMenu() {
+  const next = !showTableInsertMenu.value
+  closeAllDropdowns()
+  showTableInsertMenu.value = next
+}
+
+function toggleVariablePicker() {
+  const next = !showVariablePicker.value
+  closeAllDropdowns()
+  showVariablePicker.value = next
 }
 
 const isTextSelected = computed(() => {
@@ -937,6 +976,110 @@ function setHighlightColor(color: string) {
     textEl.style.backgroundColor = color === '#ffffff' ? 'transparent' : color
   }
   showHighlightPicker.value = false
+}
+
+// --- Canva-Style "Copy Style" (Format Painter) ---
+const copyStyleMode = ref<'single' | 'persistent' | null>(null)
+const copiedTextStyle = ref<TextStyleProps | null>(null)
+
+function extractElementStyle(el: TextCanvasElement): TextStyleProps {
+  const st = el.style || {}
+  return {
+    fontFamily: st.fontFamily,
+    fontSize: st.fontSize,
+    fontWeight: st.fontWeight,
+    fontStyle: st.fontStyle,
+    textDecoration: st.textDecoration,
+    color: st.color,
+    backgroundColor: st.backgroundColor,
+    textAlign: st.textAlign,
+    lineHeight: st.lineHeight,
+    letterSpacing: st.letterSpacing,
+    textTransform: st.textTransform,
+  }
+}
+
+function activateCopyStyle(mode: 'single' | 'persistent' = 'single') {
+  const selected = canvas.selectedElement.value as TextCanvasElement | null
+  if (!selected || !isTextSelected.value) return
+  closeAllDropdowns()
+  copiedTextStyle.value = extractElementStyle(selected)
+  copyStyleMode.value = mode
+}
+
+function deactivateCopyStyle() {
+  copyStyleMode.value = null
+  copiedTextStyle.value = null
+}
+
+function handleCopyStyleButtonClick(e: MouseEvent) {
+  if (e.detail >= 2) {
+    // Double click: persistent/locked mode
+    activateCopyStyle('persistent')
+    return
+  }
+  if (copyStyleMode.value) {
+    // Click while active -> turn off
+    deactivateCopyStyle()
+    return
+  }
+  // Single click: single target mode
+  activateCopyStyle('single')
+}
+
+function applyCopiedStyleToElement(targetId: string) {
+  if (!copiedTextStyle.value || !copyStyleMode.value) return
+  const found = canvas.findElementAndPage(targetId)
+  if (!found) return
+  const el = found.element as TextCanvasElement
+
+  // Only apply to text elements
+  const isText = el.type === 'text' || el.type === 'heading' || el.type === 'paragraph' || el.type === 'date' || el.type === 'variable'
+  if (!isText) return
+
+  // Apply copied style ONLY — CONTENT IS NEVER CHANGED!
+  // Position, Dimensions, ID, and element metadata are NEVER CHANGED!
+  const st = copiedTextStyle.value
+  if (!el.style) el.style = {}
+
+  if (st.fontFamily !== undefined) el.style.fontFamily = st.fontFamily
+  if (st.fontSize !== undefined) el.style.fontSize = st.fontSize
+  if (st.fontWeight !== undefined) el.style.fontWeight = st.fontWeight
+  if (st.fontStyle !== undefined) el.style.fontStyle = st.fontStyle
+  if (st.textDecoration !== undefined) el.style.textDecoration = st.textDecoration
+  if (st.color !== undefined) el.style.color = st.color
+  if (st.backgroundColor !== undefined) el.style.backgroundColor = st.backgroundColor
+  if (st.textAlign !== undefined) el.style.textAlign = st.textAlign
+  if (st.lineHeight !== undefined) el.style.lineHeight = st.lineHeight
+  if (st.letterSpacing !== undefined) el.style.letterSpacing = st.letterSpacing
+  if (st.textTransform !== undefined) el.style.textTransform = st.textTransform
+
+  // Select target element so user sees it highlighted with new style
+  canvas.selectElement(targetId, false, found.pageIndex)
+
+  // Record history snapshot for undo/redo
+  canvas.history.recordSnapshot(canvas.document.value)
+
+  // In single-use mode, deactivate automatically after applying once
+  if (copyStyleMode.value === 'single') {
+    deactivateCopyStyle()
+  }
+}
+
+function pasteCopiedStyleToSelected() {
+  if (!copiedTextStyle.value) return
+  const sel = canvas.selectedElement.value
+  if (sel && isTextSelected.value) {
+    applyCopiedStyleToElement(sel.id)
+  }
+}
+
+function handleSelectElement(id: string, multi: boolean, pageIdx?: number) {
+  if (copyStyleMode.value) {
+    applyCopiedStyleToElement(id)
+    return
+  }
+  canvas.selectElement(id, multi, pageIdx)
 }
 
 // Automatically create and paste a new Text element from system clipboard (Times New Roman, 14pt, black)
@@ -1220,6 +1363,8 @@ const shortcutCategories = computed(() => ({
     { label: 'Justify', keys: `${mod}+Shift+J` },
     { label: 'Font Size +', keys: `${mod}+Shift+.` },
     { label: 'Font Size -', keys: `${mod}+Shift+,` },
+    { label: 'Copy Style', keys: `${mod}+Alt+C` },
+    { label: 'Paste Style', keys: `${mod}+Alt+V` },
     { label: 'Edit Text (Enter)', keys: 'F2 / Enter' },
   ],
   elements: [
@@ -1247,7 +1392,7 @@ const shortcutCategories = computed(() => ({
     <!-- Top Action & Status Bar -->
     <div
       v-if="!hideTopBar"
-      class="no-print sticky top-0 z-30 flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 bg-white dark:bg-[#15171a] border-b border-zinc-200 dark:border-zinc-800 shadow-2xs"
+      class="no-print sticky top-0 z-40 flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 bg-white dark:bg-[#15171a] border-b border-zinc-200 dark:border-zinc-800 shadow-2xs"
     >
       <!-- Left: Back, Document Title & Contract Number -->
       <div class="flex items-center gap-3 min-w-0">
@@ -1343,7 +1488,7 @@ const shortcutCategories = computed(() => ({
     <!-- Word + Canva Style Free Positioning Document Toolbar -->
     <div
       v-if="!readonly"
-      class="no-print editor-toolbar z-20 flex flex-wrap items-center gap-1 p-2 bg-zinc-50/95 dark:bg-[#1a1d20]/95 backdrop-blur-md border-b border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 select-none text-xs"
+      class="no-print editor-toolbar z-30 flex flex-wrap items-center gap-1 p-2 bg-zinc-50/95 dark:bg-[#1a1d20]/95 backdrop-blur-md border-b border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 select-none text-xs"
       :class="hideTopBar ? 'sticky top-0' : 'sticky top-[53px]'"
     >
       <!-- History Group: Undo / Redo -->
@@ -1387,30 +1532,6 @@ const shortcutCategories = computed(() => ({
         </select>
       </div>
 
-      <!-- Document Zoom Level (25% - 500%) -->
-      <div class="flex items-center gap-0.5 px-1.5 border-r border-zinc-200 dark:border-zinc-700/60" title="Zoom">
-        <button
-          type="button"
-          @click="zoomOutAroundCenter"
-          :disabled="canvas.zoomLevel.value <= 25"
-          class="toolbar-btn text-xs font-bold w-6 h-6 p-0 disabled:opacity-40"
-          title="Zoom -"
-        >
-          <ZoomOut class="w-3.5 h-3.5" />
-        </button>
-        <span class="text-[11px] font-bold font-mono px-1 select-none text-zinc-600 dark:text-zinc-300 min-w-[36px] text-center">
-          {{ canvas.zoomLevel.value }}%
-        </span>
-        <button
-          type="button"
-          @click="zoomInAroundCenter"
-          :disabled="canvas.zoomLevel.value >= 500"
-          class="toolbar-btn text-xs font-bold w-6 h-6 p-0 disabled:opacity-40"
-          title="Zoom +"
-        >
-          <ZoomIn class="w-3.5 h-3.5" />
-        </button>
-      </div>
 
       <!-- Text Formatting: Bold, Italic, Underline, Strikethrough -->
       <div class="flex items-center gap-0.5 px-1.5 border-r border-zinc-200 dark:border-zinc-700/60">
@@ -1450,15 +1571,45 @@ const shortcutCategories = computed(() => ({
         >
           <Strikethrough class="w-3.5 h-3.5" />
         </button>
+
+        <div class="h-4 w-px bg-zinc-200 dark:bg-zinc-700 my-auto mx-0.5"></div>
+
+        <!-- Canva Copy Style (Format Painter) -->
+        <button
+          type="button"
+          @click="handleCopyStyleButtonClick"
+          @dblclick.prevent="activateCopyStyle('persistent')"
+          class="toolbar-btn relative transition-all"
+          :class="[
+            copyStyleMode
+              ? 'bg-blue-600 text-white dark:bg-blue-600 hover:bg-blue-700 shadow-xs ring-1 ring-blue-500'
+              : '',
+            !isTextSelected && !copyStyleMode ? 'opacity-40 cursor-not-allowed' : ''
+          ]"
+          :disabled="!isTextSelected && !copyStyleMode"
+          :title="
+            copyStyleMode === 'persistent'
+              ? 'Copy Style faol (Ko\'p martalik qulflangan) • Bekor qilish: Esc'
+              : copyStyleMode === 'single'
+              ? 'Copy Style faol (1 marta qo\'llash) • Bekor qilish: Esc'
+              : 'Uslubdan nusxa olish (1 marta bosish: 1 matnga, 2 marta tez bosish: ko\'p matnga) • Ctrl+Alt+C'
+          "
+        >
+          <PaintRoller class="w-3.5 h-3.5" />
+          <span
+            v-if="copyStyleMode === 'persistent'"
+            class="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-amber-400 ring-2 ring-white dark:ring-zinc-900 animate-pulse"
+          ></span>
+        </button>
       </div>
 
       <!-- Text Color & Fill Color Pickers -->
       <div class="flex items-center gap-1 px-1.5 border-r border-zinc-200 dark:border-zinc-700/60">
         <!-- Text Color -->
-        <div class="relative editor-dropdown-container">
+        <div class="relative editor-dropdown-container" :class="{ 'z-50': showColorPicker }">
           <button
             type="button"
-            @click.stop="showColorPicker = !showColorPicker; showHighlightPicker = false; showMarginMenu = false; showTableInsertMenu = false; showVariablePicker = false"
+            @click.stop="toggleColorPicker()"
             class="toolbar-btn flex items-center gap-1 h-7 px-1.5"
             title="Text color"
           >
@@ -1488,10 +1639,10 @@ const shortcutCategories = computed(() => ({
         </div>
 
         <!-- Background / Cell Fill Color -->
-        <div class="relative editor-dropdown-container">
+        <div class="relative editor-dropdown-container" :class="{ 'z-50': showHighlightPicker }">
           <button
             type="button"
-            @click.stop="showHighlightPicker = !showHighlightPicker; showColorPicker = false; showMarginMenu = false; showTableInsertMenu = false; showVariablePicker = false"
+            @click.stop="toggleHighlightPicker()"
             class="toolbar-btn flex items-center gap-1 h-7 px-1.5"
             title="Fill / Highlight color"
           >
@@ -1538,7 +1689,10 @@ const shortcutCategories = computed(() => ({
       </div>
 
       <!-- Text Spacing: Letter Spacing & Line Spacing (Canva Style) -->
-      <div class="relative px-1 border-r border-zinc-200 dark:border-zinc-700/60 editor-dropdown-container">
+      <div
+        class="relative px-1 border-r border-zinc-200 dark:border-zinc-700/60 editor-dropdown-container"
+        :class="{ 'z-50': showSpacingMenu }"
+      >
         <button
           type="button"
           @click.stop="toggleSpacingMenu()"
@@ -1676,7 +1830,10 @@ const shortcutCategories = computed(() => ({
       </div>
 
       <!-- Page Margins Dropdown -->
-      <div class="relative px-1 border-r border-zinc-200 dark:border-zinc-700/60 editor-dropdown-container">
+      <div
+        class="relative px-1 border-r border-zinc-200 dark:border-zinc-700/60 editor-dropdown-container"
+        :class="{ 'z-50': showMarginMenu }"
+      >
         <button
           type="button"
           @click.stop="toggleMarginMenu()"
@@ -1796,10 +1953,13 @@ const shortcutCategories = computed(() => ({
       </div>
 
       <!-- Table Inserter Dropdown -->
-      <div class="relative px-1 border-r border-zinc-200 dark:border-zinc-700/60 editor-dropdown-container">
+      <div
+        class="relative px-1 border-r border-zinc-200 dark:border-zinc-700/60 editor-dropdown-container"
+        :class="{ 'z-50': showTableInsertMenu }"
+      >
         <button
           type="button"
-          @click.stop="showTableInsertMenu = !showTableInsertMenu; showVariablePicker = false; showMarginMenu = false"
+          @click.stop="toggleTableInsertMenu()"
           class="toolbar-btn flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold text-blue-700 dark:text-blue-300 bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200/80 dark:border-blue-900/60 rounded-lg shadow-2xs cursor-pointer"
           title="Insert table"
         >
@@ -1844,10 +2004,13 @@ const shortcutCategories = computed(() => ({
       </div>
 
       <!-- Variables Dropdown -->
-      <div class="relative px-1 border-r border-zinc-200 dark:border-zinc-700/60 editor-dropdown-container">
+      <div
+        class="relative px-1 border-r border-zinc-200 dark:border-zinc-700/60 editor-dropdown-container"
+        :class="{ 'z-50': showVariablePicker }"
+      >
         <button
           type="button"
-          @click.stop="showVariablePicker = !showVariablePicker; showTableInsertMenu = false; showMarginMenu = false"
+          @click.stop="toggleVariablePicker()"
           class="toolbar-btn flex items-center gap-1.5 px-2 h-7 rounded-lg text-xs font-semibold text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800"
           title="Contract variables"
         >
@@ -1904,10 +2067,32 @@ const shortcutCategories = computed(() => ({
     -->
     <div
       ref="canvasWorkspaceRef"
-      class="canvas-workspace flex-1 h-0 min-h-0 overflow-auto relative select-none"
-      :class="{ 'cursor-grab': isSpacePressed && !isPanning, 'cursor-grabbing': isPanning }"
+      class="canvas-workspace flex-1 h-0 min-h-0 overflow-auto relative z-0 isolate select-none"
+      :class="{ 'cursor-grab': isSpacePressed && !isPanning, 'cursor-grabbing': isPanning, 'copy-style-active': !!copyStyleMode }"
       @click.self="canvas.clearSelection()"
     >
+      <!-- Floating Canva-style Copy Style Active Notification / Control Pill -->
+      <div
+        v-if="copyStyleMode"
+        class="no-print sticky top-3 z-50 flex justify-center pointer-events-none mb-2"
+      >
+        <div class="pointer-events-auto bg-zinc-900/95 dark:bg-zinc-100/95 text-white dark:text-zinc-900 px-4 py-2 rounded-full shadow-2xl text-xs font-semibold flex items-center gap-2.5 backdrop-blur-md border border-white/15 dark:border-zinc-300 select-none ring-1 ring-black/10">
+          <PaintRoller class="w-4 h-4 text-blue-400 dark:text-blue-600 animate-pulse shrink-0" />
+          <span>
+            {{ copyStyleMode === 'persistent' ? 'Format nusxalash (Qulflangan): Bir nechta matnga bosing' : 'Format nusxalash: Kerakli matnga bosing' }}
+          </span>
+          <span class="text-[11px] opacity-60 font-mono pl-1 border-l border-white/20 dark:border-zinc-400">Esc - bekor qilish</span>
+          <button
+            type="button"
+            @click="deactivateCopyStyle"
+            class="ml-1 p-0.5 hover:bg-white/20 dark:hover:bg-zinc-300 rounded-full cursor-pointer transition-colors"
+            title="Bekor qilish (Esc)"
+          >
+            <X class="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </div>
+
       <div
         class="canvas-stage flex flex-col items-center pt-6 pb-36 px-8 sm:px-16"
         style="width: max-content; min-width: 100%;"
@@ -1930,11 +2115,14 @@ const shortcutCategories = computed(() => ({
           :show-rulers="canvas.showRulers.value"
           :show-grid="canvas.showGrid.value"
           :active-guides="canvas.activeGuides.value"
+          :is-copy-style-active="!!copyStyleMode"
+          :copy-style-mode="copyStyleMode"
           :variable-values="variableValues"
           :calculate-snapping="canvas.calculateSnapping"
           @set-active-page="canvas.setActivePageIndex($event)"
-          @select-element="(id, multi) => canvas.selectElement(id, multi, pageIdx)"
+          @select-element="(id, multi) => handleSelectElement(id, multi, pageIdx)"
           @select-elements="(ids) => { canvas.setActivePageIndex(pageIdx); canvas.selectedElementIds.value = ids }"
+          @copy-style="handleCopyStyleButtonClick"
           @clear-selection="canvas.clearSelection()"
           @double-click-element="canvas.editingElementId.value = (canvas.editingElementId.value === $event ? null : $event)"
           @update-element="(id, updates) => canvas.updateElement(id, updates)"
@@ -2153,15 +2341,22 @@ const shortcutCategories = computed(() => ({
   position: relative;
 }
 
+.editor-toolbar {
+  position: sticky;
+  z-index: 30;
+}
+
 .canvas-workspace {
   position: relative;
+  z-index: 0;
+  isolation: isolate;
 }
 
 .zoom-rail {
   position: absolute;
   right: 16px;
   bottom: 24px;
-  z-index: 50;
+  z-index: 20;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -2354,5 +2549,11 @@ const shortcutCategories = computed(() => ({
   background: #27272a;
   border-color: #3f3f46;
   color: #d1d5db;
+}
+
+/* ─── Canva Copy Style Active Cursor & State ─── */
+.canvas-workspace.copy-style-active,
+.canvas-workspace.copy-style-active * {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%232563eb' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='14' height='5' x='2' y='2' rx='1.5' fill='%23bfdbfe'/%3E%3Cpath d='M9 15v-2a2 2 0 0 1 2-2h7a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-1'/%3E%3Crect width='4' height='7' x='7' y='15' rx='1' fill='%232563eb'/%3E%3C/svg%3E") 3 3, crosshair !important;
 }
 </style>
