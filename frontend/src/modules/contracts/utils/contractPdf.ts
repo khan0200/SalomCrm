@@ -4,6 +4,7 @@ import {
   deserializeCanvasDocument,
   convertCanvasDocumentToHtml,
 } from './contractCanvasConverter'
+import { replaceVariablesInHtml } from './contractVariables'
 
 export interface PdfMarginOptions {
   top?: number // in mm
@@ -37,6 +38,7 @@ export function prepareContractHtml(
     mergedVars['student_signature'] = sigImg
     mergedVars['signature'] = sigImg
     mergedVars['imzo'] = sigImg
+    mergedVars['signature_data'] = signatureData
   }
 
   // If it's a Canva Canvas JSON document
@@ -45,7 +47,7 @@ export function prepareContractHtml(
     if (doc) {
       let canvasHtml = convertCanvasDocumentToHtml(doc, mergedVars)
       // If signature is provided and not already rendered in canvas HTML
-      if (signatureData && !canvasHtml.includes('alt="Talaba Imzosi"')) {
+      if (signatureData && !canvasHtml.includes('alt="Talaba Imzosi"') && !canvasHtml.includes('alt="Imzo"')) {
         canvasHtml += `
           <div style="margin: 20px 0; padding: 14px 18px; border: 1.5px solid #059669; border-radius: 10px; background: #f0fdf4; font-family: 'Times New Roman', serif; font-size: 11pt; color: #064e3b; page-break-inside: avoid;">
             <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -73,12 +75,8 @@ export function prepareContractHtml(
   text = text.replace(/═{5,}\s*1-BET\s*═{5,}/gi, '')
   text = text.replace(/═{5,}\s*\d+-BET\s*═{5,}/gi, '<div class="html2pdf__page-break page-break-always"></div>')
 
-  // Variable substitution
-  for (const [key, val] of Object.entries(mergedVars)) {
-    text = text.replace(new RegExp(`\\{\\{\\s*${key}\\s*\\}\\}`, 'gi'), val || '')
-    text = text.replace(new RegExp(`\\[\\[\\s*${key}\\s*\\]\\]`, 'gi'), val || '')
-    text = text.replace(new RegExp(`%${key}%`, 'gi'), val || '')
-  }
+  // Robust universal variable substitution
+  text = replaceVariablesInHtml(text, mergedVars)
 
   let processedHtml = ''
   if (text.startsWith('<') || /<[a-z][\s\S]*>/i.test(text)) {

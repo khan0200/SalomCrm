@@ -54,8 +54,11 @@ import {
   Unlock,
   PaintRoller,
   X,
+  Building2,
+  UserCheck,
 } from 'lucide-vue-next'
-import { CONTRACT_VARIABLES, type ContractVariableDef, buildVariableValues } from '../utils/contractVariables'
+import { CONTRACT_VARIABLES, type ContractVariableDef, buildVariableValues, resolveTenantRequisites, buildCompanyRequisitesHtml, buildClientRequisitesHtml } from '../utils/contractVariables'
+import { useUiStore } from '@/stores/ui'
 import { downloadContractAsPdf, printContractAsPdf } from '../utils/contractPdf'
 import type {
   ContractDocumentModel,
@@ -119,9 +122,11 @@ const emit = defineEmits<{
 const initialRaw = props.content || props.initialContent || ''
 const initialCanvasDoc = convertHtmlToCanvasDocument(initialRaw)
 const canvas = useContractCanvas(initialCanvasDoc)
+const uiStore = useUiStore()
 
 // Compute dynamic variable replacements from studentData
 const variableValues = computed(() => {
+  if (!props.studentData) return undefined
   return buildVariableValues(props.studentData, {
     contractNumber: props.contractNumber,
     templateName: props.title,
@@ -1407,6 +1412,122 @@ function onGlobalPaste(e: ClipboardEvent) {
   }
 }
 
+// Insert Company / Contractor Requisites block (BAJARUVCHI) matching official layout
+function insertCompanyRequisites() {
+  closeAllDropdowns()
+  const page = canvas.activePage.value
+  const margins = canvas.document.value.margins
+  const contentWidth = printableContentWidthMm.value || (210 - margins.left - margins.right)
+  const blockWidth = Math.min(88, Math.floor(contentWidth / 2) - 2)
+  let targetX = margins.left
+  let targetY = margins.top + 10
+
+  // Check if MIJOZ block already exists on current page to place BAJARUVCHI side-by-side at same Y
+  const clientBlock = page?.elements.find(el => el.type === 'text' && el.content && el.content.includes('MIJOZ'))
+  if (clientBlock) {
+    targetY = clientBlock.y || targetY
+    targetX = margins.left
+  } else if (page && page.elements.length > 0) {
+    const maxY = page.elements.reduce((max, el) => Math.max(max, (el.y || 0) + (el.height || 0)), 0)
+    if (maxY + 75 < (297 - margins.bottom)) {
+      targetY = maxY + 6
+    } else {
+      targetY = Math.max(margins.top + 5, 297 - margins.bottom - 75)
+    }
+  }
+
+  const req = resolveTenantRequisites()
+  const htmlContent = buildCompanyRequisitesHtml(req)
+
+  const newElement: TextCanvasElement = {
+    id: `req_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+    type: 'text',
+    x: targetX,
+    y: targetY,
+    width: blockWidth,
+    height: 72,
+    zIndex: 1,
+    content: htmlContent,
+    style: {
+      fontFamily: 'Times New Roman',
+      fontSize: 11,
+      fontWeight: 'bold',
+      fontStyle: 'normal',
+      textAlign: 'left',
+      color: '#000000',
+      lineHeight: 1.35,
+    },
+  }
+
+  canvas.addElement(newElement)
+  canvas.selectedElementIds.value = [newElement.id]
+  canvas.editingElementId.value = newElement.id
+
+  uiStore.addToast({
+    type: 'success',
+    message: 'Bajaruvchi rekvizitlari sahifaga joylandi',
+    duration: 3000,
+  })
+}
+
+// Insert Client Requisites block (MIJOZ) matching official layout
+function insertClientRequisites() {
+  closeAllDropdowns()
+  const page = canvas.activePage.value
+  const margins = canvas.document.value.margins
+  const contentWidth = printableContentWidthMm.value || (210 - margins.left - margins.right)
+  const blockWidth = Math.min(88, Math.floor(contentWidth / 2) - 2)
+
+  let targetX = 210 - margins.right - blockWidth
+  let targetY = margins.top + 10
+
+  // Check if BAJARUVCHI block already exists on current page to place MIJOZ side-by-side at same Y!
+  const contractorBlock = page?.elements.find(el => el.type === 'text' && el.content && el.content.includes('BAJARUVCHI'))
+  if (contractorBlock) {
+    targetY = contractorBlock.y || targetY
+    targetX = Math.max(contractorBlock.x + contractorBlock.width + 4, 210 - margins.right - blockWidth)
+  } else if (page && page.elements.length > 0) {
+    const maxY = page.elements.reduce((max, el) => Math.max(max, (el.y || 0) + (el.height || 0)), 0)
+    if (maxY + 75 < (297 - margins.bottom)) {
+      targetY = maxY + 6
+    } else {
+      targetY = Math.max(margins.top + 5, 297 - margins.bottom - 75)
+    }
+  }
+
+  const htmlContent = buildClientRequisitesHtml()
+
+  const newElement: TextCanvasElement = {
+    id: `client_req_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+    type: 'text',
+    x: targetX,
+    y: targetY,
+    width: blockWidth,
+    height: 72,
+    zIndex: 1,
+    content: htmlContent,
+    style: {
+      fontFamily: 'Times New Roman',
+      fontSize: 11,
+      fontWeight: 'bold',
+      fontStyle: 'normal',
+      textAlign: 'left',
+      color: '#000000',
+      lineHeight: 1.35,
+    },
+  }
+
+  canvas.addElement(newElement)
+  canvas.selectedElementIds.value = [newElement.id]
+  canvas.editingElementId.value = newElement.id
+
+  uiStore.addToast({
+    type: 'success',
+    message: 'Mijoz rekvizitlari sahifaga joylandi',
+    duration: 3000,
+  })
+}
+
 // Insert directly a new Text block (Times New Roman, 14pt)
 function handleAddText() {
   closeAllDropdowns()
@@ -1482,27 +1603,81 @@ function insertPresetTable(rows: number, cols: number, borderStyle = 'solid') {
 
 // Variable insertion
 function insertVariable(vKey: string) {
-  const el = canvas.selectedElement.value as TextCanvasElement
-  if (el && el.type === 'text') {
-    el.content += ` ${vKey} `
+  const cleanKey = vKey.replace(/^\{\{|\}\}$/g, '').trim()
+  const token = `{{${cleanKey}}}`
+  const el = canvas.selectedElement.value as any
+
+  if (el && (el.type === 'text' || el.type === 'heading' || el.type === 'paragraph' || el.type === 'date' || el.type === 'variable')) {
+    let insertedAtCaret = false
+    const sel = window.getSelection()
+    const activeEl = document.activeElement
+    if (activeEl && (activeEl.closest('.canvas-text-element') || activeEl.closest('.canvas-table-element')) && sel && sel.rangeCount > 0) {
+      try {
+        document.execCommand('insertText', false, ` ${token} `)
+        insertedAtCaret = true
+      } catch {}
+    }
+    if (!insertedAtCaret) {
+      let raw = el.content || ''
+      let updatedContent = ''
+      if (raw.endsWith('</p>')) {
+        updatedContent = raw.slice(0, -4) + `&nbsp;${token}</p>`
+      } else if (raw.endsWith('</div>')) {
+        updatedContent = raw.slice(0, -6) + `&nbsp;${token}</div>`
+      } else {
+        updatedContent = (raw ? `${raw} ` : '') + token
+      }
+      canvas.updateElement(el.id, { content: updatedContent })
+    }
+  } else if (el && el.type === 'table') {
+    let insertedAtCaret = false
+    const sel = window.getSelection()
+    const activeEl = document.activeElement
+    if (activeEl && activeEl.closest('.canvas-table-element') && sel && sel.rangeCount > 0) {
+      try {
+        document.execCommand('insertText', false, ` ${token} `)
+        insertedAtCaret = true
+      } catch {}
+    }
+    if (!insertedAtCaret) {
+      const newId = `var_${Date.now()}`
+      canvas.addElement({
+        id: newId,
+        type: 'text',
+        x: canvas.document.value.margins.left,
+        y: canvas.document.value.margins.top + 10,
+        width: 60,
+        height: 10,
+        zIndex: 1,
+        content: `<p style="color: #2563eb; font-weight: bold;">${token}</p>`,
+        variableKey: cleanKey,
+        style: {
+          fontFamily: 'Times New Roman',
+          fontSize: 12,
+          color: '#2563eb',
+        },
+      })
+      canvas.selectedElementIds.value = [newId]
+    }
   } else {
-    const contentWidth = printableContentWidthMm.value
+    const newId = `var_${Date.now()}`
     canvas.addElement({
-      id: `var_${Date.now()}`,
+      id: newId,
       type: 'text',
       x: canvas.document.value.margins.left,
       y: canvas.document.value.margins.top + 10,
-      width: 70,
+      width: 60,
       height: 10,
       zIndex: 1,
-      content: `<span class="bg-blue-50 text-blue-700 font-mono font-bold px-1.5 py-0.5 rounded border border-blue-200 text-xs">${vKey}</span>`,
-      variableKey: vKey,
+      content: `<p style="color: #2563eb; font-weight: bold;">${token}</p>`,
+      variableKey: cleanKey,
       style: {
         fontFamily: 'Times New Roman',
         fontSize: 12,
-        color: '#1d4ed8',
+        color: '#2563eb',
       },
     })
+    canvas.selectedElementIds.value = [newId]
   }
   showVariablePicker.value = false
 }
@@ -1704,6 +1879,30 @@ const shortcutCategories = computed(() => ({
         >
           <Eye class="w-3.5 h-3.5 text-zinc-400" />
           <span class="hidden sm:inline">Preview</span>
+        </button>
+
+        <!-- Bajaruvchi Rekvizitlarini joylash Button -->
+        <button
+          v-if="!readonly"
+          type="button"
+          @click="insertCompanyRequisites"
+          class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-indigo-200 dark:border-indigo-900/60 bg-indigo-50/80 hover:bg-indigo-100 dark:bg-indigo-950/40 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 text-xs font-bold transition-all shadow-2xs cursor-pointer active:scale-95"
+          title="Kompaniya (Bajaruvchi) rekvizitlarini sahifaga joylash"
+        >
+          <Building2 class="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+          <span>Bajaruvchi</span>
+        </button>
+
+        <!-- Mijoz Rekvizitlarini joylash Button -->
+        <button
+          v-if="!readonly"
+          type="button"
+          @click="insertClientRequisites"
+          class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50/80 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 text-xs font-bold transition-all shadow-2xs cursor-pointer active:scale-95"
+          title="Mijoz ma'lumotlari (F.I.O, Passport, Imzo) blokini sahifaga joylash"
+        >
+          <UserCheck class="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+          <span>Mijoz</span>
         </button>
 
         <!-- Download PDF Button (Direct) -->
@@ -2355,6 +2554,7 @@ const shortcutCategories = computed(() => ({
       >
         <button
           type="button"
+          @mousedown.prevent
           @click.stop="toggleVariablePicker()"
           class="toolbar-btn flex items-center gap-1.5 px-2 h-7 rounded-lg text-xs font-semibold text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800"
           title="Contract variables"
@@ -2374,6 +2574,7 @@ const shortcutCategories = computed(() => ({
             v-for="v in CONTRACT_VARIABLES"
             :key="v.key"
             type="button"
+            @mousedown.prevent
             @click="insertVariable(v.key)"
             class="w-full text-left px-2 py-1.5 rounded-lg hover:bg-blue-50 dark:hover:bg-zinc-800 flex items-center justify-between text-xs cursor-pointer group"
           >
@@ -2384,6 +2585,29 @@ const shortcutCategories = computed(() => ({
             <span class="text-blue-500 font-bold opacity-0 group-hover:opacity-100">+</span>
           </button>
         </div>
+      </div>
+
+      <!-- Rekvizitlar Toolbar Buttons -->
+      <div class="flex items-center gap-0.5 px-1 border-r border-zinc-200 dark:border-zinc-700/60">
+        <button
+          type="button"
+          @click="insertCompanyRequisites"
+          class="toolbar-btn flex items-center gap-1.5 px-2 h-7 rounded-lg text-xs font-semibold text-indigo-700 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 cursor-pointer"
+          title="Kompaniya (Bajaruvchi) rekvizitlarini sahifaga joylash"
+        >
+          <Building2 class="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+          <span>Bajaruvchi</span>
+        </button>
+
+        <button
+          type="button"
+          @click="insertClientRequisites"
+          class="toolbar-btn flex items-center gap-1.5 px-2 h-7 rounded-lg text-xs font-semibold text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/50 cursor-pointer"
+          title="Mijoz ma'lumotlari va imzo blokini sahifaga joylash"
+        >
+          <UserCheck class="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+          <span>Mijoz</span>
+        </button>
       </div>
 
       <!-- "+ Text" Button: Directly inserts a new Text element (Times New Roman, 14pt) -->

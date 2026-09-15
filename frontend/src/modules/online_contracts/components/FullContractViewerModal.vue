@@ -6,6 +6,7 @@ import {
   deserializeCanvasDocument,
   convertCanvasDocumentToHtml,
 } from '@/modules/contracts/utils/contractCanvasConverter'
+import { replaceVariablesInHtml } from '@/modules/contracts/utils/contractVariables'
 
 const props = defineProps<{
   isOpen: boolean
@@ -56,9 +57,7 @@ const renderedPages = computed<string[]>(() => {
 
   // Substitute variable values if passed
   if (props.variableValues) {
-    for (const [k, v] of Object.entries(props.variableValues)) {
-      cleaned = cleaned.split(k).join(v)
-    }
+    cleaned = replaceVariablesInHtml(cleaned, props.variableValues)
   }
 
   const parts = cleaned.split(/<hr[^>]*\/?>/i).map(p => p.trim()).filter(p => p.length > 0)

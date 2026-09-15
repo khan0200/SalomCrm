@@ -343,6 +343,7 @@ class StudentProfileView(APIView):
                 'status': c.status,
                 'tariff_name': c.tariff_name,
                 'tariff_price': float(c.tariff_price),
+                'discount': float(c.discount or 0),
                 'student_id_assigned': c.student_id_assigned,
                 'created_at': c.created_at.isoformat() if c.created_at else None,
                 'signed_at': c.signed_at.isoformat() if c.signed_at else None,
@@ -636,7 +637,52 @@ class VerifyContractView(APIView):
         contract.status = 'verified'
         contract.verification_code_used = True
         contract.verified_at = now
-        contract.save(update_fields=['status', 'verification_code_used', 'verified_at', 'updated_at'])
+
+        # Ensure CRM Student is created and linked in Students page (WITHOUT passport)
+        if contract.student_id_assigned:
+            crm_student = Student.objects.filter(tenant=contract.tenant, id=contract.student_id_assigned).first()
+            if not crm_student:
+                crm_student = Student.objects.create(
+                    id=contract.student_id_assigned,
+                    tenant=contract.tenant,
+                    full_name=contract.full_name or f"Student {contract.student_id_assigned}",
+                    phone1=contract.phone1 or '',
+                    phone2=contract.phone2 or '',
+                    email=user.email or '',
+                    office=contract.office or '',
+                    tariff=contract.tariff_name or '',
+                    level=contract.education_level or '',
+                    birthday=contract.date_of_birth or '',
+                    discount=contract.discount or Decimal('0.00'),
+                )
+            elif contract.discount and crm_student.discount != contract.discount:
+                crm_student.discount = contract.discount
+                crm_student.save(update_fields=['discount'])
+
+            if not contract.student:
+                contract.student = crm_student
+
+            # Ensure official discount payment is recorded in payments system
+            if contract.discount and contract.discount > 0:
+                from apps.payments.services import record_payment
+                contract_ref = f"CONTRACT_{contract.id}"
+                already_recorded = crm_student.payments.filter(
+                    is_discount=True,
+                    notes__contains=contract_ref
+                ).exists()
+                if not already_recorded:
+                    record_payment(
+                        tenant=contract.tenant,
+                        student=crm_student,
+                        amount=contract.discount,
+                        method='Discount',
+                        received_by='Contract Verification',
+                        notes=f"Shartnoma bo'yicha chegirma (#{contract.contract_number or contract.student_id_assigned}, ref: {contract_ref})",
+                        is_discount=True,
+                        user=None
+                    )
+
+        contract.save(update_fields=['status', 'verification_code_used', 'verified_at', 'updated_at', 'student'])
 
         # Record Audit Log
         ContractAuditEvent.objects.create(
@@ -771,6 +817,7 @@ class PublicContractDetailView(APIView):
             'status': contract.status,
             'tariff_name': contract.tariff_name,
             'tariff_price': float(contract.tariff_price),
+            'discount': float(contract.discount or 0),
             'passport_number': contract.passport_number,
             'full_name': contract.full_name,
             'education_level': contract.education_level,
@@ -782,6 +829,7 @@ class PublicContractDetailView(APIView):
             'content': contract.content,
             'student_id_assigned': contract.student_id_assigned,
             'has_verification_code': bool(contract.verification_code),
+            'verification_code': contract.verification_code if (contract.status == 'verified' or contract.verification_code_used) else '',
             'verification_code_expires_at': contract.verification_code_expires_at.isoformat() if contract.verification_code_expires_at else None,
             'verified_at': contract.verified_at.isoformat() if contract.verified_at else None,
             'rejection_reason': contract.rejection_reason,

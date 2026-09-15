@@ -26,6 +26,7 @@ import {
   type TenantInfoResponse,
 } from '@/api/onlineContracts'
 import { downloadContractAsPdf } from '@/modules/contracts/utils/contractPdf'
+import { buildVariableValues } from '@/modules/contracts/utils/contractVariables'
 import OnlineContractLayout from '../layouts/OnlineContractLayout.vue'
 import OnlineContractVerifyModal from '../components/OnlineContractVerifyModal.vue'
 import FullContractViewerModal from '../components/FullContractViewerModal.vue'
@@ -47,6 +48,7 @@ const selectedContractForVerify = ref<OnlineContractSummary | null>(null)
 const isViewerModalOpen = ref(false)
 const viewerContractTitle = ref('')
 const viewerContractContent = ref('')
+const viewerVariableValues = ref<Record<string, string>>({})
 
 const isCancelModalOpen = ref(false)
 const selectedContractForCancel = ref<OnlineContractSummary | null>(null)
@@ -191,6 +193,13 @@ async function openViewContractModal(contract: OnlineContractSummary) {
     const detail = await onlineContractsApi.getContractDetail(contract.id)
     viewerContractTitle.value = `${detail.contract_number} — ${detail.title}`
     viewerContractContent.value = detail.content
+    viewerVariableValues.value = buildVariableValues(detail, {
+      contractNumber: detail.contract_number,
+      price: detail.tariff_price,
+      discount: detail.discount,
+      signatureData: detail.signature_data,
+      verificationCode: detail.has_verification_code ? detail.verification_code : undefined,
+    })
     isViewerModalOpen.value = true
     await onlineContractsApi.logContractViewAudit(contract.id)
   } catch (err) {
@@ -203,14 +212,28 @@ async function handleDownloadPdf(contract: OnlineContractSummary) {
   try {
     const detail = await onlineContractsApi.getContractDetail(contract.id)
     const title = `SHARTNOMA_${detail.contract_number}_${detail.full_name || 'TALABA'}`
-    const variableValues: Record<string, string> = {
-      '{{client_name}}': detail.full_name,
-      '{{passport_number}}': detail.passport_number,
-      '{{contract_price}}': detail.tariff_price?.toLocaleString('uz-UZ') + ' UZS',
-      '{{contract_date}}': detail.signed_at ? new Date(detail.signed_at).toLocaleDateString('uz-UZ') : '',
-      '{{contract_number}}': detail.contract_number,
+    const variableValues = buildVariableValues(detail, {
+      contractNumber: detail.contract_number,
+      price: detail.tariff_price,
+      discount: detail.discount,
+      signatureData: detail.signature_data,
+      verificationCode: detail.has_verification_code ? detail.verification_code : undefined,
+    })
+    const verificationMeta = {
+      contractNumber: detail.contract_number,
+      studentId: detail.student_id_assigned || undefined,
+      studentName: detail.full_name,
+      verifiedAt: detail.verified_at ? new Date(detail.verified_at).toLocaleDateString('uz-UZ') : undefined,
+      status: detail.status,
     }
-    await downloadContractAsPdf(title, detail.content, { top: 15, right: 15, bottom: 15, left: 15 }, variableValues)
+    await downloadContractAsPdf(
+      title,
+      detail.content,
+      { top: 15, right: 15, bottom: 15, left: 15 },
+      variableValues,
+      detail.signature_data,
+      verificationMeta
+    )
   } catch (err) {
     console.error('Failed to download PDF:', err)
   } finally {
@@ -651,6 +674,7 @@ function handleResubmit(contract: OnlineContractSummary) {
       :is-open="isViewerModalOpen"
       :contract-title="viewerContractTitle"
       :content="viewerContractContent"
+      :variable-values="viewerVariableValues"
       @close="isViewerModalOpen = false"
     />
 

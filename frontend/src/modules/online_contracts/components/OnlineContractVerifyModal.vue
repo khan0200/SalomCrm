@@ -14,6 +14,7 @@ import {
 } from 'lucide-vue-next'
 import { onlineContractsApi, type OnlineContractSummary } from '@/api/onlineContracts'
 import { downloadContractAsPdf } from '@/modules/contracts/utils/contractPdf'
+import { buildVariableValues } from '@/modules/contracts/utils/contractVariables'
 
 const props = defineProps<{
   isOpen: boolean
@@ -33,6 +34,10 @@ const isVerifiedSuccess = ref(false)
 const verifiedContractData = ref<any>(null)
 const isDownloadingPdf = ref(false)
 
+const canSubmit = computed(() => {
+  return verificationCode.value.trim().length >= 6 && password.value.length > 0
+})
+
 // Normalize input automatically
 function handleCodeInput(e: Event) {
   const target = e.target as HTMLInputElement
@@ -40,31 +45,20 @@ function handleCodeInput(e: Event) {
 }
 
 async function handleVerify() {
-  if (!props.contract) return
+  if (!props.contract || !canSubmit.value) return
+  isSubmitting.value = true
   errorMessage.value = ''
 
-  if (!verificationCode.value) {
-    errorMessage.value = 'Tasdiqlash kodini kiriting.'
-    return
-  }
-
-  if (!password.value) {
-    errorMessage.value = 'Hisobingiz parolini kiriting.'
-    return
-  }
-
-  isSubmitting.value = true
   try {
     const res = await onlineContractsApi.verifyContract(props.contract.id, {
-      code: verificationCode.value,
+      code: verificationCode.value.trim().toUpperCase(),
       password: password.value,
     })
-
     isVerifiedSuccess.value = true
     verifiedContractData.value = res
     emit('verified', props.contract.id)
   } catch (err: any) {
-    errorMessage.value = err?.response?.data?.detail || 'Tasdiqlash kodi yoki parol noto\'g\'ri.'
+    errorMessage.value = err?.response?.data?.detail || "Tasdiqlashda xatolik yuz berdi. Kod yoki parolni tekshiring."
   } finally {
     isSubmitting.value = false
   }
@@ -75,15 +69,29 @@ async function handleDownloadPdf() {
   isDownloadingPdf.value = true
   try {
     const detail = await onlineContractsApi.getContractDetail(props.contract.id)
-    const title = `SHARTNOMA_${detail.contract_number}_${detail.full_name}`
-    const variableValues: Record<string, string> = {
-      '{{client_name}}': detail.full_name,
-      '{{passport_number}}': detail.passport_number,
-      '{{contract_price}}': detail.tariff_price?.toLocaleString('uz-UZ') + ' UZS',
-      '{{contract_date}}': detail.signed_at ? new Date(detail.signed_at).toLocaleDateString('uz-UZ') : '',
-      '{{contract_number}}': detail.contract_number,
+    const title = `SHARTNOMA_${detail.contract_number}_${detail.full_name || 'TALABA'}`
+    const variableValues = buildVariableValues(detail, {
+      contractNumber: detail.contract_number,
+      price: detail.tariff_price,
+      discount: detail.discount,
+      signatureData: detail.signature_data,
+      verificationCode: detail.has_verification_code ? detail.verification_code : undefined,
+    })
+    const verificationMeta = {
+      contractNumber: detail.contract_number,
+      studentId: detail.student_id_assigned || undefined,
+      studentName: detail.full_name,
+      verifiedAt: detail.verified_at ? new Date(detail.verified_at).toLocaleDateString('uz-UZ') : undefined,
+      status: detail.status,
     }
-    await downloadContractAsPdf(title, detail.content, { top: 15, right: 15, bottom: 15, left: 15 }, variableValues)
+    await downloadContractAsPdf(
+      title,
+      detail.content,
+      { top: 15, right: 15, bottom: 15, left: 15 },
+      variableValues,
+      detail.signature_data,
+      verificationMeta
+    )
   } catch (err) {
     console.error('Failed to download PDF:', err)
   } finally {

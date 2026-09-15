@@ -11,6 +11,7 @@ import OnlineContractLayout from '../layouts/OnlineContractLayout.vue'
 import OnlineContractSignatureModal from '../components/OnlineContractSignatureModal.vue'
 import FullContractViewerModal from '../components/FullContractViewerModal.vue'
 import { getTariffSampleContractHtml } from '../utils/sampleContract'
+import { buildVariableValues } from '@/modules/contracts/utils/contractVariables'
 import {
   FileText,
   User,
@@ -122,14 +123,26 @@ const formattedDob = computed(() => {
 })
 
 const variableValues = computed<Record<string, string>>(() => {
-  return {
-    '{{client_name}}': (formData.fullName || '').toUpperCase() || '________________________',
-    '{{student_name}}': (formData.fullName || '').toUpperCase() || '________________________',
-    '{{passport_number}}': (formData.passportNumber || '').toUpperCase() || '____ ________',
-    '{{contract_price}}': selectedTariff.value ? formatPrice(selectedTariff.value.price) : '___________ UZS',
-    '{{contract_date}}': new Date().toLocaleDateString('uz-UZ'),
-    '{{contract_number}}': 'Pending Student ID',
-  }
+  return buildVariableValues(
+    {
+      full_name: (formData.fullName || '').toUpperCase().trim(),
+      passport_number: (formData.passportNumber || '').toUpperCase().trim(),
+      education_level: formData.educationLevel || '',
+      office: formData.office || '',
+      date_of_birth: formattedDob.value || '',
+      phone1: formData.phone1 || '',
+      phone2: formData.phone2 || '',
+      signature_data: formData.signatureData || '',
+    },
+    {
+      price: selectedTariff.value?.price,
+      contractNumber: 'Pending Student ID',
+      templateName: selectedTariff.value?.name,
+      signatureData: formData.signatureData || '',
+      educationLevel: formData.educationLevel || '',
+      office: formData.office || '',
+    }
+  )
 })
 
 const effectiveContractText = computed(() => {
@@ -634,9 +647,13 @@ onMounted(() => {
               {{ selectedTariff?.name }} DASTURI BO'YICHA KONSALTING XIZMATLARI SHARTNOMASI
             </h4>
             <div class="space-y-1 text-xs text-zinc-800 dark:text-zinc-300">
-              <p><strong>Mijoz:</strong> {{ (formData.fullName || '').toUpperCase() }} (Pasport: {{ (formData.passportNumber || '').toUpperCase() }})</p>
+              <p><strong>Mijoz (F.I.O):</strong> {{ (formData.fullName || '').toUpperCase() || '—' }}</p>
+              <p><strong>Pasport raqami:</strong> {{ (formData.passportNumber || '').toUpperCase() || '—' }}</p>
+              <p><strong>Ta'lim bosqichi:</strong> {{ formData.educationLevel || '—' }}</p>
+              <p><strong>Qabul ofisi:</strong> {{ formData.office || '—' }}</p>
+              <p><strong>Tug'ilgan sana:</strong> {{ formattedDob || '—' }}</p>
+              <p><strong>Telefonlar:</strong> {{ formData.phone1 || '—' }} / {{ formData.phone2 || '—' }}</p>
               <p><strong>Xizmat to'lovi:</strong> {{ formatPrice(selectedTariff?.price) }}</p>
-              <p><strong>Ofis:</strong> {{ formData.office }}</p>
               <p class="pt-2 text-zinc-600 dark:text-zinc-400 italic">
                 Shartnomaning barcha bandlari va yuridik kafolatlarini ko'rish uchun yuqoridagi "Shartnomani to'liq ochish" tugmasini bosing.
               </p>

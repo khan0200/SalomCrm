@@ -18,6 +18,7 @@ export interface Contract {
   student_university?: string | null
   tariff_name?: string | null
   tariff_price?: number | null
+  discount?: number | string | null
   passport_number?: string | null
   full_name?: string | null
   education_level?: string | null
@@ -103,14 +104,19 @@ export const contractsApi = {
     return data
   },
 
-  async assignStudentId(id: string, studentId: string): Promise<{
+  async assignStudentId(id: string, studentId: string, discount?: number | string): Promise<{
     detail: string
     student_id: string
     contract_number: string
+    discount?: string
     verification_code: string
     expires_at: string
   }> {
-    const { data } = await apiClient.post(`/contracts/${id}/assign-student-id/`, { student_id: studentId })
+    const payload: Record<string, any> = { student_id: studentId }
+    if (discount !== undefined && discount !== null && discount !== '') {
+      payload.discount = discount
+    }
+    const { data } = await apiClient.post(`/contracts/${id}/assign-student-id/`, payload)
     return data
   },
 

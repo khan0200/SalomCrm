@@ -2,6 +2,8 @@
 import { ref, computed, watch, nextTick, onMounted } from 'vue'
 import type { TextCanvasElement } from '../../types/contractCanvas'
 import { cleanClipboardContent } from '../../utils/clipboardUtils'
+import { scaleInlineStyles, normalizeLegacyRequisites } from '../../utils/canvasZoomUtils'
+import { replaceVariablesInHtml } from '../../utils/contractVariables'
 
 const MM_TO_PX_BASE = 3.779527559
 
@@ -49,13 +51,14 @@ const elementStyle = computed(() => {
   }
 })
 
-// Replace variables in preview mode
+// Replace variables in preview mode and scale inline styles proportionally with zoom
 const displayContent = computed(() => {
   let text = props.element.content || ''
-  if (!props.isEditing && props.variableValues) {
-    for (const [key, val] of Object.entries(props.variableValues)) {
-      text = text.split(key).join(val)
-    }
+  if (!props.isEditing && props.variableValues && Object.keys(props.variableValues).length > 0) {
+    text = replaceVariablesInHtml(text, props.variableValues)
+  }
+  if (!props.isEditing) {
+    text = scaleInlineStyles(text, props.zoomLevel)
   }
   return text
 })
@@ -104,10 +107,14 @@ function measureAndEmitHeight() {
   }
 }
 
+let lastHandledZoom = props.zoomLevel
+
 // Sync initial DOM content without triggering reactivity reset
 onMounted(() => {
   if (editableRef.value) {
-    editableRef.value.innerHTML = props.isEditing ? (props.element.content || '') : displayContent.value
+    editableRef.value.innerHTML = props.isEditing
+      ? normalizeLegacyRequisites(props.element.content || '')
+      : displayContent.value
   }
   // Auto-fit height to actual text content on mount
   nextTick(() => {
@@ -123,10 +130,23 @@ watch(
   () => props.element.content,
   newContent => {
     if (newContent === lastEmittedHtml) return
-    if (editableRef.value && editableRef.value.innerHTML !== newContent) {
-      editableRef.value.innerHTML = newContent || ''
+    const normalized = normalizeLegacyRequisites(newContent || '')
+    if (editableRef.value && editableRef.value.innerHTML !== normalized) {
+      editableRef.value.innerHTML = props.isEditing ? normalized : scaleInlineStyles(normalized, props.zoomLevel)
     }
     nextTick(() => measureAndEmitHeight())
+  }
+)
+
+// Watch zoomLevel changes when NOT editing
+watch(
+  () => props.zoomLevel,
+  newZoom => {
+    lastHandledZoom = newZoom
+    if (!props.isEditing && editableRef.value) {
+      editableRef.value.innerHTML = displayContent.value || ''
+    }
+    // Do NOT trigger measureAndEmitHeight on pure zoom slider movements
   }
 )
 
@@ -135,7 +155,10 @@ watch(displayContent, newVal => {
   if (!props.isEditing && editableRef.value) {
     editableRef.value.innerHTML = newVal || ''
   }
-  nextTick(() => measureAndEmitHeight())
+  // Only auto-resize height if content/variables changed, not pure zoom change
+  if (props.zoomLevel === lastHandledZoom) {
+    nextTick(() => measureAndEmitHeight())
+  }
 })
 
 // Watch width changes (e.g. resizing text box width triggers text re-flow and height change)
@@ -167,8 +190,9 @@ watch(
     if (isEdit) {
       nextTick(() => {
         if (!editableRef.value) return
-        editableRef.value.innerHTML = props.element.content || ''
-        lastEmittedHtml = editableRef.value.innerHTML
+        const normalized = normalizeLegacyRequisites(props.element.content || '')
+        editableRef.value.innerHTML = normalized
+        lastEmittedHtml = normalized
         editableRef.value.focus({ preventScroll: true })
 
         const range = window.document.createRange()

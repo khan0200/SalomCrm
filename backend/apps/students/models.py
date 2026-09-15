@@ -677,6 +677,7 @@ class Contract(TenantAwareModel):
     )
     tariff_name = models.CharField(max_length=255, blank=True, default='')
     tariff_price = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal('0.00'))
+    discount = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal('0.00'))
     passport_number = models.CharField(max_length=50, blank=True, default='', db_index=True)
     full_name = models.CharField(max_length=255, blank=True, default='')
     education_level = models.CharField(max_length=100, blank=True, default='')

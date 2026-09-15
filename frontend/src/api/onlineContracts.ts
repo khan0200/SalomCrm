@@ -64,6 +64,7 @@ export interface OnlineContractSummary {
   status: 'draft' | 'pending' | 'verified' | 'rejected' | 'completed' | 'cancelled'
   tariff_name: string
   tariff_price: number
+  discount?: number
   student_id_assigned?: string
   created_at?: string
   signed_at?: string
@@ -118,6 +119,7 @@ export interface ContractDetailOnlineResponse {
   tariff_id?: number | string
   tariff_name: string
   tariff_price: number
+  discount?: number
   passport_number: string
   full_name: string
   education_level: string
@@ -129,6 +131,7 @@ export interface ContractDetailOnlineResponse {
   content: string
   student_id_assigned?: string
   has_verification_code: boolean
+  verification_code?: string
   verification_code_expires_at?: string
   verified_at?: string
   rejection_reason?: string

@@ -8,6 +8,8 @@ import {
 } from 'lucide-vue-next'
 import type { TableCanvasElement, TableCellModel } from '../../types/contractCanvas'
 import { cleanClipboardContent } from '../../utils/clipboardUtils'
+import { scaleInlineStyles } from '../../utils/canvasZoomUtils'
+import { replaceVariablesInHtml } from '../../utils/contractVariables'
 
 const props = defineProps<{
   element: TableCanvasElement
@@ -35,6 +37,16 @@ function mmToPx(mm: number): number {
 function pxToMm(px: number): number {
   return px / (MM_TO_PX_BASE * (props.zoomLevel / 100))
 }
+
+const cellFontSizePx = computed(() => {
+  const base = props.element.density === 'compact' ? 11 : props.element.density === 'spacious' ? 14 : 12
+  return Math.max(5, Math.round(base * (props.zoomLevel / 100) * 10) / 10)
+})
+
+const cellPaddingPx = computed(() => {
+  const base = props.element.density === 'compact' ? 3 : props.element.density === 'spacious' ? 10 : 5
+  return Math.max(1, Math.round(base * (props.zoomLevel / 100) * 10) / 10)
+})
 
 // Resizing Columns via Dragging Column Headers
 function onColumnResizeStart(colIdx: number, e: PointerEvent) {
@@ -191,10 +203,11 @@ function deleteRowAt(rowIdx: number) {
 // Variable replacement helper
 function renderCellContent(content: string): string {
   let text = content || ''
-  if (props.variableValues) {
-    for (const [key, val] of Object.entries(props.variableValues)) {
-      text = text.split(key).join(val)
-    }
+  if (props.variableValues && Object.keys(props.variableValues).length > 0) {
+    text = replaceVariablesInHtml(text, props.variableValues)
+  }
+  if (props.zoomLevel !== 100) {
+    text = scaleInlineStyles(text, props.zoomLevel)
   }
   return text
 }
@@ -279,12 +292,7 @@ function renderCellContent(content: string): string {
             :class="[
               activeCellCoord?.r === rIdx && activeCellCoord?.c === cIdx && isSelected
                 ? 'ring-2 ring-blue-500 ring-inset bg-blue-50/20'
-                : '',
-              element.density === 'compact'
-                ? 'p-1 text-[11px]'
-                : element.density === 'spacious'
-                ? 'p-3 text-sm'
-                : 'p-1.5 text-xs'
+                : ''
             ]"
             :style="{
               border: `${element.borderWidth || '1px'} ${element.borderStyle || 'solid'} ${element.borderColor || '#94a3b8'}`,
@@ -292,7 +300,9 @@ function renderCellContent(content: string): string {
               textAlign: cell.textAlign || 'left',
               verticalAlign: cell.verticalAlign || 'top',
               color: cell.color || '#111827',
-              fontFamily: `'Times New Roman', Times, serif`
+              fontFamily: `'Times New Roman', Times, serif`,
+              fontSize: `${cellFontSizePx}px`,
+              padding: `${cellPaddingPx}px`
             }"
             @click="onCellClick(rIdx, cIdx, $event)"
             @dblclick="onCellDoubleClick(rIdx, cIdx, $event)"

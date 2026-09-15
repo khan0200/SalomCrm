@@ -12,9 +12,11 @@ import {
   Variable,
   Calendar,
   Sparkles,
+  Building2,
+  UserCheck,
 } from 'lucide-vue-next'
 import type { CanvasElement, PageMargins } from '../../types/contractCanvas'
-import { CONTRACT_VARIABLES } from '../../utils/contractVariables'
+import { CONTRACT_VARIABLES, resolveTenantRequisites, buildCompanyRequisitesHtml, buildClientRequisitesHtml } from '../../utils/contractVariables'
 
 const props = defineProps<{
   margins: PageMargins
@@ -192,20 +194,72 @@ function insertCheckbox(checked: boolean) {
 
 // 6. Variable Insertion
 function insertVariableElement(varKey: string, label: string) {
+  const cleanKey = varKey.replace(/^\{\{|\}\}$/g, '')
   emit('add-element', {
     id: generateId('var'),
     type: 'text',
     x: props.margins.left,
     y: props.margins.top + 10,
-    width: 70,
+    width: 60,
     height: 10,
     zIndex: 1,
-    content: `<span class="bg-blue-50 text-blue-700 font-mono font-bold px-1.5 py-0.5 rounded border border-blue-200 text-xs">${varKey}</span>`,
-    variableKey: varKey,
+    content: `{{${cleanKey}}}`,
+    variableKey: cleanKey,
     style: {
       fontFamily: 'Times New Roman',
       fontSize: 12,
       color: '#1d4ed8',
+    },
+  })
+}
+
+// 7. Company Requisites Insertion
+function insertCompanyRequisites() {
+  const req = resolveTenantRequisites()
+  const contentWidth = props.margins ? (210 - props.margins.left - props.margins.right) : 180
+  const blockWidth = Math.min(88, Math.floor(contentWidth / 2) - 2)
+  emit('add-element', {
+    id: generateId('req'),
+    type: 'text',
+    x: props.margins ? props.margins.left : 15,
+    y: (props.margins ? props.margins.top : 15) + 10,
+    width: blockWidth,
+    height: 72,
+    zIndex: 1,
+    content: buildCompanyRequisitesHtml(req),
+    style: {
+      fontFamily: 'Times New Roman',
+      fontSize: 11,
+      fontWeight: 'bold',
+      fontStyle: 'normal',
+      textAlign: 'left',
+      color: '#000000',
+      lineHeight: 1.35,
+    },
+  })
+}
+
+// 8. Client Requisites Insertion (MIJOZ)
+function insertClientRequisites() {
+  const contentWidth = props.margins ? (210 - props.margins.left - props.margins.right) : 180
+  const blockWidth = Math.min(88, Math.floor(contentWidth / 2) - 2)
+  emit('add-element', {
+    id: generateId('client_req'),
+    type: 'text',
+    x: props.margins ? (210 - props.margins.right - blockWidth) : 107,
+    y: (props.margins ? props.margins.top : 15) + 10,
+    width: blockWidth,
+    height: 72,
+    zIndex: 1,
+    content: buildClientRequisitesHtml(),
+    style: {
+      fontFamily: 'Times New Roman',
+      fontSize: 11,
+      fontWeight: 'bold',
+      fontStyle: 'normal',
+      textAlign: 'left',
+      color: '#000000',
+      lineHeight: 1.35,
     },
   })
 }
@@ -376,6 +430,34 @@ function insertVariableElement(varKey: string, label: string) {
         <div>
           <div class="font-bold text-zinc-800 dark:text-zinc-200">Checkbox (☑ / ☐)</div>
           <div class="text-[10px] text-zinc-400">Belgilash katagi</div>
+        </div>
+      </button>
+
+      <button
+        type="button"
+        @click="insertCompanyRequisites(); emit('close')"
+        class="w-full text-left p-2 rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50/50 dark:bg-indigo-950/40 hover:bg-indigo-100 transition-colors flex items-center gap-2.5 cursor-pointer"
+      >
+        <div class="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold">
+          <Building2 class="w-4 h-4" />
+        </div>
+        <div>
+          <div class="font-bold text-indigo-900 dark:text-indigo-200">Bajaruvchi rekvizitlari</div>
+          <div class="text-[10px] text-zinc-500">Kompaniya rasmiy rekvizitlar bloki</div>
+        </div>
+      </button>
+
+      <button
+        type="button"
+        @click="insertClientRequisites(); emit('close')"
+        class="w-full text-left p-2 rounded-xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/40 hover:bg-emerald-100 transition-colors flex items-center gap-2.5 cursor-pointer"
+      >
+        <div class="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center font-bold">
+          <UserCheck class="w-4 h-4" />
+        </div>
+        <div>
+          <div class="font-bold text-emerald-900 dark:text-emerald-200">Mijoz rekvizitlari</div>
+          <div class="text-[10px] text-zinc-500">Mijoz (F.I.O, Passport, Imzo) bloki</div>
         </div>
       </button>
     </div>

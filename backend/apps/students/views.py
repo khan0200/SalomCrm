@@ -2193,6 +2193,17 @@ class ContractViewSet(viewsets.ModelViewSet):
         if not student_id:
             return Response({'detail': 'Student ID is required.'}, status=status.HTTP_400_BAD_REQUEST)
 
+        # Parse optional discount provided by tenant staff
+        discount_raw = request.data.get('discount')
+        discount_amount = Decimal('0.00')
+        if discount_raw is not None and str(discount_raw).strip():
+            try:
+                discount_amount = Decimal(str(discount_raw).replace(' ', '').replace(',', '.'))
+                if discount_amount < 0:
+                    discount_amount = Decimal('0.00')
+            except Exception:
+                discount_amount = Decimal('0.00')
+
         tenant = contract.tenant
 
         # 1. Link or Create CRM Student (Only Student ID, Full Name, Phone 1 & 2, and Email; NO passport)
@@ -2213,10 +2224,13 @@ class ContractViewSet(viewsets.ModelViewSet):
                 email=student_email or '',
                 office=contract.office or '',
                 tariff=contract.tariff_name or '',
+                level=contract.education_level or '',
+                birthday=contract.date_of_birth or '',
+                discount=discount_amount,
                 created_by=request.user if request.user.is_authenticated else None
             )
         else:
-            # Sync contact info if CRM student was missing them (DO NOT auto-fill passport)
+            # Sync contact & educational info if CRM student was missing them (DO NOT auto-fill passport)
             updates = []
             if not crm_student.phone1 and contract.phone1:
                 crm_student.phone1 = contract.phone1
@@ -2227,13 +2241,51 @@ class ContractViewSet(viewsets.ModelViewSet):
             if not crm_student.email and student_email:
                 crm_student.email = student_email
                 updates.append('email')
+            if not crm_student.office and contract.office:
+                crm_student.office = contract.office
+                updates.append('office')
+            if not crm_student.tariff and contract.tariff_name:
+                crm_student.tariff = contract.tariff_name
+                updates.append('tariff')
+            if not crm_student.level and contract.education_level:
+                crm_student.level = contract.education_level
+                updates.append('level')
+            if not crm_student.birthday and contract.date_of_birth:
+                crm_student.birthday = contract.date_of_birth
+                updates.append('birthday')
+            if discount_amount > 0 and crm_student.discount != discount_amount:
+                crm_student.discount = discount_amount
+                updates.append('discount')
             if updates:
                 crm_student.save(update_fields=updates)
 
-        # 2. Link contract & Set public Contract Number = Student ID
+        # Record official discount in payment system so it affects balance, payments table, and student details drawer
+        if discount_amount > 0:
+            from apps.payments.services import record_payment
+            contract_ref = f"CONTRACT_{contract.id}"
+            already_recorded = crm_student.payments.filter(
+                is_discount=True,
+                notes__contains=contract_ref
+            ).exists()
+            if not already_recorded:
+                record_payment(
+                    tenant=tenant,
+                    student=crm_student,
+                    amount=discount_amount,
+                    method='Discount',
+                    received_by='Contract Signing',
+                    notes=f"Shartnoma bo'yicha chegirma (#{student_id}, ref: {contract_ref})",
+                    is_discount=True,
+                    user=request.user if request.user.is_authenticated else None
+                )
+
+        # 2. Link contract, Set public Contract Number = Student ID & Save Discount
         contract.student = crm_student
         contract.student_id_assigned = student_id
         contract.contract_number = student_id
+        contract.discount = discount_amount
+        if contract.snapshot_data and isinstance(contract.snapshot_data, dict):
+            contract.snapshot_data['discount'] = str(discount_amount)
 
         # 3. Generate Verification Code: XXXX-XXXX-STUDENTID
         from apps.core.email_service import generate_verification_code
@@ -2266,6 +2318,7 @@ class ContractViewSet(viewsets.ModelViewSet):
             'detail': 'Student ID assigned and Verification Code generated.',
             'student_id': student_id,
             'contract_number': student_id,
+            'discount': str(contract.discount or 0),
             'verification_code': verif_code,
             'expires_at': expires_at.isoformat(),
         }, status=status.HTTP_200_OK)

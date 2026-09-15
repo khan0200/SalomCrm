@@ -44,6 +44,7 @@ import {
 } from './utils/contractCanvasConverter'
 import { settingsApi, type TariffOption } from '@/api/settings'
 import { getContractTemplate } from './contractTemplates'
+import { formatDateIso } from './utils/contractVariables'
 import { contractsApi, type Contract } from '@/api/contracts'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
@@ -273,10 +274,18 @@ async function handleDownloadContract(contract: Contract, format: 'pdf' | 'doc' 
   } else {
     isDownloadingPdf.value = true
     try {
+      const contractNum = contract.student_id_assigned || contract.contract_number || ''
+      const dateIso = formatDateIso(contract.signed_at || contract.created_at)
       const variableValues: Record<string, string> = {
+        studentid: contractNum,
+        student_id: contractNum,
         contract_number: contract.contract_number || contract.student_id_assigned || '',
-        student_id: contract.student_id_assigned || '',
+        date: dateIso,
+        contract_date: dateIso,
+        sana: dateIso,
         student_name: contract.student_name || '',
+        fullname: contract.student_name || '',
+        passportnumber: contract.passport_number || contract.student_passport || '',
         student_passport: contract.passport_number || contract.student_passport || '',
         tariff_name: contract.tariff_name || '',
         tariff_price: contract.tariff_price ? String(contract.tariff_price) : '',
@@ -507,6 +516,7 @@ function getStatusLabel(status?: string): string {
 const isAssignModalOpen = ref(false)
 const assigningContract = ref<Contract | null>(null)
 const assignStudentIdInput = ref('')
+const assignDiscountInput = ref<number | string>('')
 const isAssigning = ref(false)
 const assignError = ref('')
 
@@ -514,6 +524,7 @@ const showVerificationCodeResultModal = ref(false)
 const generatedCodeResult = ref<{
   student_id: string
   contract_number: string
+  discount?: string
   verification_code: string
   expires_at: string
 } | null>(null)
@@ -577,6 +588,7 @@ async function copyOnlineContractLink() {
 function openAssignModal(contract: Contract) {
   assigningContract.value = contract
   assignStudentIdInput.value = contract.student_id || contract.student_id_assigned || ''
+  assignDiscountInput.value = contract.discount ? Number(contract.discount) : ''
   assignError.value = ''
   isAssignModalOpen.value = true
 }
@@ -592,7 +604,7 @@ async function handleConfirmAssignStudentId() {
   isAssigning.value = true
   assignError.value = ''
   try {
-    const res = await contractsApi.assignStudentId(assigningContract.value.id, sid)
+    const res = await contractsApi.assignStudentId(assigningContract.value.id, sid, assignDiscountInput.value)
     generatedCodeResult.value = res
     isAssignModalOpen.value = false
     showVerificationCodeResultModal.value = true
@@ -1446,6 +1458,24 @@ async function confirmDelete() {
           </p>
         </div>
 
+        <!-- Discount Input -->
+        <div>
+          <label class="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1">
+            Chegirma miqdori (so'm) <span class="text-zinc-400 font-normal">(ixtiyoriy)</span>
+          </label>
+          <input
+            v-model="assignDiscountInput"
+            type="number"
+            min="0"
+            step="1000"
+            placeholder="0 — chegirma yo'q"
+            class="w-full px-3.5 py-2.5 bg-zinc-50 dark:bg-zinc-850 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm font-mono focus:outline-none focus:border-emerald-500"
+          />
+          <p class="text-[11px] text-zinc-400 mt-1.5 leading-relaxed">
+            Talabaga beriladigan rasmiy chegirma. Shartnomadagi <code v-pre class="bg-zinc-100 dark:bg-zinc-800 px-1 rounded">{{discount}}</code> o'rniga yoziladi va to'lov hisobiga qo'shiladi.
+          </p>
+        </div>
+
         <!-- Explanation Link -->
         <div class="p-3 bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200/60 dark:border-blue-800/60 rounded-xl text-[11.5px] text-blue-800 dark:text-blue-300 flex items-start justify-between gap-2">
           <span>This action will assign the Student ID, link the CRM student, and generate a 24-hour Verification Code.</span>
@@ -1500,6 +1530,10 @@ async function confirmDelete() {
             Student ID: <span class="font-bold text-zinc-900 dark:text-white font-mono">{{ generatedCodeResult?.student_id }}</span>
             &nbsp;•&nbsp;
             Contract Number: <span class="font-bold text-zinc-900 dark:text-white font-mono">{{ generatedCodeResult?.contract_number }}</span>
+          </div>
+
+          <div v-if="generatedCodeResult?.discount && Number(generatedCodeResult.discount) > 0" class="text-xs text-emerald-700 dark:text-emerald-400">
+            Chegirma: <span class="font-bold font-mono">{{ Number(generatedCodeResult.discount).toLocaleString('uz-UZ') }} so'm</span>
           </div>
 
           <div class="text-[11px] uppercase tracking-wider font-bold text-emerald-700 dark:text-emerald-400">

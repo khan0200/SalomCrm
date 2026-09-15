@@ -7,6 +7,7 @@ import type {
   TableCellModel,
   PageMargins,
 } from '../types/contractCanvas'
+import { replaceVariablesInHtml } from './contractVariables'
 
 const DEFAULT_MARGINS: PageMargins = {
   top: 20,
@@ -402,9 +403,7 @@ export function convertCanvasDocumentToHtml(
           row.forEach(cell => {
             let cellContent = cell.content
             if (variableValues) {
-              for (const [key, val] of Object.entries(variableValues)) {
-                cellContent = cellContent.split(key).join(val)
-              }
+              cellContent = replaceVariablesInHtml(cellContent, variableValues)
             }
             const bg = cell.backgroundColor ? `background-color: ${cell.backgroundColor};` : ''
             const align = cell.textAlign ? `text-align: ${cell.textAlign};` : ''
@@ -439,9 +438,7 @@ export function convertCanvasDocumentToHtml(
         const textEl = el as TextCanvasElement
         let content = textEl.content
         if (variableValues) {
-          for (const [key, val] of Object.entries(variableValues)) {
-            content = content.split(key).join(val)
-          }
+          content = replaceVariablesInHtml(content, variableValues)
         }
         const st = textEl.style || {}
         const fontStyle = `
