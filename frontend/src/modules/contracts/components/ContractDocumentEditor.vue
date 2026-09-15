@@ -284,14 +284,21 @@ watch(
 // Global keyboard listeners — centralized shortcut system
 function onKeyDown(e: KeyboardEvent) {
   const isMod = e.ctrlKey || e.metaKey
-  const activeEl = window.document.activeElement
-  const isInTextEdit =
-    activeEl &&
-    (activeEl.tagName === 'INPUT' ||
-      activeEl.tagName === 'TEXTAREA' ||
-      (activeEl as HTMLElement).getAttribute('contenteditable') === 'true' ||
-      Boolean((activeEl as HTMLElement).closest('.canvas-text-element')) ||
-      Boolean((activeEl as HTMLElement).closest('[contenteditable="true"]')))
+  const activeEl = window.document.activeElement as HTMLElement | null
+  // Canvas text elements are contenteditable too, but - unlike a plain
+  // <input>/<textarea> or a table cell - Ctrl+B/I/U should keep working
+  // inside them (to format the highlighted selection; see applyInlineFormat).
+  const isInCanvasTextEdit = Boolean(activeEl?.closest('.canvas-text-element'))
+  const isInOtherTextField =
+    !isInCanvasTextEdit &&
+    Boolean(
+      activeEl &&
+        (activeEl.tagName === 'INPUT' ||
+          activeEl.tagName === 'TEXTAREA' ||
+          activeEl.getAttribute('contenteditable') === 'true' ||
+          activeEl.closest('[contenteditable="true"]'))
+    )
+  const isInTextEdit = isInCanvasTextEdit || isInOtherTextField
 
   // ── Ctrl+S → Save (always, even in text edit) ────────────────
   if (isMod && (e.key === 's' || e.key === 'S') && !e.shiftKey) {
@@ -343,8 +350,11 @@ function onKeyDown(e: KeyboardEvent) {
     return
   }
 
-  // ── Text formatting (only when element selected, not in text edit) ──
-  if (isMod && !isInTextEdit && canvas.selectedElement.value) {
+  // ── Text formatting: works both when an element is merely selected AND
+  //    while actively editing its text (applyInlineFormat then targets the
+  //    highlighted selection instead of the whole block). Only truly
+  //    unrelated text fields (inputs, table cells) are excluded. ──
+  if (isMod && !isInOtherTextField && canvas.selectedElement.value) {
     // Ctrl+B → Bold
     if ((e.key === 'b' || e.key === 'B') && !e.shiftKey) {
       e.preventDefault()
@@ -767,12 +777,18 @@ function closeAllDropdowns() {
 // Undo / Redo helpers (called once per action — buttons previously called undo() twice!)
 function performUndo() {
   const state = canvas.history.undo()
-  if (state) canvas.document.value = state
+  if (state) {
+    canvas.document.value = state
+    nextTick(() => canvas.history.settleHistoryUpdate())
+  }
 }
 
 function performRedo() {
   const state = canvas.history.redo()
-  if (state) canvas.document.value = state
+  if (state) {
+    canvas.document.value = state
+    nextTick(() => canvas.history.settleHistoryUpdate())
+  }
 }
 
 // Called when drag or resize finishes — records a history snapshot so Ctrl+Z works
@@ -812,69 +828,76 @@ onBeforeUnmount(() => {
 function setFontSize(sizePt: number | string) {
   const num = typeof sizePt === 'string' ? parseInt(sizePt, 10) : sizePt
   const el = canvas.selectedElement.value as any
-  if (el) {
+  if (!el) return
+  if (!el.style) el.style = {}
+  el.style.fontSize = num
+  canvas.history.recordSnapshot(canvas.document.value)
+}
+
+/**
+ * Bold/Italic/Underline/Strikethrough need two different behaviors depending
+ * on context, same as a real word processor:
+ *  - Actively editing with an actual text selection highlighted: format just
+ *    that run via execCommand (same technique already used by
+ *    applyListFormat/increaseIndent/decreaseIndent below), so a single word
+ *    can be bolded inside a paragraph instead of the whole block.
+ *  - Otherwise (element merely selected, or a caret with nothing
+ *    highlighted): toggle the whole block's base style, as before.
+ * Either path now always records a history snapshot - previously this only
+ * happened for checkbox elements, so bolding a paragraph was silently
+ * unrecoverable with Ctrl+Z.
+ */
+function applyInlineFormat(command: 'bold' | 'italic' | 'underline' | 'strikeThrough', toggleWholeElement: (el: any) => void) {
+  const el = canvas.selectedElement.value as any
+  if (!el) return
+
+  const activeEl = window.document.activeElement as HTMLElement | null
+  const isInsideEditable = Boolean(
+    activeEl && (activeEl.getAttribute('contenteditable') === 'true' || activeEl.closest('.canvas-text-element'))
+  )
+  const sel = window.getSelection()
+  const hasHighlightedText = Boolean(sel && sel.rangeCount > 0 && !sel.isCollapsed)
+
+  if (isInsideEditable && hasHighlightedText) {
+    window.document.execCommand(command, false)
+    const container = (activeEl!.closest('.canvas-text-element') || activeEl) as HTMLElement
+    if (container) el.content = container.innerHTML
+  } else {
     if (!el.style) el.style = {}
-    el.style.fontSize = num
-    if (el.type === 'checkbox') {
-      canvas.updateElement(el.id, { fontSize: num, style: { ...el.style, fontSize: num } })
-    }
+    toggleWholeElement(el)
   }
+
+  nextTick(() => canvas.history.recordSnapshot(canvas.document.value))
 }
 
 function toggleBold() {
-  const el = canvas.selectedElement.value as any
-  if (!el) return
-  if (!el.style) el.style = {}
-  const next = el.style.fontWeight === 'bold' || el.style.fontWeight === 700 ? 'normal' : 'bold'
-  el.style.fontWeight = next
-  if (el.type === 'checkbox') {
-    canvas.updateElement(el.id, { style: { ...el.style, fontWeight: next } })
-  }
+  applyInlineFormat('bold', el => {
+    el.style.fontWeight = (el.style.fontWeight === 'bold' || el.style.fontWeight === 700) ? 'normal' : 'bold'
+  })
 }
 
 function toggleItalic() {
-  const el = canvas.selectedElement.value as any
-  if (!el) return
-  if (!el.style) el.style = {}
-  const next = el.style.fontStyle === 'italic' ? 'normal' : 'italic'
-  el.style.fontStyle = next
-  if (el.type === 'checkbox') {
-    canvas.updateElement(el.id, { style: { ...el.style, fontStyle: next } })
-  }
+  applyInlineFormat('italic', el => {
+    el.style.fontStyle = el.style.fontStyle === 'italic' ? 'normal' : 'italic'
+  })
 }
 
 function toggleUnderline() {
-  const el = canvas.selectedElement.value as any
-  if (!el) return
-  if (!el.style) el.style = {}
-  const current = el.style.textDecoration || ''
-  let next = ''
-  if (current.includes('underline')) {
-    next = current.replace('underline', '').trim() || 'none'
-  } else {
-    next = current === 'none' || !current ? 'underline' : `${current} underline`
-  }
-  el.style.textDecoration = next
-  if (el.type === 'checkbox') {
-    canvas.updateElement(el.id, { style: { ...el.style, textDecoration: next } })
-  }
+  applyInlineFormat('underline', el => {
+    const current = el.style.textDecoration || ''
+    el.style.textDecoration = current.includes('underline')
+      ? (current.replace('underline', '').trim() || 'none')
+      : (current === 'none' || !current ? 'underline' : `${current} underline`)
+  })
 }
 
 function toggleStrike() {
-  const el = canvas.selectedElement.value as any
-  if (!el) return
-  if (!el.style) el.style = {}
-  const current = el.style.textDecoration || ''
-  let next = ''
-  if (current.includes('line-through')) {
-    next = current.replace('line-through', '').trim() || 'none'
-  } else {
-    next = current === 'none' || !current ? 'line-through' : `${current} line-through`
-  }
-  el.style.textDecoration = next
-  if (el.type === 'checkbox') {
-    canvas.updateElement(el.id, { style: { ...el.style, textDecoration: next } })
-  }
+  applyInlineFormat('strikeThrough', el => {
+    const current = el.style.textDecoration || ''
+    el.style.textDecoration = current.includes('line-through')
+      ? (current.replace('line-through', '').trim() || 'none')
+      : (current === 'none' || !current ? 'line-through' : `${current} line-through`)
+  })
 }
 
 function setTextAlign(align: 'left' | 'center' | 'right' | 'justify') {
@@ -882,6 +905,7 @@ function setTextAlign(align: 'left' | 'center' | 'right' | 'justify') {
   if (!el) return
   if (!el.style) el.style = {}
   el.style.textAlign = align
+  canvas.history.recordSnapshot(canvas.document.value)
 }
 
 // Alignment cycle: Left → Center → Right → Justify → Left
@@ -1169,9 +1193,7 @@ function setFontColor(color: string) {
   if (!el) return
   if (!el.style) el.style = {}
   el.style.color = color
-  if (el.type === 'checkbox') {
-    canvas.updateElement(el.id, { color, style: { ...el.style, color } })
-  }
+  canvas.history.recordSnapshot(canvas.document.value)
   showColorPicker.value = false
 }
 
@@ -1190,12 +1212,12 @@ function setHighlightColor(color: string) {
     if (!el.style) el.style = {}
     const bg = color === '#ffffff' ? 'transparent' : color
     el.style.backgroundColor = bg
-    canvas.updateElement(el.id, { style: { ...el.style, backgroundColor: bg } })
   } else {
     const textEl = el as TextCanvasElement
     if (!textEl.style) textEl.style = {}
     textEl.style.backgroundColor = color === '#ffffff' ? 'transparent' : color
   }
+  canvas.history.recordSnapshot(canvas.document.value)
   showHighlightPicker.value = false
 }
 
@@ -2696,7 +2718,7 @@ const shortcutCategories = computed(() => ({
           @copy-style="handleCopyStyleButtonClick"
           @clear-selection="canvas.clearSelection()"
           @double-click-element="canvas.editingElementId.value = (canvas.editingElementId.value === $event ? null : $event)"
-          @update-element="(id, updates) => canvas.updateElement(id, updates)"
+          @update-element="(id, updates, record) => canvas.updateElement(id, updates, record !== false)"
           @update-element-bounds="(id, bounds) => canvas.updateElementBounds(id, bounds)"
           @duplicate-element="canvas.duplicateSelectedElements($event)"
           @delete-element="canvas.deleteSelectedElements($event)"

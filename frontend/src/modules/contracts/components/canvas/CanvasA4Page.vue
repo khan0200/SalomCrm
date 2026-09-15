@@ -59,7 +59,7 @@ const emit = defineEmits<{
   'set-active-page': [pageIndex: number]
   'clear-selection': []
   'double-click-element': [id: string]
-  'update-element': [id: string, updates: Partial<CanvasElement>]
+  'update-element': [id: string, updates: Partial<CanvasElement>, recordHistory?: boolean]
   'update-element-bounds': [id: string, bounds: { x: number; y: number; width: number; height: number; rotation?: number }]
   'duplicate-element': [id: string]
   'delete-element': [id: string]
@@ -475,7 +475,7 @@ function confirmDeletePage() {
               :readonly="readonly"
               :zoom-level="zoomLevel"
               :variable-values="variableValues"
-              @update:content="emit('update-element', el.id, { content: $event })"
+              @update:content="(html, record) => emit('update-element', el.id, { content: html }, record)"
               @finish-edit="emit('finish-edit', el.id)"
               @auto-resize-height="emit('update-element-bounds', el.id, { x: el.x, y: el.y, width: el.width, height: $event })"
             />

@@ -31,28 +31,28 @@ export function useCanvasHistory(maxHistory = 50) {
     }
   }
 
+  // undo()/redo() flip isUpdatingFromHistory on but deliberately do NOT clear
+  // it before returning: the caller still has to assign the returned state
+  // to their reactive document ref, and any watcher that reacts to that
+  // assignment needs to see the flag still raised. Call settleHistoryUpdate()
+  // once that assignment (and its reactive fallout) has actually happened -
+  // typically via nextTick() - to lower the flag again.
   function undo(): ContractDocumentModel | null {
     if (!canUndo.value) return null
     currentIndex.value--
     isUpdatingFromHistory.value = true
-    try {
-      const state = JSON.parse(history.value[currentIndex.value])
-      return state
-    } finally {
-      isUpdatingFromHistory.value = false
-    }
+    return JSON.parse(history.value[currentIndex.value])
   }
 
   function redo(): ContractDocumentModel | null {
     if (!canRedo.value) return null
     currentIndex.value++
     isUpdatingFromHistory.value = true
-    try {
-      const state = JSON.parse(history.value[currentIndex.value])
-      return state
-    } finally {
-      isUpdatingFromHistory.value = false
-    }
+    return JSON.parse(history.value[currentIndex.value])
+  }
+
+  function settleHistoryUpdate() {
+    isUpdatingFromHistory.value = false
   }
 
   function clearHistory() {
@@ -66,6 +66,7 @@ export function useCanvasHistory(maxHistory = 50) {
     recordSnapshot,
     undo,
     redo,
+    settleHistoryUpdate,
     clearHistory,
     isUpdatingFromHistory,
   }

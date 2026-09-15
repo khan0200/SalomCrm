@@ -1,4 +1,4 @@
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
 import type {
   ContractDocumentModel,
   CanvasPageModel,
@@ -1131,15 +1131,24 @@ export function useContractCanvas(initialDoc?: ContractDocumentModel) {
         e.preventDefault()
         if (e.shiftKey) {
           const redoState = history.redo()
-          if (redoState) document.value = redoState
+          if (redoState) {
+            document.value = redoState
+            nextTick(() => history.settleHistoryUpdate())
+          }
         } else {
           const undoState = history.undo()
-          if (undoState) document.value = undoState
+          if (undoState) {
+            document.value = undoState
+            nextTick(() => history.settleHistoryUpdate())
+          }
         }
       } else if (e.key === 'y' || e.key === 'Y') {
         e.preventDefault()
         const redoState = history.redo()
-        if (redoState) document.value = redoState
+        if (redoState) {
+          document.value = redoState
+          nextTick(() => history.settleHistoryUpdate())
+        }
       }
       // ── Duplicate ─────────────────────────────────
       else if ((e.key === 'd' || e.key === 'D') && !e.shiftKey) {

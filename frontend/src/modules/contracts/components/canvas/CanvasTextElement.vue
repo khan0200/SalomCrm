@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, nextTick, onMounted } from 'vue'
+import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import type { TextCanvasElement } from '../../types/contractCanvas'
 import { cleanClipboardContent } from '../../utils/clipboardUtils'
 import { normalizeLegacyRequisites } from '../../utils/canvasZoomUtils'
@@ -21,13 +21,41 @@ const props = withDefaults(
 )
 
 const emit = defineEmits<{
-  'update:content': [val: string]
+  // recordHistory: false while live-typing (every keystroke would otherwise
+  // flood the 50-slot undo stack within a sentence or two), true for the
+  // debounced pause-in-typing checkpoint and the final on-blur commit.
+  'update:content': [val: string, recordHistory: boolean]
   'finish-edit': []
   'auto-resize-height': [heightMm: number]
 }>()
 
 const editableRef = ref<HTMLDivElement | null>(null)
 let lastEmittedHtml = ''
+
+// Groups rapid keystrokes into a single undo step: a history snapshot is
+// only taken after typing pauses for HISTORY_COMMIT_DELAY_MS, plus always on
+// blur (see onBlur) as a final safety net.
+const HISTORY_COMMIT_DELAY_MS = 800
+let commitTimer: ReturnType<typeof setTimeout> | null = null
+
+function scheduleHistoryCommit() {
+  if (commitTimer) clearTimeout(commitTimer)
+  commitTimer = setTimeout(() => {
+    commitTimer = null
+    if (editableRef.value) {
+      emit('update:content', editableRef.value.innerHTML, true)
+    }
+  }, HISTORY_COMMIT_DELAY_MS)
+}
+
+function cancelScheduledHistoryCommit() {
+  if (commitTimer) {
+    clearTimeout(commitTimer)
+    commitTimer = null
+  }
+}
+
+onBeforeUnmount(cancelScheduledHistoryCommit)
 
 const elementStyle = computed(() => {
   const st = props.element.style || {}
@@ -218,9 +246,10 @@ watch(
 
 function onBlur() {
   if (!editableRef.value) return
+  cancelScheduledHistoryCommit()
   const newHtml = editableRef.value.innerHTML
   lastEmittedHtml = newHtml
-  emit('update:content', newHtml)
+  emit('update:content', newHtml, true)
   measureAndEmitHeight()
   emit('finish-edit')
   try {
@@ -232,13 +261,16 @@ function onInput() {
   if (!editableRef.value) return
   const newHtml = editableRef.value.innerHTML
   lastEmittedHtml = newHtml
-  emit('update:content', newHtml)
+  emit('update:content', newHtml, false)
   measureAndEmitHeight()
+  scheduleHistoryCommit()
 }
 
 function onKeyDown(e: KeyboardEvent) {
   if (e.key === 'Escape') {
-    emit('finish-edit')
+    // Route through the same blur path so content + history commit +
+    // finish-edit stay in exactly one place.
+    editableRef.value?.blur()
     try {
       window.getSelection()?.removeAllRanges()
     } catch {}
