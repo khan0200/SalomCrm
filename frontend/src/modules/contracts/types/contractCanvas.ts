@@ -118,6 +118,7 @@ export interface CheckboxCanvasElement extends BaseCanvasElement {
   label: string
   fontSize?: number
   color?: string
+  style?: TextStyleProps
 }
 
 export interface ImageCanvasElement extends BaseCanvasElement {

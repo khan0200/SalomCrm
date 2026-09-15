@@ -423,8 +423,17 @@ export function convertCanvasDocumentToHtml(
         innerContent = `<div style="width: 100%; height: 100%; ${borderProp}: ${line.strokeWidth || 1}px ${line.strokeStyle || 'solid'} ${line.strokeColor || '#000'};"></div>`
       } else if (el.type === 'checkbox') {
         const cb = el as any
+        const st = cb.style || {}
         const checkedBox = cb.checked ? '☑' : '☐'
-        innerContent = `<div style="display: flex; align-items: center; gap: 6px; font-size: ${cb.fontSize || 12}pt; color: ${cb.color || '#111827'};"><span>${checkedBox}</span><span>${cb.label || ''}</span></div>`
+        const fontSize = st.fontSize || cb.fontSize || 12
+        const color = st.color || cb.color || '#111827'
+        const fontWeight = st.fontWeight || 'normal'
+        const fontStyle = st.fontStyle || 'normal'
+        const textDecoration = st.textDecoration || 'none'
+        const fontFamily = st.fontFamily || 'Times New Roman'
+        const letterSpacing = typeof st.letterSpacing === 'number' && st.letterSpacing !== 0 ? `${st.letterSpacing}px` : 'normal'
+        const bg = st.backgroundColor && st.backgroundColor !== 'transparent' && st.backgroundColor !== '#ffffff' ? `background-color: ${st.backgroundColor};` : ''
+        innerContent = `<div style="display: flex; align-items: center; gap: 6px; font-family: ${fontFamily}, Times, serif; font-size: ${fontSize}pt; font-weight: ${fontWeight}; font-style: ${fontStyle}; text-decoration: ${textDecoration}; color: ${color}; letter-spacing: ${letterSpacing}; ${bg}"><span>${checkedBox}</span><span>${cb.label || ''}</span></div>`
       } else {
         // Text / Heading / Paragraph
         const textEl = el as TextCanvasElement

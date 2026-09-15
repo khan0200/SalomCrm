@@ -506,6 +506,7 @@ function confirmDeletePage() {
               :zoom-level="zoomLevel"
               @update:checked="emit('update-element', el.id, { checked: $event })"
               @update:label="emit('update-element', el.id, { label: $event })"
+              @update:style="emit('update-element', el.id, { style: $event })"
               @finish-edit="emit('finish-edit', el.id)"
               @auto-resize-width="emit('update-element-bounds', el.id, { x: el.x, y: el.y, width: $event, height: el.height })"
             />

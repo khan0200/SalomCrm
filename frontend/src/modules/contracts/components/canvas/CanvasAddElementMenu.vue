@@ -176,9 +176,17 @@ function insertCheckbox(checked: boolean) {
     x: props.margins.left,
     y: props.margins.top + 10,
     width: 60,
-    height: 8,
+    height: 7,
     zIndex: 1,
     fontSize: 12,
+    style: {
+      fontFamily: 'Times New Roman',
+      fontSize: 12,
+      fontWeight: 'normal',
+      fontStyle: 'normal',
+      textDecoration: 'none',
+      color: '#111827',
+    },
   })
 }
 

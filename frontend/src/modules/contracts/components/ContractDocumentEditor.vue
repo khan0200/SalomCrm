@@ -149,20 +149,20 @@ const customTableCols = ref(3)
 const fontSizes = [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 18, 20, 22, 24, 28, 32]
 const currentFontSize = computed(() => {
   const el = canvas.selectedElement.value as any
-  if (el?.type === 'checkbox') return el.fontSize || 12
+  if (el?.type === 'checkbox') return el?.style?.fontSize || el?.fontSize || 12
   return el?.style?.fontSize || 14
 })
 
 // Current font color
 const currentFontColor = computed(() => {
   const el = canvas.selectedElement.value as any
-  if (el?.type === 'checkbox') return el.color || '#000000'
+  if (el?.type === 'checkbox') return el?.style?.color || el?.color || '#000000'
   return el?.style?.color || '#000000'
 })
 
 // Current text highlight
 const currentHighlightColor = computed(() => {
-  const el = canvas.selectedElement.value as TextCanvasElement
+  const el = canvas.selectedElement.value as any
   return el?.style?.backgroundColor || '#ffffff'
 })
 
@@ -807,50 +807,67 @@ function setFontSize(sizePt: number | string) {
   const num = typeof sizePt === 'string' ? parseInt(sizePt, 10) : sizePt
   const el = canvas.selectedElement.value as any
   if (el) {
+    if (!el.style) el.style = {}
+    el.style.fontSize = num
     if (el.type === 'checkbox') {
-      canvas.updateElement(el.id, { fontSize: num })
-    } else {
-      if (!el.style) el.style = {}
-      el.style.fontSize = num
+      canvas.updateElement(el.id, { fontSize: num, style: { ...el.style, fontSize: num } })
     }
   }
 }
 
 function toggleBold() {
-  const el = canvas.selectedElement.value as TextCanvasElement
+  const el = canvas.selectedElement.value as any
   if (!el) return
   if (!el.style) el.style = {}
-  el.style.fontWeight = el.style.fontWeight === 'bold' || el.style.fontWeight === 700 ? 'normal' : 'bold'
+  const next = el.style.fontWeight === 'bold' || el.style.fontWeight === 700 ? 'normal' : 'bold'
+  el.style.fontWeight = next
+  if (el.type === 'checkbox') {
+    canvas.updateElement(el.id, { style: { ...el.style, fontWeight: next } })
+  }
 }
 
 function toggleItalic() {
-  const el = canvas.selectedElement.value as TextCanvasElement
+  const el = canvas.selectedElement.value as any
   if (!el) return
   if (!el.style) el.style = {}
-  el.style.fontStyle = el.style.fontStyle === 'italic' ? 'normal' : 'italic'
+  const next = el.style.fontStyle === 'italic' ? 'normal' : 'italic'
+  el.style.fontStyle = next
+  if (el.type === 'checkbox') {
+    canvas.updateElement(el.id, { style: { ...el.style, fontStyle: next } })
+  }
 }
 
 function toggleUnderline() {
-  const el = canvas.selectedElement.value as TextCanvasElement
+  const el = canvas.selectedElement.value as any
   if (!el) return
   if (!el.style) el.style = {}
   const current = el.style.textDecoration || ''
+  let next = ''
   if (current.includes('underline')) {
-    el.style.textDecoration = current.replace('underline', '').trim() || 'none'
+    next = current.replace('underline', '').trim() || 'none'
   } else {
-    el.style.textDecoration = current === 'none' || !current ? 'underline' : `${current} underline`
+    next = current === 'none' || !current ? 'underline' : `${current} underline`
+  }
+  el.style.textDecoration = next
+  if (el.type === 'checkbox') {
+    canvas.updateElement(el.id, { style: { ...el.style, textDecoration: next } })
   }
 }
 
 function toggleStrike() {
-  const el = canvas.selectedElement.value as TextCanvasElement
+  const el = canvas.selectedElement.value as any
   if (!el) return
   if (!el.style) el.style = {}
   const current = el.style.textDecoration || ''
+  let next = ''
   if (current.includes('line-through')) {
-    el.style.textDecoration = current.replace('line-through', '').trim() || 'none'
+    next = current.replace('line-through', '').trim() || 'none'
   } else {
-    el.style.textDecoration = current === 'none' || !current ? 'line-through' : `${current} line-through`
+    next = current === 'none' || !current ? 'line-through' : `${current} line-through`
+  }
+  el.style.textDecoration = next
+  if (el.type === 'checkbox') {
+    canvas.updateElement(el.id, { style: { ...el.style, textDecoration: next } })
   }
 }
 
@@ -1093,35 +1110,48 @@ function toggleVariablePicker() {
 const isTextSelected = computed(() => {
   const el = canvas.selectedElement.value
   if (!el) return false
-  return el.type === 'text' || el.type === 'heading' || el.type === 'paragraph' || el.type === 'date' || el.type === 'variable'
+  return (
+    el.type === 'text' ||
+    el.type === 'heading' ||
+    el.type === 'paragraph' ||
+    el.type === 'date' ||
+    el.type === 'variable' ||
+    el.type === 'checkbox'
+  )
 })
 
 const currentLineHeight = computed(() => {
-  const el = canvas.selectedElement.value as TextCanvasElement
+  const el = canvas.selectedElement.value as any
   return el?.style?.lineHeight ?? 1.5
 })
 
 const currentLetterSpacing = computed(() => {
-  const el = canvas.selectedElement.value as TextCanvasElement
+  const el = canvas.selectedElement.value as any
   return el?.style?.letterSpacing ?? 0
 })
 
 function setLineHeight(val: number | string) {
   const num = typeof val === 'string' ? parseFloat(val) : val
   if (isNaN(num)) return
-  const el = canvas.selectedElement.value as TextCanvasElement
+  const el = canvas.selectedElement.value as any
   if (!el) return
   if (!el.style) el.style = {}
   el.style.lineHeight = Math.max(0.5, Math.min(3.5, Math.round(num * 100) / 100))
+  if (el.type === 'checkbox') {
+    canvas.updateElement(el.id, { style: { ...el.style } })
+  }
 }
 
 function setLetterSpacing(val: number | string) {
   const num = typeof val === 'string' ? parseFloat(val) : val
   if (isNaN(num)) return
-  const el = canvas.selectedElement.value as TextCanvasElement
+  const el = canvas.selectedElement.value as any
   if (!el) return
   if (!el.style) el.style = {}
   el.style.letterSpacing = Math.max(-5, Math.min(30, Math.round(num * 10) / 10))
+  if (el.type === 'checkbox') {
+    canvas.updateElement(el.id, { style: { ...el.style } })
+  }
 }
 
 function commitSpacingChange() {
@@ -1131,17 +1161,16 @@ function commitSpacingChange() {
 function setFontColor(color: string) {
   const el = canvas.selectedElement.value as any
   if (!el) return
+  if (!el.style) el.style = {}
+  el.style.color = color
   if (el.type === 'checkbox') {
-    canvas.updateElement(el.id, { color })
-  } else {
-    if (!el.style) el.style = {}
-    el.style.color = color
+    canvas.updateElement(el.id, { color, style: { ...el.style, color } })
   }
   showColorPicker.value = false
 }
 
 function setHighlightColor(color: string) {
-  const el = canvas.selectedElement.value
+  const el = canvas.selectedElement.value as any
   if (!el) return
   if (el.type === 'table') {
     // Apply fill to all cells in table
@@ -1151,6 +1180,11 @@ function setHighlightColor(color: string) {
         c.backgroundColor = color === '#ffffff' ? undefined : color
       })
     })
+  } else if (el.type === 'checkbox') {
+    if (!el.style) el.style = {}
+    const bg = color === '#ffffff' ? 'transparent' : color
+    el.style.backgroundColor = bg
+    canvas.updateElement(el.id, { style: { ...el.style, backgroundColor: bg } })
   } else {
     const textEl = el as TextCanvasElement
     if (!textEl.style) textEl.style = {}
@@ -1163,15 +1197,15 @@ function setHighlightColor(color: string) {
 const copyStyleMode = ref<'single' | 'persistent' | null>(null)
 const copiedTextStyle = ref<TextStyleProps | null>(null)
 
-function extractElementStyle(el: TextCanvasElement): TextStyleProps {
+function extractElementStyle(el: any): TextStyleProps {
   const st = el.style || {}
   return {
     fontFamily: st.fontFamily,
-    fontSize: st.fontSize,
+    fontSize: st.fontSize || el.fontSize,
     fontWeight: st.fontWeight,
     fontStyle: st.fontStyle,
     textDecoration: st.textDecoration,
-    color: st.color,
+    color: st.color || el.color,
     backgroundColor: st.backgroundColor,
     textAlign: st.textAlign,
     lineHeight: st.lineHeight,
@@ -1181,7 +1215,7 @@ function extractElementStyle(el: TextCanvasElement): TextStyleProps {
 }
 
 function activateCopyStyle(mode: 'single' | 'persistent' = 'single') {
-  const selected = canvas.selectedElement.value as TextCanvasElement | null
+  const selected = canvas.selectedElement.value as any
   if (!selected || !isTextSelected.value) return
   closeAllDropdowns()
   copiedTextStyle.value = extractElementStyle(selected)
@@ -1212,10 +1246,16 @@ function applyCopiedStyleToElement(targetId: string) {
   if (!copiedTextStyle.value || !copyStyleMode.value) return
   const found = canvas.findElementAndPage(targetId)
   if (!found) return
-  const el = found.element as TextCanvasElement
+  const el = found.element as any
 
-  // Only apply to text elements
-  const isText = el.type === 'text' || el.type === 'heading' || el.type === 'paragraph' || el.type === 'date' || el.type === 'variable'
+  // Only apply to text elements and checkboxes
+  const isText =
+    el.type === 'text' ||
+    el.type === 'heading' ||
+    el.type === 'paragraph' ||
+    el.type === 'date' ||
+    el.type === 'variable' ||
+    el.type === 'checkbox'
   if (!isText) return
 
   // Apply copied style ONLY — CONTENT IS NEVER CHANGED!
@@ -1224,16 +1264,30 @@ function applyCopiedStyleToElement(targetId: string) {
   if (!el.style) el.style = {}
 
   if (st.fontFamily !== undefined) el.style.fontFamily = st.fontFamily
-  if (st.fontSize !== undefined) el.style.fontSize = st.fontSize
+  if (st.fontSize !== undefined) {
+    el.style.fontSize = st.fontSize
+    if (el.type === 'checkbox') el.fontSize = st.fontSize
+  }
   if (st.fontWeight !== undefined) el.style.fontWeight = st.fontWeight
   if (st.fontStyle !== undefined) el.style.fontStyle = st.fontStyle
   if (st.textDecoration !== undefined) el.style.textDecoration = st.textDecoration
-  if (st.color !== undefined) el.style.color = st.color
+  if (st.color !== undefined) {
+    el.style.color = st.color
+    if (el.type === 'checkbox') el.color = st.color
+  }
   if (st.backgroundColor !== undefined) el.style.backgroundColor = st.backgroundColor
-  if (st.textAlign !== undefined) el.style.textAlign = st.textAlign
+  if (st.textAlign !== undefined && el.type !== 'checkbox') el.style.textAlign = st.textAlign
   if (st.lineHeight !== undefined) el.style.lineHeight = st.lineHeight
   if (st.letterSpacing !== undefined) el.style.letterSpacing = st.letterSpacing
   if (st.textTransform !== undefined) el.style.textTransform = st.textTransform
+
+  if (el.type === 'checkbox') {
+    canvas.updateElement(el.id, {
+      style: { ...el.style },
+      fontSize: el.fontSize,
+      color: el.color,
+    })
+  }
 
   // Select target element so user sees it highlighted with new style
   canvas.selectElement(targetId, false, found.pageIndex)
@@ -1464,9 +1518,17 @@ function insertCheckboxElement(checked: boolean) {
     x: canvas.document.value.margins.left,
     y: canvas.document.value.margins.top + 10,
     width: 65,
-    height: 8,
+    height: 7,
     zIndex: 1,
     fontSize: 12,
+    style: {
+      fontFamily: 'Times New Roman',
+      fontSize: 12,
+      fontWeight: 'normal',
+      fontStyle: 'normal',
+      textDecoration: 'none',
+      color: '#111827',
+    },
   })
   canvas.editingElementId.value = newId
 }
@@ -1474,9 +1536,10 @@ function insertCheckboxElement(checked: boolean) {
 function updateSelectedCheckboxLabel(newLabel: string) {
   const el = canvas.selectedElement.value as any
   if (el && el.type === 'checkbox') {
-    const fontSize = el.fontSize || 12
-    const charWidthMm = (fontSize / 12) * 2.3
-    const neededWidthMm = Math.max(35, Math.ceil(newLabel.length * charWidthMm + 14))
+    const fontSize = el.style?.fontSize || el.fontSize || 12
+    const isBold = el.style?.fontWeight === 'bold' || el.style?.fontWeight === 700
+    const charWidthMm = (fontSize / 12) * (isBold ? 2.6 : 2.3)
+    const neededWidthMm = Math.max(30, Math.ceil(newLabel.length * charWidthMm + 14))
     const finalWidth = neededWidthMm > el.width ? Math.min(printableContentWidthMm.value, neededWidthMm) : el.width
     canvas.updateElement(el.id, { label: newLabel, width: finalWidth })
   }

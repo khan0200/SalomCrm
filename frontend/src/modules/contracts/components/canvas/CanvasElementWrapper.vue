@@ -67,7 +67,7 @@ function pxToMm(px: number): number {
 
 const isTextType = computed(() => {
   const t = props.element.type
-  return t === 'text' || t === 'heading' || t === 'paragraph' || t === 'date' || t === 'variable'
+  return t === 'text' || t === 'heading' || t === 'paragraph' || t === 'date' || t === 'variable' || t === 'checkbox'
 })
 
 const isNearTop = computed(() => {
@@ -631,7 +631,7 @@ function onDoubleClick(e: MouseEvent) {
         ></div>
 
         <!-- Top & Bottom Pills (for non-text elements e.g. table) -->
-        <template v-if="element.type !== 'text' && element.type !== 'heading' && element.type !== 'paragraph'">
+        <template v-if="!isTextType">
           <div
             class="resize-handle n absolute -top-1 left-1/2 -translate-x-1/2 w-4 h-1.5 bg-white border-[1.5px] border-[#7c3aed] rounded-full shadow-xs cursor-ns-resize z-40 hover:scale-110 transition-transform"
             @pointerdown="onResizePointerDown('n', $event)"
