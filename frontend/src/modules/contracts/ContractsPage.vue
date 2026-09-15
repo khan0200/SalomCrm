@@ -25,7 +25,6 @@ import {
   PanelLeftOpen,
   Maximize2,
   ChevronDown,
-  FileText,
   KeyRound,
   Check,
   Globe,
@@ -442,6 +441,7 @@ const contractStats = computed(() => {
     pending: all.filter(c => c.status === 'pending').length,
     verified: all.filter(c => c.status === 'verified').length,
     rejected: all.filter(c => c.status === 'rejected').length,
+    cancelled: all.filter(c => c.status === 'cancelled').length,
     draft: all.filter(c => c.status === 'draft').length,
     signed: all.filter(c => c.status === 'signed').length,
     completed: all.filter(c => c.status === 'completed').length,
@@ -466,6 +466,7 @@ function getFilterCount(key: string): number {
   if (key === 'signed') return contractStats.value.signed
   if (key === 'completed') return contractStats.value.completed
   if (key === 'rejected') return contractStats.value.rejected
+  if (key === 'cancelled') return contractStats.value.cancelled
   return 0
 }
 
@@ -483,6 +484,8 @@ function getStatusBadgeClass(status?: string): string {
       return 'bg-zinc-500/10 text-zinc-600 dark:text-zinc-400 border-zinc-500/20'
     case 'rejected':
       return 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/20'
+    case 'cancelled':
+      return 'bg-zinc-500/10 text-zinc-600 dark:text-zinc-400 border-zinc-500/20'
     default:
       return 'bg-zinc-500/10 text-zinc-600 dark:text-zinc-400 border-zinc-500/20'
   }
@@ -502,6 +505,8 @@ function getStatusDotClass(status?: string): string {
       return 'bg-zinc-400'
     case 'rejected':
       return 'bg-rose-500'
+    case 'cancelled':
+      return 'bg-zinc-400'
     default:
       return 'bg-zinc-400'
   }
@@ -521,6 +526,8 @@ function getStatusLabel(status?: string): string {
       return 'Draft'
     case 'rejected':
       return 'Rejected'
+    case 'cancelled':
+      return 'Cancelled'
     default:
       return status?.toUpperCase() || '—'
   }
@@ -1081,111 +1088,6 @@ async function confirmDelete() {
 
           <!-- CONTRACTS LIST MODE (Resend App UI Style) -->
           <template v-else>
-            <!-- Resend-style Metric Cards -->
-            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
-              <!-- Total -->
-              <div
-                @click="statusFilter = 'all'"
-                class="p-3 rounded-xl bg-white dark:bg-[#0c0c0e] border transition-all cursor-pointer select-none"
-                :class="statusFilter === 'all'
-                  ? 'border-zinc-900 dark:border-zinc-100 ring-1 ring-zinc-900 dark:ring-zinc-100 shadow-xs'
-                  : 'border-zinc-200/80 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 shadow-2xs'"
-              >
-                <div class="flex items-center justify-between text-zinc-400">
-                  <span class="text-[11px] font-medium uppercase tracking-wider">Total</span>
-                  <FileSignature class="w-3.5 h-3.5" />
-                </div>
-                <div class="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100 font-mono mt-1">
-                  {{ contractStats.total }}
-                </div>
-              </div>
-
-              <!-- Pending Online -->
-              <div
-                @click="statusFilter = 'pending'"
-                class="p-3 rounded-xl bg-white dark:bg-[#0c0c0e] border transition-all cursor-pointer select-none"
-                :class="statusFilter === 'pending'
-                  ? 'border-amber-500 ring-1 ring-amber-500 shadow-xs'
-                  : 'border-zinc-200/80 dark:border-zinc-800 hover:border-amber-300 dark:hover:border-amber-800/60 shadow-2xs'"
-              >
-                <div class="flex items-center justify-between text-amber-600 dark:text-amber-400">
-                  <span class="text-[11px] font-medium uppercase tracking-wider">Pending</span>
-                  <span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-                </div>
-                <div class="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100 font-mono mt-1">
-                  {{ contractStats.pending }}
-                </div>
-              </div>
-
-              <!-- Verified -->
-              <div
-                @click="statusFilter = 'verified'"
-                class="p-3 rounded-xl bg-white dark:bg-[#0c0c0e] border transition-all cursor-pointer select-none"
-                :class="statusFilter === 'verified'
-                  ? 'border-emerald-500 ring-1 ring-emerald-500 shadow-xs'
-                  : 'border-zinc-200/80 dark:border-zinc-800 hover:border-emerald-300 dark:hover:border-emerald-800/60 shadow-2xs'"
-              >
-                <div class="flex items-center justify-between text-emerald-600 dark:text-emerald-400">
-                  <span class="text-[11px] font-medium uppercase tracking-wider">Verified</span>
-                  <span class="w-2 h-2 rounded-full bg-emerald-500" />
-                </div>
-                <div class="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100 font-mono mt-1">
-                  {{ contractStats.verified }}
-                </div>
-              </div>
-
-              <!-- Draft -->
-              <div
-                @click="statusFilter = 'draft'"
-                class="p-3 rounded-xl bg-white dark:bg-[#0c0c0e] border transition-all cursor-pointer select-none"
-                :class="statusFilter === 'draft'
-                  ? 'border-zinc-900 dark:border-zinc-100 ring-1 ring-zinc-900 dark:ring-zinc-100 shadow-xs'
-                  : 'border-zinc-200/80 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 shadow-2xs'"
-              >
-                <div class="flex items-center justify-between text-zinc-400">
-                  <span class="text-[11px] font-medium uppercase tracking-wider">Draft</span>
-                  <FileText class="w-3.5 h-3.5" />
-                </div>
-                <div class="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100 font-mono mt-1">
-                  {{ contractStats.draft }}
-                </div>
-              </div>
-
-              <!-- Signed -->
-              <div
-                @click="statusFilter = 'signed'"
-                class="p-3 rounded-xl bg-white dark:bg-[#0c0c0e] border transition-all cursor-pointer select-none"
-                :class="statusFilter === 'signed'
-                  ? 'border-sky-500 ring-1 ring-sky-500 shadow-xs'
-                  : 'border-zinc-200/80 dark:border-zinc-800 hover:border-sky-300 dark:hover:border-sky-800/60 shadow-2xs'"
-              >
-                <div class="flex items-center justify-between text-sky-600 dark:text-sky-400">
-                  <span class="text-[11px] font-medium uppercase tracking-wider">Signed</span>
-                  <span class="w-2 h-2 rounded-full bg-sky-500" />
-                </div>
-                <div class="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100 font-mono mt-1">
-                  {{ contractStats.signed }}
-                </div>
-              </div>
-
-              <!-- Completed -->
-              <div
-                @click="statusFilter = 'completed'"
-                class="p-3 rounded-xl bg-white dark:bg-[#0c0c0e] border transition-all cursor-pointer select-none"
-                :class="statusFilter === 'completed'
-                  ? 'border-teal-500 ring-1 ring-teal-500 shadow-xs'
-                  : 'border-zinc-200/80 dark:border-zinc-800 hover:border-teal-300 dark:hover:border-teal-800/60 shadow-2xs'"
-              >
-                <div class="flex items-center justify-between text-teal-600 dark:text-teal-400">
-                  <span class="text-[11px] font-medium uppercase tracking-wider">Completed</span>
-                  <span class="w-2 h-2 rounded-full bg-teal-500" />
-                </div>
-                <div class="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100 font-mono mt-1">
-                  {{ contractStats.completed }}
-                </div>
-              </div>
-            </div>
-
             <!-- Filter & Search Toolbar (Resend Control Bar) -->
             <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-2.5 bg-white dark:bg-[#0c0c0e] p-2.5 rounded-xl border border-zinc-200/80 dark:border-zinc-800 shadow-2xs">
               <!-- Search Input -->
@@ -1220,7 +1122,8 @@ async function confirmDelete() {
                     { key: 'draft', label: 'Draft' },
                     { key: 'signed', label: 'Signed' },
                     { key: 'completed', label: 'Completed' },
-                    { key: 'rejected', label: 'Rejected' }
+                    { key: 'rejected', label: 'Rejected' },
+                    { key: 'cancelled', label: 'Cancelled' }
                   ]"
                   :key="st.key"
                   type="button"
