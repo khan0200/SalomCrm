@@ -490,8 +490,10 @@ export function convertCanvasDocumentToHtml(
           line-height: ${st.lineHeight || 1.5};
           letter-spacing: ${typeof st.letterSpacing === 'number' && st.letterSpacing !== 0 ? `${st.letterSpacing}px` : 'normal'};
           padding: ${st.padding || 0}mm;
+          overflow-wrap: break-word;
+          box-sizing: border-box;
         `
-        innerContent = `<div style="${fontStyle}">${content}</div>`
+        innerContent = `<div class="canvas-text-element" style="${fontStyle}">${content}</div>`
       }
 
       elementsHtml += `
@@ -503,6 +505,11 @@ export function convertCanvasDocumentToHtml(
 
     const pageWrapper = `
       <div class="canvas-a4-page-print" style="position: relative; width: ${PAGE_WIDTH_MM}mm; height: ${PAGE_HEIGHT_MM}mm; background: #ffffff; overflow: hidden; page-break-after: ${isLastPage ? 'auto' : 'always'}; break-after: ${isLastPage ? 'auto' : 'page'};">
+        <style>
+          .canvas-a4-page-print p { margin: 0.2em 0; }
+          .canvas-a4-page-print p:first-child { margin-top: 0 !important; }
+          .canvas-a4-page-print p:last-child { margin-bottom: 0 !important; }
+        </style>
         ${elementsHtml}
       </div>
     `

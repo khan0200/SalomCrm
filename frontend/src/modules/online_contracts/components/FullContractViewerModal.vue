@@ -138,41 +138,33 @@ function handleConfirm() {
       </div>
 
       <!-- Contract A4 Pages Viewer Area -->
-      <div class="flex-1 overflow-y-auto bg-zinc-200/70 dark:bg-zinc-950 p-6 flex flex-col items-center gap-6">
+      <div class="flex-1 overflow-y-auto bg-zinc-200/70 dark:bg-zinc-950 p-6 flex flex-col items-center">
         <div
           v-for="(pageHtml, idx) in renderedPages"
           :key="idx"
-          class="flex justify-center shrink-0"
+          class="relative bg-white text-zinc-900 shadow-2xl rounded-xs shrink-0 origin-top transition-transform"
           :style="{
-            width: `calc(210mm * ${zoom})`,
-            height: isCanvas ? `calc(297mm * ${zoom})` : 'auto',
-            minHeight: `calc(297mm * ${zoom})`,
+            width: '210mm',
+            minHeight: '297mm',
+            height: isCanvas ? '297mm' : 'auto',
+            padding: isCanvas ? '0' : '20mm 20mm',
+            transform: `scale(${zoom})`,
+            transformOrigin: 'top center',
+            marginBottom: `${(zoom - 1) * 297 * 3.78 + 24}px`,
+            fontFamily: 'Times New Roman, serif',
+            fontSize: '13px',
+            lineHeight: '1.6',
+            boxSizing: 'border-box',
+            overflow: isCanvas ? 'hidden' : 'visible'
           }"
         >
-          <div
-            class="relative bg-white text-zinc-900 shadow-2xl rounded-xs origin-top-left"
-            :style="{
-              width: '210mm',
-              height: isCanvas ? '297mm' : 'auto',
-              minHeight: '297mm',
-              padding: isCanvas ? '0' : '20mm 20mm',
-              transform: `scale(${zoom})`,
-              transformOrigin: '0 0',
-              fontFamily: 'Times New Roman, serif',
-              fontSize: '13px',
-              lineHeight: '1.6',
-              boxSizing: 'border-box',
-              overflow: isCanvas ? 'hidden' : 'visible'
-            }"
-          >
-            <!-- Page Number Indicator (only for non-canvas) -->
-            <div v-if="!isCanvas" class="absolute right-4 bottom-3 text-[11px] text-zinc-400 select-none">
-              Sahifa {{ idx + 1 }} / {{ renderedPages.length }}
-            </div>
-
-            <!-- Page HTML Content -->
-            <div v-html="pageHtml" class="contract-page-content" :class="{ 'text-justify': !isCanvas }" />
+          <!-- Page Number Indicator (only for non-canvas) -->
+          <div v-if="!isCanvas" class="absolute right-4 bottom-3 text-[11px] text-zinc-400 select-none">
+            Sahifa {{ idx + 1 }} / {{ renderedPages.length }}
           </div>
+
+          <!-- Page HTML Content -->
+          <div v-html="pageHtml" :class="{ 'legacy-contract-page text-justify': !isCanvas }" />
         </div>
       </div>
 
@@ -205,24 +197,24 @@ function handleConfirm() {
 </template>
 
 <style scoped>
-.contract-page-content :deep(p) {
+.legacy-contract-page :deep(p) {
   margin: 6px 0;
   text-align: justify;
 }
-.contract-page-content :deep(h1),
-.contract-page-content :deep(h2),
-.contract-page-content :deep(h3) {
+.legacy-contract-page :deep(h1),
+.legacy-contract-page :deep(h2),
+.legacy-contract-page :deep(h3) {
   text-align: center;
   font-weight: bold;
   margin: 14px 0 8px;
 }
-.contract-page-content :deep(table) {
+.legacy-contract-page :deep(table) {
   width: 100%;
   border-collapse: collapse;
   margin: 10px 0;
 }
-.contract-page-content :deep(td),
-.contract-page-content :deep(th) {
+.legacy-contract-page :deep(td),
+.legacy-contract-page :deep(th) {
   border: 1px solid #94a3b8;
   padding: 6px 10px;
   font-size: 12px;

@@ -300,7 +300,7 @@ ${htmlBody}
           v-for="(pageHtml, pageIndex) in splitPages"
           :key="pageIndex"
           class="preview-a4-sheet relative bg-white text-zinc-900 shadow-xl border border-zinc-200/90 font-serif rounded-xs"
-          :class="isCanvas ? 'p-0 overflow-hidden w-[210mm] min-h-[297mm] shrink-0' : 'p-8 sm:p-14 min-h-[1050px] w-full max-w-[794px]'"
+          :class="isCanvas ? 'is-canvas-sheet p-0 overflow-hidden w-[210mm] min-h-[297mm] shrink-0' : 'p-8 sm:p-14 min-h-[1050px] w-full max-w-[794px]'"
           style="font-family: 'Times New Roman', Times, serif;"
         >
           <!-- Top Page badge (non-canvas only) -->
@@ -335,12 +335,12 @@ ${htmlBody}
   font-family: 'Times New Roman', Times, serif !important;
 }
 
-.preview-a4-sheet p {
+.preview-a4-sheet:not(.is-canvas-sheet) p {
   margin-top: 0.4rem;
   margin-bottom: 0.4rem;
 }
 
-.preview-a4-sheet table {
+.preview-a4-sheet:not(.is-canvas-sheet) table {
   width: 100%;
   border-collapse: collapse;
   margin: 0.8rem 0;
