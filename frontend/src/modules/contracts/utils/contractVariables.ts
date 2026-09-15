@@ -1,4 +1,12 @@
 // Dynamic Contract Variables Catalog & Resolver
+import { generateQrCodeDataUrl } from './qrCode'
+
+/**
+ * Public verification page: anyone holding the printed contract (or its QR
+ * code) can look up its live status and re-download the official PDF here,
+ * keyed by the contract's own verification code - no login required.
+ */
+export const CONTRACT_VERIFICATION_BASE_URL = 'https://crm.salomkorea.uz/contracts'
 
 export interface ContractVariableDef {
   key: string
@@ -21,6 +29,8 @@ export const CONTRACT_VARIABLES: ContractVariableDef[] = [
   { key: 'phone2', token: '{{phone2}}', label: 'Mobil telefon 2', category: 'student', example: '+998 93 987 65 43' },
   { key: 'signature', token: '{{signature}}', label: 'Elektron imzo (rasm)', category: 'contract', example: '[Elektron imzo]' },
   { key: 'discount', token: '{{discount}}', label: 'Chegirma', category: 'financial', example: '1 000 000 so\'m' },
+  { key: 'qr_code', token: '{{qr_code}}', label: 'QR-kod (tekshirish havolasi)', category: 'contract', example: '[QR-kod]' },
+  { key: 'verification_link', token: '{{verification_link}}', label: 'Tekshirish havolasi (matn)', category: 'contract', example: `${CONTRACT_VERIFICATION_BASE_URL}/XXXX-XXXX-STUDENTID` },
 ]
 
 export function formatCurrencyString(val: string | number | null | undefined): string {
@@ -386,6 +396,21 @@ export function buildVariableValues(
   const rawSignature = contractMeta?.signatureData || student?.signature_data || student?.signatureData || ''
   const rawVerifCode = contractMeta?.verificationCode || student?.verification_code || student?.verificationCode || ''
 
+  // Public verification QR: only exists once the agency has assigned a
+  // Student ID and generated a code (see assign_student_id on the backend).
+  // Before that, both tokens resolve to '' and simply render nothing.
+  const verificationUrl = rawVerifCode ? `${CONTRACT_VERIFICATION_BASE_URL}/${rawVerifCode}` : ''
+  const qrDateLabel = formatDateIso(student?.verified_at || student?.signed_at || student?.created_at || new Date())
+  let qrCodeHtml = ''
+  if (verificationUrl) {
+    try {
+      const qrDataUrl = generateQrCodeDataUrl(verificationUrl, { size: 200, color: '#2563eb' })
+      qrCodeHtml = `<div style="display:inline-flex;flex-direction:column;align-items:center;gap:1mm;line-height:1;"><img src="${qrDataUrl}" style="width:24mm;height:24mm;object-fit:contain;" alt="QR" /><span style="font-family:'Times New Roman',serif;font-size:6.5pt;color:#2563eb;font-weight:bold;">${qrDateLabel}</span></div>`
+    } catch {
+      qrCodeHtml = ''
+    }
+  }
+
   const signatureHtml = rawSignature
     ? (rawSignature.startsWith('data:image/')
         ? `<img src="${rawSignature}" style="max-height: 42px; max-width: 150px; object-fit: contain; vertical-align: middle; display: inline-block;" alt="Imzo" />`
@@ -456,6 +481,11 @@ export function buildVariableValues(
     verification_code: rawVerifCode,
     tasdiqlash_kodi: rawVerifCode,
     confirmation_code: rawVerifCode,
+
+    qr_code: qrCodeHtml,
+    qrcode: qrCodeHtml,
+    verification_link: verificationUrl,
+    verification_url: verificationUrl,
 
     // 3. Contract Metadata & Identifiers
     studentId: contractNum,
@@ -593,6 +623,11 @@ export const VARIABLE_FALLBACK_PLACEHOLDERS: Record<string, string> = {
 
   discount: '________________ so\'m',
   chegirma: '________________ so\'m',
+
+  qr_code: '<div style="width:24mm;height:24mm;border:1px dashed #94a3b8;display:inline-flex;align-items:center;justify-content:center;font-size:6pt;color:#94a3b8;">QR</div>',
+  qrcode: '<div style="width:24mm;height:24mm;border:1px dashed #94a3b8;display:inline-flex;align-items:center;justify-content:center;font-size:6pt;color:#94a3b8;">QR</div>',
+  verification_link: `${CONTRACT_VERIFICATION_BASE_URL}/____-____-____`,
+  verification_url: `${CONTRACT_VERIFICATION_BASE_URL}/____-____-____`,
 }
 
 export function getVariablePlaceholder(key: string): string {

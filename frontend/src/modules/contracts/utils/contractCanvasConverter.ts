@@ -503,6 +503,14 @@ export function convertCanvasDocumentToHtml(
       `
     })
 
+    // Every page carries the public verification link in its footer, once
+    // the contract has a verification code (assigned by the agency after
+    // signing). Before that there is nothing to link to, so it's omitted.
+    const verificationUrl = variableValues?.verification_url || variableValues?.verification_link || ''
+    const footerHtml = verificationUrl
+      ? `<div style="position: absolute; left: 0; right: 0; bottom: 6mm; text-align: center; font-family: 'Times New Roman', serif; font-size: 7.5pt; color: #2563eb;">${verificationUrl}</div>`
+      : ''
+
     const pageWrapper = `
       <div class="canvas-a4-page-print" style="position: relative; width: ${PAGE_WIDTH_MM}mm; height: ${PAGE_HEIGHT_MM}mm; background: #ffffff; overflow: hidden; page-break-after: ${isLastPage ? 'auto' : 'always'}; break-after: ${isLastPage ? 'auto' : 'page'};">
         <style>
@@ -516,6 +524,7 @@ export function convertCanvasDocumentToHtml(
           }
         </style>
         ${elementsHtml}
+        ${footerHtml}
       </div>
     `
     pageHtmls.push(pageWrapper)

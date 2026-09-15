@@ -896,3 +896,69 @@ class CancelOnlineContractView(APIView):
             'detail': "Shartnoma muvaffaqiyatli bekor qilindi.",
             'status': 'cancelled'
         }, status=status.HTTP_200_OK)
+
+
+class ContractVerifyThrottle(AnonRateThrottle):
+    scope = 'contract_verify'
+
+
+class PublicVerifyContractView(APIView):
+    """
+    Public endpoint: GET /api/contracts/public/<code>/
+    Looks up a contract purely by its verification code - the same code
+    printed on the paper contract and encoded in its QR - so a bank,
+    embassy, or the student themself can confirm its current status
+    (verified / pending / rejected / cancelled) and re-download the
+    official PDF at any time.
+
+    No authentication or ownership check by design: knowing the code IS
+    the proof of access, exactly like physically holding the paper
+    contract. The code space is cryptographically random (~1.1x10^12
+    combinations - see generate_verification_code), so a throttle here
+    guards against scripted enumeration rather than being the real
+    security boundary.
+    """
+    permission_classes = [permissions.AllowAny]
+    throttle_classes = [ContractVerifyThrottle]
+
+    def get(self, request, code):
+        clean_code = normalize_code(code)
+        contract = Contract.objects.filter(
+            verification_code=clean_code,
+            is_deleted=False
+        ).select_related('tenant').first()
+
+        if not contract:
+            return Response(
+                {'detail': "Shartnoma topilmadi. Tasdiqlash kodini tekshiring."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        return Response({
+            'status': contract.status,
+            'contract_number': contract.contract_number,
+            'title': contract.title,
+            'tariff_name': contract.tariff_name,
+            'tariff_price': float(contract.tariff_price),
+            'discount': float(contract.discount or 0),
+            'full_name': contract.full_name,
+            'passport_number': contract.passport_number,
+            'education_level': contract.education_level,
+            'date_of_birth': contract.date_of_birth,
+            'office': contract.office,
+            'phone1': contract.phone1,
+            'phone2': contract.phone2,
+            'signature_data': contract.signature_data,
+            'content': contract.content,
+            'verification_code': contract.verification_code,
+            'verified_at': contract.verified_at.isoformat() if contract.verified_at else None,
+            'signed_at': contract.signed_at.isoformat() if contract.signed_at else None,
+            'created_at': contract.created_at.isoformat() if contract.created_at else None,
+            'contract_hash': contract.contract_hash,
+            'tenant': {
+                'id': str(contract.tenant.id),
+                'name': contract.tenant.name,
+                'slug': contract.tenant.slug,
+                'logo_url': contract.tenant.logo_url,
+            }
+        }, status=status.HTTP_200_OK)

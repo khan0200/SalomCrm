@@ -196,6 +196,12 @@ REST_FRAMEWORK = {
     'DEFAULT_PAGINATION_CLASS': 'apps.core.pagination.StandardResultsSetPagination',
     'PAGE_SIZE': 50,
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    'DEFAULT_THROTTLE_RATES': {
+        # Public, unauthenticated contract-by-code lookup (QR verification page).
+        # The code space is ~1.1x10^12 combinations, so this is just a sane
+        # ceiling against scripted enumeration, not the primary defense.
+        'contract_verify': '30/min',
+    },
 }
 
 # SimpleJWT settings

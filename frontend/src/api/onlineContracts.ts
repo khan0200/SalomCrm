@@ -112,6 +112,35 @@ export interface SubmitContractPayload {
   password: string
 }
 
+export interface PublicContractVerifyResponse {
+  status: 'draft' | 'pending' | 'verified' | 'rejected' | 'completed' | 'cancelled'
+  contract_number: string
+  title: string
+  tariff_name: string
+  tariff_price: number
+  discount?: number
+  full_name: string
+  passport_number: string
+  education_level: string
+  date_of_birth: string
+  office: string
+  phone1: string
+  phone2: string
+  signature_data: string
+  content: string
+  verification_code: string
+  verified_at?: string
+  signed_at?: string
+  created_at?: string
+  contract_hash?: string
+  tenant: {
+    id: string
+    name: string
+    slug: string
+    logo_url?: string
+  }
+}
+
 export interface ContractDetailOnlineResponse {
   id: string
   contract_number: string
@@ -229,6 +258,12 @@ export const onlineContractsApi = {
   // 12. Cancel pending contract
   async cancelContract(contractId: string, reason?: string): Promise<{ detail: string; status: string }> {
     const { data } = await apiClient.post(`/contracts/online/${contractId}/cancel/`, { reason })
+    return data
+  },
+
+  // 13. Public verification by code (no auth) - QR code / "check authenticity" link
+  async verifyPublicContract(code: string): Promise<PublicContractVerifyResponse> {
+    const { data } = await apiClient.get<PublicContractVerifyResponse>(`/contracts/public/${encodeURIComponent(code)}/`)
     return data
   },
 }

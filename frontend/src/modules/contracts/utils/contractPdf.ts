@@ -37,6 +37,22 @@ export interface PdfMarginOptions {
 }
 
 /**
+ * The "Elektron Imzolangan Shartnoma" banner used to hard-code the word
+ * VERIFIED regardless of the contract's actual status, so a rejected or
+ * cancelled contract's PDF still claimed to be verified. Every caller
+ * already passes verificationMeta.status - this just makes the banner
+ * read it.
+ */
+function statusBadge(status?: string): { label: string; color: string } {
+  const s = (status || 'verified').toLowerCase()
+  if (s === 'verified') return { label: 'VERIFIED', color: '#059669' }
+  if (s === 'cancelled') return { label: 'CANCELLED', color: '#dc2626' }
+  if (s === 'rejected') return { label: 'REJECTED', color: '#dc2626' }
+  if (s === 'pending') return { label: 'PENDING', color: '#d97706' }
+  return { label: s.toUpperCase(), color: '#52525b' }
+}
+
+/**
  * Format raw contract text to clean HTML if not already HTML
  */
 export function prepareContractHtml(
@@ -54,6 +70,7 @@ export function prepareContractHtml(
   if (!rawOrHtml) return '<p></p>'
 
   const mergedVars: Record<string, string> = { ...(variableValues || {}) }
+  const badge = statusBadge(verificationMeta?.status)
 
   // Inject signature variable if provided
   if (signatureData) {
@@ -78,7 +95,7 @@ export function prepareContractHtml(
                 <div style="font-weight: bold; font-size: 11.5pt; text-transform: uppercase; color: #065f46;">Elektron Imzolangan Shartnoma</div>
                 <div style="margin-top: 2px;">Shartnoma / Talaba ID: <strong>${verificationMeta?.contractNumber || verificationMeta?.studentId || mergedVars['contract_number'] || '—'}</strong></div>
                 <div>Talaba: <strong>${verificationMeta?.studentName || mergedVars['student_name'] || '—'}</strong></div>
-                <div>Holati: <strong style="color: #059669;">VERIFIED</strong> (${verificationMeta?.verifiedAt || new Date().toLocaleDateString('uz-UZ')})</div>
+                <div>Holati: <strong style="color: ${badge.color};">${badge.label}</strong> (${verificationMeta?.verifiedAt || new Date().toLocaleDateString('uz-UZ')})</div>
               </div>
               <div style="text-align: right;">
                 <div style="font-size: 9pt; color: #64748b; margin-bottom: 2px;">Talaba imzosi:</div>
@@ -135,7 +152,7 @@ export function prepareContractHtml(
             <div style="font-weight: bold; font-size: 11.5pt; text-transform: uppercase; color: #065f46;">Elektron Imzolangan Shartnoma</div>
             <div style="margin-top: 2px;">Shartnoma / Talaba ID: <strong>${verificationMeta?.contractNumber || verificationMeta?.studentId || mergedVars['contract_number'] || '—'}</strong></div>
             <div>Talaba: <strong>${verificationMeta?.studentName || mergedVars['student_name'] || '—'}</strong></div>
-            <div>Holati: <strong style="color: #059669;">VERIFIED</strong> (${verificationMeta?.verifiedAt || new Date().toLocaleDateString('uz-UZ')})</div>
+            <div>Holati: <strong style="color: ${badge.color};">${badge.label}</strong> (${verificationMeta?.verifiedAt || new Date().toLocaleDateString('uz-UZ')})</div>
           </div>
           <div style="text-align: right;">
             <div style="font-size: 9pt; color: #64748b; margin-bottom: 2px;">Talaba imzosi:</div>
@@ -169,6 +186,7 @@ export async function downloadContractAsPdf(
   const { jsPDF, html2canvas } = await loadPdfLibs()
   const safeTitle = (title || 'shartnoma').replace(/[/\\?%*:|"<>]/g, '_')
   const mergedVars: Record<string, string> = { ...(variableValues || {}) }
+  const badge = statusBadge(verificationMeta?.status)
 
   // Inject signature variable if provided
   if (signatureData) {
@@ -187,7 +205,7 @@ export async function downloadContractAsPdf(
           <div style="font-weight: bold; font-size: 11.5pt; text-transform: uppercase; color: #065f46;">Elektron Imzolangan Shartnoma</div>
           <div style="margin-top: 2px;">Shartnoma / Talaba ID: <strong>${verificationMeta?.contractNumber || verificationMeta?.studentId || mergedVars['contract_number'] || '—'}</strong></div>
           <div>Talaba: <strong>${verificationMeta?.studentName || mergedVars['student_name'] || '—'}</strong></div>
-          <div>Holati: <strong style="color: #059669;">VERIFIED</strong> (${verificationMeta?.verifiedAt || new Date().toLocaleDateString('uz-UZ')})</div>
+          <div>Holati: <strong style="color: ${badge.color};">${badge.label}</strong> (${verificationMeta?.verifiedAt || new Date().toLocaleDateString('uz-UZ')})</div>
         </div>
         <div style="text-align: right;">
           <div style="font-size: 9pt; color: #64748b; margin-bottom: 2px;">Talaba imzosi:</div>

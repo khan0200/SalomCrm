@@ -26,6 +26,7 @@
     "html2pdf.js": "^0.14.0",
     "lucide-vue-next": "^0.359.0",
     "pinia": "^2.1.7",
+    "qrcode-generator": "^1.5.2",
     "salom-crm": "file:..",
     "tailwind-merge": "^2.2.2",
     "vue": "3.5.41",

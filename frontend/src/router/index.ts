@@ -134,6 +134,15 @@ const routes = [
     component: () => import('@/modules/online_contracts/pages/OnlineContractSignPage.vue'),
     meta: { studentOnly: true, title: 'Shartnomani Imzolash' }
   },
+  // Public "check authenticity" page reached via the QR code / link printed
+  // on every contract page - looks the contract up by its verification
+  // code, no login required.
+  {
+    path: '/contracts/:code',
+    name: 'contract-public-verify',
+    component: () => import('@/modules/online_contracts/pages/ContractVerifyPage.vue'),
+    meta: { public: true, title: 'Shartnomani tekshirish' }
+  },
   {
     path: '/:pathMatch(.*)*',
     redirect: '/students'

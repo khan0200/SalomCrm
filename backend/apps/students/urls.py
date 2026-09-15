@@ -28,6 +28,7 @@ from .online_contract_views import (
     LogContractViewAuditView,
     PublicContractDetailView,
     CancelOnlineContractView,
+    PublicVerifyContractView,
 )
 
 router = DefaultRouter()
@@ -81,6 +82,10 @@ urlpatterns = [
     path('contracts/online/<uuid:contract_id>/audit-view/', LogContractViewAuditView.as_view(), name='online-contract-audit-view'),
     path('contracts/online/<uuid:contract_id>/detail/', PublicContractDetailView.as_view(), name='online-contract-detail'),
     path('contracts/online/<uuid:contract_id>/cancel/', CancelOnlineContractView.as_view(), name='online-contract-cancel'),
+
+    # Public verification: GET /api/contracts/public/<verification_code>/
+    # No auth - see PublicVerifyContractView docstring.
+    path('contracts/public/<str:code>/', PublicVerifyContractView.as_view(), name='online-contract-public-verify'),
 
     path('', include(router.urls)),
 ]
