@@ -1,4 +1,5 @@
-import html2pdf from 'html2pdf.js'
+import { jsPDF } from 'jspdf'
+import html2canvas from 'html2canvas'
 import {
   isCanvasDocumentJson,
   deserializeCanvasDocument,
@@ -144,32 +145,159 @@ export async function downloadContractAsPdf(
   }
 ): Promise<void> {
   const safeTitle = (title || 'shartnoma').replace(/[/\\?%*:|"<>]/g, '_')
-  const isCanvas = isCanvasDocumentJson(rawOrHtml)
-  const bodyHtml = prepareContractHtml(rawOrHtml, variableValues, signatureData, verificationMeta)
+  const mergedVars: Record<string, string> = { ...(variableValues || {}) }
 
-  // For canvas, margins are already baked into the absolute mm coordinates of each sheet
-  const marginTop = isCanvas ? 0 : (margins.top ?? 20)
-  const marginRight = isCanvas ? 0 : (margins.right ?? 15)
-  const marginBottom = isCanvas ? 0 : (margins.bottom ?? 20)
-  const marginLeft = isCanvas ? 0 : (margins.left ?? 25)
+  // Inject signature variable if provided
+  if (signatureData) {
+    const sigImg = `<img src="${signatureData}" style="max-height: 55px; max-width: 170px; object-fit: contain; vertical-align: middle; display: inline-block;" alt="Talaba Imzosi" />`
+    mergedVars['student_signature'] = sigImg
+    mergedVars['signature'] = sigImg
+    mergedVars['imzo'] = sigImg
+    mergedVars['signature_data'] = signatureData
+  }
 
-  // Create temporary off-screen container for rendering
+  // Verification banner template (used if signature was provided but not placed into any canvas/HTML variable)
+  const verificationBanner = signatureData ? `
+    <div style="margin: 20px 0 0; padding: 14px 18px; border: 1.5px solid #059669; border-radius: 10px; background: #f0fdf4; font-family: 'Times New Roman', serif; font-size: 11pt; color: #064e3b; page-break-inside: avoid;">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div>
+          <div style="font-weight: bold; font-size: 11.5pt; text-transform: uppercase; color: #065f46;">Elektron Imzolangan Shartnoma</div>
+          <div style="margin-top: 2px;">Shartnoma / Talaba ID: <strong>${verificationMeta?.contractNumber || verificationMeta?.studentId || mergedVars['contract_number'] || '—'}</strong></div>
+          <div>Talaba: <strong>${verificationMeta?.studentName || mergedVars['student_name'] || '—'}</strong></div>
+          <div>Holati: <strong style="color: #059669;">VERIFIED</strong> (${verificationMeta?.verifiedAt || new Date().toLocaleDateString('uz-UZ')})</div>
+        </div>
+        <div style="text-align: right;">
+          <div style="font-size: 9pt; color: #64748b; margin-bottom: 2px;">Talaba imzosi:</div>
+          <img src="${signatureData}" style="max-height: 50px; max-width: 160px; object-fit: contain; background: white; padding: 2px 6px; border: 1px dashed #cbd5e1; border-radius: 4px;" alt="Talaba Imzosi" />
+        </div>
+      </div>
+    </div>
+  ` : ''
+
+  // CASE 1: Canva Canvas Document
+  if (isCanvasDocumentJson(rawOrHtml)) {
+    const doc = deserializeCanvasDocument(rawOrHtml)
+    if (doc && Array.isArray(doc.pages) && doc.pages.length > 0) {
+      const pdf = new jsPDF({
+        unit: 'mm',
+        format: 'a4',
+        orientation: 'portrait',
+        compress: true,
+      })
+
+      let signatureRendered = false
+
+      for (let pageIdx = 0; pageIdx < doc.pages.length; pageIdx++) {
+        const isLastPage = pageIdx === doc.pages.length - 1
+        const singlePageDoc = { ...doc, pages: [doc.pages[pageIdx]] }
+        let pageHtml = convertCanvasDocumentToHtml(singlePageDoc, mergedVars)
+
+        if (pageHtml.includes('alt="Talaba Imzosi"') || pageHtml.includes('alt="Imzo"')) {
+          signatureRendered = true
+        }
+
+        if (isLastPage && signatureData && !signatureRendered && verificationBanner) {
+          pageHtml += verificationBanner
+        }
+
+        const pageContainer = document.createElement('div')
+        pageContainer.className = 'canvas-pdf-render-page'
+        pageContainer.style.cssText = `
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 210mm;
+          min-height: 297mm;
+          background: #ffffff;
+          overflow: hidden;
+          z-index: -99999;
+          pointer-events: none;
+          box-sizing: border-box;
+          padding: 0;
+          margin: 0;
+        `
+        pageContainer.innerHTML = `
+          <style>
+            .canvas-a4-page-print p { margin: 0.2em 0; }
+            .canvas-a4-page-print p:first-child { margin-top: 0 !important; }
+            .canvas-a4-page-print p:last-child { margin-bottom: 0 !important; }
+          </style>
+          ${pageHtml}
+        `
+        document.body.appendChild(pageContainer)
+
+        try {
+          // Wait for any images to load
+          const images = Array.from(pageContainer.querySelectorAll('img'))
+          if (images.length > 0) {
+            await Promise.all(
+              images.map(
+                img =>
+                  new Promise<void>(resolve => {
+                    if (img.complete) return resolve()
+                    img.onload = () => resolve()
+                    img.onerror = () => resolve()
+                  })
+              )
+            )
+          }
+
+          const canvas = await html2canvas(pageContainer, {
+            scale: 2,
+            useCORS: true,
+            logging: false,
+            backgroundColor: '#ffffff',
+            scrollX: 0,
+            scrollY: 0,
+            windowWidth: 794,
+          })
+
+          if (pageIdx > 0) {
+            pdf.addPage()
+          }
+
+          const imgData = canvas.toDataURL('image/jpeg', 0.95)
+          pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297, undefined, 'FAST')
+        } finally {
+          if (pageContainer.parentNode) {
+            pageContainer.parentNode.removeChild(pageContainer)
+          }
+        }
+      }
+
+      pdf.save(`${safeTitle}.pdf`)
+      return
+    }
+  }
+
+  // CASE 2: Standard HTML / Text Document
+  const bodyHtml = prepareContractHtml(rawOrHtml, mergedVars, signatureData, verificationMeta)
+  const marginTop = margins.top ?? 20
+  const marginRight = margins.right ?? 15
+  const marginBottom = margins.bottom ?? 20
+  const marginLeft = margins.left ?? 25
+
+  const contentWidthMm = 210 - marginLeft - marginRight
+  const contentHeightMm = 297 - marginTop - marginBottom
+
   const container = document.createElement('div')
   container.className = 'contract-pdf-render-container'
   container.style.cssText = `
     position: fixed;
-    left: -9999px;
     top: 0;
-    width: 794px; /* Exact A4 width at 96 DPI: 210mm ≈ 794px */
+    left: 0;
+    width: 794px;
     background: #ffffff;
     color: #111827;
     font-family: 'Times New Roman', Times, serif;
-    font-size: 13px;
-    line-height: 1.6;
+    font-size: 13.5px;
+    line-height: 1.65;
     box-sizing: border-box;
     padding: 0;
+    margin: 0;
+    z-index: -99999;
+    pointer-events: none;
   `
-
   container.innerHTML = `
     <style>
       .contract-pdf-content {
@@ -178,6 +306,7 @@ export async function downloadContractAsPdf(
         line-height: 1.65;
         color: #111827 !important;
         box-sizing: border-box;
+        padding: 0;
       }
       .contract-pdf-content p {
         margin: 5px 0;
@@ -236,7 +365,6 @@ export async function downloadContractAsPdf(
         width: 100% !important;
         border-collapse: collapse !important;
         margin: 10px 0 !important;
-        page-break-inside: avoid;
       }
       .contract-pdf-content td,
       .contract-pdf-content th {
@@ -285,34 +413,75 @@ export async function downloadContractAsPdf(
       ${bodyHtml}
     </div>
   `
-
   document.body.appendChild(container)
 
-  const opt = {
-    margin: [marginTop, marginLeft, marginBottom, marginRight] as [number, number, number, number],
-    filename: `${safeTitle}.pdf`,
-    image: { type: 'jpeg' as const, quality: 0.98 },
-    html2canvas: {
+  try {
+    const images = Array.from(container.querySelectorAll('img'))
+    if (images.length > 0) {
+      await Promise.all(
+        images.map(
+          img =>
+            new Promise<void>(resolve => {
+              if (img.complete) return resolve()
+              img.onload = () => resolve()
+              img.onerror = () => resolve()
+            })
+        )
+      )
+    }
+
+    const canvas = await html2canvas(container, {
       scale: 2,
       useCORS: true,
-      letterRendering: true,
       logging: false,
+      backgroundColor: '#ffffff',
       scrollX: 0,
       scrollY: 0,
-    },
-    jsPDF: {
-      unit: 'mm' as const,
-      format: 'a4' as const,
-      orientation: 'portrait' as const,
-    },
-    pagebreak: {
-      mode: ['css', 'legacy'] as ('css' | 'legacy')[],
-      before: '.page-break-always, .html2pdf__page-break',
-    },
-  }
+      windowWidth: 794,
+    })
 
-  try {
-    await html2pdf().set(opt).from(container).save()
+    const pdf = new jsPDF({
+      unit: 'mm',
+      format: 'a4',
+      orientation: 'portrait',
+      compress: true,
+    })
+
+    const imgWidth = canvas.width
+    const imgHeight = canvas.height
+    const fullImgData = canvas.toDataURL('image/jpeg', 0.95)
+    const scaledPdfHeight = (imgHeight * contentWidthMm) / imgWidth
+
+    if (scaledPdfHeight <= contentHeightMm) {
+      pdf.addImage(fullImgData, 'JPEG', marginLeft, marginTop, contentWidthMm, scaledPdfHeight, undefined, 'FAST')
+    } else {
+      const pageCanvasHeight = (imgWidth * contentHeightMm) / contentWidthMm
+      let heightLeft = imgHeight
+      let position = 0
+
+      while (heightLeft > 0) {
+        const sliceCanvas = document.createElement('canvas')
+        sliceCanvas.width = imgWidth
+        const currentSliceHeight = Math.min(heightLeft, pageCanvasHeight)
+        sliceCanvas.height = currentSliceHeight
+        const sliceCtx = sliceCanvas.getContext('2d')
+        if (sliceCtx) {
+          sliceCtx.fillStyle = '#ffffff'
+          sliceCtx.fillRect(0, 0, imgWidth, currentSliceHeight)
+          sliceCtx.drawImage(canvas, 0, position, imgWidth, currentSliceHeight, 0, 0, imgWidth, currentSliceHeight)
+        }
+
+        if (position > 0) pdf.addPage()
+        const sliceData = sliceCanvas.toDataURL('image/jpeg', 0.95)
+        const slicePdfHeight = (currentSliceHeight * contentWidthMm) / imgWidth
+        pdf.addImage(sliceData, 'JPEG', marginLeft, marginTop, contentWidthMm, slicePdfHeight, undefined, 'FAST')
+
+        position += currentSliceHeight
+        heightLeft -= currentSliceHeight
+      }
+    }
+
+    pdf.save(`${safeTitle}.pdf`)
   } finally {
     if (container.parentNode) {
       container.parentNode.removeChild(container)
