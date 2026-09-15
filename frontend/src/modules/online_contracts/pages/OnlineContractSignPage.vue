@@ -211,6 +211,37 @@ async function init() {
       } catch (err) {
         console.error('Failed to load contract for resubmission:', err)
       }
+    } else if (authStore.isAuthenticated) {
+      try {
+        const prof = await onlineContractsApi.getProfile()
+        if (prof.user.full_name) formData.fullName = prof.user.full_name.toUpperCase()
+        if (prof.profile.passport_number) formData.passportNumber = prof.profile.passport_number.toUpperCase()
+        if (prof.profile.education_level) formData.educationLevel = prof.profile.education_level
+        if (prof.profile.office) formData.office = prof.profile.office
+        if (prof.profile.phone1) formData.phone1 = prof.profile.phone1
+        if (prof.profile.phone2) formData.phone2 = prof.profile.phone2
+        if (prof.user.email) formData.email = prof.user.email
+        if (prof.profile.date_of_birth) {
+          const s = prof.profile.date_of_birth.trim()
+          if (s.includes('.')) {
+            const parts = s.split('.')
+            if (parts.length === 3) {
+              formData.dobDay = parts[0].padStart(2, '0')
+              formData.dobMonth = parts[1].padStart(2, '0')
+              formData.dobYear = parts[2]
+            }
+          } else if (s.includes('-')) {
+            const parts = s.split('-')
+            if (parts.length === 3) {
+              formData.dobYear = parts[0]
+              formData.dobMonth = parts[1].padStart(2, '0')
+              formData.dobDay = parts[2].padStart(2, '0')
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load profile for auto-fill:', err)
+      }
     }
   } catch (err) {
     console.error('Failed to init sign page:', err)
@@ -307,7 +338,7 @@ function openPasswordModal() {
 
 async function handleFinalSubmit() {
   if (!accountPassword.value) {
-    submitError.value = 'Hisobingiz parolini kiriting.'
+    submitError.value = 'Profil parolini kiriting.'
     return
   }
 
@@ -901,7 +932,7 @@ onMounted(() => {
             Parolni tasdiqlang
           </h3>
           <p class="text-xs text-zinc-700 dark:text-zinc-300 font-medium mt-1">
-            Shartnomani rasman imzolash uchun shaxsiy hisobingiz parolini kiriting.
+            Shartnomani rasman imzolash uchun profilingiz parolini kiriting.
           </p>
         </div>
 
@@ -915,7 +946,7 @@ onMounted(() => {
 
         <div>
           <label class="block text-xs font-bold uppercase tracking-wide text-black dark:text-white mb-1.5">
-            Hisobingiz paroli
+            Profil paroli
           </label>
           <div class="relative">
             <Lock class="w-3.5 h-3.5 text-zinc-600 dark:text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />

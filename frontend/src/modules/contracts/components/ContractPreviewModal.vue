@@ -279,9 +279,9 @@ function formatRejectionDate(dateStr?: string | null): string {
 
       <!-- Right: Actions Toolbar -->
       <div class="flex items-center gap-2 flex-wrap" v-if="activeContract">
-        <!-- Bekor qilish (Reject - Faqat Pending holatida) -->
+        <!-- Bekor qilish (Reject - Pending yoki Verified holatida) -->
         <button
-          v-if="activeContract.status === 'pending'"
+          v-if="activeContract.status === 'pending' || activeContract.status === 'verified'"
           type="button"
           @click="emit('reject', activeContract)"
           class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-rose-200 dark:border-rose-900/60 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-xs font-medium transition-colors cursor-pointer"

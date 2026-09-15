@@ -197,7 +197,7 @@ function handleClose() {
       <!-- Verification Form -->
       <form v-else @submit.prevent="handleVerify" class="p-6 space-y-5">
         <div class="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/40 p-3.5 rounded-xl">
-          Konsalting kompaniyasi sizga taqdim etgan bir martalik <strong>Tasdiqlash Kodi</strong>ni va hisobingiz parolini kiriting.
+          Konsalting kompaniyasi sizga taqdim etgan bir martalik <strong>Tasdiqlash Kodi</strong>ni va profilingiz parolini kiriting.
         </div>
 
         <!-- Error display -->
@@ -233,7 +233,7 @@ function handleClose() {
         <!-- Account Password Input -->
         <div>
           <label class="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
-            Hisobingiz Paroli (Account Password)
+            Profil Paroli (Account Password)
           </label>
           <div class="relative">
             <Lock class="w-4 h-4 text-zinc-400 absolute left-3.5 top-1/2 -translate-y-1/2" />

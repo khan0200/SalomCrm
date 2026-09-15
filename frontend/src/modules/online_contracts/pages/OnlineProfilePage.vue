@@ -608,13 +608,12 @@ function handleResubmit(contract: OnlineContractSummary) {
                   <span>Yangi shartnoma tuzish</span>
                 </router-link>
 
-                <!-- Cancel Pending Contract Button -->
+                <!-- Cancel Contract Button -->
                 <button
-                  v-if="contract.status === 'pending'"
+                  v-if="contract.status === 'pending' || contract.status === 'verified'"
                   type="button"
                   @click="openCancelModal(contract)"
-                  class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-red-300 dark:border-red-800/80 bg-white hover:bg-red-50 dark:bg-zinc-900 dark:hover:bg-red-950/40 text-xs font-bold text-red-600 dark:text-red-400 transition-colors cursor-pointer shadow-2xs"
-                  title="Shartnomani bekor qilish"
+                  class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-red-200 dark:border-red-900/50 text-red-600 dark:text-red-400 text-xs font-semibold hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors shadow-2xs"
                 >
                   <Trash2 class="w-3.5 h-3.5" />
                   <span>Bekor qilish</span>

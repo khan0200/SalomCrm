@@ -867,9 +867,9 @@ class CancelOnlineContractView(APIView):
         if not contract:
             return Response({'detail': "Shartnoma topilmadi."}, status=status.HTTP_404_NOT_FOUND)
 
-        if contract.status == 'verified':
+        if contract.status in ['cancelled', 'rejected']:
             return Response(
-                {'detail': "Rasman tasdiqlangan shartnomani bekor qilib bo'lmaydi. Iltimos, ofis ma'muriyatiga murojaat qiling."},
+                {'detail': "Shartnoma allaqachon bekor qilingan yoki rad etilgan."},
                 status=status.HTTP_400_BAD_REQUEST
             )
 

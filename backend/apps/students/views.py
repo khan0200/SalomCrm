@@ -2414,8 +2414,8 @@ class ContractViewSet(viewsets.ModelViewSet):
         if not reason:
             return Response({'detail': 'Rejection reason is required.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        if contract.status == 'verified':
-            return Response({'detail': 'Verified contracts cannot be rejected.'}, status=status.HTTP_400_BAD_REQUEST)
+        if contract.status == 'rejected':
+            return Response({'detail': 'Contract is already rejected.'}, status=status.HTTP_400_BAD_REQUEST)
 
         now = timezone.now()
         contract.status = 'rejected'
