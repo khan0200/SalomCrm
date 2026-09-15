@@ -166,9 +166,24 @@ export interface AlignmentGuide {
   label?: string
 }
 
+export interface DistanceGuide {
+  id: string
+  axis: 'horizontal' | 'vertical'
+  startPos: number // mm along the primary axis (start edge)
+  endPos: number // mm along the primary axis (end edge)
+  crossPos: number // mm along the cross axis (line position)
+  distanceMm: number // mm
+  isEqualSpacing?: boolean
+  targetType: 'element' | 'page' | 'margin'
+  label?: string
+  projectionFrom?: { start: number; end: number }
+  projectionTo?: { start: number; end: number }
+}
+
 export interface BoundingBox {
   x: number // mm
   y: number // mm
   width: number // mm
   height: number // mm
 }
+

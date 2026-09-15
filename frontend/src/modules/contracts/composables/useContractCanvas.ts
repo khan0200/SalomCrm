@@ -7,6 +7,7 @@ import type {
   TableCanvasElement,
   TableCellModel,
   AlignmentGuide,
+  DistanceGuide,
   PageMargins,
   ResizeHandle,
 } from '../types/contractCanvas'
@@ -54,6 +55,7 @@ export function useContractCanvas(initialDoc?: ContractDocumentModel) {
   const isDragging = ref<boolean>(false)
   const isResizing = ref<boolean>(false)
   const activeGuides = ref<AlignmentGuide[]>([])
+  const activeDistanceGuides = ref<DistanceGuide[]>([])
   const clipboard = ref<CanvasElement[]>([])
 
   // Undo / Redo history
@@ -149,6 +151,7 @@ export function useContractCanvas(initialDoc?: ContractDocumentModel) {
     selectedElementIds.value = []
     editingElementId.value = null
     activeGuides.value = []
+    activeDistanceGuides.value = []
     try {
       window.getSelection()?.removeAllRanges()
     } catch {}
@@ -241,21 +244,42 @@ export function useContractCanvas(initialDoc?: ContractDocumentModel) {
   }
 
   // ─── Multi-Element Drag Tracking ────────────────────────
-  const dragStartPositions = new Map<string, { x: number; y: number }>()
+  interface DragItemInitial {
+    x: number
+    y: number
+    width: number
+    height: number
+  }
+  const dragStartPositions = new Map<string, DragItemInitial>()
 
   function startDrag(primaryId?: string) {
     dragStartPositions.clear()
     selectedElements.value.forEach(el => {
       if (!el.locked) {
-        dragStartPositions.set(el.id, { x: el.x, y: el.y })
+        dragStartPositions.set(el.id, { x: el.x, y: el.y, width: el.width, height: el.height })
       }
     })
     if (primaryId && !dragStartPositions.has(primaryId)) {
       const found = findElementAndPage(primaryId)
       if (found && !found.element.locked) {
-        dragStartPositions.set(primaryId, { x: found.element.x, y: found.element.y })
+        dragStartPositions.set(primaryId, { x: found.element.x, y: found.element.y, width: found.element.width, height: found.element.height })
       }
     }
+  }
+
+  function getGroupStartBounds(): { minX: number; minY: number; maxX: number; maxY: number; width: number; height: number } | null {
+    if (dragStartPositions.size <= 1) return null
+    let minX = Infinity
+    let minY = Infinity
+    let maxX = -Infinity
+    let maxY = -Infinity
+    for (const item of dragStartPositions.values()) {
+      minX = Math.min(minX, item.x)
+      minY = Math.min(minY, item.y)
+      maxX = Math.max(maxX, item.x + item.width)
+      maxY = Math.max(maxY, item.y + item.height)
+    }
+    return { minX, minY, maxX, maxY, width: maxX - minX, height: maxY - minY }
   }
 
   function updateElementBounds(
@@ -292,6 +316,8 @@ export function useContractCanvas(initialDoc?: ContractDocumentModel) {
 
   function endDrag() {
     dragStartPositions.clear()
+    activeGuides.value = []
+    activeDistanceGuides.value = []
   }
 
   function deleteSelectedElements(specificId?: string) {
@@ -397,30 +423,64 @@ export function useContractCanvas(initialDoc?: ContractDocumentModel) {
     history.recordSnapshot(document.value)
   }
 
-  // Smart Snapping Engine
+  function formatDistanceMm(mm: number): string {
+    const rounded = Math.round(mm * 10) / 10
+    return rounded % 1 === 0 ? `${rounded.toFixed(0)} mm` : `${rounded.toFixed(1)} mm`
+  }
+
+  // Smart Snapping & Distance Guides Engine (Canva/Figma Style)
   function calculateSnapping(
     targetX: number,
     targetY: number,
     targetW: number,
     targetH: number,
-    ignoreId: string
-  ): { x: number; y: number; guides: AlignmentGuide[] } {
-    let snappedX = targetX
-    let snappedY = targetY
+    ignoreId: string | string[],
+    isResize = false
+  ): { x: number; y: number; guides: AlignmentGuide[]; distanceGuides: DistanceGuide[] } {
+    const isMultiDrag = !isResize && typeof ignoreId === 'string' && dragStartPositions.size > 1 && dragStartPositions.has(ignoreId)
+    const groupBounds = isMultiDrag ? getGroupStartBounds() : null
+
+    // If multi-drag, we calculate snapping and distance guides for the entire group bounding box
+    let calcX = targetX
+    let calcY = targetY
+    let calcW = targetW
+    let calcH = targetH
+    let offsetX = 0
+    let offsetY = 0
+
+    const ignoreSet = new Set<string>()
+    if (isMultiDrag && groupBounds) {
+      dragStartPositions.forEach((_, id) => ignoreSet.add(id))
+      const primaryStart = dragStartPositions.get(ignoreId as string)!
+      offsetX = primaryStart.x - groupBounds.minX
+      offsetY = primaryStart.y - groupBounds.minY
+      calcX = targetX - offsetX
+      calcY = targetY - offsetY
+      calcW = groupBounds.width
+      calcH = groupBounds.height
+    } else {
+      if (Array.isArray(ignoreId)) {
+        ignoreId.forEach(id => ignoreSet.add(id))
+      } else if (ignoreId) {
+        ignoreSet.add(ignoreId)
+      }
+    }
+
+    let snappedX = calcX
+    let snappedY = calcY
     const guides: AlignmentGuide[] = []
+    const distanceGuides: DistanceGuide[] = []
 
     const margins = document.value.margins || { top: 20, right: 15, bottom: 20, left: 25 }
     const pageCenterHoriz = PAGE_WIDTH_MM / 2 // 105mm
     const pageCenterVert = PAGE_HEIGHT_MM / 2 // 148.5mm
 
-    const targetCenterX = targetX + targetW / 2
-    const targetRight = targetX + targetW
-    const targetCenterY = targetY + targetH / 2
-    const targetBottom = targetY + targetH
+    const targetCenterX = calcX + calcW / 2
+    const targetRight = calcX + calcW
+    const targetCenterY = calcY + calcH / 2
+    const targetBottom = calcY + calcH
 
     // 1. Page Bounds & Margin Snaps (X Axis)
-    // Snap targets: absolute page edges, margin guides, and page horizontal center.
-    // ALL coordinates are in mm in the same document space as element.x/width.
     const xSnaps = [
       { pos: 0,                             label: 'Page Left' },
       { pos: margins.left,                  label: 'Left Margin' },
@@ -431,7 +491,7 @@ export function useContractCanvas(initialDoc?: ContractDocumentModel) {
 
     for (const snap of xSnaps) {
       // Align Left edge
-      if (Math.abs(targetX - snap.pos) < SNAP_THRESHOLD_MM) {
+      if (Math.abs(calcX - snap.pos) < SNAP_THRESHOLD_MM) {
         snappedX = snap.pos
         guides.push({
           type: 'vertical',
@@ -444,7 +504,7 @@ export function useContractCanvas(initialDoc?: ContractDocumentModel) {
       }
       // Align Center
       if (Math.abs(targetCenterX - snap.pos) < SNAP_THRESHOLD_MM) {
-        snappedX = snap.pos - targetW / 2
+        snappedX = snap.pos - calcW / 2
         guides.push({
           type: 'vertical',
           position: snap.pos,
@@ -456,7 +516,7 @@ export function useContractCanvas(initialDoc?: ContractDocumentModel) {
       }
       // Align Right edge
       if (Math.abs(targetRight - snap.pos) < SNAP_THRESHOLD_MM) {
-        snappedX = snap.pos - targetW
+        snappedX = snap.pos - calcW
         guides.push({
           type: 'vertical',
           position: snap.pos,
@@ -469,18 +529,17 @@ export function useContractCanvas(initialDoc?: ContractDocumentModel) {
     }
 
     // 2. Page Bounds & Margin Snaps (Y Axis)
-    // Same approach: absolute page edges, margin guides, vertical center.
     const ySnaps = [
-      { pos: 0,                              label: 'Page Top' },
-      { pos: margins.top,                    label: 'Top Margin' },
-      { pos: pageCenterVert,                 label: 'Center Page (Y)' },
+      { pos: 0,                               label: 'Page Top' },
+      { pos: margins.top,                     label: 'Top Margin' },
+      { pos: pageCenterVert,                  label: 'Center Page (Y)' },
       { pos: PAGE_HEIGHT_MM - margins.bottom, label: 'Bottom Margin' },
       { pos: PAGE_HEIGHT_MM,                  label: 'Page Bottom' },
     ]
 
     for (const snap of ySnaps) {
       // Align Top edge
-      if (Math.abs(targetY - snap.pos) < SNAP_THRESHOLD_MM) {
+      if (Math.abs(calcY - snap.pos) < SNAP_THRESHOLD_MM) {
         snappedY = snap.pos
         guides.push({
           type: 'horizontal',
@@ -493,7 +552,7 @@ export function useContractCanvas(initialDoc?: ContractDocumentModel) {
       }
       // Align Center
       if (Math.abs(targetCenterY - snap.pos) < SNAP_THRESHOLD_MM) {
-        snappedY = snap.pos - targetH / 2
+        snappedY = snap.pos - calcH / 2
         guides.push({
           type: 'horizontal',
           position: snap.pos,
@@ -505,7 +564,7 @@ export function useContractCanvas(initialDoc?: ContractDocumentModel) {
       }
       // Align Bottom edge
       if (Math.abs(targetBottom - snap.pos) < SNAP_THRESHOLD_MM) {
-        snappedY = snap.pos - targetH
+        snappedY = snap.pos - calcH
         guides.push({
           type: 'horizontal',
           position: snap.pos,
@@ -518,10 +577,11 @@ export function useContractCanvas(initialDoc?: ContractDocumentModel) {
     }
 
     // 3. Other Elements on Page Snaps
-    const pageIndex = findElementAndPage(ignoreId)?.pageIndex ?? activePageIndex.value
+    const primaryIdStr = typeof ignoreId === 'string' ? ignoreId : (ignoreId[0] || '')
+    const pageIndex = findElementAndPage(primaryIdStr)?.pageIndex ?? activePageIndex.value
     const targetPage = document.value.pages[pageIndex] || activePage.value
     const otherElements = (targetPage?.elements || []).filter(
-      el => el.id !== ignoreId && !el.hidden
+      el => !ignoreSet.has(el.id) && !el.hidden
     )
 
     for (const other of otherElements) {
@@ -530,64 +590,448 @@ export function useContractCanvas(initialDoc?: ContractDocumentModel) {
       const otherCenterY = other.y + other.height / 2
       const otherBottom = other.y + other.height
 
-      // Horizontal element alignments — same-edge and cross-edge
-      if (Math.abs(targetX - other.x) < SNAP_THRESHOLD_MM) {
-        // Left → Left
+      // Horizontal element alignments
+      if (Math.abs(calcX - other.x) < SNAP_THRESHOLD_MM) {
         snappedX = other.x
         guides.push({ type: 'vertical', position: other.x,
-          start: Math.min(targetY, other.y), end: Math.max(targetBottom, otherBottom) })
+          start: Math.min(calcY, other.y), end: Math.max(targetBottom, otherBottom) })
       } else if (Math.abs(targetCenterX - otherCenterX) < SNAP_THRESHOLD_MM) {
-        // Center → Center
-        snappedX = otherCenterX - targetW / 2
+        snappedX = otherCenterX - calcW / 2
         guides.push({ type: 'vertical', position: otherCenterX,
-          start: Math.min(targetY, other.y), end: Math.max(targetBottom, otherBottom) })
+          start: Math.min(calcY, other.y), end: Math.max(targetBottom, otherBottom) })
       } else if (Math.abs(targetRight - otherRight) < SNAP_THRESHOLD_MM) {
-        // Right → Right
-        snappedX = otherRight - targetW
+        snappedX = otherRight - calcW
         guides.push({ type: 'vertical', position: otherRight,
-          start: Math.min(targetY, other.y), end: Math.max(targetBottom, otherBottom) })
+          start: Math.min(calcY, other.y), end: Math.max(targetBottom, otherBottom) })
       } else if (Math.abs(targetRight - other.x) < SNAP_THRESHOLD_MM) {
-        // Target right edge → Other left edge (adjacent snap)
-        snappedX = other.x - targetW
+        snappedX = other.x - calcW
         guides.push({ type: 'vertical', position: other.x,
-          start: Math.min(targetY, other.y), end: Math.max(targetBottom, otherBottom) })
-      } else if (Math.abs(targetX - otherRight) < SNAP_THRESHOLD_MM) {
-        // Target left edge → Other right edge (adjacent snap)
+          start: Math.min(calcY, other.y), end: Math.max(targetBottom, otherBottom) })
+      } else if (Math.abs(calcX - otherRight) < SNAP_THRESHOLD_MM) {
         snappedX = otherRight
         guides.push({ type: 'vertical', position: otherRight,
-          start: Math.min(targetY, other.y), end: Math.max(targetBottom, otherBottom) })
+          start: Math.min(calcY, other.y), end: Math.max(targetBottom, otherBottom) })
       }
 
-      // Vertical element alignments — same-edge and cross-edge
-      if (Math.abs(targetY - other.y) < SNAP_THRESHOLD_MM) {
-        // Top → Top
+      // Vertical element alignments
+      if (Math.abs(calcY - other.y) < SNAP_THRESHOLD_MM) {
         snappedY = other.y
         guides.push({ type: 'horizontal', position: other.y,
-          start: Math.min(targetX, other.x), end: Math.max(targetRight, otherRight) })
+          start: Math.min(calcX, other.x), end: Math.max(targetRight, otherRight) })
       } else if (Math.abs(targetCenterY - otherCenterY) < SNAP_THRESHOLD_MM) {
-        // Center → Center
-        snappedY = otherCenterY - targetH / 2
+        snappedY = otherCenterY - calcH / 2
         guides.push({ type: 'horizontal', position: otherCenterY,
-          start: Math.min(targetX, other.x), end: Math.max(targetRight, otherRight) })
+          start: Math.min(calcX, other.x), end: Math.max(targetRight, otherRight) })
       } else if (Math.abs(targetBottom - otherBottom) < SNAP_THRESHOLD_MM) {
-        // Bottom → Bottom
-        snappedY = otherBottom - targetH
+        snappedY = otherBottom - calcH
         guides.push({ type: 'horizontal', position: otherBottom,
-          start: Math.min(targetX, other.x), end: Math.max(targetRight, otherRight) })
+          start: Math.min(calcX, other.x), end: Math.max(targetRight, otherRight) })
       } else if (Math.abs(targetBottom - other.y) < SNAP_THRESHOLD_MM) {
-        // Target bottom edge → Other top edge (adjacent snap)
-        snappedY = other.y - targetH
+        snappedY = other.y - calcH
         guides.push({ type: 'horizontal', position: other.y,
-          start: Math.min(targetX, other.x), end: Math.max(targetRight, otherRight) })
-      } else if (Math.abs(targetY - otherBottom) < SNAP_THRESHOLD_MM) {
-        // Target top edge → Other bottom edge (adjacent snap)
+          start: Math.min(calcX, other.x), end: Math.max(targetRight, otherRight) })
+      } else if (Math.abs(calcY - otherBottom) < SNAP_THRESHOLD_MM) {
         snappedY = otherBottom
         guides.push({ type: 'horizontal', position: otherBottom,
-          start: Math.min(targetX, other.x), end: Math.max(targetRight, otherRight) })
+          start: Math.min(calcX, other.x), end: Math.max(targetRight, otherRight) })
       }
     }
 
-    return { x: snappedX, y: snappedY, guides }
+    // 4. Equal Spacing Snapping (during drag only)
+    if (!isResize && otherElements.length >= 2) {
+      // Horizontal Equal Spacing between Left and Right elements
+      const leftCandidates = otherElements.filter(o => o.x + o.width <= calcX + SNAP_THRESHOLD_MM)
+      const rightCandidates = otherElements.filter(o => o.x >= calcX + calcW - SNAP_THRESHOLD_MM)
+
+      let bestEqualX: number | null = null
+      let minEqualXDiff = SNAP_THRESHOLD_MM
+
+      for (const leftEl of leftCandidates) {
+        const leftEdge = leftEl.x + leftEl.width
+        for (const rightEl of rightCandidates) {
+          const rightEdge = rightEl.x
+          const totalGap = rightEdge - leftEdge
+          const equalGap = (totalGap - calcW) / 2
+          if (equalGap > 1) {
+            const candidateEqualX = leftEdge + equalGap
+            const diff = Math.abs(calcX - candidateEqualX)
+            if (diff < minEqualXDiff) {
+              minEqualXDiff = diff
+              bestEqualX = candidateEqualX
+            }
+          }
+        }
+      }
+
+      // Continuation rhythm Left1 -> Left2 -> Target
+      for (let i = 0; i < leftCandidates.length; i++) {
+        for (let j = 0; j < leftCandidates.length; j++) {
+          if (i === j) continue
+          const l1 = leftCandidates[i]
+          const l2 = leftCandidates[j]
+          if (l1.x + l1.width <= l2.x) {
+            const gap = l2.x - (l1.x + l1.width)
+            if (gap > 1) {
+              const candidateEqualX = l2.x + l2.width + gap
+              const diff = Math.abs(calcX - candidateEqualX)
+              if (diff < minEqualXDiff) {
+                minEqualXDiff = diff
+                bestEqualX = candidateEqualX
+              }
+            }
+          }
+        }
+      }
+
+      if (bestEqualX !== null) {
+        snappedX = bestEqualX
+      }
+
+      // Vertical Equal Spacing between Top and Bottom elements
+      const topCandidates = otherElements.filter(o => o.y + o.height <= calcY + SNAP_THRESHOLD_MM)
+      const bottomCandidates = otherElements.filter(o => o.y >= calcY + calcH - SNAP_THRESHOLD_MM)
+
+      let bestEqualY: number | null = null
+      let minEqualYDiff = SNAP_THRESHOLD_MM
+
+      for (const topEl of topCandidates) {
+        const topEdge = topEl.y + topEl.height
+        for (const bottomEl of bottomCandidates) {
+          const bottomEdge = bottomEl.y
+          const totalGap = bottomEdge - topEdge
+          const equalGap = (totalGap - calcH) / 2
+          if (equalGap > 1) {
+            const candidateEqualY = topEdge + equalGap
+            const diff = Math.abs(calcY - candidateEqualY)
+            if (diff < minEqualYDiff) {
+              minEqualYDiff = diff
+              bestEqualY = candidateEqualY
+            }
+          }
+        }
+      }
+
+      // Continuation rhythm Top1 -> Top2 -> Target
+      for (let i = 0; i < topCandidates.length; i++) {
+        for (let j = 0; j < topCandidates.length; j++) {
+          if (i === j) continue
+          const t1 = topCandidates[i]
+          const t2 = topCandidates[j]
+          if (t1.y + t1.height <= t2.y) {
+            const gap = t2.y - (t1.y + t1.height)
+            if (gap > 1) {
+              const candidateEqualY = t2.y + t2.height + gap
+              const diff = Math.abs(calcY - candidateEqualY)
+              if (diff < minEqualYDiff) {
+                minEqualYDiff = diff
+                bestEqualY = candidateEqualY
+              }
+            }
+          }
+        }
+      }
+
+      if (bestEqualY !== null) {
+        snappedY = bestEqualY
+      }
+    }
+
+    // 5. Smart Distance Guides (calculated from FINAL snapped geometry)
+    if (!isResize) {
+      const geomLeft = snappedX
+      const geomRight = snappedX + calcW
+      const geomTop = snappedY
+      const geomBottom = snappedY + calcH
+      const geomCenterX = snappedX + calcW / 2
+      const geomCenterY = snappedY + calcH / 2
+
+      // ─── Horizontal Distance Guides ───
+      const leftCandidates = otherElements.filter(o => o.x + o.width <= geomLeft + 0.1)
+      let nearestLeft: CanvasElement | null = null
+      let minLeftScore = Infinity
+
+      for (const o of leftCandidates) {
+        const gap = geomLeft - (o.x + o.width)
+        const overlapY = Math.min(geomBottom, o.y + o.height) - Math.max(geomTop, o.y)
+        const vertDist = overlapY > 0 ? 0 : Math.max(geomTop - (o.y + o.height), o.y - geomBottom)
+        const score = (overlapY > 0 ? 0 : 500 + vertDist) + gap
+        if (score < minLeftScore) {
+          minLeftScore = score
+          nearestLeft = o
+        }
+      }
+
+      const rightCandidates = otherElements.filter(o => o.x >= geomRight - 0.1)
+      let nearestRight: CanvasElement | null = null
+      let minRightScore = Infinity
+
+      for (const o of rightCandidates) {
+        const gap = o.x - geomRight
+        const overlapY = Math.min(geomBottom, o.y + o.height) - Math.max(geomTop, o.y)
+        const vertDist = overlapY > 0 ? 0 : Math.max(geomTop - (o.y + o.height), o.y - geomBottom)
+        const score = (overlapY > 0 ? 0 : 500 + vertDist) + gap
+        if (score < minRightScore) {
+          minRightScore = score
+          nearestRight = o
+        }
+      }
+
+      const leftGap = nearestLeft ? geomLeft - (nearestLeft.x + nearestLeft.width) : null
+      const rightGap = nearestRight ? nearestRight.x - geomRight : null
+      const isHorizontalEqual =
+        leftGap !== null && rightGap !== null && leftGap >= 0.5 && rightGap >= 0.5 && Math.abs(leftGap - rightGap) < 0.35
+
+      // Left Guide
+      if (nearestLeft && leftGap !== null && leftGap >= 0.5) {
+        const overlapY = Math.min(geomBottom, nearestLeft.y + nearestLeft.height) - Math.max(geomTop, nearestLeft.y)
+        const crossY = overlapY > 0
+          ? (Math.max(geomTop, nearestLeft.y) + Math.min(geomBottom, nearestLeft.y + nearestLeft.height)) / 2
+          : geomCenterY
+
+        const projFrom = overlapY <= 0 ? {
+          start: Math.min(nearestLeft.y, nearestLeft.y + nearestLeft.height, crossY),
+          end: Math.max(nearestLeft.y, nearestLeft.y + nearestLeft.height, crossY)
+        } : undefined
+
+        distanceGuides.push({
+          id: 'dist-h-left',
+          axis: 'horizontal',
+          startPos: nearestLeft.x + nearestLeft.width,
+          endPos: geomLeft,
+          crossPos: crossY,
+          distanceMm: Math.round(leftGap * 10) / 10,
+          isEqualSpacing: isHorizontalEqual,
+          targetType: 'element',
+          label: formatDistanceMm(leftGap),
+          projectionFrom: projFrom,
+        })
+      } else {
+        const leftMarginDist = geomLeft - margins.left
+        if (geomLeft >= margins.left && (leftMarginDist < 35 || !nearestRight)) {
+          distanceGuides.push({
+            id: 'dist-h-left-margin',
+            axis: 'horizontal',
+            startPos: margins.left,
+            endPos: geomLeft,
+            crossPos: geomCenterY,
+            distanceMm: Math.round(leftMarginDist * 10) / 10,
+            targetType: 'margin',
+            label: formatDistanceMm(leftMarginDist),
+          })
+        } else if (geomLeft < margins.left || !nearestRight) {
+          distanceGuides.push({
+            id: 'dist-h-left-page',
+            axis: 'horizontal',
+            startPos: 0,
+            endPos: geomLeft,
+            crossPos: geomCenterY,
+            distanceMm: Math.round(geomLeft * 10) / 10,
+            targetType: 'page',
+            label: formatDistanceMm(geomLeft),
+          })
+        }
+      }
+
+      // Right Guide
+      if (nearestRight && rightGap !== null && rightGap >= 0.5) {
+        const overlapY = Math.min(geomBottom, nearestRight.y + nearestRight.height) - Math.max(geomTop, nearestRight.y)
+        const crossY = overlapY > 0
+          ? (Math.max(geomTop, nearestRight.y) + Math.min(geomBottom, nearestRight.y + nearestRight.height)) / 2
+          : geomCenterY
+
+        const projTo = overlapY <= 0 ? {
+          start: Math.min(nearestRight.y, nearestRight.y + nearestRight.height, crossY),
+          end: Math.max(nearestRight.y, nearestRight.y + nearestRight.height, crossY)
+        } : undefined
+
+        distanceGuides.push({
+          id: 'dist-h-right',
+          axis: 'horizontal',
+          startPos: geomRight,
+          endPos: nearestRight.x,
+          crossPos: crossY,
+          distanceMm: Math.round(rightGap * 10) / 10,
+          isEqualSpacing: isHorizontalEqual,
+          targetType: 'element',
+          label: formatDistanceMm(rightGap),
+          projectionTo: projTo,
+        })
+      } else {
+        const rightMarginPos = PAGE_WIDTH_MM - margins.right
+        const rightMarginDist = rightMarginPos - geomRight
+        const rightPageDist = PAGE_WIDTH_MM - geomRight
+
+        if (rightMarginDist >= 0 && (rightMarginDist < 35 || !nearestLeft)) {
+          distanceGuides.push({
+            id: 'dist-h-right-margin',
+            axis: 'horizontal',
+            startPos: geomRight,
+            endPos: rightMarginPos,
+            crossPos: geomCenterY,
+            distanceMm: Math.round(rightMarginDist * 10) / 10,
+            targetType: 'margin',
+            label: formatDistanceMm(rightMarginDist),
+          })
+        } else if (rightPageDist >= 0 && (geomRight > rightMarginPos || !nearestLeft)) {
+          distanceGuides.push({
+            id: 'dist-h-right-page',
+            axis: 'horizontal',
+            startPos: geomRight,
+            endPos: PAGE_WIDTH_MM,
+            crossPos: geomCenterY,
+            distanceMm: Math.round(rightPageDist * 10) / 10,
+            targetType: 'page',
+            label: formatDistanceMm(rightPageDist),
+          })
+        }
+      }
+
+      // ─── Vertical Distance Guides ───
+      const topCandidates = otherElements.filter(o => o.y + o.height <= geomTop + 0.1)
+      let nearestTop: CanvasElement | null = null
+      let minTopScore = Infinity
+
+      for (const o of topCandidates) {
+        const gap = geomTop - (o.y + o.height)
+        const overlapX = Math.min(geomRight, o.x + o.width) - Math.max(geomLeft, o.x)
+        const horizDist = overlapX > 0 ? 0 : Math.max(geomLeft - (o.x + o.width), o.x - geomRight)
+        const score = (overlapX > 0 ? 0 : 500 + horizDist) + gap
+        if (score < minTopScore) {
+          minTopScore = score
+          nearestTop = o
+        }
+      }
+
+      const bottomCandidates = otherElements.filter(o => o.y >= geomBottom - 0.1)
+      let nearestBottom: CanvasElement | null = null
+      let minBottomScore = Infinity
+
+      for (const o of bottomCandidates) {
+        const gap = o.y - geomBottom
+        const overlapX = Math.min(geomRight, o.x + o.width) - Math.max(geomLeft, o.x)
+        const horizDist = overlapX > 0 ? 0 : Math.max(geomLeft - (o.x + o.width), o.x - geomRight)
+        const score = (overlapX > 0 ? 0 : 500 + horizDist) + gap
+        if (score < minBottomScore) {
+          minBottomScore = score
+          nearestBottom = o
+        }
+      }
+
+      const topGap = nearestTop ? geomTop - (nearestTop.y + nearestTop.height) : null
+      const bottomGap = nearestBottom ? nearestBottom.y - geomBottom : null
+      const isVerticalEqual =
+        topGap !== null && bottomGap !== null && topGap >= 0.5 && bottomGap >= 0.5 && Math.abs(topGap - bottomGap) < 0.35
+
+      // Top Guide
+      if (nearestTop && topGap !== null && topGap >= 0.5) {
+        const overlapX = Math.min(geomRight, nearestTop.x + nearestTop.width) - Math.max(geomLeft, nearestTop.x)
+        const crossX = overlapX > 0
+          ? (Math.max(geomLeft, nearestTop.x) + Math.min(geomRight, nearestTop.x + nearestTop.width)) / 2
+          : geomCenterX
+
+        const projFrom = overlapX <= 0 ? {
+          start: Math.min(nearestTop.x, nearestTop.x + nearestTop.width, crossX),
+          end: Math.max(nearestTop.x, nearestTop.x + nearestTop.width, crossX)
+        } : undefined
+
+        distanceGuides.push({
+          id: 'dist-v-top',
+          axis: 'vertical',
+          startPos: nearestTop.y + nearestTop.height,
+          endPos: geomTop,
+          crossPos: crossX,
+          distanceMm: Math.round(topGap * 10) / 10,
+          isEqualSpacing: isVerticalEqual,
+          targetType: 'element',
+          label: formatDistanceMm(topGap),
+          projectionFrom: projFrom,
+        })
+      } else {
+        const topMarginDist = geomTop - margins.top
+        if (geomTop >= margins.top && (topMarginDist < 35 || !nearestBottom)) {
+          distanceGuides.push({
+            id: 'dist-v-top-margin',
+            axis: 'vertical',
+            startPos: margins.top,
+            endPos: geomTop,
+            crossPos: geomCenterX,
+            distanceMm: Math.round(topMarginDist * 10) / 10,
+            targetType: 'margin',
+            label: formatDistanceMm(topMarginDist),
+          })
+        } else if (geomTop < margins.top || !nearestBottom) {
+          distanceGuides.push({
+            id: 'dist-v-top-page',
+            axis: 'vertical',
+            startPos: 0,
+            endPos: geomTop,
+            crossPos: geomCenterX,
+            distanceMm: Math.round(geomTop * 10) / 10,
+            targetType: 'page',
+            label: formatDistanceMm(geomTop),
+          })
+        }
+      }
+
+      // Bottom Guide
+      if (nearestBottom && bottomGap !== null && bottomGap >= 0.5) {
+        const overlapX = Math.min(geomRight, nearestBottom.x + nearestBottom.width) - Math.max(geomLeft, nearestBottom.x)
+        const crossX = overlapX > 0
+          ? (Math.max(geomLeft, nearestBottom.x) + Math.min(geomRight, nearestBottom.x + nearestBottom.width)) / 2
+          : geomCenterX
+
+        const projTo = overlapX <= 0 ? {
+          start: Math.min(nearestBottom.x, nearestBottom.x + nearestBottom.width, crossX),
+          end: Math.max(nearestBottom.x, nearestBottom.x + nearestBottom.width, crossX)
+        } : undefined
+
+        distanceGuides.push({
+          id: 'dist-v-bottom',
+          axis: 'vertical',
+          startPos: geomBottom,
+          endPos: nearestBottom.y,
+          crossPos: crossX,
+          distanceMm: Math.round(bottomGap * 10) / 10,
+          isEqualSpacing: isVerticalEqual,
+          targetType: 'element',
+          label: formatDistanceMm(bottomGap),
+          projectionTo: projTo,
+        })
+      } else {
+        const bottomMarginPos = PAGE_HEIGHT_MM - margins.bottom
+        const bottomMarginDist = bottomMarginPos - geomBottom
+        const bottomPageDist = PAGE_HEIGHT_MM - geomBottom
+
+        if (bottomMarginDist >= 0 && (bottomMarginDist < 35 || !nearestTop)) {
+          distanceGuides.push({
+            id: 'dist-v-bottom-margin',
+            axis: 'vertical',
+            startPos: geomBottom,
+            endPos: bottomMarginPos,
+            crossPos: geomCenterX,
+            distanceMm: Math.round(bottomMarginDist * 10) / 10,
+            targetType: 'margin',
+            label: formatDistanceMm(bottomMarginDist),
+          })
+        } else if (bottomPageDist >= 0 && (geomBottom > bottomMarginPos || !nearestTop)) {
+          distanceGuides.push({
+            id: 'dist-v-bottom-page',
+            axis: 'vertical',
+            startPos: geomBottom,
+            endPos: PAGE_HEIGHT_MM,
+            crossPos: geomCenterX,
+            distanceMm: Math.round(bottomPageDist * 10) / 10,
+            targetType: 'page',
+            label: formatDistanceMm(bottomPageDist),
+          })
+        }
+      }
+    }
+
+    const finalResultX = isMultiDrag ? snappedX + offsetX : snappedX
+    const finalResultY = isMultiDrag ? snappedY + offsetY : snappedY
+
+    return { x: finalResultX, y: finalResultY, guides, distanceGuides }
   }
 
   // Nudge selected with keyboard arrows
@@ -793,6 +1237,7 @@ export function useContractCanvas(initialDoc?: ContractDocumentModel) {
     isDragging,
     isResizing,
     activeGuides,
+    activeDistanceGuides,
     history,
     mmToPx,
     pxToMm,

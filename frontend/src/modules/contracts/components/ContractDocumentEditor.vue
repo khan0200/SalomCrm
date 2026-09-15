@@ -2397,6 +2397,7 @@ const shortcutCategories = computed(() => ({
           :show-rulers="canvas.showRulers.value"
           :show-grid="canvas.showGrid.value"
           :active-guides="canvas.activeGuides.value"
+          :active-distance-guides="canvas.activeDistanceGuides.value"
           :is-copy-style-active="!!copyStyleMode"
           :copy-style-mode="copyStyleMode"
           :variable-values="variableValues"
@@ -2414,7 +2415,10 @@ const shortcutCategories = computed(() => ({
           @toggle-lock="canvas.toggleLock($event)"
           @bring-forward="canvas.bringForward($event)"
           @send-backward="canvas.sendBackward($event)"
-          @set-guides="canvas.activeGuides.value = $event"
+          @set-guides="(guides, distGuides) => {
+            canvas.activeGuides.value = guides;
+            canvas.activeDistanceGuides.value = distGuides || [];
+          }"
           @finish-edit="canvas.editingElementId.value = null"
           @drag-start="(id) => canvas.startDrag(id)"
           @drag-end="() => { canvas.endDrag(); onDragResizeEnd() }"

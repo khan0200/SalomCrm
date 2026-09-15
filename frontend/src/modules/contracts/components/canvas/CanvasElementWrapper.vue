@@ -11,7 +11,7 @@ import {
   Type,
   PaintRoller,
 } from 'lucide-vue-next'
-import type { CanvasElement, ResizeHandle, AlignmentGuide } from '../../types/contractCanvas'
+import type { CanvasElement, ResizeHandle, AlignmentGuide, DistanceGuide } from '../../types/contractCanvas'
 
 const props = withDefaults(
   defineProps<{
@@ -27,8 +27,9 @@ const props = withDefaults(
       y: number,
       w: number,
       h: number,
-      id: string
-    ) => { x: number; y: number; guides: AlignmentGuide[] }
+      id: string,
+      isResize?: boolean
+    ) => { x: number; y: number; guides: AlignmentGuide[]; distanceGuides?: DistanceGuide[] }
   }>(),
   {
     readonly: false,
@@ -45,7 +46,7 @@ const emit = defineEmits<{
   'drag:end': []
   'resize:start': []
   'resize:end': []
-  'set-guides': [guides: AlignmentGuide[]]
+  'set-guides': [guides: AlignmentGuide[], distanceGuides?: DistanceGuide[]]
   duplicate: []
   delete: []
   'copy-style': [e: MouseEvent]
@@ -199,10 +200,10 @@ function onPointerDown(e: PointerEvent) {
     let finalY = Math.max(0, Math.min(297 - elH, rawYmm))
 
     if (props.calculateSnapping) {
-      const snapped = props.calculateSnapping(finalX, finalY, elW, elH, props.element.id)
+      const snapped = props.calculateSnapping(finalX, finalY, elW, elH, props.element.id, false)
       finalX = snapped.x
       finalY = snapped.y
-      emit('set-guides', snapped.guides)
+      emit('set-guides', snapped.guides, snapped.distanceGuides || [])
     }
 
     emit('update:bounds', {
@@ -218,7 +219,7 @@ function onPointerDown(e: PointerEvent) {
     window.removeEventListener('pointermove', onPointerMove)
     window.removeEventListener('pointerup', onPointerUp)
     if (hasDragged.value) {
-      emit('set-guides', [])
+      emit('set-guides', [], [])
       emit('drag:end')
     } else {
       // If was already selected and clicked without dragging, isolate selection to this element
@@ -299,14 +300,14 @@ function onResizePointerDown(handle: ResizeHandle, e: PointerEvent) {
       // East handle: snap right edge → adjust width (x stays fixed)
       // Pass actual height (not PROBE) so the guide spans the full element height.
       if (handle.includes('e') && !handle.includes('w')) {
-        const r = props.calculateSnapping(newX + newW, newY, PROBE, newH, id)
+        const r = props.calculateSnapping(newX + newW, newY, PROBE, newH, id, true)
         newW = Math.max(MIN_SIZE_MM, r.x - newX)
         snapGuides.push(...r.guides)
       }
 
       // West handle: snap left edge → adjust x and width (right edge stays fixed)
       if (handle.includes('w') && !handle.includes('e')) {
-        const r = props.calculateSnapping(newX, newY, PROBE, newH, id)
+        const r = props.calculateSnapping(newX, newY, PROBE, newH, id, true)
         newX = r.x
         newW = Math.max(MIN_SIZE_MM, (startX + startW) - r.x)
         snapGuides.push(...r.guides)
@@ -314,20 +315,20 @@ function onResizePointerDown(handle: ResizeHandle, e: PointerEvent) {
 
       // South handle: snap bottom edge → adjust height (y stays fixed)
       if (!isTextType.value && handle.includes('s') && !handle.includes('n')) {
-        const r = props.calculateSnapping(newX, newY + newH, newW, PROBE, id)
+        const r = props.calculateSnapping(newX, newY + newH, newW, PROBE, id, true)
         newH = Math.max(MIN_SIZE_MM, r.y - newY)
         snapGuides.push(...r.guides)
       }
 
       // North handle: snap top edge → adjust y and height (bottom edge stays fixed)
       if (!isTextType.value && handle.includes('n') && !handle.includes('s')) {
-        const r = props.calculateSnapping(newX, newY, newW, PROBE, id)
+        const r = props.calculateSnapping(newX, newY, newW, PROBE, id, true)
         newY = r.y
         newH = Math.max(MIN_SIZE_MM, (startY + startH) - r.y)
         snapGuides.push(...r.guides)
       }
 
-      emit('set-guides', snapGuides)
+      emit('set-guides', snapGuides, [])
     }
 
     emit('update:bounds', {
@@ -342,7 +343,7 @@ function onResizePointerDown(handle: ResizeHandle, e: PointerEvent) {
   function onResizeUp() {
     window.removeEventListener('pointermove', onResizeMove)
     window.removeEventListener('pointerup', onResizeUp)
-    emit('set-guides', []) // clear snap guides on release
+    emit('set-guides', [], []) // clear snap guides on release
     emit('resize:end')
   }
 

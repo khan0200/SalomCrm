@@ -5,6 +5,7 @@ import type {
   CanvasElement,
   PageMargins,
   AlignmentGuide,
+  DistanceGuide,
 } from '../../types/contractCanvas'
 import { Copy, Trash2 } from 'lucide-vue-next'
 import CanvasRuler from './CanvasRuler.vue'
@@ -30,6 +31,7 @@ const props = withDefaults(
     showRulers: boolean
     showGrid: boolean
     activeGuides: AlignmentGuide[]
+    activeDistanceGuides?: DistanceGuide[]
     readonly?: boolean
     variableValues?: Record<string, string>
     isActivePage?: boolean
@@ -40,8 +42,9 @@ const props = withDefaults(
       y: number,
       w: number,
       h: number,
-      id: string
-    ) => { x: number; y: number; guides: AlignmentGuide[] }
+      id: string,
+      isResize?: boolean
+    ) => { x: number; y: number; guides: AlignmentGuide[]; distanceGuides?: DistanceGuide[] }
   }>(),
   {
     readonly: false,
@@ -63,7 +66,7 @@ const emit = defineEmits<{
   'toggle-lock': [id: string]
   'bring-forward': [id: string]
   'send-backward': [id: string]
-  'set-guides': [guides: AlignmentGuide[]]
+  'set-guides': [guides: AlignmentGuide[], distanceGuides?: DistanceGuide[]]
   'finish-edit': [id: string]
   'drag-start': [id: string]
   'drag-end': []
@@ -407,8 +410,13 @@ function confirmDeletePage() {
             <div class="absolute inset-0 border border-dashed border-blue-400/35 rounded-[1px] z-10"></div>
           </div>
 
-          <!-- Smart Alignment Guides Overlay -->
-          <CanvasSmartGuides v-if="!readonly" :guides="activeGuides" :zoom-level="zoomLevel" />
+          <!-- Smart Alignment & Distance Guides Overlay -->
+          <CanvasSmartGuides
+            v-if="!readonly"
+            :guides="activeGuides"
+            :distance-guides="activeDistanceGuides"
+            :zoom-level="zoomLevel"
+          />
 
           <!-- Marquee Selection Overlay -->
           <CanvasMarqueeSelect
@@ -440,7 +448,7 @@ function confirmDeletePage() {
             @toggle-lock="emit('toggle-lock', el.id)"
             @bring-forward="emit('bring-forward', el.id)"
             @send-backward="emit('send-backward', el.id)"
-            @set-guides="emit('set-guides', $event)"
+            @set-guides="(guides, distGuides) => emit('set-guides', guides, distGuides)"
             @drag:start="emit('drag-start', el.id)"
             @drag:end="emit('drag-end')"
             @resize:end="emit('resize-end')"
