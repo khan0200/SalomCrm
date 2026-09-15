@@ -1,13 +1,22 @@
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from rest_framework_simplejwt.exceptions import AuthenticationFailed
 from django.contrib.auth import get_user_model
 from apps.tenants.models import Tenant, Branch
+from .models import UserRole
 
 User = get_user_model()
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     """
     Custom JWT serializer enriching token with user details, role, and tenant info.
+
+    Only reached by the internal CRM login (/api/auth/login/). The online
+    student portal issues its own tokens via get_token() directly (see
+    StudentSignUpView / StudentSignInView), bypassing validate() entirely -
+    so the STUDENT check below only ever blocks a student's credentials
+    from being used on the staff-facing login page, never the student
+    portal itself.
     """
     @classmethod
     def get_token(cls, user):
@@ -22,6 +31,14 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     def validate(self, attrs):
         data = super().validate(attrs)
         user = self.user
+
+        if user.role == UserRole.STUDENT:
+            raise AuthenticationFailed(
+                "Bu talaba hisobi. Iltimos, o'z konsalting kompaniyangizning "
+                "onlayn shartnomalar portali orqali kiring.",
+                code='student_account'
+            )
+
         data['user'] = {
             'id': str(user.id),
             'email': user.email,
