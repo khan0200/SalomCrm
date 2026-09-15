@@ -65,6 +65,7 @@ const emit = defineEmits<{
   'send-backward': [id: string]
   'set-guides': [guides: AlignmentGuide[]]
   'finish-edit': [id: string]
+  'drag-start': [id: string]
   'drag-end': []
   'resize-end': []
   'duplicate-page': [pageIndex: number]
@@ -440,6 +441,7 @@ function confirmDeletePage() {
             @bring-forward="emit('bring-forward', el.id)"
             @send-backward="emit('send-backward', el.id)"
             @set-guides="emit('set-guides', $event)"
+            @drag:start="emit('drag-start', el.id)"
             @drag:end="emit('drag-end')"
             @resize:end="emit('resize-end')"
           >

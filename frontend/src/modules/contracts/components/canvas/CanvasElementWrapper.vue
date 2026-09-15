@@ -70,20 +70,13 @@ const isTextType = computed(() => {
 })
 
 const isNearTop = computed(() => {
-  return props.element.y < 14
+  return props.element.y < 16
 })
 
 const toolbarPositionClass = computed(() => {
-  // If element is near top edge (< 14mm), place toolbar below to avoid being clipped by sheet boundaries
-  const vClass = isNearTop.value ? 'top-[calc(100%+8px)]' : '-top-9'
+  // If element is near top edge (< 16mm), place toolbar below to avoid being clipped by sheet boundaries
+  const vClass = isNearTop.value ? 'top-[calc(100%+12px)]' : '-top-12'
 
-  // Clamp horizontal position so toolbar stays within page bounds
-  if (props.element.x < 15) {
-    return `${vClass} left-0`
-  }
-  if (props.element.x + props.element.width > 195) {
-    return `${vClass} right-0`
-  }
   return `${vClass} left-1/2 -translate-x-1/2`
 })
 
@@ -162,7 +155,15 @@ function onPointerDown(e: PointerEvent) {
     return
   }
 
-  emit('select', e)
+  const wasAlreadySelected = props.isSelected
+
+  // If this element is NOT already selected, or if Shift key is pressed (multi-toggle mode),
+  // select it immediately.
+  // If it IS already selected and Shift is not pressed, DO NOT deselect other elements yet,
+  // so that multi-element dragging works seamlessly!
+  if (!wasAlreadySelected || e.shiftKey) {
+    emit('select', e)
+  }
 
   // Capture the pointer so pointermove events keep coming even when the
   // cursor moves outside the element or the browser window.
@@ -213,12 +214,17 @@ function onPointerDown(e: PointerEvent) {
     })
   }
 
-  function onPointerUp() {
+  function onPointerUp(upEvent: PointerEvent) {
     window.removeEventListener('pointermove', onPointerMove)
     window.removeEventListener('pointerup', onPointerUp)
     if (hasDragged.value) {
       emit('set-guides', [])
       emit('drag:end')
+    } else {
+      // If was already selected and clicked without dragging, isolate selection to this element
+      if (wasAlreadySelected && !upEvent.shiftKey) {
+        emit('select', upEvent)
+      }
     }
     isDraggingLocal.value = false
     hasDragged.value = false

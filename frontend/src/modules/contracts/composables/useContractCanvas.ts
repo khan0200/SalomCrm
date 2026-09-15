@@ -240,6 +240,60 @@ export function useContractCanvas(initialDoc?: ContractDocumentModel) {
     }
   }
 
+  // ─── Multi-Element Drag Tracking ────────────────────────
+  const dragStartPositions = new Map<string, { x: number; y: number }>()
+
+  function startDrag(primaryId?: string) {
+    dragStartPositions.clear()
+    selectedElements.value.forEach(el => {
+      if (!el.locked) {
+        dragStartPositions.set(el.id, { x: el.x, y: el.y })
+      }
+    })
+    if (primaryId && !dragStartPositions.has(primaryId)) {
+      const found = findElementAndPage(primaryId)
+      if (found && !found.element.locked) {
+        dragStartPositions.set(primaryId, { x: found.element.x, y: found.element.y })
+      }
+    }
+  }
+
+  function updateElementBounds(
+    primaryId: string,
+    bounds: { x: number; y: number; width: number; height: number; rotation?: number }
+  ) {
+    if (dragStartPositions.size === 0 && selectedElements.value.length > 1) {
+      startDrag(primaryId)
+    }
+
+    const isMultiDrag = dragStartPositions.size > 1 && dragStartPositions.has(primaryId)
+
+    if (isMultiDrag) {
+      const primaryStart = dragStartPositions.get(primaryId)!
+      const dx = bounds.x - primaryStart.x
+      const dy = bounds.y - primaryStart.y
+
+      updateElement(primaryId, bounds, false)
+
+      selectedElements.value.forEach(el => {
+        if (el.id === primaryId || el.locked) return
+        const startPos = dragStartPositions.get(el.id)
+        if (startPos) {
+          const newX = Math.max(0, Math.min(PAGE_WIDTH_MM - el.width, startPos.x + dx))
+          const newY = Math.max(0, Math.min(PAGE_HEIGHT_MM - el.height, startPos.y + dy))
+          el.x = Math.round(newX * 100) / 100
+          el.y = Math.round(newY * 100) / 100
+        }
+      })
+    } else {
+      updateElement(primaryId, bounds, false)
+    }
+  }
+
+  function endDrag() {
+    dragStartPositions.clear()
+  }
+
   function deleteSelectedElements(specificId?: string) {
     const idsToDelete = new Set(selectedElementIds.value)
     if (specificId) idsToDelete.add(specificId)
@@ -754,6 +808,9 @@ export function useContractCanvas(initialDoc?: ContractDocumentModel) {
     movePage,
     addElement,
     updateElement,
+    startDrag,
+    updateElementBounds,
+    endDrag,
     deleteSelectedElements,
     duplicateSelectedElements,
     bringToFront,
