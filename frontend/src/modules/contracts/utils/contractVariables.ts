@@ -276,32 +276,32 @@ export function buildClientRequisitesHtml(): string {
   parts.push('<p style="text-align: center; margin: 0.3em 0 0.8em; font-weight: bold; letter-spacing: 0.5px;">MIJOZ</p>')
 
   // 2. F.I.O:
-  parts.push('<p style="display: flex; align-items: flex-end; margin: 0.28em 0;"><span style="font-weight: bold; white-space: nowrap;">F.I.O:</span><span style="flex: 1; border-bottom: 1px solid #000; margin-left: 6px; min-height: 1.1em;">&nbsp;</span></p>')
+  parts.push('<p style="display: flex; align-items: flex-end; margin: 0.28em 0;"><span style="font-weight: bold; white-space: nowrap;">F.I.O:</span><span style="flex: 1; border-bottom: 1px solid #000; margin-left: 6px; min-height: 1.1em; padding-bottom: 2px;">&nbsp;</span></p>')
   // Extra line for long names
-  parts.push('<p style="border-bottom: 1px solid #000; margin: 0.28em 0; min-height: 1.1em;">&nbsp;</p>')
+  parts.push('<p style="border-bottom: 1px solid #000; margin: 0.28em 0; min-height: 1.1em; padding-bottom: 2px;">&nbsp;</p>')
 
   // 3. PASSPORT RAQAMI:
-  parts.push('<p style="display: flex; align-items: flex-end; margin: 0.28em 0;"><span style="font-weight: bold; white-space: nowrap;">PASSPORT RAQAMI:</span><span style="flex: 1; border-bottom: 1px solid #000; margin-left: 6px; min-height: 1.1em;">&nbsp;</span></p>')
+  parts.push('<p style="display: flex; align-items: flex-end; margin: 0.28em 0;"><span style="font-weight: bold; white-space: nowrap;">PASSPORT RAQAMI:</span><span style="flex: 1; border-bottom: 1px solid #000; margin-left: 6px; min-height: 1.1em; padding-bottom: 2px;">&nbsp;</span></p>')
 
-  // 4. TUG'ILGAN SANA:
-  parts.push('<p style="display: flex; align-items: flex-end; margin: 0.28em 0;"><span style="font-weight: bold; white-space: nowrap;">TUG\'ILGAN SANA:</span><span style="flex: 1; border-bottom: 1px solid #000; margin-left: 6px; min-height: 1.1em;">&nbsp;</span></p>')
+  // 4. TUG\'ILGAN SANA:
+  parts.push('<p style="display: flex; align-items: flex-end; margin: 0.28em 0;"><span style="font-weight: bold; white-space: nowrap;">TUG\'ILGAN SANA:</span><span style="flex: 1; border-bottom: 1px solid #000; margin-left: 6px; min-height: 1.1em; padding-bottom: 2px;">&nbsp;</span></p>')
 
   // 5. EMAIL:
-  parts.push('<p style="display: flex; align-items: flex-end; margin: 0.28em 0;"><span style="font-weight: bold; white-space: nowrap;">EMAIL:</span><span style="flex: 1; border-bottom: 1px solid #000; margin-left: 6px; min-height: 1.1em;">&nbsp;</span></p>')
+  parts.push('<p style="display: flex; align-items: flex-end; margin: 0.28em 0;"><span style="font-weight: bold; white-space: nowrap;">EMAIL:</span><span style="flex: 1; border-bottom: 1px solid #000; margin-left: 6px; min-height: 1.1em; padding-bottom: 2px;">&nbsp;</span></p>')
 
   // 6. TEL:
-  parts.push('<p style="display: flex; align-items: flex-end; margin: 0.28em 0;"><span style="font-weight: bold; white-space: nowrap;">TEL:</span><span style="flex: 1; border-bottom: 1px solid #000; margin-left: 6px; min-height: 1.1em;">&nbsp;</span></p>')
+  parts.push('<p style="display: flex; align-items: flex-end; margin: 0.28em 0;"><span style="font-weight: bold; white-space: nowrap;">TEL:</span><span style="flex: 1; border-bottom: 1px solid #000; margin-left: 6px; min-height: 1.1em; padding-bottom: 2px;">&nbsp;</span></p>')
 
   // 7. TEL:
-  parts.push('<p style="display: flex; align-items: flex-end; margin: 0.28em 0;"><span style="font-weight: bold; white-space: nowrap;">TEL:</span><span style="flex: 1; border-bottom: 1px solid #000; margin-left: 6px; min-height: 1.1em;">&nbsp;</span></p>')
+  parts.push('<p style="display: flex; align-items: flex-end; margin: 0.28em 0;"><span style="font-weight: bold; white-space: nowrap;">TEL:</span><span style="flex: 1; border-bottom: 1px solid #000; margin-left: 6px; min-height: 1.1em; padding-bottom: 2px;">&nbsp;</span></p>')
 
-  // 8. TA'LIM BOSQICHI:
-  parts.push('<p style="display: flex; align-items: flex-end; margin: 0.28em 0;"><span style="font-weight: bold; white-space: nowrap;">TA\'LIM BOSQICHI:</span><span style="flex: 1; border-bottom: 1px solid #000; margin-left: 6px; min-height: 1.1em;">&nbsp;</span></p>')
+  // 8. TA\'LIM BOSQICHI:
+  parts.push('<p style="display: flex; align-items: flex-end; margin: 0.28em 0;"><span style="font-weight: bold; white-space: nowrap;">TA\'LIM BOSQICHI:</span><span style="flex: 1; border-bottom: 1px solid #000; margin-left: 6px; min-height: 1.1em; padding-bottom: 2px;">&nbsp;</span></p>')
   // Extra line
-  parts.push('<p style="border-bottom: 1px solid #000; margin: 0.28em 0; min-height: 1.1em;">&nbsp;</p>')
+  parts.push('<p style="border-bottom: 1px solid #000; margin: 0.28em 0; min-height: 1.1em; padding-bottom: 2px;">&nbsp;</p>')
 
   // 9. TASDIQLASH KODI (IMZO):
-  parts.push('<p style="display: flex; align-items: flex-end; margin: 0.28em 0;"><span style="font-weight: bold; white-space: nowrap;">TASDIQLASH KODI (IMZO):</span><span style="flex: 1; border-bottom: 1px solid #000; margin-left: 6px; min-height: 1.1em;">&nbsp;</span></p>')
+  parts.push('<p style="display: flex; align-items: flex-end; margin: 0.28em 0;"><span style="font-weight: bold; white-space: nowrap;">TASDIQLASH KODI (IMZO):</span><span style="flex: 1; border-bottom: 1px solid #000; margin-left: 6px; min-height: 1.1em; padding-bottom: 2px;">&nbsp;</span></p>')
 
   return parts.join('\n')
 }
@@ -363,7 +363,7 @@ export function buildVariableValues(
   const rawDob = student?.birthday || student?.date_of_birth || student?.dateOfBirth || ''
   const rawPhone1 = student?.phone1 || student?.student_phone || student?.phone || student?.phone_1 || ''
   const rawPhone2 = student?.phone2 || student?.phone_2 || ''
-  const rawLevel = student?.level || student?.education_level || student?.educationLevel || student?.level_to_study || contractMeta?.educationLevel || 'Bakalavr'
+  const rawLevel = student?.level || student?.education_level || student?.educationLevel || student?.level_to_study || contractMeta?.educationLevel || (student ? 'Bakalavr' : '')
   const rawBranch = student?.office || student?.tenant_office_name || student?.branch || student?.office_name || contractMeta?.office || ''
   const rawEmail = student?.email || student?.student_email || student?.student_account?.email || (student?.snapshot_data && (student.snapshot_data.email || student.snapshot_data?.student_email)) || contractMeta?.email || ''
 
@@ -464,8 +464,8 @@ export function buildVariableValues(
     tariff: contractMeta?.templateName || student?.tariff_name || student?.tariff || '',
     tariff_name: contractMeta?.templateName || student?.tariff_name || student?.tariff || '',
 
-    discount: discountVal > 0 ? formatCurrencyString(discountVal) : '0 so\'m',
-    chegirma: discountVal > 0 ? formatCurrencyString(discountVal) : '0 so\'m',
+    discount: discountVal > 0 ? formatCurrencyString(discountVal) : (student ? '0 so\'m' : ''),
+    chegirma: discountVal > 0 ? formatCurrencyString(discountVal) : (student ? '0 so\'m' : ''),
 
     net_price: formatCurrencyString(netVal),
     total_price: formatCurrencyString(netVal),
@@ -580,8 +580,7 @@ export const VARIABLE_FALLBACK_PLACEHOLDERS: Record<string, string> = {
 }
 
 export function getVariablePlaceholder(key: string): string {
-  const lower = key.toLowerCase()
-  return VARIABLE_FALLBACK_PLACEHOLDERS[lower] || '_________________________'
+  return ''
 }
 
 export interface ReplaceVariablesOptions {
@@ -628,7 +627,10 @@ export function replaceVariablesInHtml(
   )
   result = result.replace(
     /<p[^>]*style="[^"]*color:\s*(?:#2563eb|#1d4ed8|rgb\(37,\s*99,\s*235\)|rgb\(29,\s*78,\s*216\))[^"]*"[^>]*>\s*(?:\{\{)?\s*([a-zA-Z0-9_]+)\s*(?:\}\})?\s*<\/p>/gi,
-    (_, key) => `<p>${resolveTokenValue(key)}</p>`
+    (_, key) => {
+      const val = resolveTokenValue(key)
+      return `<p>${val || '&nbsp;'}</p>`
+    }
   )
   result = result.replace(
     /<span[^>]*class="[^"]*bg-blue-50[^"]*"[^>]*>\s*(?:\{\{)?\s*([a-zA-Z0-9_]+)\s*(?:\}\})?\s*<\/span>/gi,

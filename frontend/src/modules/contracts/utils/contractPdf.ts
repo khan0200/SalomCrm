@@ -250,6 +250,20 @@ export async function downloadContractAsPdf(
             scrollX: 0,
             scrollY: 0,
             windowWidth: 794,
+            onclone: (clonedDoc: Document) => {
+              const fixStyle = clonedDoc.createElement('style')
+              fixStyle.textContent = `
+                img {
+                  display: inline-block !important;
+                  vertical-align: baseline !important;
+                }
+                .canvas-text-element span[style*="border-bottom"],
+                .canvas-text-element p[style*="border-bottom"] {
+                  padding-bottom: 2px !important;
+                }
+              `
+              clonedDoc.head.appendChild(fixStyle)
+            },
           })
 
           if (pageIdx > 0) {
@@ -438,6 +452,20 @@ export async function downloadContractAsPdf(
       scrollX: 0,
       scrollY: 0,
       windowWidth: 794,
+      onclone: (clonedDoc: Document) => {
+        const fixStyle = clonedDoc.createElement('style')
+        fixStyle.textContent = `
+          img {
+            display: inline-block !important;
+            vertical-align: baseline !important;
+          }
+          .contract-pdf-content span[style*="border-bottom"],
+          .contract-pdf-content p[style*="border-bottom"] {
+            padding-bottom: 2px !important;
+          }
+        `
+        clonedDoc.head.appendChild(fixStyle)
+      },
     })
 
     const pdf = new jsPDF({

@@ -445,6 +445,10 @@ function onPaste(e: ClipboardEvent) {
   margin: 0.25em 0;
   font-family: inherit !important;
 }
+.canvas-text-element span[style*="border-bottom"],
+.canvas-text-element p[style*="border-bottom"] {
+  padding-bottom: 2px;
+}
 .canvas-text-element p:first-child,
 .canvas-text-element h1:first-child,
 .canvas-text-element h2:first-child,

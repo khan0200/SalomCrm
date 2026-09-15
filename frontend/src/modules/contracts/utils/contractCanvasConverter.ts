@@ -509,6 +509,11 @@ export function convertCanvasDocumentToHtml(
           .canvas-a4-page-print p { margin: 0.2em 0; }
           .canvas-a4-page-print p:first-child { margin-top: 0 !important; }
           .canvas-a4-page-print p:last-child { margin-bottom: 0 !important; }
+          .canvas-a4-page-print img { display: inline-block !important; vertical-align: baseline !important; }
+          .canvas-a4-page-print span[style*="border-bottom"],
+          .canvas-a4-page-print p[style*="border-bottom"] {
+            padding-bottom: 2px !important;
+          }
         </style>
         ${elementsHtml}
       </div>
