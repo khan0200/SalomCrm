@@ -30,12 +30,20 @@ export function formatCurrencyString(val: string | number | null | undefined): s
   return new Intl.NumberFormat('uz-UZ').format(num) + ' so\'m'
 }
 
-export function formatDateString(val: string | Date | null | undefined): string {
-  if (!val) {
-    const now = new Date()
-    return `${String(now.getDate()).padStart(2, '0')}.${String(now.getMonth() + 1).padStart(2, '0')}.${now.getFullYear()}`
+export function formatDateDot(val: string | Date | null | undefined): string {
+  if (!val) return ''
+  if (typeof val === 'string') {
+    const s = val.trim()
+    if (!s) return ''
+    if (/^\d{2}\.\d{2}\.\d{4}$/.test(s)) return s
+    const isoMatch = s.match(/^(\d{4})[\-\/\.](\d{1,2})[\-\/\.](\d{1,2})/)
+    if (isoMatch) {
+      const y = isoMatch[1]
+      const m = isoMatch[2].padStart(2, '0')
+      const d = isoMatch[3].padStart(2, '0')
+      return `${d}.${m}.${y}`
+    }
   }
-  if (typeof val === 'string' && val.includes('.')) return val
   try {
     const d = new Date(val)
     if (isNaN(d.getTime())) return String(val)
@@ -43,6 +51,14 @@ export function formatDateString(val: string | Date | null | undefined): string 
   } catch {
     return String(val)
   }
+}
+
+export function formatDateString(val: string | Date | null | undefined): string {
+  if (!val) {
+    const now = new Date()
+    return `${String(now.getDate()).padStart(2, '0')}.${String(now.getMonth() + 1).padStart(2, '0')}.${now.getFullYear()}`
+  }
+  return formatDateDot(val)
 }
 
 export function formatDateIso(val: string | Date | null | undefined): string {
@@ -360,7 +376,7 @@ export function buildVariableValues(
 
   const rawFullName = (student?.full_name || student?.fullName || student?.student_name || student?.client_name || '').toUpperCase().trim()
   const rawPassport = (student?.passport || student?.passport_number || student?.student_passport || student?.passportNumber || '').toUpperCase().trim()
-  const rawDob = student?.birthday || student?.date_of_birth || student?.dateOfBirth || ''
+  const rawDob = formatDateDot(student?.birthday || student?.date_of_birth || student?.dateOfBirth || '')
   const rawPhone1 = student?.phone1 || student?.student_phone || student?.phone || student?.phone_1 || ''
   const rawPhone2 = student?.phone2 || student?.phone_2 || ''
   const rawLevel = student?.level || student?.education_level || student?.educationLevel || student?.level_to_study || contractMeta?.educationLevel || (student ? 'Bakalavr' : '')
@@ -399,8 +415,8 @@ export function buildVariableValues(
     passportnumber: rawPassport,
     passport_number: rawPassport,
     passport: rawPassport,
-    passport_issue_date: student?.passport_issue_date || '',
-    passport_expire_date: student?.passport_expire_date || '',
+    passport_issue_date: formatDateDot(student?.passport_issue_date) || '',
+    passport_expire_date: formatDateDot(student?.passport_expire_date) || '',
 
     leveltostudy: rawLevel,
     level_to_study: rawLevel,

@@ -191,11 +191,21 @@ async function init() {
         if (contract.phone2) formData.phone2 = contract.phone2
         if (contract.email) formData.email = contract.email
         if (contract.date_of_birth) {
-          const parts = contract.date_of_birth.split('.')
-          if (parts.length === 3) {
-            formData.dobDay = parts[0]
-            formData.dobMonth = parts[1]
-            formData.dobYear = parts[2]
+          const s = contract.date_of_birth.trim()
+          if (s.includes('.')) {
+            const parts = s.split('.')
+            if (parts.length === 3) {
+              formData.dobDay = parts[0].padStart(2, '0')
+              formData.dobMonth = parts[1].padStart(2, '0')
+              formData.dobYear = parts[2]
+            }
+          } else if (s.includes('-')) {
+            const parts = s.split('-')
+            if (parts.length === 3) {
+              formData.dobYear = parts[0]
+              formData.dobMonth = parts[1].padStart(2, '0')
+              formData.dobDay = parts[2].padStart(2, '0')
+            }
           }
         }
       } catch (err) {

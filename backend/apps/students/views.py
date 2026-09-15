@@ -2243,6 +2243,7 @@ class ContractViewSet(viewsets.ModelViewSet):
         elif contract.snapshot_data and isinstance(contract.snapshot_data, dict) and contract.snapshot_data.get('email'):
             student_email = contract.snapshot_data.get('email')
 
+        from apps.students.services import normalize_date_to_iso
         crm_student = Student.objects.filter(tenant=tenant, id=student_id).first()
         if not crm_student:
             crm_student = Student.objects.create(
@@ -2255,7 +2256,7 @@ class ContractViewSet(viewsets.ModelViewSet):
                 office=contract.office or '',
                 tariff=contract.tariff_name or '',
                 level=contract.education_level or '',
-                birthday=contract.date_of_birth or '',
+                birthday=normalize_date_to_iso(contract.date_of_birth),
                 discount=discount_amount,
                 created_by=request.user if request.user.is_authenticated else None
             )
@@ -2281,7 +2282,7 @@ class ContractViewSet(viewsets.ModelViewSet):
                 crm_student.level = contract.education_level
                 updates.append('level')
             if not crm_student.birthday and contract.date_of_birth:
-                crm_student.birthday = contract.date_of_birth
+                crm_student.birthday = normalize_date_to_iso(contract.date_of_birth)
                 updates.append('birthday')
             if discount_amount > 0 and crm_student.discount != discount_amount:
                 crm_student.discount = discount_amount

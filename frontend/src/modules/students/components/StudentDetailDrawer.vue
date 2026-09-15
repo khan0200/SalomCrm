@@ -206,7 +206,22 @@ const dateFields = new Set(['birthday', 'passport_issue_date', 'passport_expire_
 // once the next digit has been typed.
 const formatDateValue = (value?: string | null) => {
   if (!value) return ''
-  const digits = value.replace(/\D/g, '').slice(0, 8)
+  const s = String(value).trim()
+  if (!s) return ''
+  // If DD.MM.YYYY, DD/MM/YYYY, DD-MM-YYYY (or any DD.MM.YYYY with 4 digit year at end)
+  const ddmmyyyy = s.match(/^(\d{1,2})[\s\.\/\-](\d{1,2})[\s\.\/\-](\d{4})$/)
+  if (ddmmyyyy) {
+    let d = parseInt(ddmmyyyy[1], 10)
+    let m = parseInt(ddmmyyyy[2], 10)
+    const y = parseInt(ddmmyyyy[3], 10)
+    if (m > 12 && d <= 12) {
+      const temp = d
+      d = m
+      m = temp
+    }
+    return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+  }
+  const digits = s.replace(/\D/g, '').slice(0, 8)
   const year = digits.slice(0, 4)
   const month = digits.slice(4, 6)
   const day = digits.slice(6, 8)
@@ -1886,7 +1901,7 @@ const handleRestoreStudent = () => {
                     <div
                       class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
                       :class="[copiedField === 'birthday' && 'animate-copy-press']"
-                      @click="handleCopy('birthday', student.birthday)"
+                      @click="handleCopy('birthday', formatDateValue(student.birthday))"
                       title="Single-click to copy Birthday"
                     >
                       <div class="flex items-center justify-between">
@@ -1895,7 +1910,7 @@ const handleRestoreStudent = () => {
                           <span>BIRTHDAY</span>
                         </span>
                         <div class="flex items-center gap-1">
-                          <button type="button" @click.stop="handleCopy('birthday', student.birthday)" class="w-6 h-6 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-all cursor-pointer active:scale-90" title="Copy Birthday">
+                          <button type="button" @click.stop="handleCopy('birthday', formatDateValue(student.birthday))" class="w-6 h-6 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-all cursor-pointer active:scale-90" title="Copy Birthday">
                             <Check v-if="copiedField === 'birthday'" class="w-3.5 h-3.5 text-emerald-500" />
                             <Copy v-else class="w-3.5 h-3.5" />
                           </button>
@@ -1905,7 +1920,7 @@ const handleRestoreStudent = () => {
                         </div>
                       </div>
                       <div class="mt-0.5">
-                        <span v-if="student.birthday" class="text-[13.5px] font-bold font-mono text-zinc-900 dark:text-zinc-100 tracking-tight">{{ student.birthday }}</span>
+                        <span v-if="student.birthday" class="text-[13.5px] font-bold font-mono text-zinc-900 dark:text-zinc-100 tracking-tight">{{ formatDateValue(student.birthday) }}</span>
                         <span v-else class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
                       </div>
                     </div>
@@ -1945,7 +1960,7 @@ const handleRestoreStudent = () => {
                     <div
                       class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
                       :class="[copiedField === 'passport_issue_date' && 'animate-copy-press']"
-                      @click="handleCopy('passport_issue_date', student.passport_issue_date)"
+                      @click="handleCopy('passport_issue_date', formatDateValue(student.passport_issue_date))"
                       title="Single-click to copy Date of Issue"
                     >
                       <div class="flex items-center justify-between">
@@ -1954,7 +1969,7 @@ const handleRestoreStudent = () => {
                           <span>DATE OF ISSUE</span>
                         </span>
                         <div class="flex items-center gap-1">
-                          <button type="button" @click.stop="handleCopy('passport_issue_date', student.passport_issue_date)" class="w-6 h-6 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-all cursor-pointer active:scale-90" title="Copy Date of Issue">
+                          <button type="button" @click.stop="handleCopy('passport_issue_date', formatDateValue(student.passport_issue_date))" class="w-6 h-6 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-all cursor-pointer active:scale-90" title="Copy Date of Issue">
                             <Check v-if="copiedField === 'passport_issue_date'" class="w-3.5 h-3.5 text-emerald-500" />
                             <Copy v-else class="w-3.5 h-3.5" />
                           </button>
@@ -1964,7 +1979,7 @@ const handleRestoreStudent = () => {
                         </div>
                       </div>
                       <div class="mt-0.5">
-                        <span v-if="student.passport_issue_date" class="text-[13.5px] font-bold font-mono text-zinc-900 dark:text-zinc-100 tracking-tight">{{ student.passport_issue_date }}</span>
+                        <span v-if="student.passport_issue_date" class="text-[13.5px] font-bold font-mono text-zinc-900 dark:text-zinc-100 tracking-tight">{{ formatDateValue(student.passport_issue_date) }}</span>
                         <span v-else class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
                       </div>
                     </div>
@@ -1973,7 +1988,7 @@ const handleRestoreStudent = () => {
                     <div
                       class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
                       :class="[copiedField === 'passport_expire_date' && 'animate-copy-press']"
-                      @click="handleCopy('passport_expire_date', student.passport_expire_date)"
+                      @click="handleCopy('passport_expire_date', formatDateValue(student.passport_expire_date))"
                       title="Single-click to copy Date of Expiration"
                     >
                       <div class="flex items-center justify-between">
@@ -1982,7 +1997,7 @@ const handleRestoreStudent = () => {
                           <span>DATE OF EXPIRATION</span>
                         </span>
                         <div class="flex items-center gap-1">
-                          <button type="button" @click.stop="handleCopy('passport_expire_date', student.passport_expire_date)" class="w-6 h-6 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-all cursor-pointer active:scale-90" title="Copy Date of Expiration">
+                          <button type="button" @click.stop="handleCopy('passport_expire_date', formatDateValue(student.passport_expire_date))" class="w-6 h-6 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-all cursor-pointer active:scale-90" title="Copy Date of Expiration">
                             <Check v-if="copiedField === 'passport_expire_date'" class="w-3.5 h-3.5 text-emerald-500" />
                             <Copy v-else class="w-3.5 h-3.5" />
                           </button>
@@ -1992,7 +2007,7 @@ const handleRestoreStudent = () => {
                         </div>
                       </div>
                       <div class="mt-0.5">
-                        <span v-if="student.passport_expire_date" class="text-[13.5px] font-bold font-mono text-zinc-900 dark:text-zinc-100 tracking-tight">{{ student.passport_expire_date }}</span>
+                        <span v-if="student.passport_expire_date" class="text-[13.5px] font-bold font-mono text-zinc-900 dark:text-zinc-100 tracking-tight">{{ formatDateValue(student.passport_expire_date) }}</span>
                         <span v-else class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
                       </div>
                     </div>

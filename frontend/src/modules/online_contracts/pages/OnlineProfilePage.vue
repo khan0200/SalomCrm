@@ -148,15 +148,25 @@ function formatPrice(val: number | string | undefined): string {
 
 function formatDate(val: string | undefined | null): string {
   if (!val) return ''
+  const s = String(val).trim()
+  if (!s) return ''
+  if (/^\d{2}\.\d{2}\.\d{4}$/.test(s)) return s
+  const isoMatch = s.match(/^(\d{4})[\-\/\.](\d{1,2})[\-\/\.](\d{1,2})/)
+  if (isoMatch) {
+    const y = isoMatch[1]
+    const m = isoMatch[2].padStart(2, '0')
+    const d = isoMatch[3].padStart(2, '0')
+    return `${d}.${m}.${y}`
+  }
   try {
     const d = new Date(val)
-    if (isNaN(d.getTime())) return val
+    if (isNaN(d.getTime())) return s
     const day = String(d.getDate()).padStart(2, '0')
     const month = String(d.getMonth() + 1).padStart(2, '0')
     const year = d.getFullYear()
     return `${day}.${month}.${year}`
   } catch {
-    return val
+    return s
   }
 }
 

@@ -117,6 +117,24 @@ class StudentCreateUpdateSerializer(serializers.ModelSerializer):
             'payment_id',  # Immutable — set once on create, never via API
         )
 
+    def validate_birthday(self, value):
+        if value:
+            from apps.students.services import normalize_date_to_iso
+            return normalize_date_to_iso(value)
+        return value
+
+    def validate_passport_issue_date(self, value):
+        if value:
+            from apps.students.services import normalize_date_to_iso
+            return normalize_date_to_iso(value)
+        return value
+
+    def validate_passport_expire_date(self, value):
+        if value:
+            from apps.students.services import normalize_date_to_iso
+            return normalize_date_to_iso(value)
+        return value
+
     def create(self, validated_data):
         # pick_needed is a manual checklist (PICK_NEEDED_LIST on the frontend);
         # it is no longer auto-computed here. It previously used its own label

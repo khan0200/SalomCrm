@@ -640,6 +640,7 @@ class VerifyContractView(APIView):
 
         # Ensure CRM Student is created and linked in Students page (WITHOUT passport)
         if contract.student_id_assigned:
+            from apps.students.services import normalize_date_to_iso
             crm_student = Student.objects.filter(tenant=contract.tenant, id=contract.student_id_assigned).first()
             if not crm_student:
                 crm_student = Student.objects.create(
@@ -652,12 +653,19 @@ class VerifyContractView(APIView):
                     office=contract.office or '',
                     tariff=contract.tariff_name or '',
                     level=contract.education_level or '',
-                    birthday=contract.date_of_birth or '',
+                    birthday=normalize_date_to_iso(contract.date_of_birth),
                     discount=contract.discount or Decimal('0.00'),
                 )
-            elif contract.discount and crm_student.discount != contract.discount:
-                crm_student.discount = contract.discount
-                crm_student.save(update_fields=['discount'])
+            else:
+                updates = []
+                if contract.discount and crm_student.discount != contract.discount:
+                    crm_student.discount = contract.discount
+                    updates.append('discount')
+                if not crm_student.birthday and contract.date_of_birth:
+                    crm_student.birthday = normalize_date_to_iso(contract.date_of_birth)
+                    updates.append('birthday')
+                if updates:
+                    crm_student.save(update_fields=updates)
 
             if not contract.student:
                 contract.student = crm_student
