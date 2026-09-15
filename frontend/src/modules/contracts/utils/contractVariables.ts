@@ -9,10 +9,10 @@ export interface ContractVariableDef {
 }
 
 export const CONTRACT_VARIABLES: ContractVariableDef[] = [
-  // Primary Student details (Online Signing & Contracts)
   { key: 'fullname', token: '{{fullname}}', label: 'To\'liq ism-sharif (F.I.O)', category: 'student', example: 'ABDURAZZAKOV JASURBEK' },
   { key: 'passportnumber', token: '{{passportnumber}}', label: 'Pasport raqami', category: 'student', example: 'FA1234567' },
-  { key: 'studentid', token: '{{studentid}}', label: 'Shartnoma N (Student ID)', category: 'contract', example: 'UB-1042' },
+  { key: 'email', token: '{{email}}', label: 'Email manzil', category: 'student', example: 'student@salomkorea.uz' },
+  { key: 'studentId', token: '{{studentId}}', label: 'Shartnoma N (Student ID)', category: 'contract', example: 'UB-1042' },
   { key: 'date', token: '{{date}}', label: 'Imzolangan sana (YYYY-MM-DD)', category: 'contract', example: '2026-09-15' },
   { key: 'leveltostudy', token: '{{leveltostudy}}', label: 'Ta\'lim bosqichi', category: 'education', example: 'Bakalavr' },
   { key: 'branch', token: '{{branch}}', label: 'Qabul ofisi / Filial', category: 'contract', example: 'Andijon filiali' },
@@ -20,53 +20,7 @@ export const CONTRACT_VARIABLES: ContractVariableDef[] = [
   { key: 'phone1', token: '{{phone1}}', label: 'Mobil telefon 1', category: 'student', example: '+998 90 123 45 67' },
   { key: 'phone2', token: '{{phone2}}', label: 'Mobil telefon 2', category: 'student', example: '+998 93 987 65 43' },
   { key: 'signature', token: '{{signature}}', label: 'Elektron imzo (rasm)', category: 'contract', example: '[Elektron imzo]' },
-  { key: 'verification_code', token: '{{verification_code}}', label: 'Tasdiqlash kodi', category: 'contract', example: 'XXXX-XXXX-STUDENTID' },
-
-  // Aliases & Extended Student details
-  { key: 'student_name', token: '{{student_name}}', label: 'Talaba F.I.Sh (alias)', category: 'student', example: 'ALISHER ABDULLAEV' },
-  { key: 'passport_number', token: '{{passport_number}}', label: 'Pasport raqami (alias)', category: 'student', example: 'FA1234567' },
-  { key: 'passport_issue_date', token: '{{passport_issue_date}}', label: 'Berilgan sana', category: 'student', example: '12.05.2021' },
-  { key: 'passport_expire_date', token: '{{passport_expire_date}}', label: 'Amal qilish muddati', category: 'student', example: '12.05.2031' },
-  { key: 'date_of_birth', token: '{{date_of_birth}}', label: 'Tug\'ilgan sana (alias)', category: 'student', example: '15/04/2004' },
-  { key: 'phone', token: '{{phone}}', label: 'Telefon (alias)', category: 'student', example: '+998 90 123 45 67' },
-  { key: 'address', token: '{{address}}', label: 'Manzil', category: 'student', example: 'Toshkent sh., Yunusobod t., 12-uy' },
-  { key: 'nationality', token: '{{nationality}}', label: 'Fuqaroligi', category: 'student', example: 'O\'zbekiston Respublikasi' },
-
-  // Education details
-  { key: 'university', token: '{{university}}', label: 'Universitet', category: 'education', example: 'Gimcheon University' },
-  { key: 'major', token: '{{major}}', label: 'Yo\'nalish', category: 'education', example: 'Kompyuter muhandisligi' },
-  { key: 'level', token: '{{level}}', label: 'Ta\'lim bosqichi (alias)', category: 'education', example: 'Bakalavr' },
-
-  // Contract metadata
-  { key: 'contract_number', token: '{{contract_number}}', label: 'Shartnoma raqami', category: 'contract', example: 'SH-2026-0042' },
-  { key: 'contract_date', token: '{{contract_date}}', label: 'Tuzilgan sana', category: 'contract', example: '13.09.2026' },
-  { key: 'consultant_name', token: '{{consultant_name}}', label: 'Mas\'ul mutaxassis', category: 'contract', example: 'M.Abdulpattayev' },
-
-  // Contractor / Agency details
-  { key: 'contractor_company', token: '{{contractor_company}}', label: 'Bajaruvchi korxona', category: 'contract', example: 'MCHJ "IT STATION" (UniBridge)' },
-  { key: 'contractor_director', token: '{{contractor_director}}', label: 'Bajaruvchi direktor', category: 'contract', example: 'ABDULPATTAYEV M.A' },
-  { key: 'contractor_inn', token: '{{contractor_inn}}', label: 'Bajaruvchi INN', category: 'contract', example: '309 961 634' },
-  { key: 'contractor_oked', token: '{{contractor_oked}}', label: 'Bajaruvchi OKED', category: 'contract', example: '62010' },
-  { key: 'contractor_certificate', token: '{{contractor_certificate}}', label: 'Bajaruvchi guvohnoma', category: 'contract', example: '5114456, 1995739' },
-  { key: 'contractor_phone', token: '{{contractor_phone}}', label: 'Bajaruvchi telefon', category: 'contract', example: '+998 93 105 0011' },
-  { key: 'contractor_bank', token: '{{contractor_bank}}', label: 'Bajaruvchi bank nomi', category: 'contract', example: 'UZMILLIY TOSHKENT FILIALI (M.O\')' },
-  { key: 'contractor_account', token: '{{contractor_account}}', label: 'Bajaruvchi H/R', category: 'contract', example: '2020 8000 9055 7879 0001' },
-  { key: 'contractor_mfo', token: '{{contractor_mfo}}', label: 'Bajaruvchi MFO', category: 'contract', example: '00450' },
-  { key: 'contractor_address', token: '{{contractor_address}}', label: 'Bajaruvchi yuridik manzil', category: 'contract', example: 'Andijon viloyati, Marxamat tumani' },
-
-  // Financial details (matching CRM financial ledger: Tariff, Discount, Payment Done, Withdrawal, Balance)
-  { key: 'tariff_price', token: '{{tariff_price}}', label: 'Tarif narxi (Asl narx)', category: 'financial', example: '13 000 000 so\'m' },
-  { key: 'contract_price', token: '{{contract_price}}', label: 'Shartnoma narxi (alias)', category: 'financial', example: '13 000 000 so\'m' },
   { key: 'discount', token: '{{discount}}', label: 'Chegirma', category: 'financial', example: '1 000 000 so\'m' },
-  { key: 'chegirma', token: '{{chegirma}}', label: 'Chegirma (alias)', category: 'financial', example: '1 000 000 so\'m' },
-  { key: 'net_price', token: '{{net_price}}', label: 'To\'lanishi lozim summa (Tarif - Chegirma)', category: 'financial', example: '12 000 000 so\'m' },
-  { key: 'total_price', token: '{{total_price}}', label: 'Shartnoma to\'lov summasi (alias)', category: 'financial', example: '12 000 000 so\'m' },
-  { key: 'payment_done', token: '{{payment_done}}', label: 'Amalda to\'langan summa (Payment done)', category: 'financial', example: '0 so\'m' },
-  { key: 'balance', token: '{{balance}}', label: 'Qoldiq balans (Balance)', category: 'financial', example: '-12 000 000 so\'m' },
-  { key: 'remaining_debt', token: '{{remaining_debt}}', label: 'Qoldiq qarzdorlik', category: 'financial', example: '12 000 000 so\'m' },
-  { key: 'withdrawal', token: '{{withdrawal}}', label: 'Qaytarilgan summa (Withdrawal)', category: 'financial', example: '0 so\'m' },
-  { key: 'first_payment', token: '{{first_payment}}', label: 'Oldindan to\'lov (1-to\'lov)', category: 'financial', example: '6 000 000 so\'m' },
-  { key: 'second_payment', token: '{{second_payment}}', label: 'Ikkinchi to\'lov (2-to\'lov)', category: 'financial', example: '6 000 000 so\'m' },
 ]
 
 export function formatCurrencyString(val: string | number | null | undefined): string {
@@ -367,6 +321,7 @@ export function buildVariableValues(
     verificationCode?: string
     office?: string
     educationLevel?: string
+    email?: string
   }
 ): Record<string, string> {
   const priceVal = contractMeta?.price !== undefined && contractMeta?.price !== null && contractMeta?.price !== ''
@@ -410,7 +365,7 @@ export function buildVariableValues(
   const rawPhone2 = student?.phone2 || student?.phone_2 || ''
   const rawLevel = student?.level || student?.education_level || student?.educationLevel || student?.level_to_study || contractMeta?.educationLevel || 'Bakalavr'
   const rawBranch = student?.office || student?.tenant_office_name || student?.branch || student?.office_name || contractMeta?.office || ''
-  const rawEmail = student?.email || student?.student_email || ''
+  const rawEmail = student?.email || student?.student_email || student?.student_account?.email || (student?.snapshot_data && (student.snapshot_data.email || student.snapshot_data?.student_email)) || contractMeta?.email || ''
 
   const rawSignature = contractMeta?.signatureData || student?.signature_data || student?.signatureData || ''
   const rawVerifCode = contractMeta?.verificationCode || student?.verification_code || student?.verificationCode || ''
@@ -487,6 +442,7 @@ export function buildVariableValues(
     confirmation_code: rawVerifCode,
 
     // 3. Contract Metadata & Identifiers
+    studentId: contractNum,
     studentid: contractNum,
     student_id: contractNum,
     contract_number: contractNum,
@@ -579,6 +535,7 @@ export const VARIABLE_FALLBACK_PLACEHOLDERS: Record<string, string> = {
   phone2: '+998 __ ___ __ __',
   phone_2: '+998 __ ___ __ __',
 
+  studentId: '______',
   studentid: '______',
   student_id: '______',
   contract_number: '______',

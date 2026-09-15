@@ -19,6 +19,7 @@ export interface Contract {
   tariff_name?: string | null
   tariff_price?: number | null
   discount?: number | string | null
+  email?: string | null
   passport_number?: string | null
   full_name?: string | null
   education_level?: string | null

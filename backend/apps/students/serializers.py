@@ -356,6 +356,7 @@ class ContractListSerializer(serializers.ModelSerializer):
     student_name = serializers.SerializerMethodField()
     student_passport = serializers.SerializerMethodField()
     created_by_name = serializers.SerializerMethodField()
+    email = serializers.SerializerMethodField()
 
     class Meta:
         model = Contract
@@ -363,7 +364,7 @@ class ContractListSerializer(serializers.ModelSerializer):
             'id', 'contract_number', 'title', 'template_name',
             'student', 'student_id', 'student_name', 'student_passport',
             'status', 'version', 'is_deleted',
-            'tariff_name', 'tariff_price', 'discount', 'office', 'phone1', 'phone2',
+            'tariff_name', 'tariff_price', 'discount', 'email', 'office', 'phone1', 'phone2',
             'education_level', 'date_of_birth',
             'student_id_assigned', 'verification_code', 'verification_code_expires_at',
             'verification_code_used', 'verified_at', 'rejection_reason',
@@ -385,6 +386,15 @@ class ContractListSerializer(serializers.ModelSerializer):
             return getattr(obj.created_by, 'full_name', None) or getattr(obj.created_by, 'email', None) or str(obj.created_by)
         return None
 
+    def get_email(self, obj):
+        if obj.student_account and getattr(obj.student_account, 'email', None):
+            return obj.student_account.email
+        if obj.student and getattr(obj.student, 'email', None):
+            return obj.student.email
+        if obj.snapshot_data and isinstance(obj.snapshot_data, dict):
+            return obj.snapshot_data.get('email', '')
+        return ''
+
 
 class ContractDetailSerializer(serializers.ModelSerializer):
     student_id = serializers.SerializerMethodField()
@@ -395,6 +405,7 @@ class ContractDetailSerializer(serializers.ModelSerializer):
     student_university = serializers.CharField(source='student.university_1', read_only=True)
     created_by_name = serializers.SerializerMethodField()
     updated_by_name = serializers.SerializerMethodField()
+    email = serializers.SerializerMethodField()
 
     class Meta:
         model = Contract
@@ -403,7 +414,7 @@ class ContractDetailSerializer(serializers.ModelSerializer):
             'content', 'status', 'version', 'is_deleted',
             'student', 'student_id', 'student_name', 'student_passport',
             'student_phone', 'student_tariff', 'student_university',
-            'tariff_name', 'tariff_price', 'discount', 'passport_number', 'full_name',
+            'tariff_name', 'tariff_price', 'discount', 'email', 'passport_number', 'full_name',
             'education_level', 'date_of_birth', 'office', 'phone1', 'phone2',
             'signature_data', 'declarations_accepted', 'agreement_confirmations',
             'contract_hash', 'student_id_assigned', 'verification_code',
@@ -438,6 +449,15 @@ class ContractDetailSerializer(serializers.ModelSerializer):
         if obj.updated_by:
             return getattr(obj.updated_by, 'full_name', None) or getattr(obj.updated_by, 'email', None) or str(obj.updated_by)
         return None
+
+    def get_email(self, obj):
+        if obj.student_account and getattr(obj.student_account, 'email', None):
+            return obj.student_account.email
+        if obj.student and getattr(obj.student, 'email', None):
+            return obj.student.email
+        if obj.snapshot_data and isinstance(obj.snapshot_data, dict):
+            return obj.snapshot_data.get('email', '')
+        return ''
 
 
 class ContractCreateUpdateSerializer(serializers.ModelSerializer):

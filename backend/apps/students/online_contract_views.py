@@ -818,6 +818,7 @@ class PublicContractDetailView(APIView):
             'tariff_name': contract.tariff_name,
             'tariff_price': float(contract.tariff_price),
             'discount': float(contract.discount or 0),
+            'email': user.email or (contract.snapshot_data.get('email') if contract.snapshot_data else '') or '',
             'passport_number': contract.passport_number,
             'full_name': contract.full_name,
             'education_level': contract.education_level,

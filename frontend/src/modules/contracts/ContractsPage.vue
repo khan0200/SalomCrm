@@ -280,21 +280,16 @@ async function handleDownloadContract(contract: Contract, format: 'pdf' | 'doc' 
     try {
       const contractNum = contract.student_id_assigned || contract.contract_number || ''
       const dateIso = formatDateIso(contract.signed_at || contract.created_at)
-      const variableValues: Record<string, string> = {
-        studentid: contractNum,
-        student_id: contractNum,
-        contract_number: contract.contract_number || contract.student_id_assigned || '',
-        date: dateIso,
-        contract_date: dateIso,
-        sana: dateIso,
-        student_name: contract.student_name || '',
-        fullname: contract.student_name || '',
-        passportnumber: contract.passport_number || contract.student_passport || '',
-        student_passport: contract.passport_number || contract.student_passport || '',
-        tariff_name: contract.tariff_name || '',
-        tariff_price: contract.tariff_price ? String(contract.tariff_price) : '',
-        tenant_office: contract.tenant_office_name || '',
-      }
+      const variableValues: Record<string, string> = buildVariableValues(contract, {
+        contractNumber: contractNum,
+        price: contract.tariff_price || undefined,
+        discount: contract.discount || undefined,
+        signatureData: contract.signature_data || undefined,
+        verificationCode: contract.verification_code || undefined,
+        office: contract.office || contract.tenant_office_name || undefined,
+        educationLevel: contract.education_level || undefined,
+        email: contract.email || (contract as any).student_email || '',
+      })
       const verificationMeta = {
         contractNumber: contract.contract_number || contract.student_id_assigned || undefined,
         studentId: contract.student_id_assigned || undefined,

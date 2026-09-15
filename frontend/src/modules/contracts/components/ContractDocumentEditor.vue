@@ -2581,7 +2581,7 @@ const shortcutCategories = computed(() => ({
           >
             <div>
               <div class="font-bold text-zinc-800 dark:text-zinc-200 group-hover:text-blue-600">{{ v.label }}</div>
-              <div class="font-mono text-[9.5px] text-zinc-400">{{ v.key }}</div>
+              <div class="font-mono text-[9.5px] text-zinc-400">{{ v.token }}</div>
             </div>
             <span class="text-blue-500 font-bold opacity-0 group-hover:opacity-100">+</span>
           </button>

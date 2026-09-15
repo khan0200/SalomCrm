@@ -473,7 +473,7 @@ function insertClientRequisites() {
       >
         <div>
           <div class="font-bold text-[11px] text-zinc-800 dark:text-zinc-200 group-hover:text-blue-600">{{ v.label }}</div>
-          <div class="font-mono text-[9px] text-zinc-400">{{ v.key }}</div>
+          <div class="font-mono text-[9px] text-zinc-400">{{ v.token }}</div>
         </div>
         <span class="text-[10px] text-blue-500 font-bold opacity-0 group-hover:opacity-100 transition-opacity">+ Add</span>
       </button>

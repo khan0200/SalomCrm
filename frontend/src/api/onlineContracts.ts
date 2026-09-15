@@ -102,6 +102,7 @@ export interface SubmitContractPayload {
   office: string
   phone1: string
   phone2: string
+  email?: string
   signature_data: string
   declarations: {
     read_full_contract: boolean
@@ -120,6 +121,7 @@ export interface ContractDetailOnlineResponse {
   tariff_name: string
   tariff_price: number
   discount?: number
+  email?: string
   passport_number: string
   full_name: string
   education_level: string

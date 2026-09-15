@@ -61,6 +61,7 @@ const formData = reactive({
   office: '',
   phone1: '',
   phone2: '',
+  email: authStore.user?.email || '',
   signatureData: '',
 })
 
@@ -133,6 +134,7 @@ const variableValues = computed<Record<string, string>>(() => {
       phone1: formData.phone1 || '',
       phone2: formData.phone2 || '',
       signature_data: formData.signatureData || '',
+      email: formData.email || authStore.user?.email || '',
     },
     {
       price: selectedTariff.value?.price,
@@ -141,6 +143,7 @@ const variableValues = computed<Record<string, string>>(() => {
       signatureData: formData.signatureData || '',
       educationLevel: formData.educationLevel || '',
       office: formData.office || '',
+      email: formData.email || authStore.user?.email || '',
     }
   )
 })
@@ -186,6 +189,7 @@ async function init() {
         if (contract.office) formData.office = contract.office
         if (contract.phone1) formData.phone1 = contract.phone1
         if (contract.phone2) formData.phone2 = contract.phone2
+        if (contract.email) formData.email = contract.email
         if (contract.date_of_birth) {
           const parts = contract.date_of_birth.split('.')
           if (parts.length === 3) {
@@ -225,7 +229,8 @@ const isStep1Valid = computed(() => {
     !!formData.dobYear &&
     !!formData.office &&
     formData.phone1.trim().length >= 7 &&
-    formData.phone2.trim().length >= 7
+    formData.phone2.trim().length >= 7 &&
+    (!formData.email || formData.email.includes('@'))
   )
 })
 
@@ -309,6 +314,7 @@ async function handleFinalSubmit() {
       office: formData.office,
       phone1: formData.phone1.trim(),
       phone2: formData.phone2.trim(),
+      email: formData.email.trim(),
       signature_data: formData.signatureData,
       declarations: {
         read_full_contract: declarations.readFullContract,
@@ -594,6 +600,20 @@ onMounted(() => {
                 type="tel"
                 required
                 placeholder="+998 93 765 43 21"
+                class="w-full px-3.5 py-2.5 text-xs font-mono font-bold rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-black dark:text-white placeholder:text-zinc-400 focus:outline-hidden focus:border-black dark:focus:border-white transition-colors shadow-2xs"
+              />
+            </div>
+
+            <!-- Email -->
+            <div class="sm:col-span-2">
+              <label class="block text-xs font-bold uppercase tracking-wide text-black dark:text-white mb-1.5">
+                Email manzil <span class="text-red-600">*</span>
+              </label>
+              <input
+                v-model="formData.email"
+                type="email"
+                required
+                placeholder="student@example.com"
                 class="w-full px-3.5 py-2.5 text-xs font-mono font-bold rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-black dark:text-white placeholder:text-zinc-400 focus:outline-hidden focus:border-black dark:focus:border-white transition-colors shadow-2xs"
               />
             </div>
