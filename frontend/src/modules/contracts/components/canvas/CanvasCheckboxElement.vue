@@ -121,18 +121,18 @@ function onBlur() {
   emit('finish-edit')
 }
 
-// Typography & Zoom scaling
+// Typography & Base coordinates
 const effectiveFontSizePt = computed(() => {
   return props.element.style?.fontSize || props.element.fontSize || 12
 })
 
-const scaledFontSizePx = computed(() => {
-  return effectiveFontSizePt.value * (4 / 3) * (props.zoomLevel / 100)
+const fontSizePx = computed(() => {
+  return effectiveFontSizePt.value * (4 / 3)
 })
 
-// Box size scales proportionally with the font size and zoom level!
+// Box size scales proportionally with the font size
 const boxSizePx = computed(() => {
-  return Math.max(6, Math.round(scaledFontSizePx.value * 0.95))
+  return Math.max(6, Math.round(fontSizePx.value * 0.95))
 })
 
 const boxStrokeWidth = computed(() => {
@@ -141,8 +141,8 @@ const boxStrokeWidth = computed(() => {
   return 2
 })
 
-const scaledGapPx = computed(() => {
-  return Math.max(2, Math.round(scaledFontSizePx.value * 0.35))
+const gapPx = computed(() => {
+  return Math.max(2, Math.round(fontSizePx.value * 0.35))
 })
 
 const textStyle = computed(() => {
@@ -153,7 +153,7 @@ const textStyle = computed(() => {
   const fontStyle = st.fontStyle || 'normal'
   const textDecoration = st.textDecoration || 'none'
   const letterSpacing = typeof st.letterSpacing === 'number' && st.letterSpacing !== 0
-    ? `${st.letterSpacing * (props.zoomLevel / 100)}px`
+    ? `${st.letterSpacing}px`
     : 'normal'
   const backgroundColor = st.backgroundColor && st.backgroundColor !== '#ffffff'
     ? st.backgroundColor
@@ -161,7 +161,7 @@ const textStyle = computed(() => {
   const textTransform = (st.textTransform as any) || 'none'
 
   return {
-    fontSize: `${scaledFontSizePx.value}px`,
+    fontSize: `${fontSizePx.value}px`,
     color,
     fontFamily,
     fontWeight,
@@ -179,7 +179,7 @@ const textStyle = computed(() => {
     class="canvas-checkbox-element w-full h-full flex items-center select-none"
     :style="{
       fontFamily: textStyle.fontFamily,
-      gap: `${scaledGapPx}px`,
+      gap: `${gapPx}px`,
     }"
   >
     <!-- Checkbox Icon Toggle Button (Scales dynamically with zoom & font-size) -->

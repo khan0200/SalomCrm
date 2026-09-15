@@ -292,32 +292,32 @@ export function buildClientRequisitesHtml(): string {
   parts.push('<p style="text-align: center; margin: 0.3em 0 0.8em; font-weight: bold; letter-spacing: 0.5px;">MIJOZ</p>')
 
   // 2. F.I.O:
-  parts.push('<p style="display: flex; align-items: flex-end; margin: 0.28em 0;"><span style="font-weight: bold; white-space: nowrap;">F.I.O:</span><span style="flex: 1; border-bottom: 1px solid #000; margin-left: 6px; min-height: 1.1em; padding-bottom: 2px;">&nbsp;</span></p>')
+  parts.push('<p style="display: flex; align-items: flex-end; margin: 0.28em 0;"><span style="font-weight: bold; white-space: nowrap;">F.I.O:</span><span style="flex: 1; border-bottom: 1px solid #000; margin-left: 6px; min-height: 1.1em; padding-bottom: 2px; color: #2563eb; font-weight: bold;">&nbsp;{{fullname}}</span></p>')
   // Extra line for long names
   parts.push('<p style="border-bottom: 1px solid #000; margin: 0.28em 0; min-height: 1.1em; padding-bottom: 2px;">&nbsp;</p>')
 
   // 3. PASSPORT RAQAMI:
-  parts.push('<p style="display: flex; align-items: flex-end; margin: 0.28em 0;"><span style="font-weight: bold; white-space: nowrap;">PASSPORT RAQAMI:</span><span style="flex: 1; border-bottom: 1px solid #000; margin-left: 6px; min-height: 1.1em; padding-bottom: 2px;">&nbsp;</span></p>')
+  parts.push('<p style="display: flex; align-items: flex-end; margin: 0.28em 0;"><span style="font-weight: bold; white-space: nowrap;">PASSPORT RAQAMI:</span><span style="flex: 1; border-bottom: 1px solid #000; margin-left: 6px; min-height: 1.1em; padding-bottom: 2px; color: #2563eb; font-weight: bold;">&nbsp;{{passportnumber}}</span></p>')
 
   // 4. TUG\'ILGAN SANA:
-  parts.push('<p style="display: flex; align-items: flex-end; margin: 0.28em 0;"><span style="font-weight: bold; white-space: nowrap;">TUG\'ILGAN SANA:</span><span style="flex: 1; border-bottom: 1px solid #000; margin-left: 6px; min-height: 1.1em; padding-bottom: 2px;">&nbsp;</span></p>')
+  parts.push('<p style="display: flex; align-items: flex-end; margin: 0.28em 0;"><span style="font-weight: bold; white-space: nowrap;">TUG\'ILGAN SANA:</span><span style="flex: 1; border-bottom: 1px solid #000; margin-left: 6px; min-height: 1.1em; padding-bottom: 2px; color: #2563eb; font-weight: bold;">&nbsp;{{dateofbirth}}</span></p>')
 
   // 5. EMAIL:
-  parts.push('<p style="display: flex; align-items: flex-end; margin: 0.28em 0;"><span style="font-weight: bold; white-space: nowrap;">EMAIL:</span><span style="flex: 1; border-bottom: 1px solid #000; margin-left: 6px; min-height: 1.1em; padding-bottom: 2px;">&nbsp;</span></p>')
+  parts.push('<p style="display: flex; align-items: flex-end; margin: 0.28em 0;"><span style="font-weight: bold; white-space: nowrap;">EMAIL:</span><span style="flex: 1; border-bottom: 1px solid #000; margin-left: 6px; min-height: 1.1em; padding-bottom: 2px; color: #2563eb; font-weight: bold;">&nbsp;{{email}}</span></p>')
 
   // 6. TEL:
-  parts.push('<p style="display: flex; align-items: flex-end; margin: 0.28em 0;"><span style="font-weight: bold; white-space: nowrap;">TEL:</span><span style="flex: 1; border-bottom: 1px solid #000; margin-left: 6px; min-height: 1.1em; padding-bottom: 2px;">&nbsp;</span></p>')
+  parts.push('<p style="display: flex; align-items: flex-end; margin: 0.28em 0;"><span style="font-weight: bold; white-space: nowrap;">TEL:</span><span style="flex: 1; border-bottom: 1px solid #000; margin-left: 6px; min-height: 1.1em; padding-bottom: 2px; color: #2563eb; font-weight: bold;">&nbsp;{{phone1}}</span></p>')
 
   // 7. TEL:
-  parts.push('<p style="display: flex; align-items: flex-end; margin: 0.28em 0;"><span style="font-weight: bold; white-space: nowrap;">TEL:</span><span style="flex: 1; border-bottom: 1px solid #000; margin-left: 6px; min-height: 1.1em; padding-bottom: 2px;">&nbsp;</span></p>')
+  parts.push('<p style="display: flex; align-items: flex-end; margin: 0.28em 0;"><span style="font-weight: bold; white-space: nowrap;">TEL:</span><span style="flex: 1; border-bottom: 1px solid #000; margin-left: 6px; min-height: 1.1em; padding-bottom: 2px; color: #2563eb; font-weight: bold;">&nbsp;{{phone2}}</span></p>')
 
   // 8. TA\'LIM BOSQICHI:
-  parts.push('<p style="display: flex; align-items: flex-end; margin: 0.28em 0;"><span style="font-weight: bold; white-space: nowrap;">TA\'LIM BOSQICHI:</span><span style="flex: 1; border-bottom: 1px solid #000; margin-left: 6px; min-height: 1.1em; padding-bottom: 2px;">&nbsp;</span></p>')
+  parts.push('<p style="display: flex; align-items: flex-end; margin: 0.28em 0;"><span style="font-weight: bold; white-space: nowrap;">TA\'LIM BOSQICHI:</span><span style="flex: 1; border-bottom: 1px solid #000; margin-left: 6px; min-height: 1.1em; padding-bottom: 2px; color: #2563eb; font-weight: bold;">&nbsp;{{leveltostudy}}</span></p>')
   // Extra line
   parts.push('<p style="border-bottom: 1px solid #000; margin: 0.28em 0; min-height: 1.1em; padding-bottom: 2px;">&nbsp;</p>')
 
   // 9. TASDIQLASH KODI (IMZO):
-  parts.push('<p style="display: flex; align-items: flex-end; margin: 0.28em 0;"><span style="font-weight: bold; white-space: nowrap;">TASDIQLASH KODI (IMZO):</span><span style="flex: 1; border-bottom: 1px solid #000; margin-left: 6px; min-height: 1.1em; padding-bottom: 2px;">&nbsp;</span></p>')
+  parts.push('<p style="display: flex; align-items: flex-end; margin: 0.28em 0;"><span style="font-weight: bold; white-space: nowrap;">TASDIQLASH KODI (IMZO):</span><span style="flex: 1; border-bottom: 1px solid #000; margin-left: 6px; min-height: 1.1em; padding-bottom: 2px; color: #2563eb; font-weight: bold;">&nbsp;{{signature}}</span></p>')
 
   return parts.join('\n')
 }

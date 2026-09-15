@@ -57,13 +57,16 @@ const emit = defineEmits<{
 
 const MM_TO_PX_BASE = 3.779527559
 
-function mmToPx(mm: number): number {
-  return mm * MM_TO_PX_BASE * (props.zoomLevel / 100)
+function mmToBasePx(mm: number): number {
+  return mm * MM_TO_PX_BASE
 }
 
 function pxToMm(px: number): number {
   return px / (MM_TO_PX_BASE * (props.zoomLevel / 100))
 }
+
+const counterScale = computed(() => Math.max(0.65, Math.min(1.4, 100 / (props.zoomLevel || 100))))
+const handleScale = computed(() => Math.max(0.75, Math.min(1.5, 100 / (props.zoomLevel || 100))))
 
 const isTextType = computed(() => {
   const t = props.element.type
@@ -82,10 +85,10 @@ const toolbarPositionClass = computed(() => {
 })
 
 const wrapperStyle = computed(() => {
-  const leftPx = mmToPx(props.element.x)
-  const topPx = mmToPx(props.element.y)
-  const widthPx = mmToPx(props.element.width)
-  const heightPx = mmToPx(props.element.height)
+  const leftPx = mmToBasePx(props.element.x)
+  const topPx = mmToBasePx(props.element.y)
+  const widthPx = mmToBasePx(props.element.width)
+  const heightPx = mmToBasePx(props.element.height)
   const rot = props.element.rotation || 0
 
   return {
@@ -390,6 +393,10 @@ function onDoubleClick(e: MouseEvent) {
       <div
         class="absolute bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 shadow-xl rounded-xl px-1.5 py-0.5 flex items-center gap-0.5 z-[100] text-zinc-600 dark:text-zinc-300 text-xs pointer-events-auto whitespace-nowrap opacity-100 select-none ring-1 ring-black/5 dark:ring-white/10"
         :class="toolbarPositionClass"
+        :style="{
+          transform: `scale(${counterScale})`,
+          transformOrigin: isNearTop ? 'top center' : 'bottom center',
+        }"
         @pointerdown.stop.prevent
       >
         <!-- Coordinates & Dimensions Badge -->
@@ -597,36 +604,42 @@ function onDoubleClick(e: MouseEvent) {
         <!-- NW Corner Circle -->
         <div
           class="resize-handle nw absolute -top-1.5 -left-1.5 w-2.5 h-2.5 bg-white border-[1.5px] border-[#7c3aed] rounded-full shadow-xs cursor-nwse-resize z-40 hover:scale-125 transition-transform"
+          :style="{ transform: `scale(${handleScale})` }"
           @pointerdown="onResizePointerDown('nw', $event)"
         ></div>
 
         <!-- NE Corner Circle -->
         <div
           class="resize-handle ne absolute -top-1.5 -right-1.5 w-2.5 h-2.5 bg-white border-[1.5px] border-[#7c3aed] rounded-full shadow-xs cursor-nesw-resize z-40 hover:scale-125 transition-transform"
+          :style="{ transform: `scale(${handleScale})` }"
           @pointerdown="onResizePointerDown('ne', $event)"
         ></div>
 
         <!-- SE Corner Circle -->
         <div
           class="resize-handle se absolute -bottom-1.5 -right-1.5 w-2.5 h-2.5 bg-white border-[1.5px] border-[#7c3aed] rounded-full shadow-xs cursor-nwse-resize z-40 hover:scale-125 transition-transform"
+          :style="{ transform: `scale(${handleScale})` }"
           @pointerdown="onResizePointerDown('se', $event)"
         ></div>
 
         <!-- SW Corner Circle -->
         <div
           class="resize-handle sw absolute -bottom-1.5 -left-1.5 w-2.5 h-2.5 bg-white border-[1.5px] border-[#7c3aed] rounded-full shadow-xs cursor-nesw-resize z-40 hover:scale-125 transition-transform"
+          :style="{ transform: `scale(${handleScale})` }"
           @pointerdown="onResizePointerDown('sw', $event)"
         ></div>
 
         <!-- Left Edge Vertical Pill Handle -->
         <div
           class="resize-handle w absolute top-1/2 -left-1 -translate-y-1/2 w-1.5 h-4 bg-white border-[1.5px] border-[#7c3aed] rounded-full shadow-xs cursor-ew-resize z-40 hover:scale-110 transition-transform"
+          :style="{ transform: `scale(${handleScale})` }"
           @pointerdown="onResizePointerDown('w', $event)"
         ></div>
 
         <!-- Right Edge Vertical Pill Handle -->
         <div
           class="resize-handle e absolute top-1/2 -right-1 -translate-y-1/2 w-1.5 h-4 bg-white border-[1.5px] border-[#7c3aed] rounded-full shadow-xs cursor-ew-resize z-40 hover:scale-110 transition-transform"
+          :style="{ transform: `scale(${handleScale})` }"
           @pointerdown="onResizePointerDown('e', $event)"
         ></div>
 
@@ -634,10 +647,12 @@ function onDoubleClick(e: MouseEvent) {
         <template v-if="!isTextType">
           <div
             class="resize-handle n absolute -top-1 left-1/2 -translate-x-1/2 w-4 h-1.5 bg-white border-[1.5px] border-[#7c3aed] rounded-full shadow-xs cursor-ns-resize z-40 hover:scale-110 transition-transform"
+            :style="{ transform: `scale(${handleScale})` }"
             @pointerdown="onResizePointerDown('n', $event)"
           ></div>
           <div
             class="resize-handle s absolute -bottom-1 left-1/2 -translate-x-1/2 w-4 h-1.5 bg-white border-[1.5px] border-[#7c3aed] rounded-full shadow-xs cursor-ns-resize z-40 hover:scale-110 transition-transform"
+            :style="{ transform: `scale(${handleScale})` }"
             @pointerdown="onResizePointerDown('s', $event)"
           ></div>
         </template>

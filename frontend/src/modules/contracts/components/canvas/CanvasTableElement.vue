@@ -8,7 +8,6 @@ import {
 } from 'lucide-vue-next'
 import type { TableCanvasElement, TableCellModel } from '../../types/contractCanvas'
 import { cleanClipboardContent } from '../../utils/clipboardUtils'
-import { scaleInlineStyles } from '../../utils/canvasZoomUtils'
 import { replaceVariablesInHtml } from '../../utils/contractVariables'
 
 const props = withDefaults(
@@ -37,7 +36,7 @@ const editingCellCoord = ref<{ r: number; c: number } | null>(null)
 const MM_TO_PX_BASE = 3.779527559
 
 function mmToPx(mm: number): number {
-  return mm * MM_TO_PX_BASE * (props.zoomLevel / 100)
+  return mm * MM_TO_PX_BASE
 }
 
 function pxToMm(px: number): number {
@@ -46,12 +45,12 @@ function pxToMm(px: number): number {
 
 const cellFontSizePx = computed(() => {
   const base = props.element.density === 'compact' ? 11 : props.element.density === 'spacious' ? 14 : 12
-  return Math.max(5, Math.round(base * (props.zoomLevel / 100) * 10) / 10)
+  return base
 })
 
 const cellPaddingPx = computed(() => {
   const base = props.element.density === 'compact' ? 3 : props.element.density === 'spacious' ? 10 : 5
-  return Math.max(1, Math.round(base * (props.zoomLevel / 100) * 10) / 10)
+  return base
 })
 
 // Resizing Columns via Dragging Column Headers
@@ -212,9 +211,6 @@ function renderCellContent(content: string): string {
   if (props.readonly || (props.variableValues && Object.keys(props.variableValues).length > 0)) {
     text = replaceVariablesInHtml(text, props.variableValues || {}, { skipHeuristics: true })
   }
-  if (props.zoomLevel !== 100) {
-    text = scaleInlineStyles(text, props.zoomLevel)
-  }
   return text
 }
 </script>
@@ -225,6 +221,10 @@ function renderCellContent(content: string): string {
     <div
       v-if="isSelected && activeCellCoord"
       class="absolute -top-8 right-0 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 shadow-xl rounded-xl px-1.5 py-0.5 flex items-center gap-1 z-50 text-[11px] pointer-events-auto opacity-100 ring-1 ring-black/5 dark:ring-white/10"
+      :style="{
+        transform: `scale(${100 / Math.max(25, props.zoomLevel)})`,
+        transformOrigin: 'bottom right'
+      }"
       @pointerdown.stop.prevent
     >
       <button

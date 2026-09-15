@@ -16,7 +16,7 @@ const props = withDefaults(
 const MM_TO_PX_BASE = 3.779527559
 
 function mmToPx(mm: number): number {
-  return mm * MM_TO_PX_BASE * (props.zoomLevel / 100)
+  return mm * MM_TO_PX_BASE
 }
 </script>
 
@@ -37,6 +37,7 @@ function mmToPx(mm: number): number {
         <span
           v-if="guide.label"
           class="absolute top-2 left-0.5 px-1 py-0.5 rounded bg-blue-500 text-[8px] font-mono text-white font-bold whitespace-nowrap shadow-sm"
+          :style="{ transform: `scale(${100 / Math.max(25, props.zoomLevel)})`, transformOrigin: 'top left' }"
         >
           {{ guide.label }}
         </span>
@@ -55,6 +56,7 @@ function mmToPx(mm: number): number {
         <span
           v-if="guide.label"
           class="absolute left-2 -top-4 px-1 py-0.5 rounded bg-blue-500 text-[8px] font-mono text-white font-bold whitespace-nowrap shadow-sm"
+          :style="{ transform: `scale(${100 / Math.max(25, props.zoomLevel)})`, transformOrigin: 'bottom left' }"
         >
           {{ guide.label }}
         </span>
@@ -117,8 +119,9 @@ function mmToPx(mm: number): number {
 
         <!-- Centered distance pill badge -->
         <div
-          class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full px-1.5 py-0.5 text-[9px] font-mono font-bold text-white flex items-center whitespace-nowrap leading-none tracking-tight shadow-sm"
-          :class="guide.isEqualSpacing ? 'bg-fuchsia-600 ring-2 ring-fuchsia-300 shadow-md scale-105 font-extrabold' : 'bg-rose-500 ring-1 ring-white/30'"
+          class="absolute left-1/2 top-1/2 rounded-full px-1.5 py-0.5 text-[9px] font-mono font-bold text-white flex items-center whitespace-nowrap leading-none tracking-tight shadow-sm"
+          :class="guide.isEqualSpacing ? 'bg-fuchsia-600 ring-2 ring-fuchsia-300 shadow-md font-extrabold' : 'bg-rose-500 ring-1 ring-white/30'"
+          :style="{ transform: `translate(-50%, -50%) scale(${100 / Math.max(25, props.zoomLevel)})` }"
         >
           <span v-if="guide.isEqualSpacing" class="mr-0.5 opacity-90 text-[8px] font-sans">=</span>
           <span>{{ guide.label || `${guide.distanceMm} mm` }}</span>
@@ -179,8 +182,9 @@ function mmToPx(mm: number): number {
 
         <!-- Centered distance pill badge -->
         <div
-          class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full px-1.5 py-0.5 text-[9px] font-mono font-bold text-white flex items-center whitespace-nowrap leading-none tracking-tight shadow-sm"
-          :class="guide.isEqualSpacing ? 'bg-fuchsia-600 ring-2 ring-fuchsia-300 shadow-md scale-105 font-extrabold' : 'bg-rose-500 ring-1 ring-white/30'"
+          class="absolute left-1/2 top-1/2 rounded-full px-1.5 py-0.5 text-[9px] font-mono font-bold text-white flex items-center whitespace-nowrap leading-none tracking-tight shadow-sm"
+          :class="guide.isEqualSpacing ? 'bg-fuchsia-600 ring-2 ring-fuchsia-300 shadow-md font-extrabold' : 'bg-rose-500 ring-1 ring-white/30'"
+          :style="{ transform: `translate(-50%, -50%) scale(${100 / Math.max(25, props.zoomLevel)})` }"
         >
           <span v-if="guide.isEqualSpacing" class="mr-0.5 opacity-90 text-[8px] font-sans">=</span>
           <span>{{ guide.label || `${guide.distanceMm} mm` }}</span>

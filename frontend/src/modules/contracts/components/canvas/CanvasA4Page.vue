@@ -80,16 +80,19 @@ const MM_TO_PX_BASE = 3.779527559
 const PAGE_WIDTH_MM = 210
 const PAGE_HEIGHT_MM = 297
 
-function mmToPx(mm: number): number {
-  return mm * MM_TO_PX_BASE * (props.zoomLevel / 100)
+const BASE_PAGE_WIDTH_PX = PAGE_WIDTH_MM * MM_TO_PX_BASE
+const BASE_PAGE_HEIGHT_PX = PAGE_HEIGHT_MM * MM_TO_PX_BASE
+
+function mmToBasePx(mm: number): number {
+  return mm * MM_TO_PX_BASE
 }
 
-function pxToMm(px: number): number {
-  return px / (MM_TO_PX_BASE * (props.zoomLevel / 100))
+function basePxToMm(px: number): number {
+  return px / MM_TO_PX_BASE
 }
 
-const scaledPageWidthPx = computed(() => mmToPx(PAGE_WIDTH_MM))
-const scaledPageHeightPx = computed(() => mmToPx(PAGE_HEIGHT_MM))
+const scaledPageWidthPx = computed(() => BASE_PAGE_WIDTH_PX * (props.zoomLevel / 100))
+const scaledPageHeightPx = computed(() => BASE_PAGE_HEIGHT_PX * (props.zoomLevel / 100))
 
 // Ref to the physical A4 sheet DOM element — needed for marquee coordinate math
 const sheetRef = ref<HTMLElement | null>(null)
@@ -143,8 +146,9 @@ function onSheetPointerDown(e: PointerEvent) {
   if (!sheet) return
 
   const sheetRect = sheet.getBoundingClientRect()
-  const startX = e.clientX - sheetRect.left
-  const startY = e.clientY - sheetRect.top
+  const scale = props.zoomLevel / 100
+  const startX = (e.clientX - sheetRect.left) / scale
+  const startY = (e.clientY - sheetRect.top) / scale
 
   let hasMoved = false
   const DRAG_THRESHOLD_PX = 4
@@ -154,8 +158,8 @@ function onSheetPointerDown(e: PointerEvent) {
   sheet.setPointerCapture(e.pointerId)
 
   function onPointerMove(ev: PointerEvent) {
-    const curX = ev.clientX - sheetRect.left
-    const curY = ev.clientY - sheetRect.top
+    const curX = (ev.clientX - sheetRect.left) / scale
+    const curY = (ev.clientY - sheetRect.top) / scale
 
     if (!hasMoved) {
       const dx = Math.abs(curX - startX)
@@ -177,8 +181,8 @@ function onSheetPointerDown(e: PointerEvent) {
     marqueeRect.value = {
       x: Math.max(0, x),
       y: Math.max(0, y),
-      width: Math.min(width, scaledPageWidthPx.value - Math.max(0, x)),
-      height: Math.min(height, scaledPageHeightPx.value - Math.max(0, y)),
+      width: Math.min(width, BASE_PAGE_WIDTH_PX - Math.max(0, x)),
+      height: Math.min(height, BASE_PAGE_HEIGHT_PX - Math.max(0, y)),
     }
   }
 
@@ -209,10 +213,10 @@ function onSheetPointerDown(e: PointerEvent) {
  */
 function selectElementsInMarquee(rect: MarqueeRect) {
   // Convert marquee from px to mm (sheet-relative)
-  const mLeft   = pxToMm(rect.x)
-  const mTop    = pxToMm(rect.y)
-  const mRight  = pxToMm(rect.x + rect.width)
-  const mBottom = pxToMm(rect.y + rect.height)
+  const mLeft   = basePxToMm(rect.x)
+  const mTop    = basePxToMm(rect.y)
+  const mRight  = basePxToMm(rect.x + rect.width)
+  const mBottom = basePxToMm(rect.y + rect.height)
 
   const matched: string[] = []
 
@@ -363,52 +367,62 @@ function confirmDeletePage() {
           :margin-end="margins.right"
         />
 
-        <!-- The Physical A4 Sheet -->
+        <!-- Outer Viewport: reserves scaled layout space for scrollbars, centered layouts, and rulers -->
         <div
-          ref="sheetRef"
-          class="canvas-sheet-background relative bg-white text-zinc-900 shadow-2xl border border-zinc-300/80 dark:border-zinc-700/60 transition-shadow overflow-hidden outline-none"
+          class="canvas-sheet-viewport relative shrink-0"
           :style="{
             width: `${scaledPageWidthPx}px`,
             height: `${scaledPageHeightPx}px`,
-            fontFamily: `'Times New Roman', Times, serif`,
-            cursor: !readonly && marqueeActive ? 'crosshair' : 'default',
           }"
-          @pointermove="onCanvasPointerMove"
-          @pointerleave="onCanvasPointerLeave"
-          @click="onCanvasClick"
-          @pointerdown="onSheetPointerDown"
         >
-          <!-- Grid Background (if enabled) -->
+          <!-- The Physical A4 Sheet (Rendered at 100% scale, scaled via GPU transform) -->
           <div
-            v-if="!readonly && showGrid"
-            class="absolute inset-0 pointer-events-none opacity-30"
+            ref="sheetRef"
+            class="canvas-sheet-background absolute top-0 left-0 bg-white text-zinc-900 shadow-2xl border border-zinc-300/80 dark:border-zinc-700/60 transition-shadow overflow-hidden outline-none"
             :style="{
-              backgroundImage: 'radial-gradient(#3b82f6 0.75px, transparent 0.75px)',
-              backgroundSize: `${mmToPx(5)}px ${mmToPx(5)}px`,
+              width: `${BASE_PAGE_WIDTH_PX}px`,
+              height: `${BASE_PAGE_HEIGHT_PX}px`,
+              transform: `scale(${zoomLevel / 100})`,
+              transformOrigin: 'top left',
+              fontFamily: `'Times New Roman', Times, serif`,
+              cursor: !readonly && marqueeActive ? 'crosshair' : 'default',
             }"
-          ></div>
-
-          <!-- Margin Guide Dashed Lines & Crop Corners (if enabled) -->
-          <div
-            v-if="!readonly && showMarginGuides"
-            class="margin-guide-overlay pointer-events-none select-none absolute no-print"
-            :style="{
-              top: `${mmToPx(margins.top)}px`,
-              left: `${mmToPx(margins.left)}px`,
-              right: `${mmToPx(margins.right)}px`,
-              bottom: `${mmToPx(margins.bottom)}px`,
-            }"
-            aria-hidden="true"
+            @pointermove="onCanvasPointerMove"
+            @pointerleave="onCanvasPointerLeave"
+            @click="onCanvasClick"
+            @pointerdown="onSheetPointerDown"
           >
-            <!-- Corner Crop Marks -->
-            <div class="absolute -top-2.5 -left-2.5 w-3 h-3 border-t-2 border-l-2 border-blue-500/80 z-20"></div>
-            <div class="absolute -top-2.5 -right-2.5 w-3 h-3 border-t-2 border-r-2 border-blue-500/80 z-20"></div>
-            <div class="absolute -bottom-2.5 -left-2.5 w-3 h-3 border-b-2 border-l-2 border-blue-500/80 z-20"></div>
-            <div class="absolute -bottom-2.5 -right-2.5 w-3 h-3 border-b-2 border-r-2 border-blue-500/80 z-20"></div>
+            <!-- Grid Background (if enabled) -->
+            <div
+              v-if="!readonly && showGrid"
+              class="absolute inset-0 pointer-events-none opacity-30"
+              :style="{
+                backgroundImage: 'radial-gradient(#3b82f6 0.75px, transparent 0.75px)',
+                backgroundSize: `${mmToBasePx(5)}px ${mmToBasePx(5)}px`,
+              }"
+            ></div>
 
-            <!-- Dashed Printable Boundary Rect -->
-            <div class="absolute inset-0 border border-dashed border-blue-400/35 rounded-[1px] z-10"></div>
-          </div>
+            <!-- Margin Guide Dashed Lines & Crop Corners (if enabled) -->
+            <div
+              v-if="!readonly && showMarginGuides"
+              class="margin-guide-overlay pointer-events-none select-none absolute no-print"
+              :style="{
+                top: `${mmToBasePx(margins.top)}px`,
+                left: `${mmToBasePx(margins.left)}px`,
+                right: `${mmToBasePx(margins.right)}px`,
+                bottom: `${mmToBasePx(margins.bottom)}px`,
+              }"
+              aria-hidden="true"
+            >
+              <!-- Corner Crop Marks -->
+              <div class="absolute -top-2.5 -left-2.5 w-3 h-3 border-t-2 border-l-2 border-blue-500/80 z-20"></div>
+              <div class="absolute -top-2.5 -right-2.5 w-3 h-3 border-t-2 border-r-2 border-blue-500/80 z-20"></div>
+              <div class="absolute -bottom-2.5 -left-2.5 w-3 h-3 border-b-2 border-l-2 border-blue-500/80 z-20"></div>
+              <div class="absolute -bottom-2.5 -right-2.5 w-3 h-3 border-b-2 border-r-2 border-blue-500/80 z-20"></div>
+
+              <!-- Dashed Printable Boundary Rect -->
+              <div class="absolute inset-0 border border-dashed border-blue-400/35 rounded-[1px] z-10"></div>
+            </div>
 
           <!-- Smart Alignment & Distance Guides Overlay -->
           <CanvasSmartGuides
@@ -517,6 +531,7 @@ function confirmDeletePage() {
       </div>
     </div>
   </div>
+</div>
 </template>
 
 <style scoped>

@@ -49,13 +49,8 @@ const phoneDisplay = computed(() => {
   return props.element.clientPhone || '_________________________________'
 })
 
-const scaledFontSizePx = computed(() => {
-  return Math.max(5, Math.round(12 * (props.zoomLevel / 100) * 10) / 10)
-})
-
-const borderTopWidthPx = computed(() => {
-  return Math.max(1, Math.round(2 * (props.zoomLevel / 100) * 10) / 10)
-})
+const baseFontSizePx = 12
+const borderTopWidthPx = 2
 </script>
 
 <template>
@@ -63,19 +58,16 @@ const borderTopWidthPx = computed(() => {
     class="canvas-signature-element w-full h-full border-zinc-900 font-serif text-zinc-900"
     :style="{
       fontFamily: '\'Times New Roman\', Times, serif',
-      fontSize: `${scaledFontSizePx}px`,
+      fontSize: `${baseFontSizePx}px`,
       borderTop: `${borderTopWidthPx}px solid #18181b`,
-      paddingTop: `${Math.max(2, Math.round(10 * (props.zoomLevel / 100)))}px`
+      paddingTop: '10px'
     }"
   >
-    <div class="grid grid-cols-2 h-full" :style="{ gap: `${Math.max(4, Math.round(16 * (props.zoomLevel / 100)))}px` }">
+    <div class="grid grid-cols-2 h-full" style="gap: 16px;">
       <!-- Left: Contractor (Bajaruvchi) -->
       <div
         class="border-zinc-300 flex flex-col justify-between"
-        :style="{
-          borderRight: '1px solid #d4d4d8',
-          paddingRight: `${Math.max(2, Math.round(12 * (props.zoomLevel / 100)))}px`
-        }"
+        style="border-right: 1px solid #d4d4d8; padding-right: 12px;"
       >
         <div>
           <h4 class="font-bold text-center uppercase tracking-wider mb-[0.4em]">BAJARUVCHI</h4>
@@ -89,10 +81,7 @@ const borderTopWidthPx = computed(() => {
 
         <div
           class="flex items-end justify-between border-t border-dashed border-zinc-400"
-          :style="{
-            marginTop: `${Math.max(3, Math.round(12 * (props.zoomLevel / 100)))}px`,
-            paddingTop: `${Math.max(3, Math.round(12 * (props.zoomLevel / 100)))}px`
-          }"
+          style="margin-top: 12px; padding-top: 12px;"
         >
           <div class="text-[0.83em] text-zinc-400 italic">M.O' (Muhr o'rni)</div>
           <div class="text-[0.92em] font-bold">Imzo: ______________</div>
@@ -102,7 +91,7 @@ const borderTopWidthPx = computed(() => {
       <!-- Right: Client (Mijoz) -->
       <div
         class="flex flex-col justify-between"
-        :style="{ paddingLeft: `${Math.max(2, Math.round(8 * (props.zoomLevel / 100)))}px` }"
+        style="padding-left: 8px;"
       >
         <div>
           <h4 class="font-bold text-center uppercase tracking-wider mb-[0.4em]">MIJOZ</h4>
@@ -125,10 +114,7 @@ const borderTopWidthPx = computed(() => {
 
         <div
           class="flex items-end justify-between border-t border-dashed border-zinc-400"
-          :style="{
-            marginTop: `${Math.max(3, Math.round(12 * (props.zoomLevel / 100)))}px`,
-            paddingTop: `${Math.max(3, Math.round(12 * (props.zoomLevel / 100)))}px`
-          }"
+          style="margin-top: 12px; padding-top: 12px;"
         >
           <div class="text-[0.75em] text-zinc-500 italic max-w-[140px] leading-tight">
             *Rozilik va to'liq tanishib chiqilganligini tasdiqlaydi.

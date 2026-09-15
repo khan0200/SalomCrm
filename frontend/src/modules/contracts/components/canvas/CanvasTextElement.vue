@@ -2,7 +2,7 @@
 import { ref, computed, watch, nextTick, onMounted } from 'vue'
 import type { TextCanvasElement } from '../../types/contractCanvas'
 import { cleanClipboardContent } from '../../utils/clipboardUtils'
-import { scaleInlineStyles, normalizeLegacyRequisites } from '../../utils/canvasZoomUtils'
+import { normalizeLegacyRequisites } from '../../utils/canvasZoomUtils'
 import { replaceVariablesInHtml } from '../../utils/contractVariables'
 
 const MM_TO_PX_BASE = 3.779527559
@@ -32,8 +32,8 @@ let lastEmittedHtml = ''
 const elementStyle = computed(() => {
   const st = props.element.style || {}
   const fontSizePt = st.fontSize || 14
-  // Scale font size proportionally with zoom
-  const scaledFontSizePx = fontSizePt * (4 / 3) * (props.zoomLevel / 100)
+  // 1pt = 4/3 px at 96 DPI (rendered at 100% base scale on canvas sheet)
+  const fontSizePx = fontSizePt * (4 / 3)
   const resolvedFont = st.fontFamily
     ? `"${st.fontFamily}", 'Times New Roman', Times, Georgia, serif`
     : "'Times New Roman', Times, Georgia, serif"
@@ -48,7 +48,7 @@ const elementStyle = computed(() => {
   return {
     '--canvas-element-font': resolvedFont,
     fontFamily: resolvedFont,
-    fontSize: `${scaledFontSizePx}px`,
+    fontSize: `${fontSizePx}px`,
     fontWeight: st.fontWeight || (props.element.type === 'heading' ? 'bold' : 'normal'),
     fontStyle: st.fontStyle || 'normal',
     textDecoration: st.textDecoration || 'none',
@@ -57,21 +57,18 @@ const elementStyle = computed(() => {
     textAlign: st.textAlign || (props.element.type === 'heading' ? 'center' : 'left'),
     lineHeight: st.lineHeight || 1.5,
     letterSpacing: typeof st.letterSpacing === 'number' && st.letterSpacing !== 0
-      ? `${st.letterSpacing * (props.zoomLevel / 100)}px`
+      ? `${st.letterSpacing}px`
       : 'normal',
     textTransform: st.textTransform || 'none',
-    padding: st.padding ? `${st.padding * 3.78 * (props.zoomLevel / 100)}px` : '0px',
+    padding: st.padding ? `${st.padding * MM_TO_PX_BASE}px` : '0px',
   }
 })
 
-// Replace variables in preview mode and scale inline styles proportionally with zoom
+// Replace variables in preview mode
 const displayContent = computed(() => {
   let text = props.element.content || ''
   if (!props.isEditing && (props.readonly || (props.variableValues && Object.keys(props.variableValues).length > 0))) {
     text = replaceVariablesInHtml(text, props.variableValues || {}, { skipHeuristics: true })
-  }
-  if (!props.isEditing) {
-    text = scaleInlineStyles(text, props.zoomLevel)
   }
   return text
 })
@@ -87,16 +84,15 @@ function measureAndEmitHeight() {
     range.selectNodeContents(editableRef.value)
     const rangeRect = range.getBoundingClientRect()
     if (rangeRect.height > 0) {
-      contentHeightPx = rangeRect.height
+      // getBoundingClientRect is in screen coordinates; divide by zoom scale to get sheet px
+      const scale = (props.zoomLevel || 100) / 100
+      contentHeightPx = rangeRect.height / scale
     }
   } catch {}
 
-  // 2. Secondary fallback: Check children bounding rect or scrollHeight
+  // 2. Secondary fallback: Check scrollHeight (unscaled in DOM coordinates)
   if (contentHeightPx <= 0) {
-    const firstChild = editableRef.value.firstElementChild as HTMLElement | null
-    if (firstChild) {
-      contentHeightPx = firstChild.getBoundingClientRect().height
-    }
+    contentHeightPx = editableRef.value.scrollHeight || 0
   }
 
   // 3. Fallback: computed line-height for empty content
@@ -107,9 +103,8 @@ function measureAndEmitHeight() {
     contentHeightPx = lh
   }
 
-  // Convert px to mm at current zoom level
-  const zoomFactor = MM_TO_PX_BASE * (props.zoomLevel / 100)
-  const heightMm = contentHeightPx / zoomFactor
+  // Convert unscaled sheet px to mm
+  const heightMm = contentHeightPx / MM_TO_PX_BASE
 
   // Add a small 0.8mm padding buffer for descenders (g, y, p, q, j) so bounding box fits cleanly
   const finalMm = Math.max(4, Math.round((heightMm + 0.8) * 10) / 10)
@@ -119,8 +114,6 @@ function measureAndEmitHeight() {
     emit('auto-resize-height', finalMm)
   }
 }
-
-let lastHandledZoom = props.zoomLevel
 
 // Sync initial DOM content without triggering reactivity reset
 onMounted(() => {
@@ -145,21 +138,9 @@ watch(
     if (newContent === lastEmittedHtml) return
     const normalized = normalizeLegacyRequisites(newContent || '')
     if (editableRef.value && editableRef.value.innerHTML !== normalized) {
-      editableRef.value.innerHTML = props.isEditing ? normalized : scaleInlineStyles(normalized, props.zoomLevel)
+      editableRef.value.innerHTML = props.isEditing ? normalized : displayContent.value
     }
     nextTick(() => measureAndEmitHeight())
-  }
-)
-
-// Watch zoomLevel changes when NOT editing
-watch(
-  () => props.zoomLevel,
-  newZoom => {
-    lastHandledZoom = newZoom
-    if (!props.isEditing && editableRef.value) {
-      editableRef.value.innerHTML = displayContent.value || ''
-    }
-    // Do NOT trigger measureAndEmitHeight on pure zoom slider movements
   }
 )
 
@@ -168,10 +149,7 @@ watch(displayContent, newVal => {
   if (!props.isEditing && editableRef.value) {
     editableRef.value.innerHTML = newVal || ''
   }
-  // Only auto-resize height if content/variables changed, not pure zoom change
-  if (props.zoomLevel === lastHandledZoom) {
-    nextTick(() => measureAndEmitHeight())
-  }
+  nextTick(() => measureAndEmitHeight())
 })
 
 // Watch width changes (e.g. resizing text box width triggers text re-flow and height change)
