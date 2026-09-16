@@ -16,13 +16,16 @@ import {
   Check,
   FileText,
   Copy,
-  ExternalLink
+  ExternalLink,
+  QrCode
 } from 'lucide-vue-next'
 import { useStudentDashboardStore } from '@/stores/studentDashboard'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
 import { PICK_NEEDED_LIST } from '@/composables/useDocumentHelpers'
 import AgencyRequisitesModal from '@/modules/contracts/components/AgencyRequisitesModal.vue'
+import BaseModal from '@/components/common/BaseModal.vue'
+import { generateQrCodeDataUrl } from '@/modules/contracts/utils/qrCode'
 
 const route = useRoute()
 const dashboardStore = useStudentDashboardStore()
@@ -117,6 +120,23 @@ const onlineContractUrl = computed(() => {
 })
 
 const isCopiedContractLink = ref(false)
+
+// "+ New Contract" opens this instead of copying the link straight to the
+// clipboard: staff can scan the QR on their phone to test the student flow
+// themselves, or copy the link to send it - both from one place. The
+// Contracts page's empty state opens the same modal via the shared uiStore
+// flag instead of duplicating this state.
+const isShareLinkModalOpen = computed({
+  get: () => uiStore.isShareContractLinkModalOpen,
+  set: (v: boolean) => { uiStore.isShareContractLinkModalOpen = v },
+})
+const shareLinkQrDataUrl = computed(() => {
+  try {
+    return generateQrCodeDataUrl(onlineContractUrl.value, { size: 220, color: '#18181b' })
+  } catch {
+    return ''
+  }
+})
 
 async function copyOnlineContractLink() {
   const url = onlineContractUrl.value
@@ -486,18 +506,15 @@ onUnmounted(() => {
 
     <!-- Right Column: Action Buttons & Active Tenant Badge -->
     <div class="flex items-center gap-2.5">
-      <!-- On /contracts: New Contract Quick Copy button -->
+      <!-- On /contracts: New Contract (Share Link + QR) button -->
       <button
         v-if="pathname === '/contracts'"
         type="button"
-        @click="copyOnlineContractLink"
+        @click="isShareLinkModalOpen = true"
         class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all shadow-xs cursor-pointer select-none"
-        :class="{ '!bg-emerald-600 hover:!bg-emerald-700': isCopiedContractLink }"
-        :title="`Havolani nusxalash: ${onlineContractUrl}`"
       >
-        <Check v-if="isCopiedContractLink" class="w-3.5 h-3.5 text-emerald-100" />
-        <Plus v-else class="w-3.5 h-3.5" />
-        <span>{{ isCopiedContractLink ? 'Nusxalandi!' : 'New Contract' }}</span>
+        <Plus class="w-3.5 h-3.5" />
+        <span>New Contract</span>
       </button>
 
       <!-- On /contracts: Rekvizitlar button -->
@@ -529,4 +546,38 @@ onUnmounted(() => {
     :is-open="isRequisitesModalOpen"
     @close="isRequisitesModalOpen = false"
   />
+
+  <!-- Share Online Contract Link Modal (QR + Quick Copy) -->
+  <BaseModal
+    :is-open="isShareLinkModalOpen"
+    title="Share Online Contract Link"
+    subtitle="Student scans this QR or opens the link to start signing"
+    max-width="max-w-sm"
+    @close="isShareLinkModalOpen = false"
+  >
+    <div class="flex flex-col items-center text-center space-y-4">
+      <div class="p-3 bg-white border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-2xs">
+        <img v-if="shareLinkQrDataUrl" :src="shareLinkQrDataUrl" alt="QR code" class="w-44 h-44" />
+      </div>
+
+      <div class="flex items-center gap-1.5 text-[11px] text-zinc-400">
+        <QrCode class="w-3.5 h-3.5" />
+        <span>Skaner qiling yoki havolani nusxalang</span>
+      </div>
+
+      <div class="w-full flex items-center gap-2 p-2.5 bg-zinc-50 dark:bg-zinc-850 border border-zinc-200 dark:border-zinc-750 rounded-lg">
+        <span class="flex-1 text-[11px] font-mono text-zinc-700 dark:text-zinc-300 truncate text-left">{{ onlineContractUrl }}</span>
+        <button
+          type="button"
+          @click="copyOnlineContractLink"
+          class="shrink-0 inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-zinc-900 hover:bg-black dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-950 text-[11px] font-medium cursor-pointer transition-all active:scale-95"
+          :class="{ '!bg-emerald-600 hover:!bg-emerald-700 dark:!bg-emerald-600 dark:!text-white': isCopiedContractLink }"
+        >
+          <Check v-if="isCopiedContractLink" class="w-3.5 h-3.5" />
+          <Copy v-else class="w-3.5 h-3.5" />
+          <span>{{ isCopiedContractLink ? 'Copied' : 'Copy' }}</span>
+        </button>
+      </div>
+    </div>
+  </BaseModal>
 </template>
