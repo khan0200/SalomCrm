@@ -653,42 +653,42 @@ function onDoubleClick(e: MouseEvent) {
       <template v-if="!element.locked">
         <!-- NW Corner Circle -->
         <div
-          class="resize-handle nw absolute -top-1.5 -left-1.5 w-2.5 h-2.5 bg-white border-[1.5px] border-[#7c3aed] rounded-full shadow-xs cursor-nwse-resize z-40"
+          class="resize-handle nw absolute -top-1 -left-1 w-2 h-2 bg-white border-[1.5px] border-[#7c3aed] rounded-full shadow-xs cursor-nwse-resize z-40"
           :style="{ '--handle-scale': handleScale }"
           @pointerdown="onResizePointerDown('nw', $event)"
         ></div>
 
         <!-- NE Corner Circle -->
         <div
-          class="resize-handle ne absolute -top-1.5 -right-1.5 w-2.5 h-2.5 bg-white border-[1.5px] border-[#7c3aed] rounded-full shadow-xs cursor-nesw-resize z-40"
+          class="resize-handle ne absolute -top-1 -right-1 w-2 h-2 bg-white border-[1.5px] border-[#7c3aed] rounded-full shadow-xs cursor-nesw-resize z-40"
           :style="{ '--handle-scale': handleScale }"
           @pointerdown="onResizePointerDown('ne', $event)"
         ></div>
 
         <!-- SE Corner Circle -->
         <div
-          class="resize-handle se absolute -bottom-1.5 -right-1.5 w-2.5 h-2.5 bg-white border-[1.5px] border-[#7c3aed] rounded-full shadow-xs cursor-nwse-resize z-40"
+          class="resize-handle se absolute -bottom-1 -right-1 w-2 h-2 bg-white border-[1.5px] border-[#7c3aed] rounded-full shadow-xs cursor-nwse-resize z-40"
           :style="{ '--handle-scale': handleScale }"
           @pointerdown="onResizePointerDown('se', $event)"
         ></div>
 
         <!-- SW Corner Circle -->
         <div
-          class="resize-handle sw absolute -bottom-1.5 -left-1.5 w-2.5 h-2.5 bg-white border-[1.5px] border-[#7c3aed] rounded-full shadow-xs cursor-nesw-resize z-40"
+          class="resize-handle sw absolute -bottom-1 -left-1 w-2 h-2 bg-white border-[1.5px] border-[#7c3aed] rounded-full shadow-xs cursor-nesw-resize z-40"
           :style="{ '--handle-scale': handleScale }"
           @pointerdown="onResizePointerDown('sw', $event)"
         ></div>
 
         <!-- Left Edge Vertical Pill Handle -->
         <div
-          class="resize-handle handle-centered-y w absolute top-1/2 -left-1 w-1.5 h-4 bg-white border-[1.5px] border-[#7c3aed] rounded-full shadow-xs cursor-ew-resize z-40"
+          class="resize-handle handle-centered-y w absolute top-1/2 -left-0.5 w-1 h-3 bg-white border-[1.5px] border-[#7c3aed] rounded-full shadow-xs cursor-ew-resize z-40"
           :style="{ '--handle-scale': handleScale }"
           @pointerdown="onResizePointerDown('w', $event)"
         ></div>
 
         <!-- Right Edge Vertical Pill Handle -->
         <div
-          class="resize-handle handle-centered-y e absolute top-1/2 -right-1 w-1.5 h-4 bg-white border-[1.5px] border-[#7c3aed] rounded-full shadow-xs cursor-ew-resize z-40"
+          class="resize-handle handle-centered-y e absolute top-1/2 -right-0.5 w-1 h-3 bg-white border-[1.5px] border-[#7c3aed] rounded-full shadow-xs cursor-ew-resize z-40"
           :style="{ '--handle-scale': handleScale }"
           @pointerdown="onResizePointerDown('e', $event)"
         ></div>
@@ -696,12 +696,12 @@ function onDoubleClick(e: MouseEvent) {
         <!-- Top & Bottom Pills (for non-text elements e.g. table) -->
         <template v-if="!isTextType">
           <div
-            class="resize-handle handle-centered-x n absolute -top-1 left-1/2 w-4 h-1.5 bg-white border-[1.5px] border-[#7c3aed] rounded-full shadow-xs cursor-ns-resize z-40"
+            class="resize-handle handle-centered-x n absolute -top-0.5 left-1/2 w-3 h-1 bg-white border-[1.5px] border-[#7c3aed] rounded-full shadow-xs cursor-ns-resize z-40"
             :style="{ '--handle-scale': handleScale }"
             @pointerdown="onResizePointerDown('n', $event)"
           ></div>
           <div
-            class="resize-handle handle-centered-x s absolute -bottom-1 left-1/2 w-4 h-1.5 bg-white border-[1.5px] border-[#7c3aed] rounded-full shadow-xs cursor-ns-resize z-40"
+            class="resize-handle handle-centered-x s absolute -bottom-0.5 left-1/2 w-3 h-1 bg-white border-[1.5px] border-[#7c3aed] rounded-full shadow-xs cursor-ns-resize z-40"
             :style="{ '--handle-scale': handleScale }"
             @pointerdown="onResizePointerDown('s', $event)"
           ></div>
