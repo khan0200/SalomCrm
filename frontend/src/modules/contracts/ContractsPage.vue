@@ -1172,6 +1172,16 @@ async function confirmDelete() {
                   </span>
                 </button>
               </div>
+
+              <!-- New Contract (Share Link + QR) -->
+              <button
+                type="button"
+                @click="isShareLinkModalOpen = true"
+                class="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-black text-white dark:bg-zinc-100 dark:hover:bg-white dark:text-zinc-950 text-xs font-medium cursor-pointer shadow-2xs transition-all active:scale-[0.98] shrink-0"
+              >
+                <Plus class="w-3.5 h-3.5" />
+                <span>New Contract</span>
+              </button>
             </div>
 
             <!-- Contracts Table (Resend Emails/Logs Table style) -->
