@@ -236,7 +236,7 @@ const isValidDateValue = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value)
 // Always-uppercase-on-edit fields — kept as plain string keys (not sourced
 // from fieldModalConfig) because formatEditValueForField/onInlineInput run
 // before fieldModalConfig is declared further down this setup script.
-const uppercaseFields = new Set(['full_name', 'father_name', 'mother_name', 'address', 'id'])
+const uppercaseFields = new Set(['full_name', 'father_name', 'mother_name', 'address', 'id', 'father_job', 'mother_job'])
 
 const formatEditValueForField = (field: string, value: string) => {
   if (phoneFields.has(field)) return formatPhoneValue(value)
@@ -1057,16 +1057,20 @@ const applySchoolDefaults = (schoolName: string, replace = false) => {
   const known = getSchoolEntry(schoolName)
   if (!known && !replace) return
   if (replace) {
-    schoolForm.value.school_address = known?.address || ''
+    schoolForm.value.school_address = (known?.address || '').toUpperCase()
     schoolForm.value.school_website = known?.website || ''
     schoolForm.value.school_phone = formatSchoolPhone(known?.phone || '')
     schoolForm.value.school_email = known?.email || ''
   } else {
-    if (!schoolForm.value.school_address && known?.address) schoolForm.value.school_address = known.address
+    if (!schoolForm.value.school_address && known?.address) schoolForm.value.school_address = known.address.toUpperCase()
     if (!schoolForm.value.school_website && known?.website) schoolForm.value.school_website = known.website
     if (!schoolForm.value.school_phone && known?.phone) schoolForm.value.school_phone = formatSchoolPhone(known.phone)
     if (!schoolForm.value.school_email && known?.email) schoolForm.value.school_email = known.email
   }
+}
+
+const onSchoolAddressInput = (e: Event) => {
+  schoolForm.value.school_address = ((e.target as HTMLInputElement).value || '').toUpperCase()
 }
 
 const onSchoolPhoneBlur = () => {
@@ -3659,7 +3663,8 @@ const handleRestoreStudent = () => {
               </label>
               <input
                 type="text"
-                v-model="schoolForm.school_address"
+                :value="schoolForm.school_address"
+                @input="onSchoolAddressInput"
                 placeholder="Street, city, country"
                 class="w-full bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 px-3 py-2 rounded-lg outline-none focus:border-blue-500 transition-colors text-[14px]"
               />
