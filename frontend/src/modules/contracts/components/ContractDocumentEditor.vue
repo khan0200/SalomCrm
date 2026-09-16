@@ -88,6 +88,7 @@ import {
 } from '../utils/clipboardUtils'
 import { useContractCanvas } from '../composables/useContractCanvas'
 import CanvasA4Page from './canvas/CanvasA4Page.vue'
+import CanvasMarqueeSelect from './canvas/CanvasMarqueeSelect.vue'
 
 const props = withDefaults(
   defineProps<{
@@ -729,6 +730,174 @@ function onWorkspacePointerUp(e?: PointerEvent) {
     isPanning.value = false
     window.removeEventListener('pointermove', onWorkspacePointerMove)
     window.removeEventListener('pointerup', onWorkspacePointerUp)
+  }
+}
+
+// ─── Workspace-Level Marquee (Rubber-Band) Selection ─────────────────────────
+// Lives here (not inside CanvasA4Page) so a drag can start on the gray area
+// OUTSIDE any page and still select what the rectangle covers underneath, and
+// so a single drag can span multiple pages at once (Figma/Canva-style),
+// instead of being clamped to whichever single sheet the drag started on.
+const workspaceMarqueeRect = ref<{ x: number; y: number; width: number; height: number } | null>(null)
+const isWorkspaceMarqueeActive = ref(false)
+
+// Guard: right after a marquee drag's pointerup, the browser fires a
+// synthetic 'click' on whatever element ends up under the cursor. Every
+// "click on empty space clears the selection" handler (workspace background,
+// stage background, and each page's own sheet background) must consume this
+// guard first, or that click would immediately wipe the selection we just made.
+let marqueeGuardUntil = 0
+function armMarqueeGuard() {
+  marqueeGuardUntil = Date.now() + 400
+}
+function consumeMarqueeGuard(): boolean {
+  if (Date.now() < marqueeGuardUntil) {
+    marqueeGuardUntil = 0
+    return true
+  }
+  return false
+}
+function handleBackgroundClick() {
+  if (consumeMarqueeGuard()) return
+  canvas.clearSelection()
+}
+
+/**
+ * Left-mouse-button pointerdown starting on empty space anywhere inside the
+ * workspace (the gray area between/around pages, or a page's own blank
+ * background) begins a marquee drag.
+ *
+ * Edge cases handled (mirrors the previous per-page implementation):
+ *  - button !== 0 guard: only left-click triggers marquee.
+ *  - Skips when panning (Space+drag / middle-click) or copy-style is active.
+ *  - Extra target check: belt-and-suspenders guard for elements that may not
+ *    stopPropagation (resize handles, contenteditable regions) — in practice
+ *    CanvasElementWrapper's own pointerdown already stops propagation, so
+ *    genuine element drags never reach here at all.
+ *  - Allow-list: only starts when the pointerdown target is a page's sheet
+ *    background, the stage, or the workspace itself — never mid-bubble from
+ *    something else that didn't stop propagation.
+ *  - Text-edit guard: aborts if any element is in text-edit mode.
+ *  - 4px drag threshold: prevents a plain click from flickering the rect.
+ */
+function onWorkspacePointerDown(e: PointerEvent) {
+  if (props.readonly || e.button !== 0) return
+  if (isSpacePressed.value || isPanning.value || copyStyleMode.value) return
+  if (canvas.editingElementId.value !== null) return
+
+  const target = e.target as HTMLElement
+  if (
+    target.closest('.canvas-element-wrapper') ||
+    target.closest('.resize-handle') ||
+    target.closest('[contenteditable="true"]')
+  ) return
+
+  const ws = canvasWorkspaceRef.value
+  const stage = ws?.querySelector('.canvas-stage') as HTMLElement | null
+  if (!ws || !stage) return
+
+  const isValidStart = Boolean(target.closest('.canvas-sheet-background')) || target === stage || target === ws
+  if (!isValidStart) return
+
+  e.preventDefault()
+
+  const startClientX = e.clientX
+  const startClientY = e.clientY
+  let hasMoved = false
+  const DRAG_THRESHOLD_PX = 4
+
+  ws.setPointerCapture(e.pointerId)
+
+  function onMove(ev: PointerEvent) {
+    if (!hasMoved) {
+      if (Math.abs(ev.clientX - startClientX) < DRAG_THRESHOLD_PX && Math.abs(ev.clientY - startClientY) < DRAG_THRESHOLD_PX) return
+      hasMoved = true
+      isWorkspaceMarqueeActive.value = true
+      canvas.clearSelection()
+    }
+
+    // Recomputed on every move (cheap) so a mid-drag scroll of the workspace
+    // doesn't throw off the rectangle's position relative to the page stage.
+    const stageRect = stage!.getBoundingClientRect()
+    const curX = ev.clientX - stageRect.left
+    const curY = ev.clientY - stageRect.top
+    const startX = startClientX - stageRect.left
+    const startY = startClientY - stageRect.top
+
+    workspaceMarqueeRect.value = {
+      x: Math.min(startX, curX),
+      y: Math.min(startY, curY),
+      width: Math.abs(curX - startX),
+      height: Math.abs(curY - startY),
+    }
+  }
+
+  function onUp(ev: PointerEvent) {
+    ws!.removeEventListener('pointermove', onMove)
+    ws!.removeEventListener('pointerup', onUp)
+    try { ws!.releasePointerCapture(ev.pointerId) } catch { /* already released */ }
+
+    if (hasMoved) {
+      selectElementsInWorkspaceMarquee(startClientX, startClientY, ev.clientX, ev.clientY)
+      armMarqueeGuard()
+    }
+    workspaceMarqueeRect.value = null
+    isWorkspaceMarqueeActive.value = false
+  }
+
+  ws.addEventListener('pointermove', onMove)
+  ws.addEventListener('pointerup', onUp)
+}
+
+/**
+ * Given the marquee drag's start/end points in viewport (clientX/Y) space,
+ * finds every element on every page whose on-screen bounding box overlaps
+ * the rectangle, and replaces the selection with all of them at once.
+ */
+function selectElementsInWorkspaceMarquee(x1: number, y1: number, x2: number, y2: number) {
+  const dragLeft = Math.min(x1, x2)
+  const dragRight = Math.max(x1, x2)
+  const dragTop = Math.min(y1, y2)
+  const dragBottom = Math.max(y1, y2)
+
+  const ws = canvasWorkspaceRef.value
+  if (!ws) return
+
+  const scale = canvas.zoomLevel.value / 100
+  const matched: string[] = []
+
+  ws.querySelectorAll<HTMLElement>('.canvas-a4-page-container').forEach(container => {
+    const pageIdxAttr = container.getAttribute('data-page-index')
+    if (pageIdxAttr === null) return
+    const page = canvas.document.value.pages[parseInt(pageIdxAttr, 10)]
+    if (!page) return
+
+    const sheet = container.querySelector('.canvas-sheet-background') as HTMLElement | null
+    if (!sheet) return
+    const sheetRect = sheet.getBoundingClientRect()
+
+    // Quick reject: this page's sheet doesn't intersect the drag rect at all
+    if (sheetRect.right < dragLeft || sheetRect.left > dragRight || sheetRect.bottom < dragTop || sheetRect.top > dragBottom) {
+      return
+    }
+
+    for (const el of page.elements) {
+      if (el.hidden) continue
+
+      const elLeft = sheetRect.left + el.x * MM_TO_PX_BASE * scale
+      const elTop = sheetRect.top + el.y * MM_TO_PX_BASE * scale
+      const elRight = elLeft + el.width * MM_TO_PX_BASE * scale
+      const elBottom = elTop + el.height * MM_TO_PX_BASE * scale
+
+      const overlaps = dragLeft < elRight && dragRight > elLeft && dragTop < elBottom && dragBottom > elTop
+      if (overlaps) matched.push(el.id)
+    }
+  })
+
+  if (matched.length > 0) {
+    const found = canvas.findElementAndPage(matched[0])
+    if (found) canvas.setActivePageIndex(found.pageIndex)
+    canvas.selectedElementIds.value = matched
   }
 }
 
@@ -3128,8 +3297,9 @@ const shortcutCategories = computed(() => ({
     <div
       ref="canvasWorkspaceRef"
       class="canvas-workspace flex-1 h-0 min-h-0 overflow-auto relative z-0 isolate select-none"
-      :class="{ 'cursor-grab': isSpacePressed && !isPanning, 'cursor-grabbing': isPanning, 'copy-style-active': !!copyStyleMode }"
-      @click.self="canvas.clearSelection()"
+      :class="{ 'cursor-grab': isSpacePressed && !isPanning, 'cursor-grabbing': isPanning, 'cursor-crosshair': isWorkspaceMarqueeActive, 'copy-style-active': !!copyStyleMode }"
+      @pointerdown="onWorkspacePointerDown"
+      @click.self="handleBackgroundClick"
     >
       <!-- Floating Canva-style Copy Style Active Notification / Control Pill -->
       <div
@@ -3154,10 +3324,21 @@ const shortcutCategories = computed(() => ({
       </div>
 
       <div
-        class="canvas-stage flex flex-col items-center pt-6 pb-36 px-8 sm:px-16"
+        class="canvas-stage relative flex flex-col items-center pt-6 pb-36 px-8 sm:px-16"
         style="width: max-content; min-width: 100%;"
-        @click.self="canvas.clearSelection()"
+        @click.self="handleBackgroundClick"
       >
+        <!-- Workspace-Level Marquee Selection Overlay: a single rectangle
+             positioned relative to the stage, spanning across pages, instead
+             of being confined to one page's own coordinate space. -->
+        <CanvasMarqueeSelect
+          v-if="workspaceMarqueeRect"
+          :x="workspaceMarqueeRect.x"
+          :y="workspaceMarqueeRect.y"
+          :width="workspaceMarqueeRect.width"
+          :height="workspaceMarqueeRect.height"
+        />
+
         <!-- Loop through every A4 sheet in the document -->
         <CanvasA4Page
           v-for="(page, pageIdx) in canvas.document.value.pages"
@@ -3180,9 +3361,9 @@ const shortcutCategories = computed(() => ({
           :copy-style-mode="copyStyleMode"
           :variable-values="variableValues"
           :calculate-snapping="canvas.calculateSnapping"
+          :consume-marquee-guard="consumeMarqueeGuard"
           @set-active-page="canvas.setActivePageIndex($event)"
           @select-element="(id, multi) => handleSelectElement(id, multi, pageIdx)"
-          @select-elements="(ids) => { canvas.setActivePageIndex(pageIdx); canvas.selectedElementIds.value = ids }"
           @copy-style="handleCopyStyleButtonClick"
           @clear-selection="canvas.clearSelection()"
           @double-click-element="canvas.editingElementId.value = (canvas.editingElementId.value === $event ? null : $event)"

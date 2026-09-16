@@ -321,8 +321,11 @@ export async function downloadContractAsPdf(
             pdf.addPage()
           }
 
-          const imgData = canvas.toDataURL('image/jpeg', 0.95)
-          pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297, undefined, 'FAST')
+          // PNG (lossless), not JPEG: JPEG's chroma-subsampled compression
+          // blurs the sharp black-on-white edges of rendered text/lines no
+          // matter how high the quality is set - PNG keeps the page crisp.
+          const imgData = canvas.toDataURL('image/png')
+          pdf.addImage(imgData, 'PNG', 0, 0, 210, 297, undefined, 'FAST')
         } finally {
           if (pageContainer.parentNode) {
             pageContainer.parentNode.removeChild(pageContainer)
@@ -538,11 +541,12 @@ export async function downloadContractAsPdf(
 
     const imgWidth = canvas.width
     const imgHeight = canvas.height
-    const fullImgData = canvas.toDataURL('image/jpeg', 0.95)
+    // PNG (lossless), not JPEG: see comment in the canvas-document branch above.
+    const fullImgData = canvas.toDataURL('image/png')
     const scaledPdfHeight = (imgHeight * contentWidthMm) / imgWidth
 
     if (scaledPdfHeight <= contentHeightMm) {
-      pdf.addImage(fullImgData, 'JPEG', marginLeft, marginTop, contentWidthMm, scaledPdfHeight, undefined, 'FAST')
+      pdf.addImage(fullImgData, 'PNG', marginLeft, marginTop, contentWidthMm, scaledPdfHeight, undefined, 'FAST')
     } else {
       const pageCanvasHeight = (imgWidth * contentHeightMm) / contentWidthMm
       let heightLeft = imgHeight
@@ -561,9 +565,9 @@ export async function downloadContractAsPdf(
         }
 
         if (position > 0) pdf.addPage()
-        const sliceData = sliceCanvas.toDataURL('image/jpeg', 0.95)
+        const sliceData = sliceCanvas.toDataURL('image/png')
         const slicePdfHeight = (currentSliceHeight * contentWidthMm) / imgWidth
-        pdf.addImage(sliceData, 'JPEG', marginLeft, marginTop, contentWidthMm, slicePdfHeight, undefined, 'FAST')
+        pdf.addImage(sliceData, 'PNG', marginLeft, marginTop, contentWidthMm, slicePdfHeight, undefined, 'FAST')
 
         position += currentSliceHeight
         heightLeft -= currentSliceHeight

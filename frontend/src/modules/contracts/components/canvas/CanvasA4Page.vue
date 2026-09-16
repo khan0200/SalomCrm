@@ -10,7 +10,6 @@ import type {
 import { Copy, Trash2 } from 'lucide-vue-next'
 import CanvasRuler from './CanvasRuler.vue'
 import CanvasSmartGuides from './CanvasSmartGuides.vue'
-import CanvasMarqueeSelect from './CanvasMarqueeSelect.vue'
 import CanvasElementWrapper from './CanvasElementWrapper.vue'
 import CanvasTextElement from './CanvasTextElement.vue'
 import CanvasTableElement from './CanvasTableElement.vue'
@@ -45,6 +44,12 @@ const props = withDefaults(
       id: string,
       isResize?: boolean
     ) => { x: number; y: number; guides: AlignmentGuide[]; distanceGuides?: DistanceGuide[] }
+    // Marquee (rubber-band) selection now lives at the workspace level (see
+    // ContractDocumentEditor.vue) so a drag can start outside any single page
+    // and span multiple pages. This callback lets this page's own background
+    // click-to-clear-selection handler check "did a marquee drag just end?"
+    // before wiping the selection the workspace just made.
+    consumeMarqueeGuard?: () => boolean
   }>(),
   {
     readonly: false,
@@ -55,7 +60,6 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   'select-element': [id: string, multi: boolean]
-  'select-elements': [ids: string[]]
   'set-active-page': [pageIndex: number]
   'clear-selection': []
   'double-click-element': [id: string]
@@ -87,159 +91,8 @@ function mmToBasePx(mm: number): number {
   return mm * MM_TO_PX_BASE
 }
 
-function basePxToMm(px: number): number {
-  return px / MM_TO_PX_BASE
-}
-
 const scaledPageWidthPx = computed(() => BASE_PAGE_WIDTH_PX * (props.zoomLevel / 100))
 const scaledPageHeightPx = computed(() => BASE_PAGE_HEIGHT_PX * (props.zoomLevel / 100))
-
-// Ref to the physical A4 sheet DOM element — needed for marquee coordinate math
-const sheetRef = ref<HTMLElement | null>(null)
-
-// ─── Marquee (Rubber-Band) Selection State ───────────────────────────────────
-type MarqueeRect = { x: number; y: number; width: number; height: number }
-const marqueeRect = ref<MarqueeRect | null>(null)
-const marqueeActive = ref(false)
-
-// Guard flag: when a marquee drag finishes the browser fires a 'click' event
-// on the sheet which would immediately call onCanvasClick → clear-selection,
-// wiping the freshly-made selection. We set this flag in onPointerUp when a
-// real drag occurred, then check and reset it in onCanvasClick.
-let marqueeJustFinished = false
-
-/**
- * Left-mouse-button pointerdown on the A4 sheet background starts a marquee drag.
- * Only activates when the pointer lands on the bare sheet background — element
- * wrappers call e.stopPropagation() so their own pointerdown never reaches here.
- *
- * Edge cases handled:
- *  - button !== 0 guard: only left-click triggers marquee.
- *  - Extra target check: belt-and-suspenders guard for elements that may not
- *    stopPropagation (resize handles, contenteditable regions).
- *  - Text-edit guard: aborts if any element is in text-edit mode so the caret
- *    is never disrupted.
- *  - 4 px drag threshold: prevents a plain click from flickering the rect.
- *  - marqueeJustFinished flag: blocks the subsequent 'click' event from
- *    clearing the marquee selection in onCanvasClick.
- */
-function onSheetPointerDown(e: PointerEvent) {
-  // Abort if in readonly mode or not left mouse button
-  if (props.readonly || e.button !== 0) return
-
-  // Belt-and-suspenders: abort if the click actually landed on an element
-  const target = e.target as HTMLElement
-  if (
-    target.closest('.canvas-element-wrapper') ||
-    target.closest('.resize-handle') ||
-    target.closest('[contenteditable="true"]')
-  ) return
-
-  // Abort while any element is in text-edit mode
-  if (props.editingElementId !== null) return
-
-  e.preventDefault()
-  e.stopPropagation()
-  emit('set-active-page', props.pageIndex)
-
-  const sheet = sheetRef.value
-  if (!sheet) return
-
-  const sheetRect = sheet.getBoundingClientRect()
-  const scale = props.zoomLevel / 100
-  const startX = (e.clientX - sheetRect.left) / scale
-  const startY = (e.clientY - sheetRect.top) / scale
-
-  let hasMoved = false
-  const DRAG_THRESHOLD_PX = 4
-
-  // Capture the pointer so pointermove/pointerup keep arriving even when
-  // the cursor leaves the sheet or the browser window.
-  sheet.setPointerCapture(e.pointerId)
-
-  function onPointerMove(ev: PointerEvent) {
-    const curX = (ev.clientX - sheetRect.left) / scale
-    const curY = (ev.clientY - sheetRect.top) / scale
-
-    if (!hasMoved) {
-      const dx = Math.abs(curX - startX)
-      const dy = Math.abs(curY - startY)
-      if (dx < DRAG_THRESHOLD_PX && dy < DRAG_THRESHOLD_PX) return
-      hasMoved = true
-      marqueeActive.value = true
-      // Clear existing selection when a fresh marquee drag starts
-      emit('clear-selection')
-    }
-
-    // Build a normalised rect (always positive width/height)
-    const x = Math.min(startX, curX)
-    const y = Math.min(startY, curY)
-    const width = Math.abs(curX - startX)
-    const height = Math.abs(curY - startY)
-
-    // Clamp to sheet bounds so the rect never overflows the page
-    marqueeRect.value = {
-      x: Math.max(0, x),
-      y: Math.max(0, y),
-      width: Math.min(width, BASE_PAGE_WIDTH_PX - Math.max(0, x)),
-      height: Math.min(height, BASE_PAGE_HEIGHT_PX - Math.max(0, y)),
-    }
-  }
-
-  function onPointerUp() {
-    sheet?.removeEventListener('pointermove', onPointerMove)
-    sheet?.removeEventListener('pointerup', onPointerUp)
-
-    if (hasMoved && marqueeRect.value) {
-      selectElementsInMarquee(marqueeRect.value)
-      // Set the guard so the imminent 'click' event does not clear the selection
-      marqueeJustFinished = true
-    }
-
-    marqueeRect.value = null
-    marqueeActive.value = false
-  }
-
-  sheet.addEventListener('pointermove', onPointerMove)
-  sheet.addEventListener('pointerup', onPointerUp)
-}
-
-/**
- * Given a marquee rect (in sheet-relative px), find all page elements whose
- * bounding box overlaps the rect and emit a bulk selection event.
- *
- * Overlap test: two rects overlap iff neither is entirely to the side / above /
- * below the other.  We use the mm-domain to avoid repeated px↔mm round-trips.
- */
-function selectElementsInMarquee(rect: MarqueeRect) {
-  // Convert marquee from px to mm (sheet-relative)
-  const mLeft   = basePxToMm(rect.x)
-  const mTop    = basePxToMm(rect.y)
-  const mRight  = basePxToMm(rect.x + rect.width)
-  const mBottom = basePxToMm(rect.y + rect.height)
-
-  const matched: string[] = []
-
-  for (const el of props.page.elements) {
-    if (el.hidden) continue
-
-    const elRight  = el.x + el.width
-    const elBottom = el.y + el.height
-
-    // AABB overlap: not (left of | right of | above | below)
-    const overlaps =
-      mLeft   < elRight  &&
-      mRight  > el.x     &&
-      mTop    < elBottom &&
-      mBottom > el.y
-
-    if (overlaps) matched.push(el.id)
-  }
-
-  if (matched.length > 0) {
-    emit('select-elements', matched)
-  }
-}
 
 // Cursor tracking for rulers
 const cursorXmm = ref<number>(-1)
@@ -263,12 +116,9 @@ function onCanvasClick(e: MouseEvent) {
   // If clicked directly on the page background (not on an element)
   if ((e.target as HTMLElement).classList.contains('canvas-sheet-background')) {
     // Skip clear-selection if this click is the synthetic click event that
-    // the browser fires at the end of a marquee drag — we just selected elements
-    // and must NOT wipe them immediately.
-    if (marqueeJustFinished) {
-      marqueeJustFinished = false
-      return
-    }
+    // the browser fires at the end of a workspace-level marquee drag — we
+    // just selected elements and must NOT wipe them immediately.
+    if (props.consumeMarqueeGuard?.()) return
     emit('clear-selection')
     if (document.activeElement instanceof HTMLElement && document.activeElement !== document.body) {
       document.activeElement.blur()
@@ -376,8 +226,11 @@ function confirmDeletePage() {
           }"
         >
           <!-- The Physical A4 Sheet (Rendered at 100% scale, scaled via GPU transform) -->
+          <!-- Note: identified by the `canvas-sheet-background` class (not a
+               template ref) because the workspace-level marquee selection in
+               ContractDocumentEditor.vue looks up every page's sheet via
+               querySelector to hit-test elements against the drag rect. -->
           <div
-            ref="sheetRef"
             class="canvas-sheet-background absolute top-0 left-0 bg-white text-zinc-900 shadow-2xl border border-zinc-300/80 dark:border-zinc-700/60 transition-shadow overflow-hidden outline-none"
             :style="{
               width: `${BASE_PAGE_WIDTH_PX}px`,
@@ -385,12 +238,10 @@ function confirmDeletePage() {
               transform: `scale(${zoomLevel / 100})`,
               transformOrigin: 'top left',
               fontFamily: `'Times New Roman', Times, serif`,
-              cursor: !readonly && marqueeActive ? 'crosshair' : 'default',
             }"
             @pointermove="onCanvasPointerMove"
             @pointerleave="onCanvasPointerLeave"
             @click="onCanvasClick"
-            @pointerdown="onSheetPointerDown"
           >
             <!-- Grid Background (if enabled) -->
             <div
@@ -430,15 +281,6 @@ function confirmDeletePage() {
             :guides="activeGuides"
             :distance-guides="activeDistanceGuides"
             :zoom-level="zoomLevel"
-          />
-
-          <!-- Marquee Selection Overlay -->
-          <CanvasMarqueeSelect
-            v-if="!readonly && marqueeRect"
-            :x="marqueeRect.x"
-            :y="marqueeRect.y"
-            :width="marqueeRect.width"
-            :height="marqueeRect.height"
           />
 
           <!-- Render All Elements on this Page -->
