@@ -34,8 +34,10 @@ import {
   Hash,
   ArrowUpRight,
   Filter,
+  QrCode,
 } from 'lucide-vue-next'
 import { downloadContractAsPdf } from './utils/contractPdf'
+import { generateQrCodeDataUrl } from './utils/qrCode'
 import {
   isCanvasDocumentJson,
   deserializeCanvasDocument,
@@ -585,6 +587,18 @@ const onlineContractUrl = computed(() => {
 })
 
 const isCopiedContractLink = ref(false)
+
+// "+ New Contract" opens this instead of copying the link straight to the
+// clipboard: staff can now scan the QR on their phone to test the student
+// flow themselves, or copy the link to send it - both from one place.
+const isShareLinkModalOpen = ref(false)
+const shareLinkQrDataUrl = computed(() => {
+  try {
+    return generateQrCodeDataUrl(onlineContractUrl.value, { size: 220, color: '#18181b' })
+  } catch {
+    return ''
+  }
+})
 
 async function copyOnlineContractLink() {
   const url = onlineContractUrl.value
@@ -1175,13 +1189,11 @@ async function confirmDelete() {
                 </p>
                 <button
                   type="button"
-                  @click="copyOnlineContractLink"
+                  @click="isShareLinkModalOpen = true"
                   class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-black text-white dark:bg-zinc-100 dark:hover:bg-white dark:text-zinc-950 text-xs font-medium cursor-pointer shadow-2xs transition-all active:scale-[0.98]"
-                  :class="{ '!bg-emerald-600 hover:!bg-emerald-700 dark:!bg-emerald-600 dark:!text-white': isCopiedContractLink }"
                 >
-                  <Check v-if="isCopiedContractLink" class="w-3.5 h-3.5 text-emerald-100" />
-                  <Plus v-else class="w-3.5 h-3.5" />
-                  <span>{{ isCopiedContractLink ? 'Havola nusxalandi!' : 'New Contract' }}</span>
+                  <Plus class="w-3.5 h-3.5" />
+                  <span>New Contract</span>
                 </button>
               </div>
               <div v-else class="overflow-x-auto">
@@ -1652,6 +1664,40 @@ async function confirmDelete() {
             class="px-5 py-2 rounded-xl bg-zinc-900 hover:bg-black dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-950 text-xs font-bold transition-colors cursor-pointer"
           >
             I Understand
+          </button>
+        </div>
+      </div>
+    </BaseModal>
+
+    <!-- 5. SHARE ONLINE CONTRACT LINK MODAL (QR + Quick Copy) -->
+    <BaseModal
+      :is-open="isShareLinkModalOpen"
+      title="Share Online Contract Link"
+      subtitle="Student scans this QR or opens the link to start signing"
+      max-width="max-w-sm"
+      @close="isShareLinkModalOpen = false"
+    >
+      <div class="flex flex-col items-center text-center space-y-4">
+        <div class="p-3 bg-white border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-2xs">
+          <img v-if="shareLinkQrDataUrl" :src="shareLinkQrDataUrl" alt="QR code" class="w-44 h-44" />
+        </div>
+
+        <div class="flex items-center gap-1.5 text-[11px] text-zinc-400">
+          <QrCode class="w-3.5 h-3.5" />
+          <span>Skaner qiling yoki havolani nusxalang</span>
+        </div>
+
+        <div class="w-full flex items-center gap-2 p-2.5 bg-zinc-50 dark:bg-zinc-850 border border-zinc-200 dark:border-zinc-750 rounded-lg">
+          <span class="flex-1 text-[11px] font-mono text-zinc-700 dark:text-zinc-300 truncate text-left">{{ onlineContractUrl }}</span>
+          <button
+            type="button"
+            @click="copyOnlineContractLink"
+            class="shrink-0 inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-zinc-900 hover:bg-black dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-950 text-[11px] font-medium cursor-pointer transition-all active:scale-95"
+            :class="{ '!bg-emerald-600 hover:!bg-emerald-700 dark:!bg-emerald-600 dark:!text-white': isCopiedContractLink }"
+          >
+            <Check v-if="isCopiedContractLink" class="w-3.5 h-3.5" />
+            <Copy v-else class="w-3.5 h-3.5" />
+            <span>{{ isCopiedContractLink ? 'Copied' : 'Copy' }}</span>
           </button>
         </div>
       </div>
