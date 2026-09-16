@@ -383,7 +383,7 @@ class ContractListSerializer(serializers.ModelSerializer):
             'id', 'contract_number', 'title', 'template_name',
             'content', 'signature_data',
             'student', 'student_id', 'student_name', 'student_passport',
-            'status', 'version', 'is_deleted',
+            'status', 'version', 'is_deleted', 'is_archived', 'archived_at',
             'tariff_name', 'tariff_price', 'discount', 'email', 'office', 'phone1', 'phone2',
             'education_level', 'date_of_birth', 'full_name', 'passport_number',
             'student_id_assigned', 'verification_code', 'verification_code_expires_at',
@@ -438,7 +438,7 @@ class ContractDetailSerializer(serializers.ModelSerializer):
         model = Contract
         fields = (
             'id', 'contract_number', 'title', 'template_name',
-            'content', 'status', 'version', 'is_deleted',
+            'content', 'status', 'version', 'is_deleted', 'is_archived', 'archived_at',
             'student', 'student_id', 'student_name', 'student_passport',
             'student_phone', 'student_tariff', 'student_university',
             'tariff_name', 'tariff_price', 'discount', 'email', 'passport_number', 'full_name',

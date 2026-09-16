@@ -122,8 +122,10 @@ class StudentViewSet(viewsets.ModelViewSet):
         include_archive = str(params.get('include_archive', 'false')).lower() == 'true'
         search_query = str(params.get('search', '')).strip()
 
-        if folder == 'deleted' or folder == 'archive':
-            qs = qs.filter(is_deleted=True)
+        if folder == 'permanently_deleted':
+            qs = qs.filter(is_permanently_deleted=True)
+        elif folder == 'deleted' or folder == 'archive':
+            qs = qs.filter(is_deleted=True, is_permanently_deleted=False)
         elif folder == 'hidden':
             qs = qs.filter(is_deleted=False, status_hidden=True)
         elif folder == 'except':
@@ -636,7 +638,8 @@ class StudentOptionsViewSet(viewsets.ViewSet):
 
         all_count = Student.objects.filter(tenant=tenant, is_deleted=False).count() if tenant else Student.objects.filter(is_deleted=False).count()
         except_count = Student.objects.filter(tenant=tenant, is_deleted=False).filter(Q(folder_ids=[]) | Q(folder_ids__isnull=True)).count() if tenant else Student.objects.filter(is_deleted=False).filter(Q(folder_ids=[]) | Q(folder_ids__isnull=True)).count()
-        deleted_count = Student.objects.filter(tenant=tenant, is_deleted=True).count() if tenant else Student.objects.filter(is_deleted=True).count()
+        deleted_count = Student.objects.filter(tenant=tenant, is_deleted=True, is_permanently_deleted=False).count() if tenant else Student.objects.filter(is_deleted=True, is_permanently_deleted=False).count()
+        permanently_deleted_count = Student.objects.filter(tenant=tenant, is_permanently_deleted=True).count() if tenant else Student.objects.filter(is_permanently_deleted=True).count()
         hidden_count = Student.objects.filter(tenant=tenant, is_deleted=False, status_hidden=True).count() if tenant else Student.objects.filter(is_deleted=False, status_hidden=True).count()
 
         folder_counts = {
@@ -644,6 +647,7 @@ class StudentOptionsViewSet(viewsets.ViewSet):
             'except': except_count,
             'deleted': deleted_count,
             'archive': deleted_count,
+            'permanently_deleted': permanently_deleted_count,
             'hidden': hidden_count,
         }
         for f in folders_qs:
@@ -716,8 +720,10 @@ class StudentExportView(APIView):
         folder = params.get('folder', 'all')
         include_archive = str(params.get('include_archive', 'false')).lower() == 'true'
 
-        if folder == 'deleted' or folder == 'archive':
-            qs = qs.filter(is_deleted=True)
+        if folder == 'permanently_deleted':
+            qs = qs.filter(is_permanently_deleted=True)
+        elif folder == 'deleted' or folder == 'archive':
+            qs = qs.filter(is_deleted=True, is_permanently_deleted=False)
         elif folder == 'hidden':
             qs = qs.filter(is_deleted=False, status_hidden=True)
         elif folder == 'except':
@@ -2091,10 +2097,22 @@ class ContractViewSet(viewsets.ModelViewSet):
         if not include_deleted:
             qs = qs.filter(is_deleted=False)
 
-        # Status filter
+        # Archive filter: archiving is orthogonal to status - any contract,
+        # regardless of status, can be archived, and once archived it must
+        # disappear from every other filter (All/Pending/Verified/Cancelled).
+        # `include_archived=true` bypasses the default exclusion entirely -
+        # used only by the tab-counts fetch, which needs every contract
+        # (archived or not) to compute all counts, including the Archive tab.
         status_filter = self.request.query_params.get('status', '').strip()
-        if status_filter:
-            qs = qs.filter(status=status_filter)
+        include_archived = str(self.request.query_params.get('include_archived', 'false')).lower() == 'true'
+
+        if status_filter == 'archive':
+            qs = qs.filter(is_archived=True)
+        else:
+            if not include_archived:
+                qs = qs.filter(is_archived=False)
+            if status_filter:
+                qs = qs.filter(status=status_filter)
 
         # Student filter
         student_id = self.request.query_params.get('student_id', '').strip()
@@ -2187,7 +2205,43 @@ class ContractViewSet(viewsets.ModelViewSet):
         contract.is_deleted = True
         contract.updated_by = request.user if request.user.is_authenticated else None
         contract.save(update_fields=['is_deleted', 'updated_by', 'updated_at'])
-        return Response({'detail': 'Shartnoma muvaffaqiyatli arxivlandi'}, status=status.HTTP_200_OK)
+        return Response({'detail': "Shartnoma muvaffaqiyatli o'chirildi"}, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'])
+    def archive(self, request, pk=None):
+        """
+        Archive a contract regardless of its status (pending/verified/
+        cancelled/...). Archived contracts are excluded from every other
+        filter and only appear under the dedicated Archive tab.
+        """
+        contract = self.get_object()
+        if contract.is_archived:
+            return Response({'detail': 'Shartnoma allaqachon arxivlangan.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        contract.is_archived = True
+        contract.archived_at = timezone.now()
+        contract.updated_by = request.user if request.user.is_authenticated else None
+        contract.save(update_fields=['is_archived', 'archived_at', 'updated_by', 'updated_at'])
+        return Response(
+            {'detail': "Shartnoma arxivga o'tkazildi.", 'is_archived': True, 'archived_at': contract.archived_at},
+            status=status.HTTP_200_OK
+        )
+
+    @action(detail=True, methods=['post'])
+    def unarchive(self, request, pk=None):
+        """Restore an archived contract back to its normal status filter."""
+        contract = self.get_object()
+        if not contract.is_archived:
+            return Response({'detail': 'Shartnoma arxivlanmagan.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        contract.is_archived = False
+        contract.archived_at = None
+        contract.updated_by = request.user if request.user.is_authenticated else None
+        contract.save(update_fields=['is_archived', 'archived_at', 'updated_by', 'updated_at'])
+        return Response(
+            {'detail': "Shartnoma arxivdan qaytarildi.", 'is_archived': False},
+            status=status.HTTP_200_OK
+        )
 
     @action(detail=True, methods=['post'])
     def duplicate(self, request, pk=None):

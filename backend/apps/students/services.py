@@ -108,21 +108,26 @@ def restore_student(student, user=None):
 
 def permanent_delete_student(student, user=None):
     """
-    Permanently delete a student.
-    Payments are preserved or cascaded per tenant policy.
+    Move a student into the "Permanently deleted" bucket.
+
+    This does NOT remove the row from the database - agencies must never
+    lose a student's historical data. It only sets is_permanently_deleted so
+    the record disappears from the Archive tab and every normal view, moving
+    into its own "Permanently deleted" sub-tab instead of being wiped.
     """
     with atomic():
-        student_id = student.id
-        student_name = student.full_name
-        tenant = student.tenant
+        from django.utils import timezone
 
-        student.delete()
+        student.is_deleted = True
+        student.is_permanently_deleted = True
+        student.permanently_deleted_at = timezone.now()
+        student.save(update_fields=['is_deleted', 'is_permanently_deleted', 'permanently_deleted_at', 'updated_at'])
         log_audit_event(
             action='STUDENT_PERMANENTLY_DELETED',
             entity_type='Student',
-            entity_id=student_id,
-            tenant=tenant,
+            entity_id=student.id,
+            tenant=student.tenant,
             user=user,
-            description=f"Student {student_id} ({student_name}) permanently deleted."
+            description=f"Student {student.id} ({student.full_name}) marked as permanently deleted (data retained)."
         )
-        return True
+        return student

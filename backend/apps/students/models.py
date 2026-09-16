@@ -178,6 +178,15 @@ class Student(TenantAwareModel):
     coordinator = models.CharField(max_length=100, blank=True, null=True)
     notes = models.TextField(blank=True, null=True)
     is_deleted = models.BooleanField(default=False, db_index=True)  # Soft delete archive
+
+    # "Permanently deleted" no longer means a real DB delete - agencies must
+    # never lose a student's historical data. It's a second, deeper hidden
+    # state layered on top of is_deleted: the row stays in the database,
+    # fully intact, just excluded from the Archive tab and moved into its own
+    # "Permanently deleted" sub-tab.
+    is_permanently_deleted = models.BooleanField(default=False, db_index=True)
+    permanently_deleted_at = models.DateTimeField(null=True, blank=True)
+
     row_color = models.CharField(max_length=50, blank=True, null=True)
     task_tags = ArrayField(models.CharField(max_length=100), default=list, blank=True)
     folder_ids = ArrayField(models.UUIDField(), default=list, blank=True)
@@ -203,6 +212,7 @@ class Student(TenantAwareModel):
             models.Index(fields=['tenant', 'id']),
             models.Index(fields=['tenant', 'full_name']),
             models.Index(fields=['tenant', 'is_deleted']),
+            models.Index(fields=['tenant', 'is_permanently_deleted']),
             models.Index(fields=['tenant', 'status_hidden']),
             models.Index(fields=['tenant', 'tariff']),
             models.Index(fields=['tenant', 'balance']),
@@ -672,6 +682,12 @@ class Contract(TenantAwareModel):
     version = models.PositiveIntegerField(default=1)
     is_deleted = models.BooleanField(default=False, db_index=True)
 
+    # Archive: orthogonal to status - any contract regardless of its status
+    # can be archived to hide it from every other filter (All/Pending/
+    # Verified/Cancelled), without changing or losing its underlying status.
+    is_archived = models.BooleanField(default=False, db_index=True)
+    archived_at = models.DateTimeField(null=True, blank=True)
+
     # Tariff & Student form data snapshots
     tariff_option = models.ForeignKey(
         'students.TariffOption',
@@ -737,6 +753,7 @@ class Contract(TenantAwareModel):
         indexes = [
             models.Index(fields=['tenant', 'status']),
             models.Index(fields=['tenant', 'is_deleted']),
+            models.Index(fields=['tenant', 'is_archived']),
             models.Index(fields=['tenant', 'contract_number']),
             models.Index(fields=['student_account', 'status']),
         ]
