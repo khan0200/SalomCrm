@@ -94,6 +94,60 @@ function mmToBasePx(mm: number): number {
 const scaledPageWidthPx = computed(() => BASE_PAGE_WIDTH_PX * (props.zoomLevel / 100))
 const scaledPageHeightPx = computed(() => BASE_PAGE_HEIGHT_PX * (props.zoomLevel / 100))
 
+// Canva/Figma-style group selection bounding box: when 2+ elements on THIS
+// page are selected, show one shared axis-aligned rectangle around all of
+// them (in addition to each element's own outline), instead of leaving the
+// user to infer the group extent from N separate boxes.
+// Rotated elements contribute their rotated-corner AABB, matching how
+// Canva/Figma group boxes stay axis-aligned even when members are rotated.
+const groupSelectionBounds = computed(() => {
+  const selected = (props.page.elements || []).filter(
+    el => !el.hidden && props.selectedElementIds.includes(el.id)
+  )
+  if (selected.length < 2) return null
+
+  let minX = Infinity
+  let minY = Infinity
+  let maxX = -Infinity
+  let maxY = -Infinity
+
+  for (const el of selected) {
+    const rotation = el.rotation || 0
+    if (!rotation) {
+      minX = Math.min(minX, el.x)
+      minY = Math.min(minY, el.y)
+      maxX = Math.max(maxX, el.x + el.width)
+      maxY = Math.max(maxY, el.y + el.height)
+      continue
+    }
+
+    // Rotate the 4 corners around the element's own center, then fold into the AABB.
+    const cx = el.x + el.width / 2
+    const cy = el.y + el.height / 2
+    const rad = (rotation * Math.PI) / 180
+    const cos = Math.cos(rad)
+    const sin = Math.sin(rad)
+    const corners = [
+      { x: el.x, y: el.y },
+      { x: el.x + el.width, y: el.y },
+      { x: el.x + el.width, y: el.y + el.height },
+      { x: el.x, y: el.y + el.height },
+    ]
+    for (const c of corners) {
+      const dx = c.x - cx
+      const dy = c.y - cy
+      const rx = cx + dx * cos - dy * sin
+      const ry = cy + dx * sin + dy * cos
+      minX = Math.min(minX, rx)
+      minY = Math.min(minY, ry)
+      maxX = Math.max(maxX, rx)
+      maxY = Math.max(maxY, ry)
+    }
+  }
+
+  return { x: minX, y: minY, width: maxX - minX, height: maxY - minY }
+})
+
 // Cursor tracking for rulers
 const cursorXmm = ref<number>(-1)
 const cursorYmm = ref<number>(-1)
@@ -123,6 +177,37 @@ function onCanvasClick(e: MouseEvent) {
     if (document.activeElement instanceof HTMLElement && document.activeElement !== document.body) {
       document.activeElement.blur()
     }
+  }
+}
+
+// Corner-drag proportional scale for text/checkbox elements (Canva-style):
+// CanvasElementWrapper computes a scale factor relative to the size at
+// resize:start and re-emits it on every pointermove. We capture the
+// font size(s) present at drag-start ONCE per element, then multiply by the
+// latest scale each time — never compounding — so releasing and re-grabbing
+// the handle mid-gesture can't runaway-grow the text.
+const scaleStartFontSizes = new Map<string, { fontSize?: number; styleFontSize?: number }>()
+
+function onResizeStart(el: CanvasElement) {
+  scaleStartFontSizes.set(el.id, {
+    fontSize: (el as any).fontSize,
+    styleFontSize: (el as any).style?.fontSize,
+  })
+}
+
+function onScaleText(el: CanvasElement, scale: number) {
+  const start = scaleStartFontSizes.get(el.id)
+  if (!start) return
+
+  const MIN_FONT_PT = 4
+  const MAX_FONT_PT = 400
+
+  if (typeof start.styleFontSize === 'number') {
+    const nextSize = Math.max(MIN_FONT_PT, Math.min(MAX_FONT_PT, Math.round(start.styleFontSize * scale * 10) / 10))
+    emit('update-element', el.id, { style: { ...(el as any).style, fontSize: nextSize } } as Partial<CanvasElement>, false)
+  } else if (typeof start.fontSize === 'number') {
+    const nextSize = Math.max(MIN_FONT_PT, Math.min(MAX_FONT_PT, Math.round(start.fontSize * scale * 10) / 10))
+    emit('update-element', el.id, { fontSize: nextSize } as Partial<CanvasElement>, false)
   }
 }
 
@@ -283,6 +368,21 @@ function confirmDeletePage() {
             :zoom-level="zoomLevel"
           />
 
+          <!-- Group Selection Bounding Box: shown when 2+ elements on this
+               page are selected together, so the group's shared extent is
+               visible (Canva/Figma convention) instead of only each
+               element's own individual outline. -->
+          <div
+            v-if="!readonly && groupSelectionBounds"
+            class="canvas-group-selection-outline absolute pointer-events-none z-20"
+            :style="{
+              left: `${mmToBasePx(groupSelectionBounds.x)}px`,
+              top: `${mmToBasePx(groupSelectionBounds.y)}px`,
+              width: `${mmToBasePx(groupSelectionBounds.width)}px`,
+              height: `${mmToBasePx(groupSelectionBounds.height)}px`,
+            }"
+          ></div>
+
           <!-- Render All Elements on this Page -->
           <CanvasElementWrapper
             v-for="el in page.elements"
@@ -307,7 +407,9 @@ function confirmDeletePage() {
             @set-guides="(guides, distGuides) => emit('set-guides', guides, distGuides)"
             @drag:start="emit('drag-start', el.id)"
             @drag:end="emit('drag-end')"
-            @resize:end="emit('resize-end')"
+            @resize:start="onResizeStart(el)"
+            @resize:end="scaleStartFontSizes.delete(el.id); emit('resize-end')"
+            @resize:scale-text="(scale) => onScaleText(el, scale)"
           >
             <!-- Text / Heading -->
             <CanvasTextElement
@@ -379,6 +481,16 @@ function confirmDeletePage() {
 <style scoped>
 .canvas-sheet-background {
   font-family: 'Times New Roman', Times, Georgia, serif !important;
+}
+
+/* Shared bounding box drawn around every selected element on a page when 2+
+   are selected together. Dashed + slightly lighter than the solid per-element
+   outline (#7c3aed) so the two remain visually distinct when both are shown
+   at once (group box behind, individual boxes in front via z-index). */
+.canvas-group-selection-outline {
+  border: 1.5px dashed rgba(124, 58, 237, 0.55);
+  border-radius: 2px;
+  background: rgba(124, 58, 237, 0.04);
 }
 
 /* Corner box at the ruler intersection (top-left) */

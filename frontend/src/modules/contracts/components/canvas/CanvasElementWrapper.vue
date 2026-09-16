@@ -53,6 +53,12 @@ const emit = defineEmits<{
   'toggle-lock': []
   'bring-forward': []
   'send-backward': []
+  // Emitted mid-drag on a CORNER handle for text/checkbox elements: scales
+  // font size (and any other proportional style knobs) by `scale` relative
+  // to the values captured at resize:start, matching Canva's corner-drag
+  // behaviour where the whole element — box AND type size — grows/shrinks
+  // together instead of only the box width changing.
+  'resize:scale-text': [scale: number]
 }>()
 
 const MM_TO_PX_BASE = 3.779527559
@@ -257,6 +263,7 @@ function onResizePointerDown(handle: ResizeHandle, e: PointerEvent) {
   const startW = props.element.width
   const startH = props.element.height
   const aspectRatio = startW / startH
+  const isCornerHandle = handle === 'nw' || handle === 'ne' || handle === 'se' || handle === 'sw'
 
   function onResizeMove(moveEvent: PointerEvent) {
     const deltaXmm = pxToMm(moveEvent.clientX - startClientX)
@@ -269,24 +276,50 @@ function onResizePointerDown(handle: ResizeHandle, e: PointerEvent) {
 
     const MIN_SIZE_MM = 5
 
-    if (handle.includes('e')) newW = Math.max(MIN_SIZE_MM, startW + deltaXmm)
-    if (handle.includes('w')) {
-      const candidateW = startW - deltaXmm
-      if (candidateW >= MIN_SIZE_MM) { newW = candidateW; newX = startX + deltaXmm }
-    }
+    // Canva-style corner drag on text/checkbox elements: the corner handle
+    // scales the box UNIFORMLY (width AND font size together) instead of
+    // stretching width alone and leaving type size untouched. We derive the
+    // scale factor from whichever axis the user dragged further along, so a
+    // mostly-horizontal or mostly-vertical drag both feel natural.
+    if (isTextType.value && isCornerHandle) {
+      const signX = handle.includes('e') ? 1 : -1
+      const signY = handle.includes('s') ? 1 : -1
+      // Project both axes onto their handle's "grow" direction so dragging
+      // outward (any direction away from the opposite corner) always grows.
+      const growX = deltaXmm * signX
+      const growY = deltaYmm * signY
+      // Use whichever axis moved more as the driver — matches how Canva's
+      // corner handle tracks the dominant drag direction.
+      const drivingGrow = Math.abs(growX) >= Math.abs(growY) ? growX : growY
+      const candidateW = startW + drivingGrow
+      const scale = Math.max(MIN_SIZE_MM / startW, candidateW / startW)
 
-    // Only non-text elements (tables, signatures, lines) allow manual height stretching.
-    // Text elements automatically hug text height; width changes reflow text and update height dynamically.
-    if (!isTextType.value) {
-      if (handle.includes('s')) newH = Math.max(MIN_SIZE_MM, startH + deltaYmm)
-      if (handle.includes('n')) {
-        const candidateH = startH - deltaYmm
-        if (candidateH >= MIN_SIZE_MM) { newH = candidateH; newY = startY + deltaYmm }
+      newW = Math.max(MIN_SIZE_MM, startW * scale)
+      newH = Math.max(MIN_SIZE_MM, startH * scale)
+      if (handle.includes('w')) newX = startX + (startW - newW)
+      if (handle.includes('n')) newY = startY + (startH - newH)
+
+      emit('resize:scale-text', scale)
+    } else {
+      if (handle.includes('e')) newW = Math.max(MIN_SIZE_MM, startW + deltaXmm)
+      if (handle.includes('w')) {
+        const candidateW = startW - deltaXmm
+        if (candidateW >= MIN_SIZE_MM) { newW = candidateW; newX = startX + deltaXmm }
       }
 
-      // Proportional resize when Shift held on corner handles
-      if (moveEvent.shiftKey && (handle === 'nw' || handle === 'ne' || handle === 'se' || handle === 'sw')) {
-        newH = newW / aspectRatio
+      // Only non-text elements (tables, signatures, lines) allow manual height stretching.
+      // Text elements automatically hug text height; width changes reflow text and update height dynamically.
+      if (!isTextType.value) {
+        if (handle.includes('s')) newH = Math.max(MIN_SIZE_MM, startH + deltaYmm)
+        if (handle.includes('n')) {
+          const candidateH = startH - deltaYmm
+          if (candidateH >= MIN_SIZE_MM) { newH = candidateH; newY = startY + deltaYmm }
+        }
+
+        // Proportional resize when Shift held on corner handles
+        if (moveEvent.shiftKey && isCornerHandle) {
+          newH = newW / aspectRatio
+        }
       }
     }
 
@@ -295,7 +328,13 @@ function onResizePointerDown(handle: ResizeHandle, e: PointerEvent) {
     // near-zero-size element so calculateSnapping only fires for that edge.
     // PROBE = tiny width/height so all three checks (left, center, right) in
     // calculateSnapping converge to essentially the same point.
-    if (props.calculateSnapping) {
+    // Skipped entirely for the text/checkbox corner-scale path above: that
+    // path already produced a uniform width+height pair, and the single-edge
+    // snap probes below assume an independent-axis resize — running them
+    // here would silently override newW/newX on one axis only and break the
+    // uniform scale (e.g. snapping the right edge to a margin while height
+    // stays scaled to the pre-snap width, distorting the aspect ratio).
+    if (props.calculateSnapping && !(isTextType.value && isCornerHandle)) {
       const snapGuides: AlignmentGuide[] = []
       const id = props.element.id
       const PROBE = 0.001 // mm — effectively a point probe
@@ -383,10 +422,16 @@ function onDoubleClick(e: MouseEvent) {
 
     <!-- Canva Single Bounding Box & Handles (Only ONE transform box, matching Canva 1-to-1) -->
     <template v-if="!readonly && (isSelected || isEditing)">
-      <!-- Canva Signature Single Bounding Line (#7c3aed) -->
+      <!-- Canva Signature Single Bounding Line (#7c3aed).
+           Drawn flush with the element's true edge (inset-0) and grown OUTWARD
+           via box-shadow instead of a border, so the visible line never shifts
+           away from the element's real mm coordinates — this is what snap
+           guides (CanvasSmartGuides) are computed against, so the two must
+           share the same edge or they visibly disagree once you snap to a
+           page border / margin / other element. -->
       <div
-        class="absolute -inset-0.5 border-[1.5px] border-[#7c3aed] pointer-events-none rounded-[1px] z-30"
-        :class="{ 'border-dashed border-amber-500': element.locked }"
+        class="absolute inset-0 pointer-events-none rounded-[1px] z-30 canvas-selection-outline"
+        :class="{ 'canvas-selection-outline--locked': element.locked }"
       ></div>
 
       <!-- Quick Floating Action Bar (Always visible when selected or editing) -->
@@ -599,60 +644,65 @@ function onDoubleClick(e: MouseEvent) {
         </button>
       </div>
 
-      <!-- Canva Resize Handles (Circles on 4 corners, Pills on left/right edges) -->
+      <!-- Canva Resize Handles (Circles on 4 corners, Pills on left/right edges).
+           Centering/counter-zoom scale is passed via the --handle-scale CSS
+           var (not inline `transform`) so the `.resize-handle` stylesheet rule
+           below can compose base transform + hover transform correctly —
+           an inline `transform` would win over ANY class transform (including
+           `:hover`), silently killing both centering and the hover-grow effect. -->
       <template v-if="!element.locked">
         <!-- NW Corner Circle -->
         <div
-          class="resize-handle nw absolute -top-1.5 -left-1.5 w-2.5 h-2.5 bg-white border-[1.5px] border-[#7c3aed] rounded-full shadow-xs cursor-nwse-resize z-40 hover:scale-125 transition-transform"
-          :style="{ transform: `scale(${handleScale})` }"
+          class="resize-handle nw absolute -top-1.5 -left-1.5 w-2.5 h-2.5 bg-white border-[1.5px] border-[#7c3aed] rounded-full shadow-xs cursor-nwse-resize z-40"
+          :style="{ '--handle-scale': handleScale }"
           @pointerdown="onResizePointerDown('nw', $event)"
         ></div>
 
         <!-- NE Corner Circle -->
         <div
-          class="resize-handle ne absolute -top-1.5 -right-1.5 w-2.5 h-2.5 bg-white border-[1.5px] border-[#7c3aed] rounded-full shadow-xs cursor-nesw-resize z-40 hover:scale-125 transition-transform"
-          :style="{ transform: `scale(${handleScale})` }"
+          class="resize-handle ne absolute -top-1.5 -right-1.5 w-2.5 h-2.5 bg-white border-[1.5px] border-[#7c3aed] rounded-full shadow-xs cursor-nesw-resize z-40"
+          :style="{ '--handle-scale': handleScale }"
           @pointerdown="onResizePointerDown('ne', $event)"
         ></div>
 
         <!-- SE Corner Circle -->
         <div
-          class="resize-handle se absolute -bottom-1.5 -right-1.5 w-2.5 h-2.5 bg-white border-[1.5px] border-[#7c3aed] rounded-full shadow-xs cursor-nwse-resize z-40 hover:scale-125 transition-transform"
-          :style="{ transform: `scale(${handleScale})` }"
+          class="resize-handle se absolute -bottom-1.5 -right-1.5 w-2.5 h-2.5 bg-white border-[1.5px] border-[#7c3aed] rounded-full shadow-xs cursor-nwse-resize z-40"
+          :style="{ '--handle-scale': handleScale }"
           @pointerdown="onResizePointerDown('se', $event)"
         ></div>
 
         <!-- SW Corner Circle -->
         <div
-          class="resize-handle sw absolute -bottom-1.5 -left-1.5 w-2.5 h-2.5 bg-white border-[1.5px] border-[#7c3aed] rounded-full shadow-xs cursor-nesw-resize z-40 hover:scale-125 transition-transform"
-          :style="{ transform: `scale(${handleScale})` }"
+          class="resize-handle sw absolute -bottom-1.5 -left-1.5 w-2.5 h-2.5 bg-white border-[1.5px] border-[#7c3aed] rounded-full shadow-xs cursor-nesw-resize z-40"
+          :style="{ '--handle-scale': handleScale }"
           @pointerdown="onResizePointerDown('sw', $event)"
         ></div>
 
         <!-- Left Edge Vertical Pill Handle -->
         <div
-          class="resize-handle w absolute top-1/2 -left-1 -translate-y-1/2 w-1.5 h-4 bg-white border-[1.5px] border-[#7c3aed] rounded-full shadow-xs cursor-ew-resize z-40 hover:scale-110 transition-transform"
-          :style="{ transform: `scale(${handleScale})` }"
+          class="resize-handle handle-centered-y w absolute top-1/2 -left-1 w-1.5 h-4 bg-white border-[1.5px] border-[#7c3aed] rounded-full shadow-xs cursor-ew-resize z-40"
+          :style="{ '--handle-scale': handleScale }"
           @pointerdown="onResizePointerDown('w', $event)"
         ></div>
 
         <!-- Right Edge Vertical Pill Handle -->
         <div
-          class="resize-handle e absolute top-1/2 -right-1 -translate-y-1/2 w-1.5 h-4 bg-white border-[1.5px] border-[#7c3aed] rounded-full shadow-xs cursor-ew-resize z-40 hover:scale-110 transition-transform"
-          :style="{ transform: `scale(${handleScale})` }"
+          class="resize-handle handle-centered-y e absolute top-1/2 -right-1 w-1.5 h-4 bg-white border-[1.5px] border-[#7c3aed] rounded-full shadow-xs cursor-ew-resize z-40"
+          :style="{ '--handle-scale': handleScale }"
           @pointerdown="onResizePointerDown('e', $event)"
         ></div>
 
         <!-- Top & Bottom Pills (for non-text elements e.g. table) -->
         <template v-if="!isTextType">
           <div
-            class="resize-handle n absolute -top-1 left-1/2 -translate-x-1/2 w-4 h-1.5 bg-white border-[1.5px] border-[#7c3aed] rounded-full shadow-xs cursor-ns-resize z-40 hover:scale-110 transition-transform"
-            :style="{ transform: `scale(${handleScale})` }"
+            class="resize-handle handle-centered-x n absolute -top-1 left-1/2 w-4 h-1.5 bg-white border-[1.5px] border-[#7c3aed] rounded-full shadow-xs cursor-ns-resize z-40"
+            :style="{ '--handle-scale': handleScale }"
             @pointerdown="onResizePointerDown('n', $event)"
           ></div>
           <div
-            class="resize-handle s absolute -bottom-1 left-1/2 -translate-x-1/2 w-4 h-1.5 bg-white border-[1.5px] border-[#7c3aed] rounded-full shadow-xs cursor-ns-resize z-40 hover:scale-110 transition-transform"
-            :style="{ transform: `scale(${handleScale})` }"
+            class="resize-handle handle-centered-x s absolute -bottom-1 left-1/2 w-4 h-1.5 bg-white border-[1.5px] border-[#7c3aed] rounded-full shadow-xs cursor-ns-resize z-40"
+            :style="{ '--handle-scale': handleScale }"
             @pointerdown="onResizePointerDown('s', $event)"
           ></div>
         </template>
@@ -662,6 +712,47 @@ function onDoubleClick(e: MouseEvent) {
 </template>
 
 <style scoped>
+/* Selection outline is drawn with box-shadow (not border) so it hugs the
+   element's true edge exactly — the same coordinate the snap guides in
+   CanvasSmartGuides.vue are drawn at. A border would either eat into the
+   element's layout box (inset shrinks content) or require an outward inset
+   hack that desyncs the visible line from the real mm position. */
+.canvas-selection-outline {
+  box-shadow: 0 0 0 1.5px #7c3aed;
+}
+.canvas-selection-outline--locked {
+  box-shadow: 0 0 0 1.5px #f59e0b;
+  /* Approximate a dashed look for the locked state without a border (box-shadow can't dash). */
+  outline: 1.5px dashed #f59e0b;
+  outline-offset: 1.5px;
+}
+
+/* Resize handles: base transform is the counter-zoom --handle-scale (set
+   inline per-instance) composed with whichever centering translate this
+   handle needs, all in ONE property so nothing gets silently overwritten.
+   Corner circles need no translate (they're already centered via inset
+   positioning); edge/mid pills need translateX/Y(-50%) to stay centered on
+   their axis regardless of zoom level. */
+.resize-handle {
+  transform: scale(var(--handle-scale, 1));
+  transition: transform 0.1s ease-out;
+}
+.resize-handle.handle-centered-x {
+  transform: translateX(-50%) scale(var(--handle-scale, 1));
+}
+.resize-handle.handle-centered-y {
+  transform: translateY(-50%) scale(var(--handle-scale, 1));
+}
+.resize-handle:hover {
+  transform: scale(calc(var(--handle-scale, 1) * 1.25));
+}
+.resize-handle.handle-centered-x:hover {
+  transform: translateX(-50%) scale(calc(var(--handle-scale, 1) * 1.15));
+}
+.resize-handle.handle-centered-y:hover {
+  transform: translateY(-50%) scale(calc(var(--handle-scale, 1) * 1.15));
+}
+
 .animate-scale-in {
   animation: scaleIn 0.12s ease-out;
 }
