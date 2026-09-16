@@ -67,8 +67,10 @@ class TenantInfoView(APIView):
                 status=status.HTTP_200_OK
             )
 
-        # Load available tariffs for this tenant
-        tariffs = TariffOption.objects.filter(tenant=tenant).values(
+        # Load available tariffs for this tenant. Inactive tariffs (new ones
+        # whose contract text isn't ready yet, or ones staff paused) are
+        # never shown on the public signing portal.
+        tariffs = TariffOption.objects.filter(tenant=tenant, is_active=True).values(
             'id', 'name', 'price', 'contract_text'
         )
 
@@ -420,7 +422,9 @@ class SubmitContractView(APIView):
         if not tariff_id:
             return Response({'detail': 'Tariff selection is required.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        tariff = TariffOption.objects.filter(id=tariff_id, tenant=tenant).first()
+        # is_active=True here too: a tariff a student had open in their
+        # browser before staff deactivated it must not still be signable.
+        tariff = TariffOption.objects.filter(id=tariff_id, tenant=tenant, is_active=True).first()
         if not tariff:
             return Response({'detail': 'Selected tariff does not exist for this company.'}, status=status.HTTP_404_NOT_FOUND)
 

@@ -305,6 +305,11 @@ class TariffOption(SimpleTenantModel):
     name = models.CharField(max_length=100)
     price = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal('0.00'))
     contract_text = models.TextField(blank=True, null=True)
+    # Model default stays True so the migration backfills existing tariffs as
+    # active (nothing already live gets hidden). New tariffs created through
+    # the API are set inactive by TariffOptionViewSet.perform_create instead,
+    # so staff can write the contract text before exposing it to students.
+    is_active = models.BooleanField(default=True)
 
     class Meta:
         db_table = 'tariff_options'

@@ -270,7 +270,7 @@ class TariffOptionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = TariffOption
-        fields = ('id', 'name', 'price', 'contract_text', 'created_at', 'student_count')
+        fields = ('id', 'name', 'price', 'contract_text', 'is_active', 'created_at', 'student_count')
         read_only_fields = ('id', 'created_at')
 
     def get_student_count(self, obj):

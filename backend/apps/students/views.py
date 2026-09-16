@@ -864,6 +864,18 @@ class TariffOptionViewSet(BaseOptionViewSet):
     model_class = TariffOption
     serializer_class = TariffOptionSerializer
 
+    def perform_create(self, serializer):
+        req: Any = self.request
+        user = req.user
+        tenant = getattr(req, 'tenant', None) or getattr(user, 'tenant', None)
+        if not tenant:
+            from apps.tenants.models import Tenant
+            tenant = Tenant.objects.first()
+        # New tariffs start inactive (hidden from the online-signing portal)
+        # until staff writes the contract text and flips them on - see
+        # TariffOption.is_active.
+        serializer.save(tenant=tenant, is_active=False)
+
 
 class EducationLevelOptionViewSet(BaseOptionViewSet):
     model_class = EducationLevelOption

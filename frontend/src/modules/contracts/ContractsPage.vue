@@ -98,13 +98,13 @@ const activeTemplate = computed(() =>
   activeTariff.value ? getContractTemplate(activeTariff.value.name) : null
 )
 
+// Deliberately does NOT fall back to CONTRACT_TEMPLATES by name-matching: a
+// tariff with no contract_text should show as a genuinely blank page, not
+// silently substitute one of the 10 hardcoded legacy templates just because
+// its name happens to fuzzy-match one of them. Staff can still pull in a
+// known template explicitly via "Reset to Standard Template" below.
 function getTariffContent(tariff: TariffOption | null): string {
-  if (!tariff) return ''
-  if (tariff.contract_text && tariff.contract_text.trim()) {
-    return tariff.contract_text
-  }
-  const tpl = getContractTemplate(tariff.name)
-  return tpl?.fullText || ''
+  return tariff?.contract_text || ''
 }
 
 watch(
@@ -248,7 +248,15 @@ const showDownloadMenu = ref(false)
 
 async function handleDownloadTariff(format: 'pdf' | 'doc' = 'pdf') {
   if (!activeTariff.value || isDownloadingPdf.value) return
-  const content = tariffEditingContent.value || activeTemplate.value?.fullText || ''
+  const content = tariffEditingContent.value
+  if (!content || !content.trim()) {
+    uiStore.addToast({
+      type: 'error',
+      title: "Shartnoma matni yo'q",
+      message: `"${activeTariff.value.name}" tarifi uchun hali shartnoma matni yozilmagan.`,
+    })
+    return
+  }
   const title = `${activeTariff.value.name}_shartnomasi`
   if (format === 'doc') {
     downloadContractDoc(title, content)
@@ -904,7 +912,16 @@ async function confirmDelete() {
                   </div>
                   <div class="min-w-0 flex-1">
                     <div class="truncate leading-tight" :class="isEditMode ? 'text-[11px]' : 'text-xs'">{{ tariff.name }}</div>
-                    <div v-if="!isEditMode && formatPrice(tariff.price)" class="text-[10px] text-zinc-400 font-mono mt-0.5">{{ formatPrice(tariff.price) }}</div>
+                    <div v-if="!isEditMode" class="flex items-center gap-1.5 mt-0.5">
+                      <span v-if="formatPrice(tariff.price)" class="text-[10px] text-zinc-400 font-mono">{{ formatPrice(tariff.price) }}</span>
+                      <span
+                        v-if="!tariff.is_active"
+                        class="text-[9px] font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800 px-1 py-0.5 rounded"
+                        title="Onlayn portalda ko'rinmaydi"
+                      >
+                        Inactive
+                      </span>
+                    </div>
                   </div>
                 </div>
                 <ChevronRight v-if="!isEditMode" class="w-3.5 h-3.5 text-zinc-400 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -1407,7 +1424,7 @@ async function confirmDelete() {
           </div>
           <div v-if="assigningContract?.tariff_name" class="flex justify-between items-center">
             <span class="text-zinc-400">Tariff:</span>
-            <span class="font-semibold text-blue-600 dark:text-blue-400">{{ assigningContract.tariff_name }}</span>
+            <span class="font-semibold text-zinc-800 dark:text-zinc-200">{{ assigningContract.tariff_name }}</span>
           </div>
         </div>
 
@@ -1420,11 +1437,11 @@ async function confirmDelete() {
             v-model="assignStudentIdInput"
             type="text"
             placeholder="Enter Student ID (e.g. G108)"
-            class="w-full px-3.5 py-2.5 bg-zinc-50 dark:bg-zinc-850 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm font-mono font-bold uppercase tracking-wider focus:outline-none focus:border-blue-500"
+            class="w-full px-3.5 py-2.5 bg-zinc-50 dark:bg-zinc-850 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm font-mono font-bold uppercase tracking-wider focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-500"
             @keyup.enter="handleConfirmAssignStudentId"
           />
           <p class="text-[11px] text-zinc-400 mt-1.5 leading-relaxed">
-            Explanation: <strong>"This Student ID will become the student's Contract Number."</strong>
+            <strong>This ID becomes the student's contract number.</strong>
           </p>
         </div>
 
@@ -1439,20 +1456,20 @@ async function confirmDelete() {
             min="0"
             step="1000"
             placeholder="0 — chegirma yo'q"
-            class="w-full px-3.5 py-2.5 bg-zinc-50 dark:bg-zinc-850 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm font-mono focus:outline-none focus:border-emerald-500"
+            class="w-full px-3.5 py-2.5 bg-zinc-50 dark:bg-zinc-850 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm font-mono focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-500"
           />
           <p class="text-[11px] text-zinc-400 mt-1.5 leading-relaxed">
-            Talabaga beriladigan rasmiy chegirma. Shartnomadagi <code v-pre class="bg-zinc-100 dark:bg-zinc-800 px-1 rounded">{{discount}}</code> o'rniga yoziladi va to'lov hisobiga qo'shiladi.
+            Shartnomadagi <code v-pre class="bg-zinc-100 dark:bg-zinc-800 px-1 rounded">{{discount}}</code> o'rnini bosadi va to'lovga qo'shiladi.
           </p>
         </div>
 
         <!-- Explanation Link -->
-        <div class="p-3 bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200/60 dark:border-blue-800/60 rounded-xl text-[11.5px] text-blue-800 dark:text-blue-300 flex items-start justify-between gap-2">
-          <span>This action will assign the Student ID, link the CRM student, and generate a 24-hour Verification Code.</span>
+        <div class="p-3 bg-zinc-50 dark:bg-zinc-850 border border-zinc-200 dark:border-zinc-750 rounded-xl text-[11.5px] text-zinc-600 dark:text-zinc-400 flex items-start justify-between gap-2">
+          <span>Assigns the ID, links the CRM record, and issues a 24-hour code.</span>
           <button
             type="button"
             @click="showStaffExplanationModal = true"
-            class="underline font-bold shrink-0 hover:text-blue-900 cursor-pointer"
+            class="underline font-bold shrink-0 text-zinc-800 dark:text-zinc-200 hover:text-zinc-950 dark:hover:text-white cursor-pointer"
           >
             ⓘ What is this?
           </button>
@@ -1476,7 +1493,7 @@ async function confirmDelete() {
             type="button"
             @click="handleConfirmAssignStudentId"
             :disabled="isAssigning"
-            class="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all shadow-xs cursor-pointer disabled:opacity-50"
+            class="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl bg-zinc-900 hover:bg-black dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-950 text-xs font-bold transition-all shadow-xs cursor-pointer disabled:opacity-50"
           >
             <Loader2 v-if="isAssigning" class="w-3.5 h-3.5 animate-spin" />
             <KeyRound v-else class="w-3.5 h-3.5" />
@@ -1495,7 +1512,7 @@ async function confirmDelete() {
       @close="showVerificationCodeResultModal = false"
     >
       <div class="p-6 space-y-4">
-        <div class="p-4 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-2xl text-center space-y-3">
+        <div class="p-4 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-xl text-center space-y-3">
           <div class="text-xs text-zinc-500 dark:text-zinc-400">
             Student ID: <span class="font-bold text-zinc-900 dark:text-white font-mono">{{ generatedCodeResult?.student_id }}</span>
             &nbsp;•&nbsp;
@@ -1510,7 +1527,7 @@ async function confirmDelete() {
             Verification Code:
           </div>
 
-          <div class="py-2.5 px-4 bg-white dark:bg-zinc-900 rounded-xl border border-emerald-300 dark:border-emerald-700/80 font-mono text-xl sm:text-2xl font-black text-blue-600 dark:text-blue-400 tracking-widest select-all">
+          <div class="py-2.5 px-4 bg-white dark:bg-zinc-900 rounded-lg border border-emerald-300 dark:border-emerald-700/80 font-mono text-xl sm:text-2xl font-black text-zinc-900 dark:text-white tracking-widest select-all">
             {{ generatedCodeResult?.verification_code }}
           </div>
 
@@ -1518,7 +1535,7 @@ async function confirmDelete() {
             <button
               type="button"
               @click="copyCodeToClipboard(generatedCodeResult?.verification_code || '')"
-              class="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
+              class="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-zinc-900 hover:bg-black dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-950 text-xs font-bold transition-all shadow-xs cursor-pointer"
             >
               <Check v-if="copyFeedback" class="w-3.5 h-3.5" />
               <Copy v-else class="w-3.5 h-3.5" />
@@ -1533,9 +1550,9 @@ async function confirmDelete() {
         </div>
 
         <div class="p-3 bg-zinc-50 dark:bg-zinc-850 rounded-xl border border-zinc-200 dark:border-zinc-750 text-xs text-zinc-600 dark:text-zinc-400 space-y-1">
-          <p class="font-bold text-zinc-800 dark:text-zinc-200">Send this Verification Code to the student.</p>
+          <p class="font-bold text-zinc-800 dark:text-zinc-200">Send this code to the student.</p>
           <p class="text-[11px] leading-relaxed">
-            The student must open <strong>Shartnomalarim</strong> and enter this Verification Code together with their account password to make the contract <strong>VERIFIED</strong>.
+            They enter it + their password in <strong>Shartnomalarim</strong> to become <strong>VERIFIED</strong>.
           </p>
         </div>
 
@@ -1555,7 +1572,7 @@ async function confirmDelete() {
     <BaseModal
       :is-open="isRejectModalOpen"
       title="Reject Contract"
-      subtitle="Provide a reason for rejecting this online contract submission"
+      subtitle="Give a reason for rejecting this submission"
       max-width="max-w-md"
       @close="isRejectModalOpen = false"
     >
@@ -1571,7 +1588,7 @@ async function confirmDelete() {
           <textarea
             v-model="rejectionReasonInput"
             rows="3"
-            placeholder="Specify reason (e.g. passport data does not match, wrong tariff selected)..."
+            placeholder="Reason (e.g. wrong passport, wrong tariff)..."
             class="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-850 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs focus:outline-none focus:border-rose-500"
           ></textarea>
         </div>
@@ -1606,35 +1623,33 @@ async function confirmDelete() {
     <BaseModal
       :is-open="showStaffExplanationModal"
       title="WHAT IS THE VERIFICATION CODE?"
-      subtitle="Staff Guide for Online Contract Verification"
+      subtitle="Quick guide for staff"
       max-width="max-w-lg"
       @close="showStaffExplanationModal = false"
     >
       <div class="p-6 space-y-4 text-xs text-zinc-700 dark:text-zinc-300 leading-relaxed">
         <p class="font-medium">
-          The Verification Code is a one-time code generated by the system after you assign the Student ID.
+          A one-time code generated after you assign the Student ID.
         </p>
 
         <ol class="space-y-2 list-decimal list-inside bg-zinc-50 dark:bg-zinc-850 p-4 rounded-xl border border-zinc-200 dark:border-zinc-750">
-          <li><strong>Enter the correct Student ID</strong> for the student (e.g. G108).</li>
+          <li>Enter the <strong>Student ID</strong> (e.g. G108).</li>
           <li>Click <strong>'Tasdiqlash'</strong>.</li>
-          <li>The system will generate a unique Verification Code (format: <code>XXXX-XXXX-STUDENTID</code>).</li>
-          <li><strong>Copy this code.</strong></li>
-          <li><strong>Send the code to the student</strong> through the approved communication channel.</li>
-          <li>The student will enter this code in <strong>'Shartnomalarim'</strong> together with their account password.</li>
-          <li>If the code and password are correct, the contract will become <strong>VERIFIED</strong>.</li>
+          <li>System generates a code (format: <code>XXXX-XXXX-STUDENTID</code>).</li>
+          <li><strong>Copy</strong> and <strong>send it to the student</strong>.</li>
+          <li>Student enters it + their password in <strong>'Shartnomalarim'</strong>.</li>
+          <li>Correct code + password → contract becomes <strong>VERIFIED</strong>.</li>
         </ol>
 
         <div class="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-xl text-amber-800 dark:text-amber-300 text-[11.5px]">
-          <strong>IMPORTANT:</strong> Generating the code does <em>NOT</em> complete the contract verification by itself.
-          The contract becomes VERIFIED only after the student successfully enters the Verification Code and their account password.
+          <strong>IMPORTANT:</strong> Generating the code alone does <em>not</em> verify the contract — only the student entering it does.
         </div>
 
         <div class="flex justify-end pt-2">
           <button
             type="button"
             @click="showStaffExplanationModal = false"
-            class="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-colors cursor-pointer"
+            class="px-5 py-2 rounded-xl bg-zinc-900 hover:bg-black dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-950 text-xs font-bold transition-colors cursor-pointer"
           >
             I Understand
           </button>

@@ -39,6 +39,7 @@ import {
   Laptop,
   CreditCard,
   Check,
+  Power,
   Wallet,
   UserCheck,
   StickyNote,
@@ -595,6 +596,39 @@ const executeDelete = async (type: string, id: string, name: string) => {
   }
 }
 
+// Active/Inactive toggle: controls whether a tariff is shown and selectable
+// on the public online-signing portal (see TenantInfoView / SubmitContractView
+// on the backend). New tariffs start inactive so staff can write the
+// contract text in Contracts before exposing them to students.
+const togglingTariffId = ref<string | null>(null)
+
+async function handleToggleTariffActive(item: TariffOption) {
+  if (togglingTariffId.value) return
+  const idx = tariffs.value.findIndex(t => String(t.id) === String(item.id))
+  if (idx === -1) return
+
+  const prevValue = item.is_active
+  const nextValue = !prevValue
+  togglingTariffId.value = String(item.id)
+  tariffs.value[idx] = { ...tariffs.value[idx], is_active: nextValue }
+
+  try {
+    await settingsApi.updateTariff(item.id, { is_active: nextValue })
+    uiStore.addToast({
+      type: 'success',
+      title: nextValue ? 'Tarif faollashtirildi' : 'Tarif to\'xtatildi',
+      message: nextValue
+        ? `"${item.name}" endi onlayn portalda ko'rinadi va tanlash uchun ochiq.`
+        : `"${item.name}" onlayn portaldan yashirildi, talabalar tanlay olmaydi.`,
+    })
+  } catch (err: any) {
+    tariffs.value[idx] = { ...tariffs.value[idx], is_active: prevValue }
+    uiStore.addToast({ type: 'error', title: 'Xatolik', message: err?.response?.data?.detail || 'Holatni o\'zgartirib bo\'lmadi.' })
+  } finally {
+    togglingTariffId.value = null
+  }
+}
+
 const handleSubmit = async (e: Event) => {
   e.preventDefault()
   if (!formName.value.trim()) {
@@ -879,11 +913,34 @@ const activeConfig = computed(() => TABS_CONFIG[activeTab.value])
           >
             <div class="min-w-0">
               <div class="text-xs font-bold text-zinc-900 dark:text-zinc-100 uppercase tracking-wide truncate">{{ item.name }}</div>
-              <div class="inline-flex items-center gap-1 mt-1 text-[10px] font-bold px-2 py-0.5 bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 rounded-md font-mono">
-                {{ formatCurrency(item.price) }}
+              <div class="flex items-center gap-1.5 mt-1 flex-wrap">
+                <span class="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 rounded-md font-mono">
+                  {{ formatCurrency(item.price) }}
+                </span>
+                <span
+                  class="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md"
+                  :class="item.is_active
+                    ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400'
+                    : 'bg-zinc-200/70 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400'"
+                >
+                  <span class="w-1.5 h-1.5 rounded-full" :class="item.is_active ? 'bg-emerald-500' : 'bg-zinc-400'"></span>
+                  {{ item.is_active ? 'Active' : 'Inactive' }}
+                </span>
               </div>
             </div>
             <div class="flex items-center gap-1 shrink-0">
+              <button
+                @click="handleToggleTariffActive(item)"
+                :disabled="togglingTariffId === String(item.id)"
+                class="w-7 h-7 flex items-center justify-center border rounded-lg transition-all cursor-pointer shadow-2xs disabled:opacity-50 disabled:cursor-not-allowed"
+                :class="item.is_active
+                  ? 'border-emerald-200 dark:border-emerald-900/60 hover:bg-white dark:hover:bg-zinc-750 text-emerald-600'
+                  : 'border-zinc-200 dark:border-zinc-700 hover:bg-white dark:hover:bg-zinc-750 text-zinc-400'"
+                :title="item.is_active ? 'Deactivate (hide from online portal)' : 'Activate (show on online portal)'"
+              >
+                <Loader2 v-if="togglingTariffId === String(item.id)" class="w-3.5 h-3.5 animate-spin" />
+                <Power v-else class="w-3.5 h-3.5" />
+              </button>
               <button
                 @click="handleOpenEdit('tariff', item)"
                 class="w-7 h-7 flex items-center justify-center border border-zinc-200 dark:border-zinc-700 hover:bg-white dark:hover:bg-zinc-750 rounded-lg text-blue-600 transition-all cursor-pointer shadow-2xs"
