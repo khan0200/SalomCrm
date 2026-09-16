@@ -56,6 +56,9 @@ import {
   X,
   Building2,
   UserCheck,
+  Hash,
+  Search,
+  Replace,
 } from 'lucide-vue-next'
 import { CONTRACT_VARIABLES, type ContractVariableDef, buildVariableValues, resolveTenantRequisites, buildCompanyRequisitesHtml, buildClientRequisitesHtml } from '../utils/contractVariables'
 import { useUiStore } from '@/stores/ui'
@@ -141,6 +144,10 @@ const showTableInsertMenu = ref(false)
 const showMarginMenu = ref(false)
 const showSpacingMenu = ref(false)
 const showListMenu = ref(false)
+const showCaseMenu = ref(false)
+const showFindReplace = ref(false)
+const findQuery = ref('')
+const replaceQuery = ref('')
 const activeListType = ref<'ordered' | 'unordered' | null>(null)
 const showVariablePicker = ref(false)
 const showEditorDownloadMenu = ref(false)
@@ -153,22 +160,48 @@ const customTableCols = ref(3)
 
 // Available font sizes (pt)
 const fontSizes = [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 18, 20, 22, 24, 28, 32]
+
+// --- Multi-select helpers ---
+// Element types a styling tool (bold, color, alignment, case, list, ...) can
+// meaningfully act on. Tables/lines/images are excluded from bulk text ops.
+function isTextLikeElement(el: any): boolean {
+  return Boolean(el) && (
+    el.type === 'text' ||
+    el.type === 'heading' ||
+    el.type === 'paragraph' ||
+    el.type === 'date' ||
+    el.type === 'variable' ||
+    el.type === 'checkbox'
+  )
+}
+
+// The whole current selection, whether it's one element or many - every
+// toolbar tool below operates on this instead of the old single-element
+// `canvas.selectedElement`, so formatting tools (bold, color, alignment,
+// case, spacing, list, copy-style) all apply to every selected element.
+const selectedTextElements = computed(() => (canvas.selectedElements.value as any[]).filter(isTextLikeElement))
+
+// Used only for read-only display purposes (e.g. what font size/color to
+// show in the toolbar) when multiple elements are selected - shows the
+// first selected element's value rather than trying to merge/compare all.
+const primarySelectedElement = computed<any>(() => canvas.selectedElements.value[0] ?? null)
+
 const currentFontSize = computed(() => {
-  const el = canvas.selectedElement.value as any
+  const el = primarySelectedElement.value
   if (el?.type === 'checkbox') return el?.style?.fontSize || el?.fontSize || 12
   return el?.style?.fontSize || 14
 })
 
 // Current font color
 const currentFontColor = computed(() => {
-  const el = canvas.selectedElement.value as any
+  const el = primarySelectedElement.value
   if (el?.type === 'checkbox') return el?.style?.color || el?.color || '#000000'
   return el?.style?.color || '#000000'
 })
 
 // Current text highlight
 const currentHighlightColor = computed(() => {
-  const el = canvas.selectedElement.value as any
+  const el = primarySelectedElement.value
   return el?.style?.backgroundColor || '#ffffff'
 })
 
@@ -307,6 +340,14 @@ function onKeyDown(e: KeyboardEvent) {
     return
   }
 
+  // ── Ctrl+F → Find & Replace (always, even in text edit - like Ctrl+S) ──
+  if (isMod && (e.key === 'f' || e.key === 'F') && !e.shiftKey) {
+    e.preventDefault()
+    closeAllDropdowns()
+    showFindReplace.value = true
+    return
+  }
+
   // ── Ctrl+/ or ? → Shortcut help modal ───────────────────────
   if ((isMod && e.key === '/') || (e.key === '?' && !isInTextEdit)) {
     e.preventDefault()
@@ -354,7 +395,7 @@ function onKeyDown(e: KeyboardEvent) {
   //    while actively editing its text (applyInlineFormat then targets the
   //    highlighted selection instead of the whole block). Only truly
   //    unrelated text fields (inputs, table cells) are excluded. ──
-  if (isMod && !isInOtherTextField && canvas.selectedElement.value) {
+  if (isMod && !isInOtherTextField && canvas.selectedElements.value.length > 0) {
     // Ctrl+B → Bold
     if ((e.key === 'b' || e.key === 'B') && !e.shiftKey) {
       e.preventDefault()
@@ -771,6 +812,8 @@ function closeAllDropdowns() {
   showMarginMenu.value = false
   showSpacingMenu.value = false
   showListMenu.value = false
+  showCaseMenu.value = false
+  showFindReplace.value = false
   showEditorDownloadMenu.value = false
 }
 
@@ -827,10 +870,12 @@ onBeforeUnmount(() => {
 // --- Toolbar Element Styling Helpers ---
 function setFontSize(sizePt: number | string) {
   const num = typeof sizePt === 'string' ? parseInt(sizePt, 10) : sizePt
-  const el = canvas.selectedElement.value as any
-  if (!el) return
-  if (!el.style) el.style = {}
-  el.style.fontSize = num
+  const targets = canvas.selectedElements.value as any[]
+  if (!targets.length) return
+  targets.forEach(el => {
+    if (!el.style) el.style = {}
+    el.style.fontSize = num
+  })
   canvas.history.recordSnapshot(canvas.document.value)
 }
 
@@ -848,8 +893,8 @@ function setFontSize(sizePt: number | string) {
  * unrecoverable with Ctrl+Z.
  */
 function applyInlineFormat(command: 'bold' | 'italic' | 'underline' | 'strikeThrough', toggleWholeElement: (el: any) => void) {
-  const el = canvas.selectedElement.value as any
-  if (!el) return
+  const targets = canvas.selectedElements.value as any[]
+  if (!targets.length) return
 
   const activeEl = window.document.activeElement as HTMLElement | null
   const isInsideEditable = Boolean(
@@ -858,13 +903,16 @@ function applyInlineFormat(command: 'bold' | 'italic' | 'underline' | 'strikeThr
   const sel = window.getSelection()
   const hasHighlightedText = Boolean(sel && sel.rangeCount > 0 && !sel.isCollapsed)
 
-  if (isInsideEditable && hasHighlightedText) {
+  if (targets.length === 1 && isInsideEditable && hasHighlightedText) {
+    const el = targets[0]
     window.document.execCommand(command, false)
     const container = (activeEl!.closest('.canvas-text-element') || activeEl) as HTMLElement
     if (container) el.content = container.innerHTML
   } else {
-    if (!el.style) el.style = {}
-    toggleWholeElement(el)
+    targets.forEach(el => {
+      if (!el.style) el.style = {}
+      toggleWholeElement(el)
+    })
   }
 
   nextTick(() => canvas.history.recordSnapshot(canvas.document.value))
@@ -900,11 +948,95 @@ function toggleStrike() {
   })
 }
 
+/**
+ * Text case tools: UPPERCASE, lowercase, Title Case, and Sentence case
+ * (capitalizes just the first letter, leaving the rest untouched).
+ * Same two-context behavior as applyInlineFormat above: transforms the
+ * live selection when one is highlighted while editing, or the whole
+ * element's text otherwise - except case changes rewrite text content,
+ * not a style, so they walk text nodes directly instead of using
+ * execCommand's bold/italic/etc commands (there's no execCommand for this).
+ */
+type TextCaseMode = 'upper' | 'lower' | 'title' | 'sentence'
+
+function transformCaseText(text: string, mode: 'upper' | 'lower' | 'title'): string {
+  if (mode === 'upper') return text.toUpperCase()
+  if (mode === 'lower') return text.toLowerCase()
+  // Title Case: capitalize each run of letters (apostrophes stay inside the
+  // run so "o'zbek" -> "O'zbek", not "O'Zbek").
+  return text.replace(/[a-zA-Zа-яА-ЯёЁʻʼ']+/g, w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+}
+
+function capitalizeFirstLetter(text: string): string {
+  const idx = text.search(/[a-zA-Zа-яА-ЯёЁ]/)
+  if (idx === -1) return text
+  return text.slice(0, idx) + text[idx].toUpperCase() + text.slice(idx + 1)
+}
+
+// Walks every text node in a content HTML string and rewrites it via fn.
+// onlyFirst stops after the first node that actually contains a letter -
+// used by Sentence case so only the true first letter of the whole
+// element changes, not the first letter of every tag-separated fragment.
+function transformHtmlTextNodes(html: string, fn: (t: string) => string, onlyFirst = false): string {
+  const container = document.createElement('div')
+  container.innerHTML = html
+  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT)
+  let node: Node | null
+  let done = false
+  while ((node = walker.nextNode())) {
+    if (done) break
+    const text = node.textContent || ''
+    if (onlyFirst) {
+      if (/[a-zA-Zа-яА-ЯёЁ]/.test(text)) {
+        node.textContent = fn(text)
+        done = true
+      }
+    } else if (text) {
+      node.textContent = fn(text)
+    }
+  }
+  return container.innerHTML
+}
+
+function applyTextCase(mode: TextCaseMode) {
+  const targets = selectedTextElements.value as any[]
+  if (!targets.length) return
+
+  const activeEl = window.document.activeElement as HTMLElement | null
+  const isInsideEditable = Boolean(
+    activeEl && (activeEl.getAttribute('contenteditable') === 'true' || activeEl.closest('.canvas-text-element'))
+  )
+  const sel = window.getSelection()
+  const hasHighlightedText = Boolean(sel && sel.rangeCount > 0 && !sel.isCollapsed)
+
+  if (targets.length === 1 && isInsideEditable && hasHighlightedText) {
+    const el = targets[0]
+    const selectedText = sel!.toString()
+    const transformed = mode === 'sentence'
+      ? capitalizeFirstLetter(selectedText)
+      : transformCaseText(selectedText, mode)
+    window.document.execCommand('insertText', false, transformed)
+    const container = (activeEl!.closest('.canvas-text-element') || activeEl) as HTMLElement
+    if (container) el.content = container.innerHTML
+  } else {
+    targets.forEach(el => {
+      el.content = mode === 'sentence'
+        ? transformHtmlTextNodes(el.content || '', capitalizeFirstLetter, true)
+        : transformHtmlTextNodes(el.content || '', t => transformCaseText(t, mode))
+    })
+  }
+
+  showCaseMenu.value = false
+  nextTick(() => canvas.history.recordSnapshot(canvas.document.value))
+}
+
 function setTextAlign(align: 'left' | 'center' | 'right' | 'justify') {
-  const el = canvas.selectedElement.value as TextCanvasElement
-  if (!el) return
-  if (!el.style) el.style = {}
-  el.style.textAlign = align
+  const targets = selectedTextElements.value as any[]
+  if (!targets.length) return
+  targets.forEach(el => {
+    if (!el.style) el.style = {}
+    el.style.textAlign = align
+  })
   canvas.history.recordSnapshot(canvas.document.value)
 }
 
@@ -912,12 +1044,12 @@ function setTextAlign(align: 'left' | 'center' | 'right' | 'justify') {
 const ALIGN_CYCLE: ('left' | 'center' | 'right' | 'justify')[] = ['left', 'center', 'right', 'justify']
 
 const currentTextAlign = computed(() => {
-  const el = canvas.selectedElement.value as TextCanvasElement
+  const el = primarySelectedElement.value as TextCanvasElement | null
   return (el?.style?.textAlign as 'left' | 'center' | 'right' | 'justify') || 'left'
 })
 
 function cycleTextAlign() {
-  if (!canvas.selectedElement.value) return
+  if (!selectedTextElements.value.length) return
   const idx = ALIGN_CYCLE.indexOf(currentTextAlign.value)
   setTextAlign(ALIGN_CYCLE[(idx + 1) % ALIGN_CYCLE.length])
 }
@@ -949,6 +1081,20 @@ function toggleSpacingMenu() {
   showSpacingMenu.value = next
 }
 
+// Text case dropdown toggle
+function toggleCaseMenu() {
+  const next = !showCaseMenu.value
+  closeAllDropdowns()
+  showCaseMenu.value = next
+}
+
+// Find & Replace panel toggle
+function toggleFindReplace() {
+  const next = !showFindReplace.value
+  closeAllDropdowns()
+  showFindReplace.value = next
+}
+
 // List dropdown toggle & active state (Canva / Word Style)
 function toggleListMenu() {
   const next = !showListMenu.value
@@ -972,8 +1118,8 @@ function updateActiveListState() {
     }
   }
 
-  // Fallback: check selected canvas element content
-  const el = canvas.selectedElement.value as TextCanvasElement | null
+  // Fallback: check first selected canvas element's content
+  const el = primarySelectedElement.value as TextCanvasElement | null
   if (el && el.content) {
     const trimmed = el.content.trim().toLowerCase()
     if (trimmed.startsWith('<ol') || trimmed.includes('<ol>') || trimmed.includes('<ol ')) {
@@ -1052,8 +1198,8 @@ function formatHtmlAsList(html: string, type: 'ordered' | 'unordered'): string {
 
 function applyListFormat(type: 'ordered' | 'unordered') {
   closeAllDropdowns()
-  const selected = canvas.selectedElement.value as TextCanvasElement | null
-  if (!selected || !isTextSelected.value) return
+  const targets = selectedTextElements.value as TextCanvasElement[]
+  if (!targets.length) return
 
   const activeEl = window.document.activeElement as HTMLElement | null
   const isInsideEditable = activeEl && (
@@ -1062,7 +1208,8 @@ function applyListFormat(type: 'ordered' | 'unordered') {
     Boolean(activeEl.closest('[contenteditable="true"]'))
   )
 
-  if (isInsideEditable) {
+  if (targets.length === 1 && isInsideEditable) {
+    const selected = targets[0]
     const cmd = type === 'ordered' ? 'insertOrderedList' : 'insertUnorderedList'
     window.document.execCommand(cmd, false)
     const container = (activeEl.closest('.canvas-text-element') || activeEl) as HTMLElement
@@ -1070,7 +1217,9 @@ function applyListFormat(type: 'ordered' | 'unordered') {
       selected.content = container.innerHTML
     }
   } else {
-    selected.content = formatHtmlAsList(selected.content || '', type)
+    targets.forEach(el => {
+      el.content = formatHtmlAsList(el.content || '', type)
+    })
   }
 
   nextTick(() => {
@@ -1137,51 +1286,46 @@ function toggleVariablePicker() {
   showVariablePicker.value = next
 }
 
-const isTextSelected = computed(() => {
-  const el = canvas.selectedElement.value
-  if (!el) return false
-  return (
-    el.type === 'text' ||
-    el.type === 'heading' ||
-    el.type === 'paragraph' ||
-    el.type === 'date' ||
-    el.type === 'variable' ||
-    el.type === 'checkbox'
-  )
-})
+const isTextSelected = computed(() => selectedTextElements.value.length > 0)
 
 const currentLineHeight = computed(() => {
-  const el = canvas.selectedElement.value as any
+  const el = primarySelectedElement.value
   return el?.style?.lineHeight ?? 1.5
 })
 
 const currentLetterSpacing = computed(() => {
-  const el = canvas.selectedElement.value as any
+  const el = primarySelectedElement.value
   return el?.style?.letterSpacing ?? 0
 })
 
 function setLineHeight(val: number | string) {
   const num = typeof val === 'string' ? parseFloat(val) : val
   if (isNaN(num)) return
-  const el = canvas.selectedElement.value as any
-  if (!el) return
-  if (!el.style) el.style = {}
-  el.style.lineHeight = Math.max(0.5, Math.min(3.5, Math.round(num * 100) / 100))
-  if (el.type === 'checkbox') {
-    canvas.updateElement(el.id, { style: { ...el.style } })
-  }
+  const targets = canvas.selectedElements.value as any[]
+  if (!targets.length) return
+  const clamped = Math.max(0.5, Math.min(3.5, Math.round(num * 100) / 100))
+  targets.forEach(el => {
+    if (!el.style) el.style = {}
+    el.style.lineHeight = clamped
+    if (el.type === 'checkbox') {
+      canvas.updateElement(el.id, { style: { ...el.style } })
+    }
+  })
 }
 
 function setLetterSpacing(val: number | string) {
   const num = typeof val === 'string' ? parseFloat(val) : val
   if (isNaN(num)) return
-  const el = canvas.selectedElement.value as any
-  if (!el) return
-  if (!el.style) el.style = {}
-  el.style.letterSpacing = Math.max(-5, Math.min(30, Math.round(num * 10) / 10))
-  if (el.type === 'checkbox') {
-    canvas.updateElement(el.id, { style: { ...el.style } })
-  }
+  const targets = canvas.selectedElements.value as any[]
+  if (!targets.length) return
+  const clamped = Math.max(-5, Math.min(30, Math.round(num * 10) / 10))
+  targets.forEach(el => {
+    if (!el.style) el.style = {}
+    el.style.letterSpacing = clamped
+    if (el.type === 'checkbox') {
+      canvas.updateElement(el.id, { style: { ...el.style } })
+    }
+  })
 }
 
 function commitSpacingChange() {
@@ -1189,34 +1333,38 @@ function commitSpacingChange() {
 }
 
 function setFontColor(color: string) {
-  const el = canvas.selectedElement.value as any
-  if (!el) return
-  if (!el.style) el.style = {}
-  el.style.color = color
+  const targets = canvas.selectedElements.value as any[]
+  if (!targets.length) return
+  targets.forEach(el => {
+    if (!el.style) el.style = {}
+    el.style.color = color
+  })
   canvas.history.recordSnapshot(canvas.document.value)
   showColorPicker.value = false
 }
 
 function setHighlightColor(color: string) {
-  const el = canvas.selectedElement.value as any
-  if (!el) return
-  if (el.type === 'table') {
-    // Apply fill to all cells in table
-    const table = el as TableCanvasElement
-    table.cells.forEach(row => {
-      row.forEach(c => {
-        c.backgroundColor = color === '#ffffff' ? undefined : color
+  const targets = canvas.selectedElements.value as any[]
+  if (!targets.length) return
+  targets.forEach(el => {
+    if (el.type === 'table') {
+      // Apply fill to all cells in table
+      const table = el as TableCanvasElement
+      table.cells.forEach(row => {
+        row.forEach(c => {
+          c.backgroundColor = color === '#ffffff' ? undefined : color
+        })
       })
-    })
-  } else if (el.type === 'checkbox') {
-    if (!el.style) el.style = {}
-    const bg = color === '#ffffff' ? 'transparent' : color
-    el.style.backgroundColor = bg
-  } else {
-    const textEl = el as TextCanvasElement
-    if (!textEl.style) textEl.style = {}
-    textEl.style.backgroundColor = color === '#ffffff' ? 'transparent' : color
-  }
+    } else if (el.type === 'checkbox') {
+      if (!el.style) el.style = {}
+      const bg = color === '#ffffff' ? 'transparent' : color
+      el.style.backgroundColor = bg
+    } else {
+      const textEl = el as TextCanvasElement
+      if (!textEl.style) textEl.style = {}
+      textEl.style.backgroundColor = color === '#ffffff' ? 'transparent' : color
+    }
+  })
   canvas.history.recordSnapshot(canvas.document.value)
   showHighlightPicker.value = false
 }
@@ -1243,7 +1391,11 @@ function extractElementStyle(el: any): TextStyleProps {
 }
 
 function activateCopyStyle(mode: 'single' | 'persistent' = 'single') {
-  const selected = canvas.selectedElement.value as any
+  // Copying style always captures FROM one source element - if several are
+  // selected, use the first one rather than silently doing nothing (the
+  // toolbar button itself stays enabled whenever any text-like element is
+  // part of the selection, via isTextSelected).
+  const selected = primarySelectedElement.value
   if (!selected || !isTextSelected.value) return
   closeAllDropdowns()
   copiedTextStyle.value = extractElementStyle(selected)
@@ -1270,25 +1422,9 @@ function handleCopyStyleButtonClick(e: MouseEvent) {
   activateCopyStyle('single')
 }
 
-function applyCopiedStyleToElement(targetId: string) {
-  if (!copiedTextStyle.value || !copyStyleMode.value) return
-  const found = canvas.findElementAndPage(targetId)
-  if (!found) return
-  const el = found.element as any
-
-  // Only apply to text elements and checkboxes
-  const isText =
-    el.type === 'text' ||
-    el.type === 'heading' ||
-    el.type === 'paragraph' ||
-    el.type === 'date' ||
-    el.type === 'variable' ||
-    el.type === 'checkbox'
-  if (!isText) return
-
-  // Apply copied style ONLY — CONTENT IS NEVER CHANGED!
-  // Position, Dimensions, ID, and element metadata are NEVER CHANGED!
-  const st = copiedTextStyle.value
+// Apply copied style ONLY — CONTENT IS NEVER CHANGED!
+// Position, Dimensions, ID, and element metadata are NEVER CHANGED!
+function applyStyleObjectToElement(el: any, st: TextStyleProps) {
   if (!el.style) el.style = {}
 
   if (st.fontFamily !== undefined) el.style.fontFamily = st.fontFamily
@@ -1316,6 +1452,16 @@ function applyCopiedStyleToElement(targetId: string) {
       color: el.color,
     })
   }
+}
+
+function applyCopiedStyleToElement(targetId: string) {
+  if (!copiedTextStyle.value || !copyStyleMode.value) return
+  const found = canvas.findElementAndPage(targetId)
+  if (!found) return
+  const el = found.element as any
+  if (!isTextLikeElement(el)) return
+
+  applyStyleObjectToElement(el, copiedTextStyle.value)
 
   // Select target element so user sees it highlighted with new style
   canvas.selectElement(targetId, false, found.pageIndex)
@@ -1329,12 +1475,14 @@ function applyCopiedStyleToElement(targetId: string) {
   }
 }
 
+// Applies the copied style clipboard to every currently selected text-like
+// element at once (Ctrl+Alt+V), instead of only the first one.
 function pasteCopiedStyleToSelected() {
   if (!copiedTextStyle.value) return
-  const sel = canvas.selectedElement.value
-  if (sel && isTextSelected.value) {
-    applyCopiedStyleToElement(sel.id)
-  }
+  const targets = selectedTextElements.value as any[]
+  if (!targets.length) return
+  targets.forEach(el => applyStyleObjectToElement(el, copiedTextStyle.value!))
+  canvas.history.recordSnapshot(canvas.document.value)
 }
 
 function handleSelectElement(id: string, multi: boolean, pageIdx?: number) {
@@ -1549,6 +1697,160 @@ function insertClientRequisites() {
     message: 'Mijoz rekvizitlari sahifaga joylandi',
     duration: 3000,
   })
+}
+
+/**
+ * Inserts a {{page_number}} block at the bottom-right of the current page.
+ * The token itself is resolved per-page in convertCanvasDocumentToHtml, so
+ * copy/pasting this same element onto other pages (Ctrl+C/V, or duplicating
+ * the page) keeps showing each page's own correct number - no manual
+ * renumbering needed.
+ */
+function insertPageNumber() {
+  closeAllDropdowns()
+  const margins = canvas.document.value.margins
+  const width = 28
+  const height = 8
+  const targetX = 210 - margins.right - width
+  const targetY = 297 - Math.max(margins.bottom, height + 4) + (Math.max(margins.bottom, height + 4) - height) / 2
+
+  const newElement: TextCanvasElement = {
+    id: `pgnum_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+    type: 'text',
+    x: targetX,
+    y: targetY,
+    width,
+    height,
+    zIndex: 1,
+    content: '<p>{{page_number}}</p>',
+    style: {
+      fontFamily: 'Times New Roman',
+      fontSize: 11,
+      fontWeight: 'bold',
+      fontStyle: 'normal',
+      textAlign: 'right',
+      color: '#000000',
+      lineHeight: 1.2,
+    },
+  }
+
+  canvas.addElement(newElement)
+  canvas.selectedElementIds.value = [newElement.id]
+
+  uiStore.addToast({
+    type: 'success',
+    message: "Sahifa raqami qo'yildi. Boshqa sahifalarga nusxalasangiz, u yerda ham to'g'ri raqam avtomatik chiqadi.",
+    duration: 4500,
+  })
+}
+
+// --- Find & Replace (document-wide: every page, every text element and table cell) ---
+
+function stripHtml(html: string): string {
+  const div = document.createElement('div')
+  div.innerHTML = html
+  return div.textContent || ''
+}
+
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+function buildSnippet(text: string, queryLower: string): string {
+  const idx = text.toLowerCase().indexOf(queryLower)
+  if (idx === -1) return text.slice(0, 60).trim()
+  const start = Math.max(0, idx - 24)
+  const end = Math.min(text.length, idx + queryLower.length + 24)
+  return (start > 0 ? '…' : '') + text.slice(start, end).trim() + (end < text.length ? '…' : '')
+}
+
+interface FindMatch {
+  pageIndex: number
+  elementId: string
+  snippet: string
+}
+
+const findMatches = computed<FindMatch[]>(() => {
+  const query = findQuery.value.trim()
+  if (!query) return []
+  const queryLower = query.toLowerCase()
+  const results: FindMatch[] = []
+
+  canvas.document.value.pages.forEach((page, pageIndex) => {
+    page.elements.forEach(el => {
+      if (el.hidden) return
+      if (el.type === 'table') {
+        const table = el as TableCanvasElement
+        const cellTexts = table.cells.flat().map(c => stripHtml(c.content || '')).join(' | ')
+        if (cellTexts.toLowerCase().includes(queryLower)) {
+          results.push({ pageIndex, elementId: el.id, snippet: buildSnippet(cellTexts, queryLower) })
+        }
+      } else if (typeof (el as any).content === 'string') {
+        const text = stripHtml((el as any).content)
+        if (text.toLowerCase().includes(queryLower)) {
+          results.push({ pageIndex, elementId: el.id, snippet: buildSnippet(text, queryLower) })
+        }
+      }
+    })
+  })
+  return results
+})
+
+function jumpToMatch(match: FindMatch) {
+  canvas.setActivePageIndex(match.pageIndex)
+  canvas.selectedElementIds.value = [match.elementId]
+}
+
+// Replaces every occurrence across the whole document (all pages, text
+// elements and table cells) in one pass and records a single history
+// snapshot, so Ctrl+Z undoes the entire batch as one step.
+function replaceAllMatches() {
+  const query = findQuery.value.trim()
+  if (!query) return
+  const replacement = replaceQuery.value
+  const re = new RegExp(escapeRegExp(query), 'gi')
+  let count = 0
+
+  canvas.document.value.pages.forEach(page => {
+    page.elements.forEach(el => {
+      if (el.type === 'table') {
+        const table = el as TableCanvasElement
+        table.cells.forEach(row => row.forEach(cell => {
+          if (!cell.content) return
+          const matches = cell.content.match(re)
+          if (matches) {
+            count += matches.length
+            cell.content = cell.content.replace(re, replacement)
+          }
+        }))
+      } else if (typeof (el as any).content === 'string') {
+        const anyEl = el as any
+        const matches = anyEl.content.match(re)
+        if (matches) {
+          count += matches.length
+          anyEl.content = anyEl.content.replace(re, replacement)
+        }
+      }
+    })
+  })
+
+  if (count > 0) {
+    canvas.history.recordSnapshot(canvas.document.value)
+  }
+
+  uiStore.addToast({
+    type: count > 0 ? 'success' : 'error',
+    message: count > 0
+      ? `${count} ta o'rin almashtirildi (barcha sahifalarda).`
+      : "Hech qanday moslik topilmadi.",
+    duration: 3000,
+  })
+
+  if (count > 0) {
+    findQuery.value = ''
+    replaceQuery.value = ''
+    showFindReplace.value = false
+  }
 }
 
 // Insert directly a new Text block (Times New Roman, 14pt)
@@ -1783,6 +2085,7 @@ const mod = isMac ? '⌘' : 'Ctrl'
 const shortcutCategories = computed(() => ({
   general: [
     { label: 'Save', keys: `${mod}+S` },
+    { label: 'Find & Replace', keys: `${mod}+F` },
     { label: 'Undo', keys: `${mod}+Z` },
     { label: 'Redo', keys: `${mod}+Y / ${mod}+Shift+Z` },
     { label: 'Copy', keys: `${mod}+C` },
@@ -1983,6 +2286,79 @@ const shortcutCategories = computed(() => ({
         </button>
       </div>
 
+      <!-- Find & Replace (document-wide: all pages) -->
+      <div
+        class="relative px-1 pr-1.5 border-r border-zinc-200 dark:border-zinc-700/60 editor-dropdown-container"
+        :class="{ 'z-50': showFindReplace }"
+      >
+        <button
+          type="button"
+          @click.stop="toggleFindReplace()"
+          class="toolbar-btn"
+          :class="showFindReplace ? 'bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-400' : ''"
+          title="Find & Replace"
+        >
+          <Search class="w-3.5 h-3.5" />
+        </button>
+
+        <div
+          v-if="showFindReplace"
+          class="absolute top-full left-0 mt-1.5 w-80 bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-700 shadow-2xl p-3 z-[250] space-y-2.5 select-none animate-scale-in"
+          @click.stop
+        >
+          <div class="text-[10px] font-bold text-zinc-400 uppercase tracking-wider px-0.5">Find &amp; Replace (barcha sahifalar)</div>
+
+          <div class="relative">
+            <Search class="w-3.5 h-3.5 text-zinc-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+            <input
+              v-model="findQuery"
+              type="text"
+              placeholder="Qidiriladigan matn..."
+              class="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              @keydown.enter="findMatches.length ? jumpToMatch(findMatches[0]) : undefined"
+            />
+          </div>
+
+          <div class="relative">
+            <Replace class="w-3.5 h-3.5 text-zinc-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+            <input
+              v-model="replaceQuery"
+              type="text"
+              placeholder="Almashtiriladigan matn..."
+              class="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              @keydown.enter="replaceAllMatches()"
+            />
+          </div>
+
+          <div class="flex items-center justify-between">
+            <span class="text-[11px] font-medium text-zinc-500">
+              {{ findQuery ? `${findMatches.length} ta moslik topildi` : 'Qidiruv so\'zini kiriting' }}
+            </span>
+            <button
+              type="button"
+              @click="replaceAllMatches"
+              :disabled="!findQuery.trim() || findMatches.length === 0"
+              class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-black dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-950 text-[11px] font-bold transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Replace All
+            </button>
+          </div>
+
+          <!-- Match results list: click to jump to that page/element -->
+          <div v-if="findMatches.length > 0" class="max-h-40 overflow-y-auto space-y-1 border-t border-zinc-100 dark:border-zinc-800 pt-2">
+            <button
+              v-for="(match, idx) in findMatches"
+              :key="match.elementId + idx"
+              type="button"
+              @click="jumpToMatch(match)"
+              class="w-full text-left px-2 py-1.5 rounded-lg hover:bg-blue-50 dark:hover:bg-zinc-800 flex items-center gap-2 cursor-pointer group"
+            >
+              <span class="text-[9px] font-mono font-bold text-zinc-400 shrink-0">P{{ match.pageIndex + 1 }}</span>
+              <span class="text-[11px] text-zinc-600 dark:text-zinc-300 truncate group-hover:text-blue-600 dark:group-hover:text-blue-400">{{ match.snippet }}</span>
+            </button>
+          </div>
+        </div>
+      </div>
 
       <!-- Font Family & Font Size Group -->
       <div class="flex items-center gap-1 px-1.5 border-r border-zinc-200 dark:border-zinc-700/60">
@@ -2009,7 +2385,7 @@ const shortcutCategories = computed(() => ({
           type="button"
           @click="toggleBold"
           class="toolbar-btn font-bold"
-          :class="{ 'bg-blue-100 dark:bg-blue-950/60 text-blue-700 font-black': (canvas.selectedElement.value as any)?.style?.fontWeight === 'bold' }"
+          :class="{ 'bg-blue-100 dark:bg-blue-950/60 text-blue-700 font-black': primarySelectedElement?.style?.fontWeight === 'bold' }"
           title="Bold (Ctrl+B)"
         >
           <Bold class="w-3.5 h-3.5" />
@@ -2018,7 +2394,7 @@ const shortcutCategories = computed(() => ({
           type="button"
           @click="toggleItalic"
           class="toolbar-btn italic font-serif"
-          :class="{ 'bg-blue-100 dark:bg-blue-950/60 text-blue-700 font-bold': (canvas.selectedElement.value as any)?.style?.fontStyle === 'italic' }"
+          :class="{ 'bg-blue-100 dark:bg-blue-950/60 text-blue-700 font-bold': primarySelectedElement?.style?.fontStyle === 'italic' }"
           title="Italic (Ctrl+I)"
         >
           <Italic class="w-3.5 h-3.5" />
@@ -2027,7 +2403,7 @@ const shortcutCategories = computed(() => ({
           type="button"
           @click="toggleUnderline"
           class="toolbar-btn underline"
-          :class="{ 'bg-blue-100 dark:bg-blue-950/60 text-blue-700 font-bold': ((canvas.selectedElement.value as any)?.style?.textDecoration || '').includes('underline') }"
+          :class="{ 'bg-blue-100 dark:bg-blue-950/60 text-blue-700 font-bold': (primarySelectedElement?.style?.textDecoration || '').includes('underline') }"
           title="Underline (Ctrl+U)"
         >
           <UnderlineIcon class="w-3.5 h-3.5" />
@@ -2036,7 +2412,7 @@ const shortcutCategories = computed(() => ({
           type="button"
           @click="toggleStrike"
           class="toolbar-btn line-through"
-          :class="{ 'bg-blue-100 dark:bg-blue-950/60 text-blue-700 font-bold': ((canvas.selectedElement.value as any)?.style?.textDecoration || '').includes('line-through') }"
+          :class="{ 'bg-blue-100 dark:bg-blue-950/60 text-blue-700 font-bold': (primarySelectedElement?.style?.textDecoration || '').includes('line-through') }"
           title="Strikethrough"
         >
           <Strikethrough class="w-3.5 h-3.5" />
@@ -2071,6 +2447,88 @@ const shortcutCategories = computed(() => ({
             class="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-amber-400 ring-2 ring-white dark:ring-zinc-900 animate-pulse"
           ></span>
         </button>
+      </div>
+
+      <!-- Text Case Dropdown: UPPERCASE / lowercase / Sentence case / Title Case -->
+      <div
+        class="relative px-1 border-r border-zinc-200 dark:border-zinc-700/60 editor-dropdown-container"
+        :class="{ 'z-50': showCaseMenu }"
+      >
+        <button
+          type="button"
+          @mousedown.prevent
+          @click.stop="toggleCaseMenu()"
+          class="toolbar-btn flex items-center gap-1 h-7 px-1.5"
+          :class="[
+            showCaseMenu ? 'bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-400 font-bold' : '',
+            !isTextSelected ? 'opacity-40 cursor-not-allowed' : ''
+          ]"
+          :disabled="!isTextSelected"
+          title="Matn registri: UPPERCASE, lowercase, Sentence case, Title Case"
+        >
+          <span class="font-bold text-xs leading-none font-serif">Aa</span>
+          <ChevronDown class="w-2.5 h-2.5 opacity-60" />
+        </button>
+
+        <div
+          v-if="showCaseMenu && isTextSelected"
+          class="absolute top-full left-0 mt-1.5 w-56 bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-700 shadow-2xl p-1.5 z-[250] space-y-0.5 select-none animate-scale-in"
+          @click.stop
+        >
+          <div class="text-[10px] font-bold text-zinc-400 uppercase tracking-wider px-2 py-1">Matn registri</div>
+
+          <button
+            type="button"
+            @mousedown.prevent
+            @click="applyTextCase('upper')"
+            class="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-xs font-medium text-zinc-700 dark:text-zinc-200 hover:bg-blue-50 dark:hover:bg-zinc-800 cursor-pointer transition-colors"
+          >
+            <span class="w-7 h-6 rounded-lg bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center shrink-0 font-black text-[11px]">AA</span>
+            <div class="text-left flex-1">
+              <div class="font-bold text-xs">UPPERCASE</div>
+              <div class="text-[10px] text-zinc-400 font-mono">BARCHA HARFLAR KATTA</div>
+            </div>
+          </button>
+
+          <button
+            type="button"
+            @mousedown.prevent
+            @click="applyTextCase('lower')"
+            class="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-xs font-medium text-zinc-700 dark:text-zinc-200 hover:bg-blue-50 dark:hover:bg-zinc-800 cursor-pointer transition-colors"
+          >
+            <span class="w-7 h-6 rounded-lg bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center shrink-0 font-black text-[11px]">aa</span>
+            <div class="text-left flex-1">
+              <div class="font-bold text-xs">lowercase</div>
+              <div class="text-[10px] text-zinc-400 font-mono">barcha harflar kichik</div>
+            </div>
+          </button>
+
+          <button
+            type="button"
+            @mousedown.prevent
+            @click="applyTextCase('sentence')"
+            class="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-xs font-medium text-zinc-700 dark:text-zinc-200 hover:bg-blue-50 dark:hover:bg-zinc-800 cursor-pointer transition-colors"
+          >
+            <span class="w-7 h-6 rounded-lg bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center shrink-0 font-black text-[11px]">Aa</span>
+            <div class="text-left flex-1">
+              <div class="font-bold text-xs">Sentence case</div>
+              <div class="text-[10px] text-zinc-400 font-mono">Faqat birinchi harf katta</div>
+            </div>
+          </button>
+
+          <button
+            type="button"
+            @mousedown.prevent
+            @click="applyTextCase('title')"
+            class="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-xs font-medium text-zinc-700 dark:text-zinc-200 hover:bg-blue-50 dark:hover:bg-zinc-800 cursor-pointer transition-colors"
+          >
+            <span class="w-7 h-6 rounded-lg bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center shrink-0 font-black text-[11px]">TC</span>
+            <div class="text-left flex-1">
+              <div class="font-bold text-xs">Title Case</div>
+              <div class="text-[10px] text-zinc-400 font-mono">Har Bir So'z Katta</div>
+            </div>
+          </button>
+        </div>
       </div>
 
       <!-- Text Color & Fill Color Pickers -->
@@ -2148,7 +2606,7 @@ const shortcutCategories = computed(() => ({
           type="button"
           @click="cycleTextAlign()"
           class="toolbar-btn"
-          :class="canvas.selectedElement.value ? 'text-blue-600 dark:text-blue-400' : 'opacity-50'"
+          :class="selectedTextElements.length > 0 ? 'text-blue-600 dark:text-blue-400' : 'opacity-50'"
           :title="`Alignment: ${currentTextAlign} — click to cycle`"
         >
           <AlignLeft     v-if="currentTextAlign === 'left'"    class="w-3.5 h-3.5" />
@@ -2393,6 +2851,16 @@ const shortcutCategories = computed(() => ({
         >
           <FilePlus class="w-3.5 h-3.5" />
           <span>+ Page</span>
+        </button>
+
+        <button
+          type="button"
+          @click="insertPageNumber"
+          class="toolbar-btn flex items-center gap-1 font-bold text-[11px] text-zinc-600 dark:text-zinc-300 px-2 py-1 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800"
+          title="Sahifa raqamini joylash (o'ng pastga) — {{page_number}}"
+        >
+          <Hash class="w-3.5 h-3.5" />
+          <span>Page #</span>
         </button>
       </div>
 

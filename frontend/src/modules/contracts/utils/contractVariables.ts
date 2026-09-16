@@ -31,6 +31,12 @@ export const CONTRACT_VARIABLES: ContractVariableDef[] = [
   { key: 'discount', token: '{{discount}}', label: 'Chegirma', category: 'financial', example: '1 000 000 so\'m' },
   { key: 'qr_code', token: '{{qr_code}}', label: 'QR-kod (tekshirish havolasi)', category: 'contract', example: '[QR-kod]' },
   { key: 'verification_link', token: '{{verification_link}}', label: 'Tekshirish havolasi (matn)', category: 'contract', example: `${CONTRACT_VERIFICATION_BASE_URL}/XXXX-XXXX-STUDENTID` },
+  // Resolved per-page inside convertCanvasDocumentToHtml (contractCanvasConverter.ts),
+  // not from this document-wide values map - the same {{token}} placed on any
+  // page (e.g. by copy/pasting the element the toolbar's "Page Number" button
+  // inserts) always shows THAT page's own number.
+  { key: 'page_number', token: '{{page_number}}', label: 'Sahifa raqami', category: 'contract', example: '1' },
+  { key: 'total_pages', token: '{{total_pages}}', label: 'Jami sahifalar soni', category: 'contract', example: '4' },
 ]
 
 export function formatCurrencyString(val: string | number | null | undefined): string {
@@ -628,6 +634,9 @@ export const VARIABLE_FALLBACK_PLACEHOLDERS: Record<string, string> = {
   qrcode: '<div style="width:24mm;height:24mm;border:1px dashed #94a3b8;display:inline-flex;align-items:center;justify-content:center;font-size:6pt;color:#94a3b8;">QR</div>',
   verification_link: `${CONTRACT_VERIFICATION_BASE_URL}/____-____-____`,
   verification_url: `${CONTRACT_VERIFICATION_BASE_URL}/____-____-____`,
+
+  page_number: '1',
+  total_pages: '1',
 }
 
 export function getVariablePlaceholder(key: string): string {

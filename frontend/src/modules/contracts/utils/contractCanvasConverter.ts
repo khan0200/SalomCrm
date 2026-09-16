@@ -411,6 +411,15 @@ export function convertCanvasDocumentToHtml(
       }
     })
 
+    // {{page_number}}/{{total_pages}} resolve per page, not from the passed-in
+    // document-wide variableValues map: the exact same element, copy/pasted
+    // onto several pages, shows each page's own number.
+    const pageVariableValues = {
+      ...(variableValues || {}),
+      page_number: String(pageIdx + 1),
+      total_pages: String(doc.pages.length),
+    }
+
     // Sort elements by zIndex
     const sorted = [...page.elements].sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0))
 
@@ -432,7 +441,7 @@ export function convertCanvasDocumentToHtml(
         table.cells.forEach(row => {
           let colsHtml = ''
           row.forEach(cell => {
-            let cellContent = replaceVariablesInHtml(cell.content || '', variableValues || {}, {
+            let cellContent = replaceVariablesInHtml(cell.content || '', pageVariableValues, {
               skipHeuristics: pageVars.size > 0,
               excludedVariables: pageVars,
             })
@@ -467,7 +476,7 @@ export function convertCanvasDocumentToHtml(
       } else {
         // Text / Heading / Paragraph
         const textEl = el as TextCanvasElement
-        let content = replaceVariablesInHtml(textEl.content || '', variableValues || {}, {
+        let content = replaceVariablesInHtml(textEl.content || '', pageVariableValues, {
           skipHeuristics: pageVars.size > 0,
           excludedVariables: pageVars,
         })
