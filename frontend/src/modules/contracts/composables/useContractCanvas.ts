@@ -43,6 +43,12 @@ export function useContractCanvas(initialDoc?: ContractDocumentModel) {
   const selectedElementIds = ref<string[]>([])
   const editingElementId = ref<string | null>(null)
 
+  // Guide selection is tracked separately from element selection — a guide
+  // is an editor-only layout aid, never a CanvasElement, so it must never be
+  // able to enter selectedElementIds (which flows into element-only paths
+  // like deleteSelectedElements, duplicateSelectedElements, PDF export, etc).
+  const selectedGuideId = ref<string | null>(null)
+
   // Viewport & Guides
   const zoomLevel = ref<number>(100)
   const showMarginGuides = ref<boolean>(false)
@@ -115,6 +121,7 @@ export function useContractCanvas(initialDoc?: ContractDocumentModel) {
 
   // Selection
   function selectElement(id: string, multi = false, pageIndexHint?: number) {
+    selectedGuideId.value = null
     if (pageIndexHint !== undefined && pageIndexHint >= 0 && pageIndexHint < document.value.pages.length) {
       activePageIndex.value = pageIndexHint
     } else {
@@ -149,6 +156,7 @@ export function useContractCanvas(initialDoc?: ContractDocumentModel) {
 
   function clearSelection() {
     selectedElementIds.value = []
+    selectedGuideId.value = null
     editingElementId.value = null
     activeGuides.value = []
     activeDistanceGuides.value = []
@@ -159,6 +167,57 @@ export function useContractCanvas(initialDoc?: ContractDocumentModel) {
 
   function isElementSelected(id: string): boolean {
     return selectedElementIds.value.includes(id)
+  }
+
+  // ─── Guides (editor-only layout aids, never contract content) ──────────
+  // Stored document-wide as `document.guides` — GLOBAL, not per-page: one
+  // guide created anywhere renders at the same mm position on every page,
+  // and dragging/deleting it updates that single shared definition (per
+  // explicit product requirement — a guide is not scoped to the page it was
+  // created on). They still ride along with the document's existing
+  // save/load/undo path for free (the whole `document` is snapshotted/
+  // serialized as one JSON tree). Every export/render path (PDF, Preview,
+  // HTML) only ever reads `page.elements`, so guides are structurally
+  // invisible to them — no exclusion filtering needed there.
+  function addGuide(type: 'horizontal' | 'vertical'): string {
+    if (!document.value.guides) document.value.guides = []
+
+    const id = `guide_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`
+    document.value.guides.push({
+      id,
+      type,
+      position: type === 'horizontal' ? PAGE_HEIGHT_MM / 2 : PAGE_WIDTH_MM / 2,
+      visible: true,
+    })
+    clearSelection()
+    selectedGuideId.value = id
+    history.recordSnapshot(document.value)
+    return id
+  }
+
+  function updateGuidePosition(guideId: string, position: number, recordHistory = false) {
+    const guide = document.value.guides?.find(g => g.id === guideId)
+    if (!guide) return
+    const max = guide.type === 'horizontal' ? PAGE_HEIGHT_MM : PAGE_WIDTH_MM
+    guide.position = Math.round(Math.max(0, Math.min(max, position)) * 100) / 100
+    if (recordHistory) history.recordSnapshot(document.value)
+  }
+
+  function deleteGuide(guideId: string) {
+    if (!document.value.guides) return
+    document.value.guides = document.value.guides.filter(g => g.id !== guideId)
+    if (selectedGuideId.value === guideId) selectedGuideId.value = null
+    history.recordSnapshot(document.value)
+  }
+
+  function selectGuide(guideId: string) {
+    clearSelection()
+    selectedGuideId.value = guideId
+  }
+
+  function deleteSelectedGuide() {
+    if (!selectedGuideId.value) return
+    deleteGuide(selectedGuideId.value)
   }
 
   // Page Operations
@@ -583,6 +642,44 @@ export function useContractCanvas(initialDoc?: ContractDocumentModel) {
     const otherElements = (targetPage?.elements || []).filter(
       el => !ignoreSet.has(el.id) && !el.hidden
     )
+
+    // 2.5 User-placed Guides — GLOBAL (document.guides, not per-page), same
+    // coordinate space as elements/ruler/margins. Checked after page-bound
+    // snaps but before other elements — a guide the user deliberately placed
+    // should win a tie against an incidental element edge. Only fires when a
+    // break hasn't already been hit above (snappedX/snappedY only get
+    // overwritten if this guide is a closer match than whatever's already
+    // been chosen, mirroring how "Other Elements" below also unconditionally
+    // overwrites — last strongest match wins since every check uses the same
+    // SNAP_THRESHOLD).
+    const docGuides = (document.value.guides || []).filter(g => g.visible !== false)
+    for (const guide of docGuides) {
+      if (guide.type === 'vertical') {
+        const gx = guide.position
+        if (Math.abs(calcX - gx) < SNAP_THRESHOLD_MM) {
+          snappedX = gx
+          guides.push({ type: 'vertical', position: gx, start: 0, end: PAGE_HEIGHT_MM, label: `X: ${formatDistanceMm(gx)}` })
+        } else if (Math.abs(targetCenterX - gx) < SNAP_THRESHOLD_MM) {
+          snappedX = gx - calcW / 2
+          guides.push({ type: 'vertical', position: gx, start: 0, end: PAGE_HEIGHT_MM, label: `X: ${formatDistanceMm(gx)}` })
+        } else if (Math.abs(targetRight - gx) < SNAP_THRESHOLD_MM) {
+          snappedX = gx - calcW
+          guides.push({ type: 'vertical', position: gx, start: 0, end: PAGE_HEIGHT_MM, label: `X: ${formatDistanceMm(gx)}` })
+        }
+      } else {
+        const gy = guide.position
+        if (Math.abs(calcY - gy) < SNAP_THRESHOLD_MM) {
+          snappedY = gy
+          guides.push({ type: 'horizontal', position: gy, start: 0, end: PAGE_WIDTH_MM, label: `Y: ${formatDistanceMm(gy)}` })
+        } else if (Math.abs(targetCenterY - gy) < SNAP_THRESHOLD_MM) {
+          snappedY = gy - calcH / 2
+          guides.push({ type: 'horizontal', position: gy, start: 0, end: PAGE_WIDTH_MM, label: `Y: ${formatDistanceMm(gy)}` })
+        } else if (Math.abs(targetBottom - gy) < SNAP_THRESHOLD_MM) {
+          snappedY = gy - calcH
+          guides.push({ type: 'horizontal', position: gy, start: 0, end: PAGE_WIDTH_MM, label: `Y: ${formatDistanceMm(gy)}` })
+        }
+      }
+    }
 
     for (const other of otherElements) {
       const otherCenterX = other.x + other.width / 2
@@ -1091,6 +1188,9 @@ export function useContractCanvas(initialDoc?: ContractDocumentModel) {
       if (selectedElementIds.value.length > 0) {
         e.preventDefault()
         deleteSelectedElements()
+      } else if (selectedGuideId.value) {
+        e.preventDefault()
+        deleteSelectedGuide()
       }
     } else if (e.key === 'Escape') {
       clearSelection()
@@ -1236,6 +1336,7 @@ export function useContractCanvas(initialDoc?: ContractDocumentModel) {
     selectedElementIds,
     selectedElement,
     selectedElements,
+    selectedGuideId,
     editingElementId,
     zoomLevel,
     showMarginGuides,
@@ -1256,6 +1357,11 @@ export function useContractCanvas(initialDoc?: ContractDocumentModel) {
     selectAll,
     clearSelection,
     isElementSelected,
+    addGuide,
+    updateGuidePosition,
+    deleteGuide,
+    selectGuide,
+    deleteSelectedGuide,
     addPage,
     duplicatePage,
     deletePage,

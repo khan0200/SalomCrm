@@ -32,6 +32,7 @@ import {
   Save,
   Check,
   ChevronDown,
+  ChevronUp,
   FilePlus,
   FileText,
   ZoomIn,
@@ -48,6 +49,8 @@ import {
   Ruler,
   SlidersHorizontal,
   Plus,
+  MoveVertical,
+  MoveHorizontal,
   Layers,
   Copy,
   Lock,
@@ -142,6 +145,7 @@ const variableValues = computed(() => {
 const showColorPicker = ref(false)
 const showHighlightPicker = ref(false)
 const showTableInsertMenu = ref(false)
+const showGuideMenu = ref(false)
 const showMarginMenu = ref(false)
 const showSpacingMenu = ref(false)
 const showListMenu = ref(false)
@@ -975,6 +979,7 @@ function onWorkspaceScroll() {
 // Close all dropdown menus (click-outside support)
 function closeAllDropdowns() {
   showTableInsertMenu.value = false
+  showGuideMenu.value = false
   showVariablePicker.value = false
   showColorPicker.value = false
   showHighlightPicker.value = false
@@ -984,6 +989,9 @@ function closeAllDropdowns() {
   showCaseMenu.value = false
   showFindReplace.value = false
   showEditorDownloadMenu.value = false
+  if (typeof CSS !== 'undefined' && (CSS as any).highlights) {
+    ;(CSS as any).highlights.delete('search-results')
+  }
 }
 
 // Undo / Redo helpers (called once per action — buttons previously called undo() twice!)
@@ -1262,6 +1270,13 @@ function toggleFindReplace() {
   const next = !showFindReplace.value
   closeAllDropdowns()
   showFindReplace.value = next
+  if (!next) {
+    if (typeof CSS !== 'undefined' && (CSS as any).highlights) {
+      ;(CSS as any).highlights.delete('search-results')
+    }
+  } else {
+    nextTick(() => updateCanvasHighlights())
+  }
 }
 
 // List dropdown toggle & active state (Canva / Word Style)
@@ -1447,6 +1462,24 @@ function toggleTableInsertMenu() {
   const next = !showTableInsertMenu.value
   closeAllDropdowns()
   showTableInsertMenu.value = next
+}
+
+function toggleGuideMenu() {
+  const next = !showGuideMenu.value
+  closeAllDropdowns()
+  showGuideMenu.value = next
+}
+
+function addGuideAndCloseMenu(type: 'horizontal' | 'vertical') {
+  canvas.addGuide(type)
+  showGuideMenu.value = false
+  // Guides only render on this canvas when the margin/rulers ("Line") toggle
+  // is on — auto-enable it so a freshly-added guide is immediately visible
+  // instead of appearing to silently do nothing.
+  if (!canvas.showMarginGuides.value) {
+    canvas.showMarginGuides.value = true
+    canvas.showRulers.value = true
+  }
 }
 
 function toggleVariablePicker() {
@@ -1925,12 +1958,31 @@ function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
-function buildSnippet(text: string, queryLower: string): string {
-  const idx = text.toLowerCase().indexOf(queryLower)
+function buildSnippet(text: string, queryLower: string, startIdx?: number): string {
+  const idx = startIdx !== undefined ? startIdx : text.toLowerCase().indexOf(queryLower)
   if (idx === -1) return text.slice(0, 60).trim()
   const start = Math.max(0, idx - 24)
   const end = Math.min(text.length, idx + queryLower.length + 24)
   return (start > 0 ? '…' : '') + text.slice(start, end).trim() + (end < text.length ? '…' : '')
+}
+
+function highlightSnippet(snippet: string, query: string): string {
+  if (!snippet || !query || !query.trim()) return snippet || ''
+  const escapedQuery = escapeRegExp(query.trim())
+  if (!escapedQuery) return snippet
+
+  const safeSnippet = snippet
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;')
+
+  const re = new RegExp(`(${escapedQuery})`, 'gi')
+  return safeSnippet.replace(
+    re,
+    '<mark class="bg-amber-300 dark:bg-amber-400/40 text-amber-950 dark:text-amber-100 font-bold px-0.5 rounded-xs">$1</mark>'
+  )
 }
 
 interface FindMatch {
@@ -1938,6 +1990,8 @@ interface FindMatch {
   elementId: string
   snippet: string
 }
+
+const selectedMatchIndex = ref<number | null>(null)
 
 const findMatches = computed<FindMatch[]>(() => {
   const query = findQuery.value.trim()
@@ -1950,14 +2004,34 @@ const findMatches = computed<FindMatch[]>(() => {
       if (el.hidden) return
       if (el.type === 'table') {
         const table = el as TableCanvasElement
-        const cellTexts = table.cells.flat().map(c => stripHtml(c.content || '')).join(' | ')
-        if (cellTexts.toLowerCase().includes(queryLower)) {
-          results.push({ pageIndex, elementId: el.id, snippet: buildSnippet(cellTexts, queryLower) })
-        }
+        table.cells.forEach(row => {
+          row.forEach(cell => {
+            const cellText = stripHtml(cell.content || '')
+            let start = 0
+            while (start < cellText.length) {
+              const idx = cellText.toLowerCase().indexOf(queryLower, start)
+              if (idx === -1) break
+              results.push({
+                pageIndex,
+                elementId: el.id,
+                snippet: buildSnippet(cellText, queryLower, idx),
+              })
+              start = idx + Math.max(1, queryLower.length)
+            }
+          })
+        })
       } else if (typeof (el as any).content === 'string') {
         const text = stripHtml((el as any).content)
-        if (text.toLowerCase().includes(queryLower)) {
-          results.push({ pageIndex, elementId: el.id, snippet: buildSnippet(text, queryLower) })
+        let start = 0
+        while (start < text.length) {
+          const idx = text.toLowerCase().indexOf(queryLower, start)
+          if (idx === -1) break
+          results.push({
+            pageIndex,
+            elementId: el.id,
+            snippet: buildSnippet(text, queryLower, idx),
+          })
+          start = idx + Math.max(1, queryLower.length)
         }
       }
     })
@@ -1965,10 +2039,128 @@ const findMatches = computed<FindMatch[]>(() => {
   return results
 })
 
-function jumpToMatch(match: FindMatch) {
+function scrollToMatch(match: FindMatch) {
+  nextTick(() => {
+    const ws = canvasWorkspaceRef.value
+    if (!ws) return
+
+    const pageContainer = ws.querySelector<HTMLElement>(
+      `.canvas-a4-page-container[data-page-index="${match.pageIndex}"]`
+    )
+    if (!pageContainer) return
+
+    const targetEl = pageContainer.querySelector<HTMLElement>(
+      `[data-element-id="${match.elementId}"]`
+    )
+
+    const elToScroll = targetEl || pageContainer
+
+    const wsRect = ws.getBoundingClientRect()
+    const elRect = elToScroll.getBoundingClientRect()
+    const scrollOffsetY = elRect.top - wsRect.top - (wsRect.height / 2 - elRect.height / 2)
+    const scrollOffsetX = elRect.left - wsRect.left - (wsRect.width / 2 - elRect.width / 2)
+
+    ws.scrollTo({
+      top: Math.max(0, ws.scrollTop + scrollOffsetY),
+      left: Math.max(0, ws.scrollLeft + scrollOffsetX),
+      behavior: 'smooth',
+    })
+
+    if (targetEl) {
+      targetEl.classList.remove('search-highlight-pulse')
+      void targetEl.offsetWidth
+      targetEl.classList.add('search-highlight-pulse')
+      setTimeout(() => {
+        targetEl?.classList.remove('search-highlight-pulse')
+      }, 2500)
+    }
+  })
+}
+
+function jumpToMatch(match: FindMatch, idx?: number) {
+  if (idx !== undefined) {
+    selectedMatchIndex.value = idx
+  }
   canvas.setActivePageIndex(match.pageIndex)
   canvas.selectedElementIds.value = [match.elementId]
+  scrollToMatch(match)
 }
+
+function jumpToNextMatch() {
+  if (findMatches.value.length === 0) return
+  const nextIdx = selectedMatchIndex.value === null
+    ? 0
+    : (selectedMatchIndex.value + 1) % findMatches.value.length
+  jumpToMatch(findMatches.value[nextIdx], nextIdx)
+}
+
+function jumpToPrevMatch() {
+  if (findMatches.value.length === 0) return
+  const prevIdx = selectedMatchIndex.value === null
+    ? findMatches.value.length - 1
+    : (selectedMatchIndex.value - 1 + findMatches.value.length) % findMatches.value.length
+  jumpToMatch(findMatches.value[prevIdx], prevIdx)
+}
+
+function updateCanvasHighlights() {
+  if (typeof CSS === 'undefined' || !(CSS as any).highlights) return
+  const query = findQuery.value.trim()
+  if (!query || !canvasWorkspaceRef.value || !showFindReplace.value) {
+    ;(CSS as any).highlights.delete('search-results')
+    return
+  }
+
+  const queryLower = query.toLowerCase()
+  const ranges: Range[] = []
+
+  const walker = document.createTreeWalker(
+    canvasWorkspaceRef.value,
+    NodeFilter.SHOW_TEXT,
+    {
+      acceptNode: (node) => {
+        const parent = node.parentElement
+        if (!parent) return NodeFilter.FILTER_REJECT
+        if (parent.closest('.canvas-guide-line') || parent.closest('.editor-dropdown-container') || parent.closest('.ruler-track')) {
+          return NodeFilter.FILTER_REJECT
+        }
+        if (parent.closest('.canvas-element-content')) {
+          return NodeFilter.FILTER_ACCEPT
+        }
+        return NodeFilter.FILTER_SKIP
+      }
+    }
+  )
+
+  let textNode: Text | null = walker.nextNode() as Text | null
+  while (textNode) {
+    const text = textNode.textContent || ''
+    let startIdx = 0
+    while (startIdx < text.length) {
+      const matchIdx = text.toLowerCase().indexOf(queryLower, startIdx)
+      if (matchIdx === -1) break
+      try {
+        const range = new Range()
+        range.setStart(textNode, matchIdx)
+        range.setEnd(textNode, matchIdx + query.length)
+        ranges.push(range)
+      } catch {}
+      startIdx = matchIdx + Math.max(1, query.length)
+    }
+    textNode = walker.nextNode() as Text | null
+  }
+
+  if (ranges.length > 0) {
+    const highlight = new (window as any).Highlight(...ranges)
+    ;(CSS as any).highlights.set('search-results', highlight)
+  } else {
+    ;(CSS as any).highlights.delete('search-results')
+  }
+}
+
+watch(findQuery, () => {
+  selectedMatchIndex.value = null
+  nextTick(updateCanvasHighlights)
+})
 
 // Replaces every occurrence across the whole document (all pages, text
 // elements and table cells) in one pass and records a single history
@@ -2484,7 +2676,8 @@ const shortcutCategories = computed(() => ({
               type="text"
               placeholder="Qidiriladigan matn..."
               class="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
-              @keydown.enter="findMatches.length ? jumpToMatch(findMatches[0]) : undefined"
+              @keydown.enter.exact="jumpToNextMatch()"
+              @keydown.shift.enter="jumpToPrevMatch()"
             />
           </div>
 
@@ -2500,9 +2693,29 @@ const shortcutCategories = computed(() => ({
           </div>
 
           <div class="flex items-center justify-between">
-            <span class="text-[11px] font-medium text-zinc-500">
-              {{ findQuery ? `${findMatches.length} ta moslik topildi` : 'Qidiruv so\'zini kiriting' }}
-            </span>
+            <div class="flex items-center gap-1">
+              <span class="text-[11px] font-medium text-zinc-500">
+                {{ findQuery ? (selectedMatchIndex !== null ? `${selectedMatchIndex + 1}/${findMatches.length}` : `${findMatches.length} ta moslik topildi`) : 'Qidiruv so\'zini kiriting' }}
+              </span>
+              <div v-if="findMatches.length > 0" class="flex items-center gap-0.5 ml-1">
+                <button
+                  type="button"
+                  @click="jumpToPrevMatch()"
+                  class="w-5 h-5 rounded flex items-center justify-center hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 cursor-pointer"
+                  title="Oldingi moslik (Shift+Enter)"
+                >
+                  <ChevronUp class="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  @click="jumpToNextMatch()"
+                  class="w-5 h-5 rounded flex items-center justify-center hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 cursor-pointer"
+                  title="Keyingi moslik (Enter)"
+                >
+                  <ChevronDown class="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
             <button
               type="button"
               @click="replaceAllMatches"
@@ -2514,16 +2727,29 @@ const shortcutCategories = computed(() => ({
           </div>
 
           <!-- Match results list: click to jump to that page/element -->
-          <div v-if="findMatches.length > 0" class="max-h-40 overflow-y-auto space-y-1 border-t border-zinc-100 dark:border-zinc-800 pt-2">
+          <div v-if="findMatches.length > 0" class="max-h-48 overflow-y-auto space-y-1 border-t border-zinc-100 dark:border-zinc-800 pt-2 pr-0.5">
             <button
               v-for="(match, idx) in findMatches"
-              :key="match.elementId + idx"
+              :key="match.elementId + '_' + idx"
               type="button"
-              @click="jumpToMatch(match)"
-              class="w-full text-left px-2 py-1.5 rounded-lg hover:bg-blue-50 dark:hover:bg-zinc-800 flex items-center gap-2 cursor-pointer group"
+              @click="jumpToMatch(match, idx)"
+              class="w-full text-left px-2 py-1.5 rounded-lg flex items-center gap-2 cursor-pointer transition-colors group"
+              :class="selectedMatchIndex === idx
+                ? 'bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800/80 shadow-2xs'
+                : 'hover:bg-zinc-100 dark:hover:bg-zinc-800 border border-transparent'"
             >
-              <span class="text-[9px] font-mono font-bold text-zinc-400 shrink-0">P{{ match.pageIndex + 1 }}</span>
-              <span class="text-[11px] text-zinc-600 dark:text-zinc-300 truncate group-hover:text-blue-600 dark:group-hover:text-blue-400">{{ match.snippet }}</span>
+              <span
+                class="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded shrink-0 transition-colors"
+                :class="selectedMatchIndex === idx
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 group-hover:bg-blue-100 dark:group-hover:bg-blue-900/50 group-hover:text-blue-700 dark:group-hover:text-blue-300'"
+              >
+                P{{ match.pageIndex + 1 }}
+              </span>
+              <span
+                class="text-[11px] text-zinc-600 dark:text-zinc-300 truncate group-hover:text-blue-600 dark:group-hover:text-blue-400"
+                v-html="highlightSnippet(match.snippet, findQuery)"
+              ></span>
             </button>
           </div>
         </div>
@@ -3081,7 +3307,11 @@ const shortcutCategories = computed(() => ({
         </div>
       </div>
 
-      <!-- Line (Ruler & Margins Guide) Toggle -->
+      <!-- Line / Guides & Rulers Visibility Toggle.
+           Governs page border, rulers, AND user-placed ruler guides (added
+           editor-only guide layer) all together — hiding it hides guides
+           visually without deleting them; their positions stay in
+           document.guides and reappear the moment this is switched back on. -->
       <div class="flex items-center px-1 border-r border-zinc-200 dark:border-zinc-700/60">
         <button
           type="button"
@@ -3092,11 +3322,52 @@ const shortcutCategories = computed(() => ({
               ? 'bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800/80 shadow-2xs'
               : 'text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800'
           ]"
-          title="Toggle page border line & rulers"
+          title="Toggle page border line, rulers & guides"
         >
           <Ruler class="w-3.5 h-3.5 text-blue-500" />
           <span>Line</span>
         </button>
+      </div>
+
+      <!-- + Guide Dropdown (Canva/Figma-style ruler guides) -->
+      <div
+        class="relative px-1 border-r border-zinc-200 dark:border-zinc-700/60 editor-dropdown-container"
+        :class="{ 'z-50': showGuideMenu }"
+      >
+        <button
+          type="button"
+          @click.stop="toggleGuideMenu()"
+          class="toolbar-btn flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold text-cyan-700 dark:text-cyan-300 bg-cyan-50/80 dark:bg-cyan-950/40 border border-cyan-200/80 dark:border-cyan-900/60 rounded-lg shadow-2xs cursor-pointer"
+          title="Add a horizontal or vertical guide"
+        >
+          <Plus class="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400" />
+          <span>Guide</span>
+          <ChevronDown class="w-2.5 h-2.5 opacity-60" />
+        </button>
+
+        <div
+          v-if="showGuideMenu"
+          class="absolute top-full left-0 mt-1.5 w-44 bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-700 shadow-2xl p-1.5 z-[200] animate-scale-in"
+          @click.stop
+        >
+          <div class="px-2 py-1 text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Add Guide</div>
+          <button
+            type="button"
+            @click="addGuideAndCloseMenu('horizontal')"
+            class="w-full flex items-center gap-2 px-2.5 py-1.5 text-xs font-semibold rounded-lg text-zinc-700 dark:text-zinc-300 hover:bg-cyan-50 dark:hover:bg-cyan-950/50 hover:text-cyan-700 dark:hover:text-cyan-300 transition-colors"
+          >
+            <MoveVertical class="w-3.5 h-3.5" />
+            <span>Horizontal</span>
+          </button>
+          <button
+            type="button"
+            @click="addGuideAndCloseMenu('vertical')"
+            class="w-full flex items-center gap-2 px-2.5 py-1.5 text-xs font-semibold rounded-lg text-zinc-700 dark:text-zinc-300 hover:bg-cyan-50 dark:hover:bg-cyan-950/50 hover:text-cyan-700 dark:hover:text-cyan-300 transition-colors"
+          >
+            <MoveHorizontal class="w-3.5 h-3.5" />
+            <span>Vertical</span>
+          </button>
+        </div>
       </div>
 
       <!-- Checkboxes Group (☑ / ☐) -->
@@ -3357,6 +3628,8 @@ const shortcutCategories = computed(() => ({
           :show-grid="canvas.showGrid.value"
           :active-guides="canvas.activeGuides.value"
           :active-distance-guides="canvas.activeDistanceGuides.value"
+          :guides="canvas.document.value.guides"
+          :selected-guide-id="canvas.selectedGuideId.value"
           :is-copy-style-active="!!copyStyleMode"
           :copy-style-mode="copyStyleMode"
           :variable-values="variableValues"
@@ -3384,6 +3657,9 @@ const shortcutCategories = computed(() => ({
           @resize-end="onDragResizeEnd()"
           @duplicate-page="canvas.duplicatePage($event)"
           @delete-page="canvas.deletePage($event)"
+          @select-guide="canvas.selectGuide($event)"
+          @update-guide-position="(guideId, pos, recordHistory) => canvas.updateGuidePosition(guideId, pos, recordHistory)"
+          @delete-guide="canvas.deleteGuide($event)"
         />
       </div>
     </div>
@@ -3801,5 +4077,28 @@ const shortcutCategories = computed(() => ({
 .canvas-workspace.copy-style-active,
 .canvas-workspace.copy-style-active * {
   cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%232563eb' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='14' height='5' x='2' y='2' rx='1.5' fill='%23bfdbfe'/%3E%3Cpath d='M9 15v-2a2 2 0 0 1 2-2h7a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-1'/%3E%3Crect width='4' height='7' x='7' y='15' rx='1' fill='%232563eb'/%3E%3C/svg%3E") 3 3, crosshair !important;
+}
+
+/* ─── Search Match Highlight & Pulse ─── */
+@keyframes searchMatchPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.9), 0 0 20px rgba(245, 158, 11, 0.6);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(245, 158, 11, 0), 0 0 30px rgba(245, 158, 11, 0.9);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0), 0 0 10px rgba(245, 158, 11, 0.3);
+  }
+}
+
+:deep(.search-highlight-pulse) {
+  animation: searchMatchPulse 0.75s ease-in-out 3 !important;
+  z-index: 90 !important;
+}
+
+::highlight(search-results) {
+  background-color: #fef08a;
+  color: #713f12;
 }
 </style>

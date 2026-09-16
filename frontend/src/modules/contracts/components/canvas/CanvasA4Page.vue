@@ -6,10 +6,12 @@ import type {
   PageMargins,
   AlignmentGuide,
   DistanceGuide,
+  PageGuide,
 } from '../../types/contractCanvas'
 import { Copy, Trash2 } from 'lucide-vue-next'
 import CanvasRuler from './CanvasRuler.vue'
 import CanvasSmartGuides from './CanvasSmartGuides.vue'
+import CanvasGuideLine from './CanvasGuideLine.vue'
 import CanvasElementWrapper from './CanvasElementWrapper.vue'
 import CanvasTextElement from './CanvasTextElement.vue'
 import CanvasTableElement from './CanvasTableElement.vue'
@@ -31,6 +33,11 @@ const props = withDefaults(
     showGrid: boolean
     activeGuides: AlignmentGuide[]
     activeDistanceGuides?: DistanceGuide[]
+    // Global (document-level) ruler guides — the SAME array is passed to
+    // every page instance so a guide created on any page renders identically
+    // on all of them (see PageGuide doc comment in contractCanvas.ts).
+    guides?: PageGuide[]
+    selectedGuideId?: string | null
     readonly?: boolean
     variableValues?: Record<string, string>
     isActivePage?: boolean
@@ -78,6 +85,9 @@ const emit = defineEmits<{
   'duplicate-page': [pageIndex: number]
   'delete-page': [pageIndex: number]
   'copy-style': [e: MouseEvent]
+  'select-guide': [guideId: string]
+  'update-guide-position': [guideId: string, position: number, recordHistory: boolean]
+  'delete-guide': [guideId: string]
 }>()
 
 const MM_TO_PX_BASE = 3.779527559
@@ -359,6 +369,33 @@ function confirmDeletePage() {
               <!-- Dashed Printable Boundary Rect -->
               <div class="absolute inset-0 border border-dashed border-blue-400/35 rounded-[1px] z-10"></div>
             </div>
+
+          <!-- User-placed Ruler Guides (Canva/Figma-style layout aids).
+               GLOBAL: the same `guides` array (document.guides) is rendered
+               on every page instance, so a guide created on page 1 appears
+               identically on page 2, 3, etc. — there is exactly one shared
+               set of guides, not independent ones per page.
+               Visibility follows the SAME toggle as the page-border/ruler
+               ("Line" button in the toolbar, showMarginGuides) per product
+               requirement — hiding it hides guides too, but never deletes
+               them (position stays in document.guides either way). A guide's
+               own `visible` flag additionally allows per-guide hide without
+               deletion, independent of the global toggle. -->
+          <template v-if="!readonly && showMarginGuides">
+            <CanvasGuideLine
+              v-for="g in (guides || [])"
+              :key="g.id"
+              v-show="g.visible !== false"
+              :guide="g"
+              :zoom-level="zoomLevel"
+              :is-selected="selectedGuideId === g.id"
+              :page-width-mm="PAGE_WIDTH_MM"
+              :page-height-mm="PAGE_HEIGHT_MM"
+              @select="emit('set-active-page', pageIndex); emit('select-guide', g.id)"
+              @update:position="(pos, recordHistory) => emit('update-guide-position', g.id, pos, recordHistory)"
+              @delete="emit('delete-guide', g.id)"
+            />
+          </template>
 
           <!-- Smart Alignment & Distance Guides Overlay -->
           <CanvasSmartGuides

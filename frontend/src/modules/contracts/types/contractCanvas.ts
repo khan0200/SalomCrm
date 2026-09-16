@@ -136,6 +136,21 @@ export type CanvasElement =
   | CheckboxCanvasElement
   | ImageCanvasElement
 
+// Editor-only layout aid — a Canva/Figma-style ruler guide. NEVER an element:
+// excluded from PDF/HTML export, Preview rendering, and selection/hit-testing
+// of normal contract content by construction (every export/render path only
+// ever walks `page.elements`, never `document.guides`).
+// Guides are GLOBAL (document-level, not per-page): one guide created on any
+// page renders at the same mm position on every page, and dragging/deleting
+// it updates that single shared definition — there is exactly one set of
+// guides for the whole document, not independent ones per page.
+export interface PageGuide {
+  id: string
+  type: 'horizontal' | 'vertical'
+  position: number // mm — y for horizontal, x for vertical (same doc coordinate space as elements/ruler/snapping)
+  visible: boolean
+}
+
 export interface CanvasPageModel {
   id: string
   pageNumber: number
@@ -152,6 +167,7 @@ export interface ContractDocumentModel {
   }
   margins: PageMargins
   pages: CanvasPageModel[]
+  guides?: PageGuide[] // global — same guides render on every page, see PageGuide doc comment
   defaultFontFamily?: string
   defaultFontSize?: number
 }
