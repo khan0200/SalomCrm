@@ -18,10 +18,25 @@ const emit = defineEmits<{
 
 const MM_TO_PX_BASE = 3.779527559
 
+// This component is rendered INSIDE `.canvas-sheet-background`, which is
+// itself already scaled via CSS `transform: scale(zoomLevel/100)` (see
+// CanvasA4Page.vue). That ancestor transform automatically scales every
+// descendant's pixel position — exactly like the margin-guide overlay and
+// every CanvasElementWrapper already rely on (they position with plain
+// unscaled mmToBasePx(), never multiplying by zoom themselves).
+// `top`/`left` here must therefore use the SAME unscaled conversion, or the
+// zoom factor gets applied twice: once by the ancestor's `transform: scale`,
+// once more here. At 100% zoom (factor 1) that bug is invisible, which is
+// why it only shows up away from 100% — guides land short of their true
+// position below 100% zoom and fly off past the (overflow:hidden) sheet
+// edge above 100% zoom.
 function mmToPx(mm: number): number {
-  return mm * MM_TO_PX_BASE * (props.zoomLevel / 100)
+  return mm * MM_TO_PX_BASE
 }
 
+// Pointer deltas, in contrast, are real on-screen pixels (clientX/clientY),
+// which DO need to be converted through the current zoom factor to get back
+// to document mm — this is unrelated to the render-position bug above.
 function pxToMm(px: number): number {
   return px / (MM_TO_PX_BASE * (props.zoomLevel / 100))
 }
