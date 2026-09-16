@@ -35,6 +35,8 @@ import {
   ArrowUpRight,
   Filter,
   QrCode,
+  Archive,
+  ArchiveRestore,
 } from 'lucide-vue-next'
 import { downloadContractAsPdf } from './utils/contractPdf'
 import { generateQrCodeDataUrl } from './utils/qrCode'
@@ -437,7 +439,10 @@ const {
   data: allContractsData,
 } = useQuery<Contract[]>({
   queryKey: computed(() => ['contracts-all-metrics', authStore.activeTenantId]),
-  queryFn: () => contractsApi.getContracts({}),
+  // include_archived: fetches every contract (archived or not) in one shot
+  // so tab counts can be computed for both the normal tabs (which must
+  // exclude archived contracts) and the Archive tab (which needs only them).
+  queryFn: () => contractsApi.getContracts({ include_archived: true }),
   staleTime: 1000 * 60 * 2,
 })
 
@@ -446,15 +451,17 @@ const contracts = computed<Contract[]>(() => contractsData.value || [])
 // Stats (Resend style metrics)
 const contractStats = computed(() => {
   const all = allContractsData.value || contracts.value
+  const active = all.filter(c => !c.is_archived)
   return {
-    total: all.length,
-    pending: all.filter(c => c.status === 'pending').length,
-    verified: all.filter(c => c.status === 'verified').length,
-    rejected: all.filter(c => c.status === 'rejected').length,
-    cancelled: all.filter(c => c.status === 'cancelled').length,
-    draft: all.filter(c => c.status === 'draft').length,
-    signed: all.filter(c => c.status === 'signed').length,
-    completed: all.filter(c => c.status === 'completed').length,
+    total: active.length,
+    pending: active.filter(c => c.status === 'pending').length,
+    verified: active.filter(c => c.status === 'verified').length,
+    rejected: active.filter(c => c.status === 'rejected').length,
+    cancelled: active.filter(c => c.status === 'cancelled').length,
+    draft: active.filter(c => c.status === 'draft').length,
+    signed: active.filter(c => c.status === 'signed').length,
+    completed: active.filter(c => c.status === 'completed').length,
+    archived: all.filter(c => c.is_archived).length,
   }
 })
 
@@ -477,6 +484,7 @@ function getFilterCount(key: string): number {
   if (key === 'completed') return contractStats.value.completed
   if (key === 'rejected') return contractStats.value.rejected
   if (key === 'cancelled') return contractStats.value.cancelled
+  if (key === 'archive') return contractStats.value.archived
   return 0
 }
 
@@ -815,6 +823,35 @@ async function confirmDelete() {
   }
 }
 
+// Archive: works for any contract regardless of status. Archiving just hides
+// it from every other filter (All/Pending/Verified/Cancelled) - it doesn't
+// touch the underlying status, so unarchiving restores it exactly as it was.
+async function handleArchive(contract: Contract) {
+  try {
+    await contractsApi.archiveContract(contract.id)
+    uiStore.addToast({ type: 'success', message: 'Shartnoma arxivga o\'tkazildi.', duration: 3000 })
+    queryClient.invalidateQueries({ queryKey: ['contracts-list'] })
+    queryClient.invalidateQueries({ queryKey: ['contracts-all-metrics'] })
+  } catch (err: any) {
+    console.error('Failed to archive contract:', err)
+    const errorMsg = err?.response?.data?.detail || 'Shartnomani arxivlashda xatolik yuz berdi'
+    alert(errorMsg)
+  }
+}
+
+async function handleUnarchive(contract: Contract) {
+  try {
+    await contractsApi.unarchiveContract(contract.id)
+    uiStore.addToast({ type: 'success', message: 'Shartnoma arxivdan qaytarildi.', duration: 3000 })
+    queryClient.invalidateQueries({ queryKey: ['contracts-list'] })
+    queryClient.invalidateQueries({ queryKey: ['contracts-all-metrics'] })
+  } catch (err: any) {
+    console.error('Failed to unarchive contract:', err)
+    const errorMsg = err?.response?.data?.detail || 'Shartnomani arxivdan qaytarishda xatolik yuz berdi'
+    alert(errorMsg)
+  }
+}
+
 </script>
 
 <template>
@@ -1150,7 +1187,8 @@ async function confirmDelete() {
                     { key: 'all', label: 'All' },
                     { key: 'pending', label: 'Pending' },
                     { key: 'verified', label: 'Verified' },
-                    { key: 'cancelled', label: 'Cancelled' }
+                    { key: 'cancelled', label: 'Cancelled' },
+                    { key: 'archive', label: 'Archive' }
                   ]"
                   :key="st.key"
                   type="button"
@@ -1265,6 +1303,7 @@ async function confirmDelete() {
 
                       <!-- Column 4: Status + Contextual Action (At the right edge) -->
                       <td class="py-3 px-4 align-middle text-right" @click.stop>
+                        <div class="flex items-center justify-end gap-2">
                         <!-- Pending status: shows badge + Tasdiqlash button / code -->
                         <div v-if="contract.status === 'pending'" class="flex items-center justify-end gap-2.5 flex-nowrap whitespace-nowrap">
                           <div class="flex flex-col items-end gap-0.5">
@@ -1356,6 +1395,21 @@ async function confirmDelete() {
                             {{ formatContractDate(contract.created_at) }}
                           </span>
                         </div>
+
+                        <!-- Archive / Unarchive: available for any status, always shown -->
+                        <button
+                          type="button"
+                          @click.stop="contract.is_archived ? handleUnarchive(contract) : handleArchive(contract)"
+                          class="p-1.5 rounded-lg border transition-all cursor-pointer shadow-2xs active:scale-95 shrink-0"
+                          :class="contract.is_archived
+                            ? 'border-blue-200 dark:border-blue-900/60 bg-blue-50/70 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/60'
+                            : 'border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-850 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800'"
+                          :title="contract.is_archived ? 'Arxivdan qaytarish' : 'Arxivlash'"
+                        >
+                          <ArchiveRestore v-if="contract.is_archived" class="w-3.5 h-3.5" />
+                          <Archive v-else class="w-3.5 h-3.5" />
+                        </button>
+                        </div>
                       </td>
                     </tr>
                   </tbody>
@@ -1389,13 +1443,15 @@ async function confirmDelete() {
       @regenerate="c => { previewContract = null; handleRegenerateCode(c) }"
       @duplicate="c => { previewContract = null; handleDuplicate(c) }"
       @delete="c => { previewContract = null; deletingContract = c }"
+      @archive="c => { previewContract = null; handleArchive(c) }"
+      @unarchive="c => { previewContract = null; handleUnarchive(c) }"
     />
 
     <!-- DELETE MODAL -->
     <BaseModal
       :is-open="!!deletingContract"
       :title="deletingContract?.status === 'rejected' ? 'Shartnomani butunlay o\'chirish' : 'Shartnomani o\'chirish'"
-      :subtitle="deletingContract?.status === 'rejected' ? 'Ushbu amal shartnomani bazadan mutlaqo o\'chirib yuboradi' : 'Ushbu amal shartnomani arxivlaydi'"
+      :subtitle="deletingContract?.status === 'rejected' ? 'Ushbu amal shartnomani bazadan mutlaqo o\'chirib yuboradi' : 'Ushbu amal shartnomani ro\'yxatdan yashiradi'"
       max-width="max-w-md"
       @close="deletingContract = null"
     >

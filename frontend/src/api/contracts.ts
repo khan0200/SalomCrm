@@ -9,6 +9,8 @@ export interface Contract {
   status: 'draft' | 'pending' | 'verified' | 'rejected' | 'sent' | 'viewed' | 'signed' | 'completed' | 'cancelled'
   version: number
   is_deleted: boolean
+  is_archived: boolean
+  archived_at?: string | null
   student?: string | null
   student_id?: string | null
   student_name?: string | null
@@ -69,6 +71,9 @@ export interface ContractListParams {
   status?: string
   student_id?: string
   include_deleted?: boolean
+  // Bypasses the default is_archived=false filter - only meant for the tab-
+  // counts fetch, which needs every contract (archived or not) at once.
+  include_archived?: boolean
 }
 
 export const contractsApi = {
@@ -142,6 +147,16 @@ export const contractsApi = {
     rejection_reason: string
   }> {
     const { data } = await apiClient.post(`/contracts/${id}/reject/`, { reason })
+    return data
+  },
+
+  async archiveContract(id: string): Promise<{ detail: string; is_archived: boolean; archived_at?: string }> {
+    const { data } = await apiClient.post(`/contracts/${id}/archive/`)
+    return data
+  },
+
+  async unarchiveContract(id: string): Promise<{ detail: string; is_archived: boolean }> {
+    const { data } = await apiClient.post(`/contracts/${id}/unarchive/`)
     return data
   },
 }

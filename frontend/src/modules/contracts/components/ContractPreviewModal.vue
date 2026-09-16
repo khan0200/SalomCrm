@@ -13,7 +13,9 @@ import {
   Ban,
   Trash2,
   Check,
-  AlertCircle
+  AlertCircle,
+  Archive,
+  ArchiveRestore,
 } from 'lucide-vue-next'
 import BaseModal from '@/components/common/BaseModal.vue'
 import { contractsApi, type Contract } from '@/api/contracts'
@@ -38,6 +40,8 @@ const emit = defineEmits<{
   regenerate: [contract: Contract]
   duplicate: [contract: Contract]
   delete: [contract: Contract]
+  archive: [contract: Contract]
+  unarchive: [contract: Contract]
 }>()
 
 const detailedContract = ref<Contract | null>(null)
@@ -303,6 +307,21 @@ function formatRejectionDate(dateStr?: string | null): string {
         >
           <Trash2 class="w-3.5 h-3.5" />
           <span>O'chirib yuborish</span>
+        </button>
+
+        <!-- Arxivlash / Arxivdan qaytarish (istalgan holatdagi shartnoma uchun) -->
+        <button
+          type="button"
+          @click="activeContract.is_archived ? emit('unarchive', activeContract) : emit('archive', activeContract)"
+          class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-all shadow-2xs cursor-pointer active:scale-95"
+          :class="activeContract.is_archived
+            ? 'border-blue-200 dark:border-blue-900/60 bg-blue-50/80 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/60'
+            : 'border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-750'"
+          :title="activeContract.is_archived ? 'Arxivdan qaytarish' : 'Arxivlash'"
+        >
+          <ArchiveRestore v-if="activeContract.is_archived" class="w-3.5 h-3.5" />
+          <Archive v-else class="w-3.5 h-3.5" />
+          <span>{{ activeContract.is_archived ? 'Arxivdan qaytarish' : 'Arxivlash' }}</span>
         </button>
 
         <!-- Yuklab olish (Faqat PDF) -->
