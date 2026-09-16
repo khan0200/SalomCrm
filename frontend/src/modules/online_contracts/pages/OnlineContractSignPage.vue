@@ -26,6 +26,7 @@ import {
   Building2,
   ShieldCheck,
   Eye,
+  EyeOff,
   Check,
 } from 'lucide-vue-next'
 
@@ -92,6 +93,7 @@ const hasReadFullContract = ref(false)
 // Password Confirmation Modal
 const isPasswordModalOpen = ref(false)
 const accountPassword = ref('')
+const showAccountPassword = ref(false)
 const isSubmitting = ref(false)
 const submitError = ref('')
 const submitSuccess = ref(false)
@@ -332,6 +334,7 @@ function openPasswordModal() {
     return
   }
   accountPassword.value = ''
+  showAccountPassword.value = false
   submitError.value = ''
   isPasswordModalOpen.value = true
 }
@@ -952,12 +955,22 @@ onMounted(() => {
             <Lock class="w-3.5 h-3.5 text-zinc-600 dark:text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               v-model="accountPassword"
-              type="password"
+              :type="showAccountPassword ? 'text' : 'password'"
               required
               placeholder="Parolingizni kiriting"
-              class="w-full pl-9 pr-3.5 py-2 text-xs font-bold rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-black dark:text-white focus:outline-hidden focus:border-black dark:focus:border-white transition-colors shadow-2xs"
+              class="w-full pl-9 pr-9 py-2 text-xs font-bold rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-black dark:text-white focus:outline-hidden focus:border-black dark:focus:border-white transition-colors shadow-2xs"
               @keydown.enter="handleFinalSubmit"
             />
+            <button
+              type="button"
+              @click="showAccountPassword = !showAccountPassword"
+              class="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors cursor-pointer"
+              tabindex="-1"
+              :title="showAccountPassword ? 'Parolni yashirish' : 'Parolni ko\'rsatish'"
+            >
+              <EyeOff v-if="showAccountPassword" class="w-3.5 h-3.5" />
+              <Eye v-else class="w-3.5 h-3.5" />
+            </button>
           </div>
         </div>
 

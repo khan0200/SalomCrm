@@ -13,6 +13,8 @@ import {
   CheckCircle2,
   AlertCircle,
   Clock,
+  Eye,
+  EyeOff,
 } from 'lucide-vue-next'
 
 const route = useRoute()
@@ -42,6 +44,8 @@ const tenantSlug = computed(() => (route.params.tenantname as string) || '')
 const email = ref('')
 const password = ref('')
 const confirmPassword = ref('')
+const showPassword = ref(false)
+const showConfirmPassword = ref(false)
 const otpCode = ref('')
 
 const isOtpSent = ref(false)
@@ -224,12 +228,22 @@ async function handleVerifyAndRegister() {
             <Lock class="w-3.5 h-3.5 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               v-model="password"
-              type="password"
+              :type="showPassword ? 'text' : 'password'"
               required
               minlength="6"
               placeholder="Kamida 6 ta belgi"
-              class="w-full pl-9 pr-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 text-xs text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-hidden focus:border-zinc-400 dark:focus:border-zinc-600 transition-colors"
+              class="w-full pl-9 pr-9 py-2 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 text-xs text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-hidden focus:border-zinc-400 dark:focus:border-zinc-600 transition-colors"
             />
+            <button
+              type="button"
+              @click="showPassword = !showPassword"
+              class="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors cursor-pointer"
+              tabindex="-1"
+              :title="showPassword ? 'Parolni yashirish' : 'Parolni ko\'rsatish'"
+            >
+              <EyeOff v-if="showPassword" class="w-3.5 h-3.5" />
+              <Eye v-else class="w-3.5 h-3.5" />
+            </button>
           </div>
         </div>
 
@@ -241,12 +255,22 @@ async function handleVerifyAndRegister() {
             <Lock class="w-3.5 h-3.5 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               v-model="confirmPassword"
-              type="password"
+              :type="showConfirmPassword ? 'text' : 'password'"
               required
               minlength="6"
               placeholder="Parolni qayta kiriting"
-              class="w-full pl-9 pr-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 text-xs text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-hidden focus:border-zinc-400 dark:focus:border-zinc-600 transition-colors"
+              class="w-full pl-9 pr-9 py-2 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 text-xs text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-hidden focus:border-zinc-400 dark:focus:border-zinc-600 transition-colors"
             />
+            <button
+              type="button"
+              @click="showConfirmPassword = !showConfirmPassword"
+              class="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors cursor-pointer"
+              tabindex="-1"
+              :title="showConfirmPassword ? 'Parolni yashirish' : 'Parolni ko\'rsatish'"
+            >
+              <EyeOff v-if="showConfirmPassword" class="w-3.5 h-3.5" />
+              <Eye v-else class="w-3.5 h-3.5" />
+            </button>
           </div>
         </div>
 

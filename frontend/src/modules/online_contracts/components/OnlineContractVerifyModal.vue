@@ -8,6 +8,8 @@ import {
   Clock,
   Loader2,
   Download,
+  Eye,
+  EyeOff,
 } from 'lucide-vue-next'
 import { onlineContractsApi, type OnlineContractSummary } from '@/api/onlineContracts'
 import { downloadContractAsPdf } from '@/modules/contracts/utils/contractPdf'
@@ -26,6 +28,7 @@ const emit = defineEmits<{
 
 const verificationCode = ref('')
 const password = ref('')
+const showPassword = ref(false)
 const isSubmitting = ref(false)
 const errorMessage = ref('')
 const isVerifiedSuccess = ref(false)
@@ -105,6 +108,7 @@ function handleClose() {
   isVerifiedSuccess.value = false
   verificationCode.value = ''
   password.value = ''
+  showPassword.value = false
   errorMessage.value = ''
   emit('close')
 }
@@ -214,11 +218,21 @@ function handleClose() {
           <Lock class="w-3.5 h-3.5 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             v-model="password"
-            type="password"
+            :type="showPassword ? 'text' : 'password'"
             required
             placeholder="Shaxsiy profilingiz paroli"
-            class="w-full pl-9 pr-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 text-xs text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-hidden focus:border-zinc-400 dark:focus:border-zinc-600 transition-colors"
+            class="w-full pl-9 pr-9 py-2 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 text-xs text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-hidden focus:border-zinc-400 dark:focus:border-zinc-600 transition-colors"
           />
+          <button
+            type="button"
+            @click="showPassword = !showPassword"
+            class="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors cursor-pointer"
+            tabindex="-1"
+            :title="showPassword ? 'Parolni yashirish' : 'Parolni ko\'rsatish'"
+          >
+            <EyeOff v-if="showPassword" class="w-3.5 h-3.5" />
+            <Eye v-else class="w-3.5 h-3.5" />
+          </button>
         </div>
       </div>
 
