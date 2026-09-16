@@ -37,36 +37,36 @@ def send_otp_email(to_email: str, otp_code: str, tenant_name: str = 'UniBridge')
     <head>
       <meta charset="utf-8">
       <style>
-        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f4f4f7; margin: 0; padding: 0; }}
-        .email-wrapper {{ width: 100%; background-color: #f4f4f7; padding: 40px 0; }}
-        .email-card {{ max-width: 500px; margin: 0 auto; background: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.06); border: 1px solid #e5e7eb; }}
-        .email-header {{ background: linear-gradient(135deg, #1e40af, #2563eb); padding: 30px; text-align: center; color: white; }}
-        .email-body {{ padding: 32px; color: #1f2937; line-height: 1.6; }}
-        .otp-box {{ background: #f0fdf4; border: 2px dashed #16a34a; border-radius: 12px; padding: 20px; text-align: center; margin: 24px 0; }}
-        .otp-digits {{ font-size: 36px; font-weight: 800; letter-spacing: 8px; color: #15803d; font-family: monospace; }}
-        .footer {{ text-align: center; padding: 20px; font-size: 12px; color: #6b7280; }}
+        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #fafafa; margin: 0; padding: 0; }}
+        .email-wrapper {{ width: 100%; background-color: #fafafa; padding: 40px 0; }}
+        .email-card {{ max-width: 480px; margin: 0 auto; background: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #e4e4e7; }}
+        .email-header {{ padding: 24px 32px; border-bottom: 1px solid #f4f4f5; background: #fafafa; }}
+        .email-body {{ padding: 32px; color: #18181b; line-height: 1.65; }}
+        .otp-box {{ background: #fafafa; border: 1px solid #e4e4e7; border-radius: 12px; padding: 22px; text-align: center; margin: 24px 0; }}
+        .otp-digits {{ font-size: 32px; font-weight: 800; letter-spacing: 8px; color: #18181b; font-family: 'SF Mono', Menlo, monospace; }}
+        .footer {{ text-align: center; padding: 20px 32px; font-size: 11px; color: #a1a1aa; border-top: 1px solid #f4f4f5; }}
       </style>
     </head>
     <body>
       <div class="email-wrapper">
         <div class="email-card">
           <div class="email-header">
-            <h1 style="margin: 0; font-size: 22px; font-weight: 700;">{tenant_name}</h1>
-            <p style="margin: 6px 0 0; opacity: 0.9; font-size: 14px;">Onlayn Shartnoma Tizimi</p>
+            <h1 style="margin: 0; font-size: 15px; font-weight: 700; color: #18181b; letter-spacing: -0.2px;">{tenant_name}</h1>
+            <p style="margin: 3px 0 0; font-size: 12px; color: #71717a;">Onlayn Shartnoma Tizimi</p>
           </div>
           <div class="email-body">
-            <h2 style="font-size: 18px; margin-top: 0;">Assalomu alaykum!</h2>
-            <p>Onlayn shartnoma imzolash tizimida ro'yxatdan o'tish yoki tizimga kirish uchun quyidagi tasdiqlash kodidan foydalaning:</p>
-            
+            <h2 style="font-size: 16px; font-weight: 700; margin: 0 0 12px; color: #18181b;">Assalomu alaykum!</h2>
+            <p style="font-size: 13px; margin: 0 0 4px; color: #3f3f46;">Ro'yxatdan o'tish yoki kirish uchun kodingiz:</p>
+
             <div class="otp-box">
               <div class="otp-digits">{otp_code}</div>
-              <p style="margin: 8px 0 0; font-size: 13px; color: #166534;">Ushbu kod <strong>10 daqiqa</strong> davomida amal qiladi.</p>
+              <p style="margin: 10px 0 0; font-size: 12px; color: #71717a;">Kod <strong style="color: #18181b;">10 daqiqa</strong> amal qiladi.</p>
             </div>
-            
-            <p style="font-size: 13px; color: #4b5563;">Xavfsizlik eslatmasi: Ushbu kodni hech kimga, hatto kompaniya xodimlariga ham bermang.</p>
+
+            <p style="font-size: 12px; color: #a1a1aa; margin: 0;">Bu kodni hech kim bilan, hatto xodimlar bilan ham baham ko'rmang.</p>
           </div>
           <div class="footer">
-            <p>© 2026 {tenant_name}. Barcha huquqlar himoyalangan.</p>
+            <p style="margin: 0;">© 2026 {tenant_name}. Barcha huquqlar himoyalangan.</p>
           </div>
         </div>
       </div>
