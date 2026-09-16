@@ -107,6 +107,13 @@ const tempUniMajor = ref('')
 const isSchoolModalOpen = ref(false)
 const schoolForm = ref<Record<string, any>>({})
 
+// Father Job Modal State (Work Place + Job, each with autocomplete)
+const isFatherJobModalOpen = ref(false)
+const savingFatherJob = ref(false)
+const fatherJobForm = ref<{ workplace: string; job: string }>({ workplace: '', job: '' })
+const showFatherWorkplaceSuggestions = ref(false)
+const showFatherJobSuggestions = ref(false)
+
 // Certificate Modal State
 const isCertModalOpen = ref(false)
 const certModalSlot = ref<1 | 2 | 3>(1)
@@ -236,7 +243,7 @@ const isValidDateValue = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value)
 // Always-uppercase-on-edit fields — kept as plain string keys (not sourced
 // from fieldModalConfig) because formatEditValueForField/onInlineInput run
 // before fieldModalConfig is declared further down this setup script.
-const uppercaseFields = new Set(['full_name', 'father_name', 'mother_name', 'address', 'id', 'father_job', 'mother_job'])
+const uppercaseFields = new Set(['full_name', 'father_name', 'mother_name', 'address', 'id', 'father_workplace', 'father_job', 'mother_job'])
 
 const formatEditValueForField = (field: string, value: string) => {
   if (phoneFields.has(field)) return formatPhoneValue(value)
@@ -490,7 +497,6 @@ const fieldModalConfig: Record<string, FieldModalDef> = {
   mother_name: { label: 'Mother Fullname', type: 'text', uppercase: true },
   father_phone: { label: 'Father Phone', type: 'phone' },
   mother_phone: { label: 'Mother Phone', type: 'phone' },
-  father_job: { label: 'Father Job', type: 'text' },
   mother_job: { label: 'Mother Job', type: 'text' },
   notes: { label: 'Notes', type: 'textarea' },
   office: { label: 'Office', type: 'select', options: () => officeOptions.value },
@@ -580,6 +586,10 @@ const handleGlobalKeyDown = (e: KeyboardEvent) => {
     }
     if (isMajorModalOpen.value) {
       isMajorModalOpen.value = false
+      return
+    }
+    if (isFatherJobModalOpen.value) {
+      isFatherJobModalOpen.value = false
       return
     }
     if (isSchoolModalOpen.value) {
@@ -1052,6 +1062,99 @@ const schoolSuggestions = computed(() => {
 const uzMajorSuggestions = computed(() => {
   return matchSuggestions(allMajorSuggestions.value, schoolForm.value.major || '')
 })
+
+// Workplace & Job Title Directories (global, pre-seeded with a curated Uzbek
+// list, auto-learning: see WorkplaceDirectory/JobTitleDirectory backend models)
+const { data: dbWorkplacesData, refetch: refetchDbWorkplaces } = useQuery({
+  queryKey: ['workplace-directory'],
+  queryFn: () => settingsApi.getWorkplaces(),
+  staleTime: 1000 * 60 * 5,
+})
+
+const { data: dbJobTitlesData, refetch: refetchDbJobTitles } = useQuery({
+  queryKey: ['job-title-directory'],
+  queryFn: () => settingsApi.getJobTitles(),
+  staleTime: 1000 * 60 * 5,
+})
+
+const allWorkplaceSuggestions = computed(() => {
+  const names = Array.isArray(dbWorkplacesData.value) ? dbWorkplacesData.value.map((w: any) => w.name) : []
+  return dedupeSuggestions(names, [])
+})
+
+const allJobTitleSuggestions = computed(() => {
+  const names = Array.isArray(dbJobTitlesData.value) ? dbJobTitlesData.value.map((j: any) => j.name) : []
+  return dedupeSuggestions(names, [])
+})
+
+const fatherWorkplaceSuggestions = computed(() => {
+  return matchSuggestions(allWorkplaceSuggestions.value, fatherJobForm.value.workplace || '')
+})
+
+const fatherJobTitleSuggestions = computed(() => {
+  return matchSuggestions(allJobTitleSuggestions.value, fatherJobForm.value.job || '')
+})
+
+const onFatherWorkplaceInput = (e: Event) => {
+  fatherJobForm.value.workplace = (e.target as HTMLInputElement).value
+  showFatherWorkplaceSuggestions.value = true
+}
+
+const selectFatherWorkplaceSuggestion = (suggestion: string) => {
+  fatherJobForm.value.workplace = suggestion
+  showFatherWorkplaceSuggestions.value = false
+}
+
+const onFatherJobInput = (e: Event) => {
+  fatherJobForm.value.job = (e.target as HTMLInputElement).value
+  showFatherJobSuggestions.value = true
+}
+
+const selectFatherJobSuggestion = (suggestion: string) => {
+  fatherJobForm.value.job = suggestion
+  showFatherJobSuggestions.value = false
+}
+
+const openFatherJobModal = () => {
+  if (!authStore.canEdit || !props.student) return
+  fatherJobForm.value = {
+    workplace: props.student.father_workplace || '',
+    job: props.student.father_job || '',
+  }
+  showFatherWorkplaceSuggestions.value = false
+  showFatherJobSuggestions.value = false
+  isFatherJobModalOpen.value = true
+}
+
+const saveFatherJobModal = async () => {
+  if (!props.student || !authStore.canEdit) return
+  savingFatherJob.value = true
+  try {
+    const workplace = (fatherJobForm.value.workplace || '').trim()
+    const job = (fatherJobForm.value.job || '').trim()
+
+    // Remember custom values globally so they become suggestions everywhere,
+    // for every tenant, the next time anyone types a matching letter.
+    if (workplace) {
+      settingsApi.upsertWorkplace({ name: workplace })
+        .then(() => refetchDbWorkplaces())
+        .catch(e => console.error('Workplace directory sync error:', e))
+    }
+    if (job) {
+      settingsApi.upsertJobTitle({ name: job })
+        .then(() => refetchDbJobTitles())
+        .catch(e => console.error('Job title directory sync error:', e))
+    }
+
+    emit('update-student', {
+      father_workplace: workplace ? workplace.toUpperCase() : null,
+      father_job: job ? job.toUpperCase() : null,
+    })
+    isFatherJobModalOpen.value = false
+  } finally {
+    savingFatherJob.value = false
+  }
+}
 
 const applySchoolDefaults = (schoolName: string, replace = false) => {
   const known = getSchoolEntry(schoolName)
@@ -2930,11 +3033,11 @@ const handleRestoreStudent = () => {
                     </div>
                   </div>
 
-                  <!-- FATHER JOB -->
+                  <!-- FATHER JOB (Work Place + Job) -->
                   <div
                     class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
                     :class="[copiedField === 'father_job' && 'animate-copy-press']"
-                    @click="handleCopy('father_job', student.father_job)"
+                    @click="handleCopy('father_job', [student.father_workplace, student.father_job].filter(Boolean).join(' — '))"
                     title="Single-click to copy Father Job"
                   >
                     <div class="flex items-center justify-between">
@@ -2943,13 +3046,16 @@ const handleRestoreStudent = () => {
                         <span>FATHER JOB</span>
                       </span>
                       <div class="flex items-center gap-1">
-                        <button type="button" @click.stop="handleCopy('father_job', student.father_job)" class="w-6 h-6 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-all cursor-pointer active:scale-90" title="Copy Father Job"><Check v-if="copiedField === 'father_job'" class="w-3.5 h-3.5 text-emerald-500" /><Copy v-else class="w-3.5 h-3.5" /></button>
-                        <button type="button" @click.stop="startInlineEdit('father_job', student.father_job)" class="w-6 h-6 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-all cursor-pointer active:scale-90" title="Edit Father Job"><Pencil class="w-3.5 h-3.5" /></button>
+                        <button type="button" @click.stop="handleCopy('father_job', [student.father_workplace, student.father_job].filter(Boolean).join(' — '))" class="w-6 h-6 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-all cursor-pointer active:scale-90" title="Copy Father Job"><Check v-if="copiedField === 'father_job'" class="w-3.5 h-3.5 text-emerald-500" /><Copy v-else class="w-3.5 h-3.5" /></button>
+                        <button type="button" @click.stop="openFatherJobModal" class="w-6 h-6 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-all cursor-pointer active:scale-90" title="Edit Father Job"><Pencil class="w-3.5 h-3.5" /></button>
                       </div>
                     </div>
-                    <div class="mt-0.5">
-                      <span v-if="student.father_job" class="text-[13px] font-bold uppercase text-zinc-900 dark:text-zinc-100 tracking-tight">{{ student.father_job }}</span>
-                      <span v-else class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
+                    <div class="mt-0.5" v-if="student.father_workplace || student.father_job">
+                      <span v-if="student.father_workplace" class="block text-[13px] font-bold uppercase text-zinc-900 dark:text-zinc-100 tracking-tight">{{ student.father_workplace }}</span>
+                      <span v-if="student.father_job" class="block text-[11.5px] font-medium uppercase text-zinc-500 dark:text-zinc-400 tracking-tight">{{ student.father_job }}</span>
+                    </div>
+                    <div class="mt-0.5" v-else>
+                      <span class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
                     </div>
                   </div>
 
@@ -3742,6 +3848,128 @@ const handleRestoreStudent = () => {
             >
               <Loader2 v-if="savingSchool" class="w-4 h-4 animate-spin" />
               <span>{{ savingSchool ? 'Saving...' : 'Save Changes' }}</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </transition>
+
+    <!-- ═════════════════════════════════════════════════════════════
+         MODAL: Father Job (Work Place + Job, each with autocomplete)
+         ═════════════════════════════════════════════════════════════ -->
+    <transition
+      enter-active-class="transition duration-200 ease-out"
+      enter-from-class="opacity-0 scale-95"
+      enter-to-class="opacity-100 scale-100"
+      leave-active-class="transition duration-150 ease-in"
+      leave-from-class="opacity-100 scale-100"
+      leave-to-class="opacity-0 scale-95"
+    >
+      <div
+        v-if="isFatherJobModalOpen"
+        class="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm overflow-y-auto"
+        @click.self="isFatherJobModalOpen = false"
+      >
+        <div class="relative bg-white dark:bg-[#18181b] border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl p-6 w-full max-w-md mx-4 z-[80] max-h-[90vh] overflow-y-auto">
+          <button
+            type="button"
+            @click="isFatherJobModalOpen = false"
+            class="absolute right-4 top-4 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 p-1 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded transition-all cursor-pointer"
+          >
+            <X class="w-4 h-4" />
+          </button>
+
+          <h3 class="text-[17px] font-bold text-zinc-900 dark:text-zinc-100 mb-1 pr-6">
+            Edit Father Job
+          </h3>
+          <p class="text-[12px] text-zinc-400 dark:text-zinc-500 mb-5">
+            Both fields are optional — leave blank to clear.
+          </p>
+
+          <div class="space-y-4">
+            <!-- WORK PLACE -->
+            <div>
+              <label class="block text-[12px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase mb-1.5">
+                Work Place
+              </label>
+              <div class="relative">
+                <input
+                  type="text"
+                  :value="fatherJobForm.workplace"
+                  @input="onFatherWorkplaceInput"
+                  @focus="showFatherWorkplaceSuggestions = true"
+                  placeholder="e.g. Bank"
+                  autoComplete="off"
+                  class="w-full bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 px-3 py-2 rounded-lg outline-none focus:border-blue-500 transition-colors text-[14px]"
+                />
+                <div
+                  v-if="showFatherWorkplaceSuggestions && fatherWorkplaceSuggestions.length > 0"
+                  class="absolute left-0 right-0 mt-1 max-h-52 overflow-y-auto border border-zinc-200 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-800 shadow-xl z-50 divide-y divide-zinc-100 dark:divide-zinc-700/60 animate-in fade-in slide-in-from-top-1 duration-100"
+                >
+                  <button
+                    v-for="suggestion in fatherWorkplaceSuggestions"
+                    :key="suggestion"
+                    type="button"
+                    @click="selectFatherWorkplaceSuggestion(suggestion)"
+                    class="w-full text-left px-3.5 py-2 text-xs font-semibold hover:bg-zinc-100 dark:hover:bg-zinc-700 text-zinc-900 dark:text-zinc-100 transition-colors cursor-pointer"
+                  >
+                    {{ suggestion }}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- JOB -->
+            <div>
+              <label class="block text-[12px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase mb-1.5">
+                Job
+              </label>
+              <div class="relative">
+                <input
+                  type="text"
+                  :value="fatherJobForm.job"
+                  @input="onFatherJobInput"
+                  @focus="showFatherJobSuggestions = true"
+                  placeholder="e.g. Buxgalter"
+                  autoComplete="off"
+                  class="w-full bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 px-3 py-2 rounded-lg outline-none focus:border-blue-500 transition-colors text-[14px]"
+                />
+                <div
+                  v-if="showFatherJobSuggestions && fatherJobTitleSuggestions.length > 0"
+                  class="absolute left-0 right-0 mt-1 max-h-52 overflow-y-auto border border-zinc-200 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-800 shadow-xl z-50 divide-y divide-zinc-100 dark:divide-zinc-700/60 animate-in fade-in slide-in-from-top-1 duration-100"
+                >
+                  <button
+                    v-for="suggestion in fatherJobTitleSuggestions"
+                    :key="suggestion"
+                    type="button"
+                    @click="selectFatherJobSuggestion(suggestion)"
+                    class="w-full text-left px-3.5 py-2 text-xs font-semibold hover:bg-zinc-100 dark:hover:bg-zinc-700 text-zinc-900 dark:text-zinc-100 transition-colors cursor-pointer"
+                  >
+                    {{ suggestion }}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Footer Buttons -->
+          <div class="flex justify-end gap-2 mt-8">
+            <button
+              type="button"
+              @click="isFatherJobModalOpen = false"
+              class="px-4 py-2 rounded-lg text-[13px] font-semibold text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+              :disabled="savingFatherJob"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              @click="saveFatherJobModal"
+              class="px-4 py-2 rounded-lg text-[13px] font-semibold bg-blue-600 hover:bg-blue-700 text-white hover:opacity-90 transition-opacity flex items-center gap-2 shadow-xs cursor-pointer"
+              :disabled="savingFatherJob"
+            >
+              <Loader2 v-if="savingFatherJob" class="w-4 h-4 animate-spin" />
+              <span>{{ savingFatherJob ? 'Saving...' : 'Save Changes' }}</span>
             </button>
           </div>
         </div>

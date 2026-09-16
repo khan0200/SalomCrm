@@ -83,7 +83,8 @@ class Student(TenantAwareModel):
     father_name = models.CharField(max_length=255, blank=True, null=True)
 
     father_phone = models.CharField(max_length=50, blank=True, null=True)
-    father_job = models.CharField(max_length=255, blank=True, null=True)
+    father_workplace = models.CharField(max_length=255, blank=True, null=True)  # Ish joyi
+    father_job = models.CharField(max_length=255, blank=True, null=True)  # Lavozim
     mother_name = models.CharField(max_length=255, blank=True, null=True)
     mother_phone = models.CharField(max_length=50, blank=True, null=True)
     mother_job = models.CharField(max_length=255, blank=True, null=True)
@@ -490,6 +491,37 @@ class SchoolDirectory(TimeStampedModel):
 
     class Meta:
         db_table = 'schools'
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
+
+class WorkplaceDirectory(TimeStampedModel):
+    """
+    Global (not tenant-scoped), auto-learning list of parent workplace names
+    for the Work Place autocomplete field. Seeded with a curated Uzbek list;
+    any custom value a staff member types is upserted here so it becomes a
+    suggestion for every tenant going forward - never lost, never duplicated.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=255, unique=True, db_index=True)
+
+    class Meta:
+        db_table = 'workplace_directory'
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
+
+class JobTitleDirectory(TimeStampedModel):
+    """Global, auto-learning list of parent job titles - see WorkplaceDirectory."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=255, unique=True, db_index=True)
+
+    class Meta:
+        db_table = 'job_title_directory'
         ordering = ['name']
 
     def __str__(self):

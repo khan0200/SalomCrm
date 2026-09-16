@@ -338,6 +338,22 @@ class SchoolDirectorySerializer(serializers.ModelSerializer):
         read_only_fields = ('id', 'created_at', 'updated_at')
 
 
+class WorkplaceDirectorySerializer(serializers.ModelSerializer):
+    class Meta:
+        from .models import WorkplaceDirectory
+        model = WorkplaceDirectory
+        fields = ('id', 'name', 'created_at', 'updated_at')
+        read_only_fields = ('id', 'created_at', 'updated_at')
+
+
+class JobTitleDirectorySerializer(serializers.ModelSerializer):
+    class Meta:
+        from .models import JobTitleDirectory
+        model = JobTitleDirectory
+        fields = ('id', 'name', 'created_at', 'updated_at')
+        read_only_fields = ('id', 'created_at', 'updated_at')
+
+
 class MajorOptionSerializer(serializers.ModelSerializer):
     class Meta:
         from .models import MajorOption

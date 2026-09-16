@@ -5,7 +5,8 @@ from .views import (
     TariffOptionViewSet, EducationLevelOptionViewSet, StudentGroupOptionViewSet,
     LeadSourceOptionViewSet, CoordinatorOptionViewSet,
     UniversityOptionViewSet, UniversityStatusOptionViewSet, TagOptionViewSet,
-    SchoolDirectoryViewSet, MajorOptionViewSet, ExtractDocumentView,
+    SchoolDirectoryViewSet, WorkplaceDirectoryViewSet, JobTitleDirectoryViewSet,
+    MajorOptionViewSet, ExtractDocumentView,
     VisaCheckView, VisaDownloadPdfView, VisaStudentQuickSearchView,
     VisaStudentLookupView, VisaStudentListCreateView, VisaStudentDetailView,
     VisaStudentBulkDeleteView, VisaOptionsView,
@@ -44,6 +45,8 @@ router.register(r'universities', UniversityOptionViewSet, basename='university')
 router.register(r'university-statuses', UniversityStatusOptionViewSet, basename='university-status')
 router.register(r'tags', TagOptionViewSet, basename='tag-option')
 router.register(r'schools', SchoolDirectoryViewSet, basename='school')
+router.register(r'workplaces', WorkplaceDirectoryViewSet, basename='workplace')
+router.register(r'job-titles', JobTitleDirectoryViewSet, basename='job-title')
 router.register(r'majors', MajorOptionViewSet, basename='major')
 
 urlpatterns = [

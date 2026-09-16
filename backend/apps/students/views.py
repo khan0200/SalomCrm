@@ -25,6 +25,7 @@ from .models import (
     Student, Folder, TariffOption, EducationLevelOption,
     StudentGroupOption, LeadSourceOption, CoordinatorOption,
     UniversityOption, UniversityStatusOption, TagOption, SchoolDirectory, MajorOption,
+    WorkplaceDirectory, JobTitleDirectory,
     StudentUserPreference, Contract, ContractAuditEvent
 )
 from .serializers import (
@@ -34,6 +35,7 @@ from .serializers import (
     LeadSourceOptionSerializer, CoordinatorOptionSerializer,
     UniversityOptionSerializer, UniversityStatusOptionSerializer,
     TagOptionSerializer, SchoolDirectorySerializer, MajorOptionSerializer,
+    WorkplaceDirectorySerializer, JobTitleDirectorySerializer,
     ContractListSerializer, ContractDetailSerializer, ContractCreateUpdateSerializer
 )
 from .services import archive_student, restore_student, permanent_delete_student
@@ -948,6 +950,40 @@ class SchoolDirectoryViewSet(viewsets.ModelViewSet):
             }
         )
         return Response(SchoolDirectorySerializer(school).data, status=status.HTTP_200_OK)
+
+
+class WorkplaceDirectoryViewSet(viewsets.ModelViewSet):
+    """Global, auto-learning list of parent workplace names (see WorkplaceDirectory model)."""
+    permission_classes = [IsTenantManagerOrReadOnly]
+    pagination_class = None
+    serializer_class = WorkplaceDirectorySerializer
+    queryset = WorkplaceDirectory.objects.all().order_by('name')
+
+    @action(detail=False, methods=['post'], url_path='upsert')
+    def upsert(self, request: Request):
+        name = str(request.data.get('name', '')).strip()
+        if not name:
+            return Response({'error': 'Workplace name is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        entry, created = WorkplaceDirectory.objects.get_or_create(name=name)
+        return Response(WorkplaceDirectorySerializer(entry).data, status=status.HTTP_200_OK)
+
+
+class JobTitleDirectoryViewSet(viewsets.ModelViewSet):
+    """Global, auto-learning list of parent job titles (see JobTitleDirectory model)."""
+    permission_classes = [IsTenantManagerOrReadOnly]
+    pagination_class = None
+    serializer_class = JobTitleDirectorySerializer
+    queryset = JobTitleDirectory.objects.all().order_by('name')
+
+    @action(detail=False, methods=['post'], url_path='upsert')
+    def upsert(self, request: Request):
+        name = str(request.data.get('name', '')).strip()
+        if not name:
+            return Response({'error': 'Job title is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        entry, created = JobTitleDirectory.objects.get_or_create(name=name)
+        return Response(JobTitleDirectorySerializer(entry).data, status=status.HTTP_200_OK)
 
 
 class MajorOptionViewSet(BaseOptionViewSet):

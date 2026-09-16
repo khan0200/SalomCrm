@@ -258,6 +258,7 @@ const FIELD_GROUPS: FieldGroup[] = [
       { key: 'mother_name', label: 'Mother Fullname', checked: true, get: (s) => s.mother_name || '' },
       { key: 'father_phone', label: 'Father Phone', checked: true, get: (s) => s.father_phone || '' },
       { key: 'mother_phone', label: 'Mother Phone', checked: true, get: (s) => s.mother_phone || '' },
+      { key: 'father_workplace', label: 'Father Work Place', checked: false, get: (s) => s.father_workplace || '' },
       { key: 'father_job', label: 'Father Job', checked: false, get: (s) => s.father_job || '' },
       { key: 'mother_job', label: 'Mother Job', checked: false, get: (s) => s.mother_job || '' },
       { key: 'notes', label: 'Notes', checked: true, get: (s) => s.notes || '' },

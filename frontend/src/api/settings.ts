@@ -274,4 +274,24 @@ export const settingsApi = {
     const res = await apiClient.post('/majors/upsert/', data)
     return res.data
   },
+
+  // Workplace Directory (global, auto-learning list for parent "Work Place")
+  getWorkplaces: async (): Promise<any[]> => {
+    const res = await apiClient.get('/workplaces/')
+    return Array.isArray(res.data) ? res.data : (res.data?.results || [])
+  },
+  upsertWorkplace: async (data: { name: string }): Promise<any> => {
+    const res = await apiClient.post('/workplaces/upsert/', data)
+    return res.data
+  },
+
+  // Job Title Directory (global, auto-learning list for parent "Job")
+  getJobTitles: async (): Promise<any[]> => {
+    const res = await apiClient.get('/job-titles/')
+    return Array.isArray(res.data) ? res.data : (res.data?.results || [])
+  },
+  upsertJobTitle: async (data: { name: string }): Promise<any> => {
+    const res = await apiClient.post('/job-titles/upsert/', data)
+    return res.data
+  },
 }
