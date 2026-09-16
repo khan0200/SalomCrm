@@ -402,6 +402,7 @@ function onDoubleClick(e: MouseEvent) {
 
 <template>
   <div
+    :data-element-id="element.id"
     class="canvas-element-wrapper absolute top-0 left-0 select-none group"
     :class="[
       readonly ? 'cursor-default' : isEditing ? 'cursor-text' : element.locked ? 'cursor-not-allowed' : 'cursor-move',
