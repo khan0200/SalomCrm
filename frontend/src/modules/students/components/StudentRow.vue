@@ -148,9 +148,15 @@ const universities = computed(() => {
           {{ student.full_name }}
         </span>
 
-        <!-- Archive Badge -->
+        <!-- Archive / Permanently Deleted Badge -->
         <span
-          v-if="student.is_deleted"
+          v-if="student.is_permanently_deleted"
+          class="px-1.5 py-0.5 rounded text-[9.5px] font-bold tracking-wider uppercase bg-rose-600/15 text-rose-700 dark:text-rose-400 border border-rose-600/25 shrink-0"
+        >
+          Permanently Deleted
+        </span>
+        <span
+          v-else-if="student.is_deleted"
           class="px-1.5 py-0.5 rounded text-[9.5px] font-bold tracking-wider uppercase bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20 shrink-0"
         >
           Archive

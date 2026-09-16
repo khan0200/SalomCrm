@@ -166,6 +166,8 @@ export interface Student {
   coordinator?: string | null
   notes?: string | null
   is_deleted?: boolean
+  is_permanently_deleted?: boolean
+  permanently_deleted_at?: string | null
   row_color?: string | null
   task_tags?: string[]
   my_row_color?: string | null

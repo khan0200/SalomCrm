@@ -394,8 +394,15 @@ const handleRestoreStudent = () => {
 
             <!-- 3. Footer / Action Buttons -->
             <div class="px-6 pb-6 pt-2 flex gap-3 border-t border-zinc-100 dark:border-zinc-800/80 bg-zinc-50/40 dark:bg-zinc-850/40">
+              <!-- If student is permanently deleted: data is retained, but no further action is offered here -->
+              <template v-if="student.is_permanently_deleted">
+                <div class="flex-1 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-100/60 dark:bg-zinc-800/60 text-zinc-500 dark:text-zinc-400 text-[11.5px] font-medium text-center">
+                  Permanently deleted — data retained, no actions available
+                </div>
+              </template>
+
               <!-- If student is archived / deleted -->
-              <template v-if="student.is_deleted">
+              <template v-else-if="student.is_deleted">
                 <button
                   type="button"
                   @click="handleRestoreStudent"
@@ -456,7 +463,7 @@ const handleRestoreStudent = () => {
           <div class="flex items-start justify-between">
             <div>
               <h3 class="text-base font-bold text-zinc-900 dark:text-zinc-100">Confirm Permanent Deletion</h3>
-              <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">This action cannot be undone.</p>
+              <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">There is no way back to this student from the app after this.</p>
             </div>
             <button
               @click="isPermanentConfirmOpen = false"
@@ -469,7 +476,7 @@ const handleRestoreStudent = () => {
           <div class="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-200 flex items-start gap-2.5">
             <AlertTriangle class="w-5 h-5 shrink-0 text-rose-600 mt-0.5" />
             <p class="leading-relaxed">
-              Are you sure you want to permanently delete <strong>{{ student?.full_name }}</strong> (ID: <strong>{{ student?.id }}</strong>)? All associated records will be permanently removed.
+              Are you sure you want to permanently delete <strong>{{ student?.full_name }}</strong> (ID: <strong>{{ student?.id }}</strong>)? The student will move to the Permanently Deleted tab and disappear from every other view. No data is erased - it stays in the database - but there's no button in the app to bring it back.
             </p>
           </div>
 

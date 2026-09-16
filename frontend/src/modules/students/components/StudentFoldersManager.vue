@@ -31,13 +31,22 @@ const handleCreate = () => {
 }
 
 const isCustomFolder = computed(() => {
-  return props.activeFolder !== 'all' && props.activeFolder !== 'except' && props.activeFolder !== 'deleted' && props.activeFolder !== 'archive' && props.activeFolder !== 'hidden'
+  return props.activeFolder !== 'all' && props.activeFolder !== 'except' && props.activeFolder !== 'deleted' && props.activeFolder !== 'archive' && props.activeFolder !== 'permanently_deleted' && props.activeFolder !== 'hidden'
 })
+
+// The Archive tab has two sub-views: still-recoverable "Archive" and
+// "Permanently deleted" - shown as a small segmented switch whenever either
+// is active, so the choice reads as "2 tabs inside Archive" rather than a
+// separate top-level filter.
+const isInArchiveSection = computed(() => (
+  props.activeFolder === 'deleted' || props.activeFolder === 'archive' || props.activeFolder === 'permanently_deleted'
+))
 
 const activeFolderName = computed(() => {
   if (props.activeFolder === 'all') return 'All'
   if (props.activeFolder === 'except') return 'Except'
   if (props.activeFolder === 'deleted' || props.activeFolder === 'archive') return 'Archive'
+  if (props.activeFolder === 'permanently_deleted') return 'Permanently Deleted'
   if (props.activeFolder === 'hidden') return 'Hidden'
   const f = props.folders.find(x => String(x.id) === String(props.activeFolder))
   return f ? f.name : props.activeFolder
@@ -122,12 +131,12 @@ const activeFolderName = computed(() => {
           </span>
         </button>
 
-        <!-- Archive Tab -->
+        <!-- Archive Tab (covers both its "Archive" and "Permanently Deleted" sub-tabs) -->
         <button
           @click="emit('select', 'deleted')"
           class="relative text-sm font-semibold transition-all cursor-pointer whitespace-nowrap pb-2.5 -mb-3 border-b-2"
           :class="[
-            activeFolder === 'deleted' || activeFolder === 'archive'
+            isInArchiveSection
               ? 'text-blue-600 dark:text-blue-400 border-blue-600 dark:border-blue-400 font-bold'
               : 'text-zinc-600 dark:text-zinc-400 border-transparent hover:text-zinc-900 dark:hover:text-zinc-100'
           ]"
@@ -135,12 +144,49 @@ const activeFolderName = computed(() => {
           <span>Archive</span>
           <span
             class="ml-1 text-xs font-normal"
-            :class="activeFolder === 'deleted' || activeFolder === 'archive' ? 'text-blue-600 dark:text-blue-400 font-semibold' : 'text-zinc-400 dark:text-zinc-500'"
+            :class="isInArchiveSection ? 'text-blue-600 dark:text-blue-400 font-semibold' : 'text-zinc-400 dark:text-zinc-500'"
           >
-            ({{ folderCounts?.deleted ?? 0 }})
+            ({{ (folderCounts?.deleted ?? 0) + (folderCounts?.permanently_deleted ?? 0) }})
           </span>
         </button>
       </div>
+    </div>
+
+    <!-- Archive Sub-Tabs: Archive (recoverable) vs Permanently Deleted (hidden, but never actually deleted) -->
+    <div v-if="isInArchiveSection" class="flex items-center gap-1.5 px-1 pt-0.5">
+      <button
+        type="button"
+        @click="emit('select', 'deleted')"
+        class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer"
+        :class="(activeFolder === 'deleted' || activeFolder === 'archive')
+          ? 'bg-blue-600 text-white shadow-xs'
+          : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200'"
+      >
+        <span>Archive</span>
+        <span
+          class="text-[11px] font-normal"
+          :class="(activeFolder === 'deleted' || activeFolder === 'archive') ? 'text-blue-100' : 'text-zinc-400 dark:text-zinc-500'"
+        >
+          ({{ folderCounts?.deleted ?? 0 }})
+        </span>
+      </button>
+
+      <button
+        type="button"
+        @click="emit('select', 'permanently_deleted')"
+        class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer"
+        :class="activeFolder === 'permanently_deleted'
+          ? 'bg-rose-600 text-white shadow-xs'
+          : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200'"
+      >
+        <span>Permanently Deleted</span>
+        <span
+          class="text-[11px] font-normal"
+          :class="activeFolder === 'permanently_deleted' ? 'text-rose-100' : 'text-zinc-400 dark:text-zinc-500'"
+        >
+          ({{ folderCounts?.permanently_deleted ?? 0 }})
+        </span>
+      </button>
     </div>
 
     <!-- Subtitle Bar matching the screenshot -->

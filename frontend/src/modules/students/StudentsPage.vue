@@ -245,8 +245,9 @@ const dynamicFolderCounts = computed(() => {
   const counts: Record<string, number> = {
     all: activeList.length,
     except: activeList.filter(s => !s.folder_ids || s.folder_ids.length === 0).length,
-    deleted: list.filter(s => s.is_deleted).length,
-    archive: list.filter(s => s.is_deleted).length,
+    deleted: list.filter(s => s.is_deleted && !s.is_permanently_deleted).length,
+    archive: list.filter(s => s.is_deleted && !s.is_permanently_deleted).length,
+    permanently_deleted: list.filter(s => s.is_permanently_deleted).length,
     hidden: activeList.filter(s => s.status_hidden).length,
   }
   for (const f of folders.value) {
@@ -266,8 +267,10 @@ const folderScopedStudents = computed(() => {
   // 1. Folder Scope (In-Memory Filter - 0 network delay)
   const q = searchQuery.value.trim().toLowerCase()
 
-  if (activeFolder.value === 'deleted' || activeFolder.value === 'archive') {
-    list = list.filter(s => s.is_deleted)
+  if (activeFolder.value === 'permanently_deleted') {
+    list = list.filter(s => s.is_permanently_deleted)
+  } else if (activeFolder.value === 'deleted' || activeFolder.value === 'archive') {
+    list = list.filter(s => s.is_deleted && !s.is_permanently_deleted)
   } else if (activeFolder.value === 'hidden') {
     list = list.filter(s => !s.is_deleted && s.status_hidden)
   } else if (activeFolder.value === 'except') {
@@ -700,19 +703,14 @@ const restoreMutation = useMutation({
   }
 })
 
+// Note: "permanent delete" no longer removes the student from the roster -
+// the record's data is never lost. It just moves into its own "Permanently
+// Deleted" sub-tab of Archive, so the optimistic update flips the flag
+// instead of filtering the row out of the in-memory master list.
 const permanentDeleteMutation = useMutation({
   mutationFn: (id: string) => studentsApi.permanentDeleteStudent(id),
   onMutate: async (id) => {
-    queryClient.setQueryData<PaginatedResponse<Student> | { results: Student[] } | undefined>(
-      ['all-students-master'],
-      (oldData) => {
-        if (!oldData || !oldData.results) return oldData
-        return {
-          ...oldData,
-          results: oldData.results.filter((s) => s.id !== id),
-        }
-      }
-    )
+    updateMasterStudentOptimistically(id, s => ({ ...s, is_deleted: true, is_permanently_deleted: true }))
   },
   onSuccess: () => {
     queryClient.invalidateQueries({ queryKey: ['all-students-master'] })
@@ -722,7 +720,7 @@ const permanentDeleteMutation = useMutation({
     uiStore.addToast({
       type: 'error',
       title: 'Student Permanently Deleted',
-      message: 'Student removed completely.'
+      message: 'Moved to the Permanently Deleted tab. Data is retained, not erased.'
     })
   }
 })

@@ -1553,9 +1553,15 @@ const handleRestoreStudent = () => {
                     ID: <span class="font-mono text-blue-600 dark:text-blue-400 font-bold">{{ student.id }}</span>
                   </span>
                   <span class="w-1 h-1 rounded-full bg-zinc-300 dark:bg-zinc-700 shrink-0" />
-                  <!-- Active/Deleted Badge -->
+                  <!-- Active/Deleted/Permanently Deleted Badge -->
                   <span
-                    v-if="student.is_deleted"
+                    v-if="student.is_permanently_deleted"
+                    class="bg-rose-600/15 text-rose-700 dark:text-rose-400 border border-rose-600/25 px-1.5 py-0.2 rounded-full text-[10px] font-extrabold uppercase shrink-0"
+                  >
+                    PERMANENTLY DELETED
+                  </span>
+                  <span
+                    v-else-if="student.is_deleted"
                     class="bg-rose-500/10 text-rose-600 border border-rose-500/20 px-1.5 py-0.2 rounded-full text-[10px] font-extrabold uppercase shrink-0"
                   >
                     DELETED
@@ -1642,7 +1648,14 @@ const handleRestoreStudent = () => {
             </button>
 
             <!-- Delete / Restore -->
-            <template v-if="student.is_deleted">
+            <template v-if="student.is_permanently_deleted">
+              <span
+                class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-zinc-100/60 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700 text-zinc-500 dark:text-zinc-400 rounded-lg text-xs font-medium shrink-0"
+              >
+                Permanently deleted — data retained, no actions available
+              </span>
+            </template>
+            <template v-else-if="student.is_deleted">
               <button
                 type="button"
                 @click="handleRestoreStudent"
@@ -4199,7 +4212,7 @@ const handleRestoreStudent = () => {
           <div class="flex items-start justify-between">
             <div>
               <h3 class="text-base font-bold text-zinc-900 dark:text-zinc-100">Confirm Permanent Deletion</h3>
-              <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">This action cannot be undone.</p>
+              <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">There is no way back to this student from the app after this.</p>
             </div>
             <button @click="isPermanentConfirmOpen = false" class="rounded-lg p-1 text-zinc-400 hover:text-zinc-600">
               <X class="w-4 h-4" />
@@ -4209,7 +4222,7 @@ const handleRestoreStudent = () => {
           <div class="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-200 flex items-start gap-2.5">
             <AlertTriangle class="w-5 h-5 shrink-0 text-rose-600 mt-0.5" />
             <p class="leading-relaxed">
-              Are you sure you want to permanently delete <strong>{{ student?.full_name }}</strong> (ID: <strong>{{ student?.id }}</strong>)? All associated records will be permanently removed.
+              Are you sure you want to permanently delete <strong>{{ student?.full_name }}</strong> (ID: <strong>{{ student?.id }}</strong>)? The student will move to the Permanently Deleted tab and disappear from every other view. No data is erased - it stays in the database - but there's no button in the app to bring it back.
             </p>
           </div>
 
