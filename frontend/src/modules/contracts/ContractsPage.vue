@@ -1078,7 +1078,6 @@ async function handleUnarchive(contract: Contract) {
               <div class="h-[calc(100vh-175px)] min-h-0 flex flex-col overflow-hidden">
                 <ContractDocumentEditor
                   v-model:content="tariffEditingContent"
-                  :contract-number="activeTariff.name"
                   :title="activeTariff.name + ' Contract Template'"
                   :readonly="tariffViewMode === 'preview'"
                   :save-status="tariffSaveStatus"
