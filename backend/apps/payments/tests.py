@@ -130,19 +130,26 @@ class FinancialIntegrityTestCase(TestCase):
         self.student.refresh_from_db()
         self.assertEqual(self.student.balance, Decimal('-32500000.00'))
 
-    def test_evisa_certificate_pricing_distinction(self):
+    def test_evisa_variants_are_priced_by_their_own_names(self):
         """
-        E-VISA with language certificate is 16,000,000 UZS.
-        E-VISA without certificate is 24,000,000 UZS.
+        The two E-VISA variants are separate named tariffs, priced by name
+        alone - the language certificate never enters the calculation.
         """
-        price_with_cert = get_tariff_price('E-VISA', 'TOPIK')
-        self.assertEqual(price_with_cert, Decimal('16000000'))
+        self.assertEqual(
+            get_tariff_price('E-VISA (TIL SERTIFIKATLI)'), Decimal('16000000')
+        )
+        self.assertEqual(
+            get_tariff_price('E-VISA (TIL SERTIFIKATISIZ)'), Decimal('24000000')
+        )
 
-        price_without_cert = get_tariff_price('E-VISA', 'NO CERTIFICATE')
-        self.assertEqual(price_without_cert, Decimal('24000000'))
+        # A certificate argument must not change the resolved price.
+        self.assertEqual(
+            get_tariff_price('E-VISA (TIL SERTIFIKATISIZ)', 'TOPIK'),
+            Decimal('24000000'),
+        )
 
-        price_none_cert = get_tariff_price('E-VISA', None)
-        self.assertEqual(price_none_cert, Decimal('24000000'))
+        # The retired generic 'E-VISA' no longer resolves to a price.
+        self.assertEqual(get_tariff_price('E-VISA'), Decimal('0'))
 
 
 class StudentSerializerFinancialSyncTestCase(TestCase):

@@ -17,7 +17,8 @@ class StudentTariff(models.TextChoices):
     STANDART = 'STANDART', 'Standart'
     PREMIUM = 'PREMIUM', 'Premium'
     VISA_PLUS = 'VISA PLUS', 'Visa Plus'
-    E_VISA = 'E-VISA', 'E-Visa'
+    E_VISA_WITH_CERT = 'E-VISA (TIL SERTIFIKATLI)', 'E-Visa (with certificate)'
+    E_VISA_NO_CERT = 'E-VISA (TIL SERTIFIKATISIZ)', 'E-Visa (without certificate)'
     REGIONAL_VISA = 'REGIONAL VISA', 'Regional Visa'
     ZERO_RISK = 'ZERO RISK', 'Zero Risk'
 
@@ -108,6 +109,14 @@ class Student(TenantAwareModel):
     school_phone = models.CharField(max_length=50, blank=True, null=True)
     school_email = models.CharField(max_length=255, blank=True, null=True)
     tariff = models.CharField(max_length=50, blank=True, null=True, db_index=True)
+    # Price agreed with this student, captured when the tariff is assigned or
+    # changed. Balance is computed from this, NOT from the live TariffOption
+    # price: repricing a tariff in Settings must never move the balance of
+    # students who already signed at the old price. NULL means "never captured"
+    # (legacy rows), and the next recalculation fills it from the live price.
+    tariff_price = models.DecimalField(
+        max_digits=14, decimal_places=2, null=True, blank=True
+    )
 
     # 3. Language Certificates (Supports up to 3 slots)
     language_certificate = models.CharField(max_length=50, blank=True, null=True, db_index=True)

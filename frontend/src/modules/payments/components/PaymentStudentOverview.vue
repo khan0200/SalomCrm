@@ -469,11 +469,6 @@ onUnmounted(() => {
             class="text-[13px] font-bold px-2.5 py-1 rounded-[6px] bg-[#10b981] text-white uppercase shadow-2xs"
           >
             {{ student.tariff }}
-            <template v-if="student.tariff === 'E-VISA'">
-              {{ (student.language_certificate && student.language_certificate !== 'NO CERTIFICATE')
-                ? ' (TIL SERTIFIKATLI)'
-                : ' (TIL SERTIFIKATISIZ)' }}
-            </template>
           </span>
 
           <!-- Balance Badge (Red if < 0 debt, Green if >= 0) -->
@@ -559,11 +554,6 @@ onUnmounted(() => {
                   class="inline-flex px-2 py-0.5 rounded-[4px] text-[12px] font-bold bg-[#10b981] text-white uppercase shadow-2xs"
                 >
                   {{ student.tariff }}
-                  <template v-if="student.tariff === 'E-VISA'">
-                    {{ (student.language_certificate && student.language_certificate !== 'NO CERTIFICATE')
-                      ? ' (TIL SERTIFIKATLI)'
-                      : ' (TIL SERTIFIKATISIZ)' }}
-                  </template>
                 </span>
                 <span v-else class="text-zinc-400">—</span>
               </td>

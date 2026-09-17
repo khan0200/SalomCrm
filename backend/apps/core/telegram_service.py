@@ -190,12 +190,6 @@ def notify_payment_received(payment: Any, student: Optional[Any] = None) -> None
         tariff_name = "-"
         if student_obj and student_obj.tariff:
             tariff_name = student_obj.tariff
-            if student_obj.tariff == "E-VISA":
-                cert = getattr(student_obj, 'language_certificate', None)
-                if cert and cert != "NO CERTIFICATE":
-                    tariff_name += " (TIL SERTIFIKATLI)"
-                else:
-                    tariff_name += " (TIL SERTIFIKATISIZ)"
 
         amount_str = format_uzs(payment.amount)
         balance_str = format_uzs_signed(student_obj.balance) if student_obj and student_obj.balance is not None else "-"

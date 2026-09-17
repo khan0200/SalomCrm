@@ -247,7 +247,10 @@ class StudentCreateUpdateSerializer(serializers.ModelSerializer):
         # (e.g. the Telegram bot) may read balance right after this request.
         if financials_changed:
             from apps.payments.services import recalculate_student_financials
-            instance = recalculate_student_financials(instance)
+            # The tariff itself changed, so re-capture the price: the student is
+            # now owed against the newly chosen tariff's current price, not the
+            # one captured for the tariff they moved off.
+            instance = recalculate_student_financials(instance, reprice=True)
 
         return instance
 

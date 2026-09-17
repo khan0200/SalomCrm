@@ -6,12 +6,16 @@ export const DEFAULT_TARIFF_PRICES: Record<string, number> = {
   'E-VISA (TIL SERTIFIKATLI)': 16000000,
   'REGIONAL VISA': 24000000,
   'ZERO RISK': 18500000,
-  'E-VISA': 24000000,
 }
 
 /**
- * Calculates the price of a tariff for a student, taking into account custom
- * tariff prices configured in settings, specific tariff variant names, and language certificates.
+ * Calculates the price of a tariff for a student from custom tariff prices
+ * configured in settings, normalising the known E-VISA variant spellings onto
+ * their canonical tariff names.
+ *
+ * The two E-VISA variants are separate named tariffs; there is no generic
+ * 'E-VISA' priced from the language certificate, so `languageCertificate` is
+ * ignored and kept only so existing call sites keep compiling.
  */
 export function getTariffPrice(
   tariff: string | null | undefined,
@@ -61,32 +65,14 @@ export function getTariffPrice(
     return 24000000
   }
 
-  // 2. Exact match in prices (case-insensitive) - if cleanTariff is not generic E-VISA
-  if (cleanTariff !== 'E-VISA') {
-    const directMatch = Object.entries(priceMap).find(([k]) => k.trim().toUpperCase() === cleanTariff)
-    if (directMatch && Number(directMatch[1]) !== undefined && Number(directMatch[1]) > 0) {
-      return Number(directMatch[1])
-    }
-  }
-
-  // 3. E-VISA generic resolution based on language certificate
-  if (cleanTariff.includes('E-VISA')) {
-    const hasCert = !!languageCertificate && languageCertificate !== 'NO CERTIFICATE' && languageCertificate.trim() !== ''
-    const targetName = hasCert ? 'E-VISA (TIL SERTIFIKATLI)' : 'E-VISA (TIL SERTIFIKATISIZ)'
-
-    const foundMatch = Object.entries(priceMap).find(([k]) => k.trim().toUpperCase() === targetName)
-    if (foundMatch && Number(foundMatch[1]) > 0) return Number(foundMatch[1])
-
-    return hasCert ? 16000000 : 24000000
-  }
-
-  // 4. Any other exact match in prices
+  // 2. Exact match in the configured prices. A configured price of 0 means
+  // "not really priced here", so it falls through to the defaults below.
   const directMatch = Object.entries(priceMap).find(([k]) => k.trim().toUpperCase() === cleanTariff)
-  if (directMatch && Number(directMatch[1]) !== undefined) {
+  if (directMatch && Number(directMatch[1]) > 0) {
     return Number(directMatch[1])
   }
 
-  // 5. Fallback defaults
+  // 3. Fallback defaults
   const fallback = DEFAULT_TARIFF_PRICES[cleanTariff]
   return fallback !== undefined ? fallback : 0
 }

@@ -86,7 +86,6 @@ class Command(BaseCommand):
             ('E-VISA (TIL SERTIFIKATLI)', Decimal('16000000')),
             ('REGIONAL VISA', Decimal('24000000')),
             ('ZERO RISK', Decimal('18500000')),
-            ('E-VISA', Decimal('2000000')),
         ]
         for name, price in tariffs:
             TariffOption.objects.get_or_create(tenant=tenant_ub, name=name, defaults={'price': price})
@@ -236,7 +235,7 @@ class Command(BaseCommand):
                 'phone1': '94-252-15-10',
                 'phone2': '50-886-60-38',
                 'level': 'MASTER NO CERTIFICATE',
-                'tariff': 'E-VISA (TIL SERTIFIKATSIZ)',
+                'tariff': 'E-VISA (TIL SERTIFIKATISIZ)',
                 'language_certificate': 'NO CERTIFICATE',
                 'university_1': 'JEONJU UNIVERSITY (WANSAN, JEONJU)',
                 'university_1_status': 'Accepted',
@@ -313,7 +312,7 @@ class Command(BaseCommand):
                 'passport': 'FC5544332',
                 'phone1': '93-456-78-90',
                 'level': 'LANGUAGE COURSE',
-                'tariff': 'E-VISA',
+                'tariff': 'E-VISA (TIL SERTIFIKATISIZ)',
                 'language_certificate': 'NO CERTIFICATE',
                 'certificate_score': None,
                 'university_1': 'YEUNGNAM UNIVERSITY',

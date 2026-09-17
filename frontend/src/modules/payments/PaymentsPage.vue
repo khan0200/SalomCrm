@@ -306,12 +306,6 @@ const filteredStudents = computed(() => {
         if (selected === 'No Tariff' && !s.tariff) {
           matchesTariff = true
           break
-        } else if (selected === 'E-VISA (TIL SERTIFIKATLI)' && s.tariff === 'E-VISA' && s.language_certificate && s.language_certificate !== 'NO CERTIFICATE') {
-          matchesTariff = true
-          break
-        } else if (selected === 'E-VISA (TIL SERTIFIKATISIZ)' && s.tariff === 'E-VISA' && (!s.language_certificate || s.language_certificate === 'NO CERTIFICATE')) {
-          matchesTariff = true
-          break
         } else if (s.tariff === selected) {
           matchesTariff = true
           break
@@ -747,12 +741,7 @@ const exportStudentOverviewToExcel = async () => {
     const balance = Number(s.balance) || 0
     const discount = Number(s.discount) || 0
     const paid = Number(s.payments_sum ?? (s as any).paid_amount ?? 0)
-    let tariffName = s.tariff || 'No Tariff'
-    if (s.tariff === 'E-VISA') {
-      tariffName += (s.language_certificate && s.language_certificate !== 'NO CERTIFICATE')
-        ? ' (TIL SERTIFIKATLI)'
-        : ' (TIL SERTIFIKATISIZ)'
-    }
+    const tariffName = s.tariff || 'No Tariff'
     let finStatus = 'Fully Paid'
     if (balance < 0) finStatus = 'In Debt'
     else if (balance > 0) finStatus = 'Advance / Overpaid'

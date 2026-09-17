@@ -824,10 +824,6 @@ const isStudentSelected = (id: string) => selectedStudentIds.value.has(id)
 // ─── Student Row display helpers ────────────────────────────────────────────
 const getTariffDisplayName = (s: Student): string => {
   if (!s.tariff) return 'NO TARIFF'
-  if (s.tariff === 'E-VISA') {
-    const hasCert = !!s.language_certificate && s.language_certificate !== 'NO CERTIFICATE'
-    return `E-VISA ${hasCert ? '(TIL SERTIFIKATLI)' : '(TIL SERTIFIKATISIZ)'}`
-  }
   return s.tariff
 }
 

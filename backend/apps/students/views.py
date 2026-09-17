@@ -2380,6 +2380,10 @@ class ContractViewSet(viewsets.ModelViewSet):
             if not crm_student.tariff and contract.tariff_name:
                 crm_student.tariff = contract.tariff_name
                 updates.append('tariff')
+                # Drop any stale captured price so the next recalculation
+                # captures this newly assigned tariff's current price.
+                crm_student.tariff_price = None
+                updates.append('tariff_price')
             if not crm_student.level and contract.education_level:
                 crm_student.level = contract.education_level
                 updates.append('level')

@@ -43,7 +43,7 @@ export interface UserProfile {
 }
 
 export type StudentLevel = 'COLLEGE' | 'BACHELOR' | 'MASTERS' | 'MASTER NO CERTIFICATE' | 'LANGUAGE COURSE'
-export type StudentTariff = 'STANDART' | 'PREMIUM' | 'VISA PLUS' | 'E-VISA' | 'REGIONAL VISA' | 'ZERO RISK'
+export type StudentTariff = 'STANDART' | 'PREMIUM' | 'VISA PLUS' | 'E-VISA (TIL SERTIFIKATLI)' | 'E-VISA (TIL SERTIFIKATISIZ)' | 'REGIONAL VISA' | 'ZERO RISK'
 export type StudentLanguageCertificate = 'TOPIK' | 'IELTS' | 'TOEFL' | 'CEFR' | 'SAT' | 'SKA' | 'NO CERTIFICATE'
 
 export interface Folder {

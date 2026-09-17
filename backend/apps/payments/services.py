@@ -13,25 +13,20 @@ DEFAULT_TARIFF_PRICES = {
     'E-VISA (TIL SERTIFIKATLI)': Decimal('16000000'),
     'REGIONAL VISA': Decimal('24000000'),
     'ZERO RISK': Decimal('18500000'),
-    'E-VISA': Decimal('24000000'),  # Default if certificate not specified
 }
 
 def get_tariff_price(tariff_name, certificate=None, tenant=None):
     """
     Computes price of a tariff in UZS.
-    Handles dynamic E-VISA distinction:
-    - E-VISA with language certificate -> 16,000,000 UZS
-    - E-VISA without certificate -> 24,000,000 UZS
+
+    The two E-VISA variants are separate, explicitly named tariffs; there is no
+    generic 'E-VISA' whose price is derived from the language certificate.
+    `certificate` is kept in the signature for call-site compatibility.
     """
     if not tariff_name or tariff_name in ('No Tariff', 'Select', 'None', ''):
         return Decimal('0')
 
     tariff_upper = str(tariff_name).strip().upper()
-
-    # Dynamic E-VISA pricing rule
-    if tariff_upper == 'E-VISA':
-        has_cert = bool(certificate and str(certificate).strip().upper() not in ('NO CERTIFICATE', '', 'NONE'))
-        return DEFAULT_TARIFF_PRICES['E-VISA (TIL SERTIFIKATLI)'] if has_cert else DEFAULT_TARIFF_PRICES['E-VISA (TIL SERTIFIKATISIZ)']
 
     # Look up from tenant tariff options if available
     if tenant:
@@ -43,13 +38,18 @@ def get_tariff_price(tariff_name, certificate=None, tenant=None):
     return DEFAULT_TARIFF_PRICES.get(tariff_upper, Decimal('0'))
 
 
-def recalculate_student_financials(student):
+def recalculate_student_financials(student, reprice=False):
     """
     Recalculates a student's balance and discount strictly from payment history and assigned tariff.
     Formula: Balance = (Total Payments + Total Discount) - Tariff Price - abs(Total Withdrawals)
     - Negative balance indicates remaining debt.
     - Zero balance indicates fully paid.
     - Positive balance indicates overpayment.
+
+    The tariff price comes from the student's own `tariff_price` snapshot, so
+    editing a tariff's price in Settings never moves the balance of students who
+    already signed at the old price. Pass reprice=True when the student's tariff
+    itself changed - that re-captures the newly chosen tariff's current price.
     """
     from apps.students.models import Student
     with cast(Any, transaction.atomic()):
@@ -74,8 +74,16 @@ def recalculate_student_financials(student):
         )['total'] or Decimal('0.00')
         withdrawals_abs = abs(withdrawals_sum)
 
-        # 4. Get tariff price
-        tariff_price = get_tariff_price(student_obj.tariff, student_obj.language_certificate, student_obj.tenant)
+        # 4. Resolve the tariff price from the student's own snapshot, capturing
+        # it from the live tariff when the tariff was just (re)assigned or when
+        # this student predates snapshotting.
+        updated_fields = ['balance', 'discount', 'updated_at']
+        if reprice or student_obj.tariff_price is None:
+            student_obj.tariff_price = get_tariff_price(
+                student_obj.tariff, student_obj.language_certificate, student_obj.tenant
+            )
+            updated_fields.append('tariff_price')
+        tariff_price = student_obj.tariff_price or Decimal('0')
 
         # 5. Compute balance: (Payments + Discount) - Tariff - Withdrawals
         if tariff_price > 0:
@@ -85,7 +93,7 @@ def recalculate_student_financials(student):
 
         student_obj.balance = computed_balance
         student_obj.discount = discounts_sum
-        student_obj.save(update_fields=['balance', 'discount', 'updated_at'])
+        student_obj.save(update_fields=updated_fields)
         return student_obj
 
 
