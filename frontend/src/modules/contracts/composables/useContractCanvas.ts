@@ -539,103 +539,6 @@ export function useContractCanvas(initialDoc?: ContractDocumentModel) {
     const targetCenterY = calcY + calcH / 2
     const targetBottom = calcY + calcH
 
-    // 1. Page Bounds & Margin Snaps (X Axis)
-    const xSnaps = [
-      { pos: 0,                             label: 'Page Left' },
-      { pos: margins.left,                  label: 'Left Margin' },
-      { pos: pageCenterHoriz,               label: 'Center Page (X)' },
-      { pos: PAGE_WIDTH_MM - margins.right, label: 'Right Margin' },
-      { pos: PAGE_WIDTH_MM,                 label: 'Page Right' },
-    ]
-
-    for (const snap of xSnaps) {
-      // Align Left edge
-      if (Math.abs(calcX - snap.pos) < SNAP_THRESHOLD_MM) {
-        snappedX = snap.pos
-        guides.push({
-          type: 'vertical',
-          position: snap.pos,
-          start: 0,
-          end: PAGE_HEIGHT_MM,
-          label: snap.label,
-        })
-        break
-      }
-      // Align Center
-      if (Math.abs(targetCenterX - snap.pos) < SNAP_THRESHOLD_MM) {
-        snappedX = snap.pos - calcW / 2
-        guides.push({
-          type: 'vertical',
-          position: snap.pos,
-          start: 0,
-          end: PAGE_HEIGHT_MM,
-          label: snap.label,
-        })
-        break
-      }
-      // Align Right edge
-      if (Math.abs(targetRight - snap.pos) < SNAP_THRESHOLD_MM) {
-        snappedX = snap.pos - calcW
-        guides.push({
-          type: 'vertical',
-          position: snap.pos,
-          start: 0,
-          end: PAGE_HEIGHT_MM,
-          label: snap.label,
-        })
-        break
-      }
-    }
-
-    // 2. Page Bounds & Margin Snaps (Y Axis)
-    const ySnaps = [
-      { pos: 0,                               label: 'Page Top' },
-      { pos: margins.top,                     label: 'Top Margin' },
-      { pos: pageCenterVert,                  label: 'Center Page (Y)' },
-      { pos: PAGE_HEIGHT_MM - margins.bottom, label: 'Bottom Margin' },
-      { pos: PAGE_HEIGHT_MM,                  label: 'Page Bottom' },
-    ]
-
-    for (const snap of ySnaps) {
-      // Align Top edge
-      if (Math.abs(calcY - snap.pos) < SNAP_THRESHOLD_MM) {
-        snappedY = snap.pos
-        guides.push({
-          type: 'horizontal',
-          position: snap.pos,
-          start: 0,
-          end: PAGE_WIDTH_MM,
-          label: snap.label,
-        })
-        break
-      }
-      // Align Center
-      if (Math.abs(targetCenterY - snap.pos) < SNAP_THRESHOLD_MM) {
-        snappedY = snap.pos - calcH / 2
-        guides.push({
-          type: 'horizontal',
-          position: snap.pos,
-          start: 0,
-          end: PAGE_WIDTH_MM,
-          label: snap.label,
-        })
-        break
-      }
-      // Align Bottom edge
-      if (Math.abs(targetBottom - snap.pos) < SNAP_THRESHOLD_MM) {
-        snappedY = snap.pos - calcH
-        guides.push({
-          type: 'horizontal',
-          position: snap.pos,
-          start: 0,
-          end: PAGE_WIDTH_MM,
-          label: snap.label,
-        })
-        break
-      }
-    }
-
-    // 3. Other Elements on Page Snaps
     const primaryIdStr = typeof ignoreId === 'string' ? ignoreId : (ignoreId[0] || '')
     const pageIndex = findElementAndPage(primaryIdStr)?.pageIndex ?? activePageIndex.value
     const targetPage = document.value.pages[pageIndex] || activePage.value
@@ -643,105 +546,159 @@ export function useContractCanvas(initialDoc?: ContractDocumentModel) {
       el => !ignoreSet.has(el.id) && !el.hidden
     )
 
-    // 2.5 User-placed Guides — GLOBAL (document.guides, not per-page), same
-    // coordinate space as elements/ruler/margins. Checked after page-bound
-    // snaps but before other elements — a guide the user deliberately placed
-    // should win a tie against an incidental element edge. Only fires when a
-    // break hasn't already been hit above (snappedX/snappedY only get
-    // overwritten if this guide is a closer match than whatever's already
-    // been chosen, mirroring how "Other Elements" below also unconditionally
-    // overwrites — last strongest match wins since every check uses the same
-    // SNAP_THRESHOLD).
-    const docGuides = (document.value.guides || []).filter(g => g.visible !== false)
-    for (const guide of docGuides) {
-      if (guide.type === 'vertical') {
-        const gx = guide.position
-        if (Math.abs(calcX - gx) < SNAP_THRESHOLD_MM) {
-          snappedX = gx
-          guides.push({ type: 'vertical', position: gx, start: 0, end: PAGE_HEIGHT_MM, label: `X: ${formatDistanceMm(gx)}` })
-        } else if (Math.abs(targetCenterX - gx) < SNAP_THRESHOLD_MM) {
-          snappedX = gx - calcW / 2
-          guides.push({ type: 'vertical', position: gx, start: 0, end: PAGE_HEIGHT_MM, label: `X: ${formatDistanceMm(gx)}` })
-        } else if (Math.abs(targetRight - gx) < SNAP_THRESHOLD_MM) {
-          snappedX = gx - calcW
-          guides.push({ type: 'vertical', position: gx, start: 0, end: PAGE_HEIGHT_MM, label: `X: ${formatDistanceMm(gx)}` })
-        }
-      } else {
-        const gy = guide.position
-        if (Math.abs(calcY - gy) < SNAP_THRESHOLD_MM) {
-          snappedY = gy
-          guides.push({ type: 'horizontal', position: gy, start: 0, end: PAGE_WIDTH_MM, label: `Y: ${formatDistanceMm(gy)}` })
-        } else if (Math.abs(targetCenterY - gy) < SNAP_THRESHOLD_MM) {
-          snappedY = gy - calcH / 2
-          guides.push({ type: 'horizontal', position: gy, start: 0, end: PAGE_WIDTH_MM, label: `Y: ${formatDistanceMm(gy)}` })
-        } else if (Math.abs(targetBottom - gy) < SNAP_THRESHOLD_MM) {
-          snappedY = gy - calcH
-          guides.push({ type: 'horizontal', position: gy, start: 0, end: PAGE_WIDTH_MM, label: `Y: ${formatDistanceMm(gy)}` })
+    // ─── Unified Snap Resolution (Canva/Figma style: exactly ONE guide line
+    // per axis, always the single closest candidate) ───────────────────────
+    // Every possible snap target — page edges, margins, page center,
+    // user-placed guides, and other elements' edges/centers — is collected
+    // into one flat candidate list per axis, then reduced to whichever
+    // candidate is numerically closest to the dragged/resized shape. This
+    // replaces the old design where page-bounds, guides, and each element
+    // were checked in separate sequential passes that each unconditionally
+    // overwrote the previous match — that's what let a weaker/farther
+    // element-edge match silently beat a closer margin or guide, and let
+    // several elements each contribute their own line at once instead of
+    // showing only the winning one.
+    interface SnapCandidate {
+      pos: number // fixed target position this candidate sits at, in mm
+      guidePos: number // mm position where the guide LINE itself should be drawn (usually === pos)
+      span: [number, number] // guide line's start/end extent along the cross axis, in mm
+      label?: string
+      priority: number // lower wins a tie (user guides > page/margin > other elements)
+    }
+
+    function pickBestCandidate(
+      candidates: SnapCandidate[],
+      calcPos: number,
+      calcCenter: number,
+      calcEnd: number,
+      calcSize: number
+    ): { snapped: number; guidePos: number; span: [number, number]; label?: string } | null {
+      let best: { candidate: SnapCandidate; edge: 'start' | 'center' | 'end'; dist: number } | null = null
+
+      for (const c of candidates) {
+        const checks: Array<['start' | 'center' | 'end', number]> = [
+          ['start', calcPos],
+          ['center', calcCenter],
+          ['end', calcEnd],
+        ]
+        for (const [edge, value] of checks) {
+          const dist = Math.abs(value - c.pos)
+          if (dist >= SNAP_THRESHOLD_MM) continue
+          if (
+            !best ||
+            dist < best.dist - 1e-6 ||
+            (Math.abs(dist - best.dist) <= 1e-6 && c.priority < best.candidate.priority)
+          ) {
+            best = { candidate: c, edge, dist }
+          }
         }
       }
+
+      if (!best) return null
+
+      const snapped =
+        best.edge === 'start' ? best.candidate.pos :
+        best.edge === 'center' ? best.candidate.pos - calcSize / 2 :
+        best.candidate.pos - calcSize
+
+      return { snapped, guidePos: best.candidate.guidePos, span: best.candidate.span, label: best.candidate.label }
+    }
+
+    // Priority tiers: user guides win ties over page/margin, which win ties
+    // over other elements — matching the old code's effective behavior
+    // (guides were checked after page bounds but the "closest wins" rule
+    // above is what actually matters; priority only breaks exact ties).
+    const PRIORITY_GUIDE = 0
+    const PRIORITY_PAGE_MARGIN = 1
+    const PRIORITY_ELEMENT = 2
+
+    // ─── X Axis Candidates ──────────────────────────────────────────────
+    const xCandidates: SnapCandidate[] = [
+      { pos: 0, guidePos: 0, span: [0, PAGE_HEIGHT_MM], label: 'Page Left', priority: PRIORITY_PAGE_MARGIN },
+      { pos: margins.left, guidePos: margins.left, span: [0, PAGE_HEIGHT_MM], label: 'Left Margin', priority: PRIORITY_PAGE_MARGIN },
+      { pos: pageCenterHoriz, guidePos: pageCenterHoriz, span: [0, PAGE_HEIGHT_MM], label: 'Center Page', priority: PRIORITY_PAGE_MARGIN },
+      { pos: PAGE_WIDTH_MM - margins.right, guidePos: PAGE_WIDTH_MM - margins.right, span: [0, PAGE_HEIGHT_MM], label: 'Right Margin', priority: PRIORITY_PAGE_MARGIN },
+      { pos: PAGE_WIDTH_MM, guidePos: PAGE_WIDTH_MM, span: [0, PAGE_HEIGHT_MM], label: 'Page Right', priority: PRIORITY_PAGE_MARGIN },
+    ]
+
+    const docGuides = (document.value.guides || []).filter(g => g.visible !== false)
+    for (const guide of docGuides) {
+      if (guide.type !== 'vertical') continue
+      xCandidates.push({
+        pos: guide.position,
+        guidePos: guide.position,
+        span: [0, PAGE_HEIGHT_MM],
+        label: `X: ${formatDistanceMm(guide.position)}`,
+        priority: PRIORITY_GUIDE,
+      })
     }
 
     for (const other of otherElements) {
-      const otherCenterX = other.x + other.width / 2
-      const otherRight = other.x + other.width
-      const otherCenterY = other.y + other.height / 2
-      const otherBottom = other.y + other.height
-
-      // Horizontal element alignments
-      if (Math.abs(calcX - other.x) < SNAP_THRESHOLD_MM) {
-        snappedX = other.x
-        guides.push({ type: 'vertical', position: other.x,
-          start: Math.min(calcY, other.y), end: Math.max(targetBottom, otherBottom) })
-      } else if (Math.abs(targetCenterX - otherCenterX) < SNAP_THRESHOLD_MM) {
-        snappedX = otherCenterX - calcW / 2
-        guides.push({ type: 'vertical', position: otherCenterX,
-          start: Math.min(calcY, other.y), end: Math.max(targetBottom, otherBottom) })
-      } else if (Math.abs(targetRight - otherRight) < SNAP_THRESHOLD_MM) {
-        snappedX = otherRight - calcW
-        guides.push({ type: 'vertical', position: otherRight,
-          start: Math.min(calcY, other.y), end: Math.max(targetBottom, otherBottom) })
-      } else if (Math.abs(targetRight - other.x) < SNAP_THRESHOLD_MM) {
-        snappedX = other.x - calcW
-        guides.push({ type: 'vertical', position: other.x,
-          start: Math.min(calcY, other.y), end: Math.max(targetBottom, otherBottom) })
-      } else if (Math.abs(calcX - otherRight) < SNAP_THRESHOLD_MM) {
-        snappedX = otherRight
-        guides.push({ type: 'vertical', position: otherRight,
-          start: Math.min(calcY, other.y), end: Math.max(targetBottom, otherBottom) })
-      }
-
-      // Vertical element alignments
-      if (Math.abs(calcY - other.y) < SNAP_THRESHOLD_MM) {
-        snappedY = other.y
-        guides.push({ type: 'horizontal', position: other.y,
-          start: Math.min(calcX, other.x), end: Math.max(targetRight, otherRight) })
-      } else if (Math.abs(targetCenterY - otherCenterY) < SNAP_THRESHOLD_MM) {
-        snappedY = otherCenterY - calcH / 2
-        guides.push({ type: 'horizontal', position: otherCenterY,
-          start: Math.min(calcX, other.x), end: Math.max(targetRight, otherRight) })
-      } else if (Math.abs(targetBottom - otherBottom) < SNAP_THRESHOLD_MM) {
-        snappedY = otherBottom - calcH
-        guides.push({ type: 'horizontal', position: otherBottom,
-          start: Math.min(calcX, other.x), end: Math.max(targetRight, otherRight) })
-      } else if (Math.abs(targetBottom - other.y) < SNAP_THRESHOLD_MM) {
-        snappedY = other.y - calcH
-        guides.push({ type: 'horizontal', position: other.y,
-          start: Math.min(calcX, other.x), end: Math.max(targetRight, otherRight) })
-      } else if (Math.abs(calcY - otherBottom) < SNAP_THRESHOLD_MM) {
-        snappedY = otherBottom
-        guides.push({ type: 'horizontal', position: otherBottom,
-          start: Math.min(calcX, other.x), end: Math.max(targetRight, otherRight) })
-      }
+      const oRight = other.x + other.width
+      const oCenter = other.x + other.width / 2
+      const oSpan: [number, number] = [Math.min(calcY, other.y), Math.max(targetBottom, other.y + other.height)]
+      xCandidates.push(
+        { pos: other.x, guidePos: other.x, span: oSpan, priority: PRIORITY_ELEMENT },
+        { pos: oCenter, guidePos: oCenter, span: oSpan, priority: PRIORITY_ELEMENT },
+        { pos: oRight, guidePos: oRight, span: oSpan, priority: PRIORITY_ELEMENT },
+      )
     }
 
-    // 4. Equal Spacing Snapping (during drag only)
+    const xResult = pickBestCandidate(xCandidates, calcX, targetCenterX, targetRight, calcW)
+    if (xResult) {
+      snappedX = xResult.snapped
+      guides.push({ type: 'vertical', position: xResult.guidePos, start: xResult.span[0], end: xResult.span[1], label: xResult.label })
+    }
+
+    // ─── Y Axis Candidates ──────────────────────────────────────────────
+    const yCandidates: SnapCandidate[] = [
+      { pos: 0, guidePos: 0, span: [0, PAGE_WIDTH_MM], label: 'Page Top', priority: PRIORITY_PAGE_MARGIN },
+      { pos: margins.top, guidePos: margins.top, span: [0, PAGE_WIDTH_MM], label: 'Top Margin', priority: PRIORITY_PAGE_MARGIN },
+      { pos: pageCenterVert, guidePos: pageCenterVert, span: [0, PAGE_WIDTH_MM], label: 'Center Page', priority: PRIORITY_PAGE_MARGIN },
+      { pos: PAGE_HEIGHT_MM - margins.bottom, guidePos: PAGE_HEIGHT_MM - margins.bottom, span: [0, PAGE_WIDTH_MM], label: 'Bottom Margin', priority: PRIORITY_PAGE_MARGIN },
+      { pos: PAGE_HEIGHT_MM, guidePos: PAGE_HEIGHT_MM, span: [0, PAGE_WIDTH_MM], label: 'Page Bottom', priority: PRIORITY_PAGE_MARGIN },
+    ]
+
+    for (const guide of docGuides) {
+      if (guide.type !== 'horizontal') continue
+      yCandidates.push({
+        pos: guide.position,
+        guidePos: guide.position,
+        span: [0, PAGE_WIDTH_MM],
+        label: `Y: ${formatDistanceMm(guide.position)}`,
+        priority: PRIORITY_GUIDE,
+      })
+    }
+
+    for (const other of otherElements) {
+      const oBottom = other.y + other.height
+      const oCenter = other.y + other.height / 2
+      const oSpan: [number, number] = [Math.min(calcX, other.x), Math.max(targetRight, other.x + other.width)]
+      yCandidates.push(
+        { pos: other.y, guidePos: other.y, span: oSpan, priority: PRIORITY_ELEMENT },
+        { pos: oCenter, guidePos: oCenter, span: oSpan, priority: PRIORITY_ELEMENT },
+        { pos: oBottom, guidePos: oBottom, span: oSpan, priority: PRIORITY_ELEMENT },
+      )
+    }
+
+    const yResult = pickBestCandidate(yCandidates, calcY, targetCenterY, targetBottom, calcH)
+    if (yResult) {
+      snappedY = yResult.snapped
+      guides.push({ type: 'horizontal', position: yResult.guidePos, start: yResult.span[0], end: yResult.span[1], label: yResult.label })
+    }
+
+    // 4. Equal Spacing Snapping (during drag only).
+    // Only allowed to override the alignment-snap result above (xResult/
+    // yResult) when it's a genuinely closer match, not unconditionally —
+    // otherwise equal-spacing could silently un-snap an element from a
+    // margin/guide/edge it had already correctly locked onto.
     if (!isResize && otherElements.length >= 2) {
       // Horizontal Equal Spacing between Left and Right elements
       const leftCandidates = otherElements.filter(o => o.x + o.width <= calcX + SNAP_THRESHOLD_MM)
       const rightCandidates = otherElements.filter(o => o.x >= calcX + calcW - SNAP_THRESHOLD_MM)
 
       let bestEqualX: number | null = null
-      let minEqualXDiff = SNAP_THRESHOLD_MM
+      let minEqualXDiff = xResult ? Math.abs(calcX - snappedX) : SNAP_THRESHOLD_MM
 
       for (const leftEl of leftCandidates) {
         const leftEdge = leftEl.x + leftEl.width
@@ -789,7 +746,7 @@ export function useContractCanvas(initialDoc?: ContractDocumentModel) {
       const bottomCandidates = otherElements.filter(o => o.y >= calcY + calcH - SNAP_THRESHOLD_MM)
 
       let bestEqualY: number | null = null
-      let minEqualYDiff = SNAP_THRESHOLD_MM
+      let minEqualYDiff = yResult ? Math.abs(calcY - snappedY) : SNAP_THRESHOLD_MM
 
       for (const topEl of topCandidates) {
         const topEdge = topEl.y + topEl.height
