@@ -72,6 +72,15 @@ export interface TableCellModel {
     left?: string
     right?: string
   }
+  /**
+   * Set only on a grid slot that a merge from another cell covers - points at
+   * that cell's (row, col). The grid stays a dense rows×cols array (every
+   * slot present) so r/c always mean literal grid coordinates everywhere
+   * (selection, arrow-key nav, insert/delete); a covered slot just renders
+   * nothing and forwards clicks/selection to its master. Never set together
+   * with colSpan/rowSpan/content on the same cell - only the master carries those.
+   */
+  coveredBy?: { r: number; c: number }
 }
 
 export interface TableCanvasElement extends BaseCanvasElement {
@@ -80,11 +89,19 @@ export interface TableCanvasElement extends BaseCanvasElement {
   cols: number
   colWidths: number[] // width of each column in mm (sum should equal width)
   rowHeights: number[] // min height of each row in mm (sum should approximate height)
-  cells: TableCellModel[][] // 2D array [row][col]
+  cells: TableCellModel[][] // 2D array [row][col], always exactly rows×cols (see TableCellModel.coveredBy)
   borderWidth?: string
   borderColor?: string
   borderStyle?: string
   density?: 'compact' | 'normal' | 'spacious'
+  /** Base fill for cells that set no backgroundColor of their own. */
+  tableBackground?: string
+  /** Row 0 renders bold with headerColor unless a cell overrides it explicitly. */
+  headerRow?: boolean
+  headerColor?: string
+  /** Alternating fill on odd body rows (below the header row, if any). */
+  zebra?: boolean
+  zebraColor?: string
 }
 
 /**

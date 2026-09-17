@@ -472,12 +472,8 @@ function confirmDeletePage() {
               :zoom-level="zoomLevel"
               :variable-values="variableValues"
               @update:element="emit('update-element', el.id, $event)"
-              @update:cell="(r, c, val) => {
-                const cells = [...(el as any).cells]
-                cells[r][c].content = val
-                emit('update-element', el.id, { cells })
-              }"
               @select-cells="(r1, c1, r2, c2) => emit('select-table-cells', el.id, r1, c1, r2, c2)"
+              @activate-element="emit('set-active-page', pageIndex); emit('select-element', el.id, false)"
             />
 
             <!-- Signature -->

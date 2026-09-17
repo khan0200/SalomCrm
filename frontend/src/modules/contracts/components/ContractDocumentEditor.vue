@@ -235,11 +235,11 @@ function applyToTableCells(mutate: (cell: TableCellModel) => void): boolean {
       for (let r = range.r1; r <= range.r2; r++) {
         for (let c = range.c1; c <= range.c2; c++) {
           const cell = table.cells?.[r]?.[c]
-          if (cell) mutate(cell)
+          if (cell && !cell.coveredBy) mutate(cell)
         }
       }
     } else {
-      table.cells?.forEach(row => row.forEach(mutate))
+      table.cells?.forEach(row => row.forEach(cell => { if (!cell.coveredBy) mutate(cell) }))
     }
   }
   canvas.history.recordSnapshot(canvas.document.value)
@@ -1336,29 +1336,92 @@ const CELL_VALIGN_OPTIONS = [
   { value: 'bottom', label: 'Past' },
 ] as const
 
-const currentTableBorderColor = computed(() => selectedTables.value[0]?.borderColor || '#94a3b8')
-const currentTableBorderWidth = computed(() => selectedTables.value[0]?.borderWidth || '1px')
-const currentTableBorderStyle = computed(() => selectedTables.value[0]?.borderStyle || 'solid')
 const currentTableDensity = computed(() => selectedTables.value[0]?.density || 'normal')
-
-function setTableBorderColor(color: string) {
-  updateSelectedTables({ borderColor: color })
-}
-
-function setTableBorderWidth(width: string) {
-  updateSelectedTables({ borderWidth: width })
-}
-
-function setTableBorderStyle(style: string) {
-  // A borderless table still needs a width the renderer can echo, so pair the
-  // two rather than leaving 'none' sitting next to a stale 1px.
-  updateSelectedTables(
-    style === 'none' ? { borderStyle: 'none', borderWidth: '0px' } : { borderStyle: style, borderWidth: currentTableBorderWidth.value === '0px' ? '1px' : currentTableBorderWidth.value }
-  )
-}
 
 function setTableDensity(density: 'compact' | 'normal' | 'spacious') {
   updateSelectedTables({ density })
+}
+
+// ─── Per-cell border toolbar ──────────────────────────────────────────────
+// The value picked here is what the next preset click paints on; this is the
+// standard toolbar convention (pick style/width/color, then pick where).
+const borderStyleChoice = ref<'solid' | 'dashed' | 'dotted' | 'double'>('solid')
+const borderWidthChoice = ref('1px')
+const borderColorChoice = ref('#000000')
+
+type BorderPreset = 'all' | 'outside' | 'inside' | 'horizontal' | 'vertical' | 'top' | 'bottom' | 'left' | 'right' | 'none'
+
+/**
+ * Paints the chosen border onto the selected block, per side, using each
+ * selection edge relative to that CELL'S OWN full span (not just its top-left
+ * grid coordinate) so a merged cell sitting on the selection's edge gets the
+ * correct side even though its content lives at one corner of a larger area.
+ */
+function applyBorderPreset(preset: BorderPreset) {
+  const range = activeTableRange.value
+  const table = range ? selectedTables.value.find(t => t.id === range.elementId) : selectedTables.value[0]
+  if (!table) return
+
+  const r1 = range?.r1 ?? 0
+  const c1 = range?.c1 ?? 0
+  const r2 = range?.r2 ?? table.rows - 1
+  const c2 = range?.c2 ?? table.cols - 1
+  const value = preset === 'none' ? 'none' : `${borderWidthChoice.value} ${borderStyleChoice.value} ${borderColorChoice.value}`
+
+  for (let r = r1; r <= r2; r++) {
+    for (let c = c1; c <= c2; c++) {
+      const cell = table.cells?.[r]?.[c]
+      if (!cell || cell.coveredBy) continue
+      if (!cell.borders) cell.borders = {}
+      const cellR2 = r + (cell.rowSpan ?? 1) - 1
+      const cellC2 = c + (cell.colSpan ?? 1) - 1
+      const top = r === r1, bottom = cellR2 === r2, left = c === c1, right = cellC2 === c2
+
+      if (preset === 'all' || preset === 'none') {
+        cell.borders.top = value; cell.borders.right = value; cell.borders.bottom = value; cell.borders.left = value
+      } else if (preset === 'outside') {
+        if (top) cell.borders.top = value
+        if (bottom) cell.borders.bottom = value
+        if (left) cell.borders.left = value
+        if (right) cell.borders.right = value
+      } else if (preset === 'inside') {
+        if (!top) cell.borders.top = value
+        if (!bottom) cell.borders.bottom = value
+        if (!left) cell.borders.left = value
+        if (!right) cell.borders.right = value
+      } else if (preset === 'horizontal') {
+        if (!top) cell.borders.top = value
+        if (!bottom) cell.borders.bottom = value
+      } else if (preset === 'vertical') {
+        if (!left) cell.borders.left = value
+        if (!right) cell.borders.right = value
+      } else if (preset === 'top' && top) cell.borders.top = value
+      else if (preset === 'bottom' && bottom) cell.borders.bottom = value
+      else if (preset === 'left' && left) cell.borders.left = value
+      else if (preset === 'right' && right) cell.borders.right = value
+    }
+  }
+  canvas.history.recordSnapshot(canvas.document.value)
+}
+
+// ─── Table design: background, header row, zebra striping ────────────────
+function setTableBackground(color: string) {
+  updateSelectedTables({ tableBackground: color })
+}
+function clearTableBackground() {
+  updateSelectedTables({ tableBackground: undefined })
+}
+function toggleHeaderRow() {
+  updateSelectedTables({ headerRow: !selectedTables.value[0]?.headerRow })
+}
+function setHeaderColor(color: string) {
+  updateSelectedTables({ headerColor: color })
+}
+function toggleZebra() {
+  updateSelectedTables({ zebra: !selectedTables.value[0]?.zebra })
+}
+function setZebraColor(color: string) {
+  updateSelectedTables({ zebraColor: color })
 }
 
 function distributeColumnsEvenly() {
@@ -1898,6 +1961,29 @@ function handlePasteNewText(clipboardData: DataTransfer) {
   // Clean HTML/text, stripping Telegram white fonts and dark backgrounds
   const cleanHtml = cleanClipboardContent(clipboardData, '#000000')
   if (!cleanHtml || !cleanHtml.trim()) return
+
+  // A pasted <table> (Word, Excel, Sheets...) must become a real table
+  // element - dumping it as raw HTML into a text element left it inert: none
+  // of the table toolbar, cell selection or resize handles apply to markup
+  // sitting inside a text element's content, only to an actual 'table'
+  // canvas element. convertHtmlToCanvasDocument already knows how to turn
+  // arbitrary HTML (tables included) into properly laid-out elements, so
+  // reuse it here instead of maintaining a second, paste-specific parser.
+  if (/<table[\s>]/i.test(cleanHtml)) {
+    const parsedDoc = convertHtmlToCanvasDocument(cleanHtml, canvas.document.value.margins)
+    const parsedElements = parsedDoc.pages.flatMap(p => p.elements)
+    if (parsedElements.length > 0) {
+      const baseY = Math.min(...parsedElements.map(el => el.y))
+      const shiftY = targetY - baseY
+      const startZ = page?.elements.length || 0
+      parsedElements.forEach((el, idx) => {
+        canvas.addElement({ ...el, y: el.y + shiftY, zIndex: startZ + idx + 1 } as CanvasElement)
+      })
+      canvas.selectedElementIds.value = [parsedElements[parsedElements.length - 1].id]
+      canvas.history.recordSnapshot(canvas.document.value)
+      return
+    }
+  }
 
   // Calculate dynamic element height so bounding box fits the pasted text
   const calculatedHeight = estimateTextHeightMm(cleanHtml, contentWidth, 14)
@@ -3462,20 +3548,18 @@ const shortcutCategories = computed(() => ({
             </template>
           </p>
 
-          <!-- Border colour / width / style -->
+          <!-- Border: style/width/color pick, then a preset paints it onto the selection -->
           <div class="space-y-1.5">
             <span class="text-xs font-medium text-zinc-700 dark:text-zinc-300">Chegara</span>
             <div class="flex items-center gap-1.5">
               <input
                 type="color"
-                :value="currentTableBorderColor"
-                @input="setTableBorderColor(($event.target as HTMLInputElement).value)"
+                v-model="borderColorChoice"
                 class="w-7 h-7 rounded-md border border-zinc-200 dark:border-zinc-700 cursor-pointer bg-transparent p-0.5"
                 title="Chegara rangi"
               />
               <select
-                :value="currentTableBorderWidth"
-                @change="setTableBorderWidth(($event.target as HTMLSelectElement).value)"
+                v-model="borderWidthChoice"
                 class="flex-1 h-7 px-1.5 text-xs bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-md focus:outline-none"
                 title="Chegara qalinligi"
               >
@@ -3484,18 +3568,30 @@ const shortcutCategories = computed(() => ({
                 <option value="1.5px">1.5 px</option>
                 <option value="2px">2 px</option>
                 <option value="3px">3 px</option>
+                <option value="4px">4 px</option>
               </select>
               <select
-                :value="currentTableBorderStyle"
-                @change="setTableBorderStyle(($event.target as HTMLSelectElement).value)"
+                v-model="borderStyleChoice"
                 class="flex-1 h-7 px-1.5 text-xs bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-md focus:outline-none"
                 title="Chegara uslubi"
               >
                 <option value="solid">To'liq</option>
                 <option value="dashed">Chiziqli</option>
                 <option value="dotted">Nuqtali</option>
-                <option value="none">Yo'q</option>
+                <option value="double">Qo'sh chiziq</option>
               </select>
+            </div>
+            <div class="grid grid-cols-5 gap-1">
+              <button type="button" @click="applyBorderPreset('all')" class="px-1 py-1 rounded-md text-[10px] font-semibold bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:border-blue-300" title="Barcha borderlar">Hammasi</button>
+              <button type="button" @click="applyBorderPreset('outside')" class="px-1 py-1 rounded-md text-[10px] font-semibold bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:border-blue-300" title="Tashqi border">Tashqi</button>
+              <button type="button" @click="applyBorderPreset('inside')" class="px-1 py-1 rounded-md text-[10px] font-semibold bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:border-blue-300" title="Ichki borderlar">Ichki</button>
+              <button type="button" @click="applyBorderPreset('horizontal')" class="px-1 py-1 rounded-md text-[10px] font-semibold bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:border-blue-300" title="Ichki gorizontal">Gorizont</button>
+              <button type="button" @click="applyBorderPreset('vertical')" class="px-1 py-1 rounded-md text-[10px] font-semibold bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:border-blue-300" title="Ichki vertikal">Vertikal</button>
+              <button type="button" @click="applyBorderPreset('top')" class="px-1 py-1 rounded-md text-[10px] font-semibold bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:border-blue-300" title="Yuqori border">Yuqori</button>
+              <button type="button" @click="applyBorderPreset('bottom')" class="px-1 py-1 rounded-md text-[10px] font-semibold bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:border-blue-300" title="Pastki border">Pastki</button>
+              <button type="button" @click="applyBorderPreset('left')" class="px-1 py-1 rounded-md text-[10px] font-semibold bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:border-blue-300" title="Chap border">Chap</button>
+              <button type="button" @click="applyBorderPreset('right')" class="px-1 py-1 rounded-md text-[10px] font-semibold bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:border-blue-300" title="O'ng border">O'ng</button>
+              <button type="button" @click="applyBorderPreset('none')" class="px-1 py-1 rounded-md text-[10px] font-semibold bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900 text-rose-600 dark:text-rose-400 hover:bg-rose-100" title="Borderlarni olib tashlash">Yo'q</button>
             </div>
           </div>
 
@@ -3534,6 +3630,76 @@ const shortcutCategories = computed(() => ({
               >
                 {{ opt.label }}
               </button>
+            </div>
+          </div>
+
+          <!-- Table-wide design: background, header row, zebra -->
+          <div class="space-y-1.5 pt-2 border-t border-zinc-100 dark:border-zinc-800">
+            <span class="text-xs font-medium text-zinc-700 dark:text-zinc-300">Jadval dizayni</span>
+
+            <div class="flex items-center gap-1.5">
+              <input
+                type="color"
+                :value="selectedTables[0]?.tableBackground || '#ffffff'"
+                @input="setTableBackground(($event.target as HTMLInputElement).value)"
+                class="w-7 h-7 rounded-md border border-zinc-200 dark:border-zinc-700 cursor-pointer bg-transparent p-0.5"
+                title="Jadval foni"
+              />
+              <span class="flex-1 text-[11px] text-zinc-500 dark:text-zinc-400">Jadval foni</span>
+              <button
+                v-if="selectedTables[0]?.tableBackground"
+                type="button"
+                @click="clearTableBackground()"
+                class="text-[10px] font-semibold text-zinc-500 hover:text-rose-500 px-1.5 py-0.5 rounded"
+              >
+                Tozalash
+              </button>
+            </div>
+
+            <div class="flex items-center gap-1.5">
+              <button
+                type="button"
+                @click="toggleHeaderRow()"
+                class="w-7 h-7 rounded-md border flex items-center justify-center shrink-0"
+                :class="selectedTables[0]?.headerRow
+                  ? 'bg-blue-50 dark:bg-blue-950/50 border-blue-300 dark:border-blue-800 text-blue-600'
+                  : 'bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-400'"
+                title="Birinchi qatorni sarlavha sifatida formatlash"
+              >
+                <span class="text-[10px] font-bold">H</span>
+              </button>
+              <span class="flex-1 text-[11px] text-zinc-500 dark:text-zinc-400">Header qatori (birinchi qator)</span>
+              <input
+                v-if="selectedTables[0]?.headerRow"
+                type="color"
+                :value="selectedTables[0]?.headerColor || '#e5e7eb'"
+                @input="setHeaderColor(($event.target as HTMLInputElement).value)"
+                class="w-7 h-7 rounded-md border border-zinc-200 dark:border-zinc-700 cursor-pointer bg-transparent p-0.5"
+                title="Header rangi"
+              />
+            </div>
+
+            <div class="flex items-center gap-1.5">
+              <button
+                type="button"
+                @click="toggleZebra()"
+                class="w-7 h-7 rounded-md border flex items-center justify-center shrink-0"
+                :class="selectedTables[0]?.zebra
+                  ? 'bg-blue-50 dark:bg-blue-950/50 border-blue-300 dark:border-blue-800 text-blue-600'
+                  : 'bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-400'"
+                title="Navbatma-navbat qator rangi"
+              >
+                <span class="text-[10px] font-bold">Z</span>
+              </button>
+              <span class="flex-1 text-[11px] text-zinc-500 dark:text-zinc-400">Zebra (navbatma-navbat)</span>
+              <input
+                v-if="selectedTables[0]?.zebra"
+                type="color"
+                :value="selectedTables[0]?.zebraColor || '#f8fafc'"
+                @input="setZebraColor(($event.target as HTMLInputElement).value)"
+                class="w-7 h-7 rounded-md border border-zinc-200 dark:border-zinc-700 cursor-pointer bg-transparent p-0.5"
+                title="Zebra rangi"
+              />
             </div>
           </div>
 

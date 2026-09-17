@@ -24,6 +24,128 @@ function generateId(prefix: string): string {
 }
 
 /**
+ * Parses a real `<table>` element (our own exported HTML, or one pasted
+ * straight from Word/Excel/Sheets) into a dense rows×cols grid, using the
+ * standard "occupancy cursor" reconstruction: a browser doesn't require - and
+ * Word/Excel don't emit - a `<td>` for a grid slot a colspan/rowspan from
+ * earlier already claims, so this walks each row's actual `<td>`s while
+ * skipping any column position a still-open rowspan occupies, which is the
+ * only way to recover true column indices from raw rowspan/colspan HTML.
+ *
+ * Column widths come from an authored `<colgroup>` (round-tripping our own
+ * export) when present, else from Word/Excel's unitless-pixel `td[width]`
+ * attributes on the first row, scaled to fit `contentWidth`, else split evenly.
+ */
+export function parseHtmlTable(
+  tableEl: HTMLTableElement,
+  contentWidth: number
+): { rows: number; cols: number; colWidths: number[]; rowHeights: number[]; cells: TableCellModel[][] } {
+  const rowEls = Array.from(tableEl.rows) // flattens thead/tbody/tfoot in document order, like a browser lays them out
+  const cells: TableCellModel[][] = []
+  const occupied: boolean[][] = []
+  let maxCols = 0
+
+  const readBorderSide = (el: HTMLElement, prop: 'borderTop' | 'borderRight' | 'borderBottom' | 'borderLeft'): string | undefined => {
+    const v = (el.style as any)[prop]
+    return v && v.trim() ? v.trim() : undefined
+  }
+
+  rowEls.forEach((tr, r) => {
+    if (!occupied[r]) occupied[r] = []
+    if (!cells[r]) cells[r] = []
+    const domCells = Array.from(tr.cells)
+    let c = 0
+    let domIdx = 0
+
+    while (domIdx < domCells.length || occupied[r][c]) {
+      if (occupied[r][c]) { c++; continue }
+      const htmlCell = domCells[domIdx] as HTMLElement
+      domIdx++
+      const colSpan = Math.max(1, parseInt(htmlCell.getAttribute('colspan') || '1', 10) || 1)
+      const rowSpan = Math.max(1, parseInt(htmlCell.getAttribute('rowspan') || '1', 10) || 1)
+      const borders = {
+        top: readBorderSide(htmlCell, 'borderTop'),
+        right: readBorderSide(htmlCell, 'borderRight'),
+        bottom: readBorderSide(htmlCell, 'borderBottom'),
+        left: readBorderSide(htmlCell, 'borderLeft'),
+      }
+      const hasBorders = Object.values(borders).some(Boolean)
+
+      cells[r][c] = {
+        id: generateId('cell'),
+        content: htmlCell.innerHTML.trim() || '&nbsp;',
+        backgroundColor: htmlCell.style.backgroundColor || undefined,
+        textAlign: (htmlCell.style.textAlign as any) || 'left',
+        verticalAlign: (htmlCell.style.verticalAlign as any) || 'top',
+        color: htmlCell.style.color || undefined,
+        fontSize: parseFloat(htmlCell.style.fontSize) || undefined,
+        fontWeight: htmlCell.style.fontWeight || undefined,
+        fontStyle: (htmlCell.style.fontStyle as 'normal' | 'italic') || undefined,
+        textDecoration: htmlCell.style.textDecoration || undefined,
+        colSpan: colSpan > 1 ? colSpan : undefined,
+        rowSpan: rowSpan > 1 ? rowSpan : undefined,
+        borders: hasBorders ? borders : undefined,
+      }
+
+      for (let rr = r; rr < r + rowSpan; rr++) {
+        if (!occupied[rr]) occupied[rr] = []
+        if (!cells[rr]) cells[rr] = []
+        for (let cc = c; cc < c + colSpan; cc++) {
+          occupied[rr][cc] = true
+          if (rr === r && cc === c) continue
+          cells[rr][cc] = { id: generateId('cell'), content: '', coveredBy: { r, c } }
+        }
+      }
+      maxCols = Math.max(maxCols, c + colSpan)
+      c += colSpan
+    }
+  })
+
+  const rows = cells.length
+  const colCount = Math.max(1, maxCols)
+  // Malformed/ragged source HTML can leave short rows - pad rather than let a
+  // later `cells[r][c]` access go out of bounds anywhere downstream.
+  for (let r = 0; r < rows; r++) {
+    if (!cells[r]) cells[r] = []
+    for (let c = 0; c < colCount; c++) {
+      if (!cells[r][c]) cells[r][c] = { id: generateId('cell'), content: '&nbsp;' }
+    }
+  }
+
+  // Column widths: authored <colgroup> (our own export) first.
+  const colEls = Array.from(tableEl.querySelectorAll('col'))
+  const authoredWidths = colEls
+    .map(c => parseFloat((c as HTMLElement).style.width))
+    .filter(w => Number.isFinite(w) && w > 0)
+
+  let colWidths: number[]
+  if (authoredWidths.length === colCount) {
+    colWidths = authoredWidths
+  } else {
+    // Word/Excel paste: unitless `width` attributes on the first row's <td>s
+    // are pixels, kept in proportion but scaled to fit the page.
+    const firstRowCells = rowEls[0] ? Array.from(rowEls[0].cells) : []
+    const pxWidths = firstRowCells.map(td => parseFloat(td.getAttribute('width') || '')).filter(w => Number.isFinite(w) && w > 0)
+    if (pxWidths.length === colCount) {
+      const naturalMm = pxWidths.map(px => px * 0.264583) // 96px/inch -> 25.4mm/inch
+      const naturalTotal = naturalMm.reduce((a, b) => a + b, 0)
+      const scale = naturalTotal > contentWidth ? contentWidth / naturalTotal : 1
+      colWidths = naturalMm.map(w => Math.round(w * scale * 10) / 10)
+    } else {
+      const even = Math.round((contentWidth / colCount) * 10) / 10
+      colWidths = Array(colCount).fill(even)
+    }
+  }
+
+  const rowHeights = rowEls.map(tr => {
+    const h = parseFloat((tr as HTMLElement).style.height)
+    return Number.isFinite(h) && h > 0 ? h : 10
+  })
+
+  return { rows, cols: colCount, colWidths, rowHeights, cells }
+}
+
+/**
  * Check if a raw string is already a serialized canvas document JSON
  */
 export function isCanvasDocumentJson(content: string): boolean {
@@ -165,8 +287,27 @@ export function convertHtmlToCanvasDocument(
     currentY += estimatedHeightMm + 4 // 4mm gap between stacked blocks
   }
 
-  // Iterate over child elements
-  const children = Array.from(body.children)
+  // Iterate over child elements. Word/Google Docs/Sheets wrap clipboard
+  // content in one or more plain `<div>`s (e.g. `<div><table>...</table></div>`),
+  // so a shallow `body.children` walk never reaches the table at all - it
+  // sees one div, falls into the generic paragraph/div branch below, and
+  // swallows the whole table as inert text. Unwrap any div that contains a
+  // recognisable block child (table/heading/paragraph/list/div) down to its
+  // real content first; a div with only inline/text content is left alone
+  // and still handled as a single block by the default branch.
+  const BLOCK_TAGS = new Set(['table', 'p', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol'])
+  function flattenWrapperDivs(nodes: Element[]): Element[] {
+    const out: Element[] = []
+    for (const node of nodes) {
+      if (node.tagName.toLowerCase() === 'div' && Array.from(node.children).some(c => BLOCK_TAGS.has(c.tagName.toLowerCase()))) {
+        out.push(...flattenWrapperDivs(Array.from(node.children) as Element[]))
+      } else {
+        out.push(node)
+      }
+    }
+    return out
+  }
+  const children = flattenWrapperDivs(Array.from(body.children) as Element[])
 
   if (children.length === 0 && body.textContent?.trim()) {
     // It's raw plain text without tags
@@ -211,66 +352,8 @@ export function convertHtmlToCanvasDocument(
 
       // Check for Table
       if (tagName === 'table') {
-        const tableEl = child as HTMLTableElement
-        const trs = Array.from(tableEl.querySelectorAll('tr'))
-        const rowCount = trs.length
-        let maxCols = 1
-
-        trs.forEach(tr => {
-          const cells = tr.querySelectorAll('td, th')
-          let colSpanSum = 0
-          cells.forEach(c => {
-            colSpanSum += parseInt(c.getAttribute('colspan') || '1', 10)
-          })
-          maxCols = Math.max(maxCols, colSpanSum)
-        })
-
-        const cells: TableCellModel[][] = []
-        trs.forEach(tr => {
-          const rowCells: TableCellModel[] = []
-          const cellEls = Array.from(tr.querySelectorAll('td, th'))
-          cellEls.forEach(c => {
-            const htmlCell = c as HTMLElement
-            const bg = htmlCell.style.backgroundColor || ''
-            const align = (htmlCell.style.textAlign as any) || 'left'
-            const vAlign = (htmlCell.style.verticalAlign as any) || 'top'
-            const colSpan = parseInt(htmlCell.getAttribute('colspan') || '1', 10)
-            const rowSpan = parseInt(htmlCell.getAttribute('rowspan') || '1', 10)
-
-            rowCells.push({
-              id: generateId('cell'),
-              content: htmlCell.innerHTML.trim() || '&nbsp;',
-              backgroundColor: bg || undefined,
-              textAlign: align,
-              verticalAlign: vAlign,
-              color: htmlCell.style.color || undefined,
-              fontSize: parseFloat(htmlCell.style.fontSize) || undefined,
-              fontWeight: htmlCell.style.fontWeight || undefined,
-              fontStyle: (htmlCell.style.fontStyle as 'normal' | 'italic') || undefined,
-              textDecoration: htmlCell.style.textDecoration || undefined,
-              colSpan: colSpan > 1 ? colSpan : undefined,
-              rowSpan: rowSpan > 1 ? rowSpan : undefined,
-            })
-          })
-          cells.push(rowCells)
-        })
-
-        // Honour an authored <colgroup>/<tr height> so a table that was exported
-        // by convertCanvasDocumentToHtml round-trips back with its geometry
-        // rather than collapsing to evenly spaced columns.
-        const colEls = Array.from(tableEl.querySelectorAll('col'))
-        const authoredWidths = colEls
-          .map(c => parseFloat((c as HTMLElement).style.width))
-          .filter(w => Number.isFinite(w) && w > 0)
-        const colW = contentWidth / maxCols
-        const colWidths =
-          authoredWidths.length === maxCols ? authoredWidths : Array(maxCols).fill(colW)
-
-        const rowHeights = trs.map(tr => {
-          const h = parseFloat((tr as HTMLElement).style.height)
-          return Number.isFinite(h) && h > 0 ? h : 10
-        })
-        const estimatedTableHeight = Math.max(20, rowHeights.reduce((sum, h) => sum + h, 0))
+        const parsed = parseHtmlTable(child as HTMLTableElement, contentWidth)
+        const estimatedTableHeight = Math.max(20, parsed.rowHeights.reduce((sum, h) => sum + h, 0))
 
         addElement(
           {
@@ -278,14 +361,14 @@ export function convertHtmlToCanvasDocument(
             type: 'table',
             x: margins.left,
             y: currentY,
-            width: colWidths.reduce((sum, w) => sum + w, 0),
+            width: parsed.colWidths.reduce((sum, w) => sum + w, 0),
             height: estimatedTableHeight,
             zIndex: 1,
-            rows: rowCount,
-            cols: maxCols,
-            colWidths,
-            rowHeights,
-            cells,
+            rows: parsed.rows,
+            cols: parsed.cols,
+            colWidths: parsed.colWidths,
+            rowHeights: parsed.rowHeights,
+            cells: parsed.cells,
             borderWidth: '1px',
             borderColor: '#94a3b8',
             borderStyle: 'solid',
@@ -455,7 +538,7 @@ export function convertCanvasDocumentToHtml(
         const table = el as TableCanvasElement
         const cellPadding =
           table.density === 'compact' ? '4px 6px' : table.density === 'spacious' ? '10px 14px' : '6px 10px'
-        const cellBorder = `${table.borderWidth || '1px'} ${table.borderStyle || 'solid'} ${table.borderColor || '#94a3b8'}`
+        const defaultBorder = `${table.borderWidth || '1px'} ${table.borderStyle || 'solid'} ${table.borderColor || '#94a3b8'}`
 
         // Column widths only survive into the PDF/print/signing output if they
         // are emitted as a <colgroup>: `table-layout: fixed` alone distributes
@@ -471,21 +554,44 @@ export function convertCanvasDocumentToHtml(
         table.cells.forEach((row, rowIdx) => {
           let colsHtml = ''
           row.forEach(cell => {
+            // A merge's covered slots carry no content of their own - the
+            // master's colspan/rowspan already claims their grid space, so a
+            // real HTML table (like the browser that renders it) must not see
+            // a <td> for them at all.
+            if (cell.coveredBy) return
+
             const cellContent = replaceVariablesInHtml(cell.content || '', pageVariableValues, {
               skipHeuristics: pageVars.size > 0,
               excludedVariables: pageVars,
             })
-            const bg = cell.backgroundColor ? `background-color: ${cell.backgroundColor};` : ''
+
+            const isHeaderCell = Boolean(table.headerRow) && rowIdx === 0
+            const bodyRowIdx = table.headerRow ? rowIdx - 1 : rowIdx
+            const isZebraRow = Boolean(table.zebra) && bodyRowIdx >= 0 && bodyRowIdx % 2 === 1
+            const effectiveBg =
+              cell.backgroundColor ||
+              (isHeaderCell ? table.headerColor || '#e5e7eb' : '') ||
+              (isZebraRow ? table.zebraColor || '#f8fafc' : '') ||
+              table.tableBackground || ''
+            const effectiveWeight = cell.fontWeight || (isHeaderCell ? 'bold' : '')
+
+            const bg = effectiveBg ? `background-color: ${effectiveBg};` : ''
             const align = cell.textAlign ? `text-align: ${cell.textAlign};` : ''
             const vAlign = cell.verticalAlign ? `vertical-align: ${cell.verticalAlign};` : ''
             const color = cell.color ? `color: ${cell.color};` : ''
             const fontSize = cell.fontSize ? `font-size: ${cell.fontSize}pt;` : ''
-            const fontWeight = cell.fontWeight ? `font-weight: ${cell.fontWeight};` : ''
+            const fontWeight = effectiveWeight ? `font-weight: ${effectiveWeight};` : ''
             const fontStyle = cell.fontStyle ? `font-style: ${cell.fontStyle};` : ''
             const textDecoration = cell.textDecoration ? `text-decoration: ${cell.textDecoration};` : ''
-            const spanAttrs = `${cell.colSpan ? `colspan="${cell.colSpan}"` : ''} ${cell.rowSpan ? `rowspan="${cell.rowSpan}"` : ''}`
+            const borders = [
+              `border-top: ${cell.borders?.top ?? defaultBorder};`,
+              `border-right: ${cell.borders?.right ?? defaultBorder};`,
+              `border-bottom: ${cell.borders?.bottom ?? defaultBorder};`,
+              `border-left: ${cell.borders?.left ?? defaultBorder};`,
+            ].join('')
+            const spanAttrs = `${cell.colSpan && cell.colSpan > 1 ? `colspan="${cell.colSpan}"` : ''} ${cell.rowSpan && cell.rowSpan > 1 ? `rowspan="${cell.rowSpan}"` : ''}`
 
-            colsHtml += `<td ${spanAttrs} style="border: ${cellBorder}; padding: ${cellPadding}; ${bg}${align}${vAlign}${color}${fontSize}${fontWeight}${fontStyle}${textDecoration}">${cellContent}</td>`
+            colsHtml += `<td ${spanAttrs} style="${borders}padding: ${cellPadding}; ${bg}${align}${vAlign}${color}${fontSize}${fontWeight}${fontStyle}${textDecoration}">${cellContent}</td>`
           })
           // Row heights are authored in mm like every other canvas dimension.
           // `height` (not `min-height`) is what a table row actually honours.
