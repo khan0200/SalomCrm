@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import { Eraser, Check, AlertCircle } from 'lucide-vue-next'
 
 const props = defineProps<{
@@ -15,10 +15,16 @@ const canvasRef = ref<HTMLCanvasElement | null>(null)
 const isDrawing = ref(false)
 const hasSignature = ref(false)
 const previewDataUrl = ref<string>(props.modelValue || '')
+// Original default was 2.5; 2.9 is ~15% thicker (within the requested 10-20% range).
+const strokeWidth = ref(2.9)
 
 let ctx: CanvasRenderingContext2D | null = null
 let lastX = 0
 let lastY = 0
+
+watch(strokeWidth, (val) => {
+  if (ctx) ctx.lineWidth = val
+})
 
 function initCanvas() {
   const canvas = canvasRef.value
@@ -35,7 +41,7 @@ function initCanvas() {
 
   ctx.scale(dpr, dpr)
   ctx.strokeStyle = '#0f172a'
-  ctx.lineWidth = 2.5
+  ctx.lineWidth = strokeWidth.value
   ctx.lineCap = 'round'
   ctx.lineJoin = 'round'
 
@@ -151,6 +157,20 @@ onBeforeUnmount(() => {
         <Eraser class="w-3.5 h-3.5" />
         <span>Tozalash</span>
       </button>
+    </div>
+
+    <!-- Stroke thickness control -->
+    <div class="flex items-center gap-2.5 mb-2.5">
+      <span class="text-xs font-semibold text-zinc-600 dark:text-zinc-400 shrink-0">Chiziq qalinligi</span>
+      <input
+        type="range"
+        min="1"
+        max="6"
+        step="0.5"
+        v-model.number="strokeWidth"
+        class="flex-1 h-1.5 accent-black dark:accent-white cursor-pointer"
+      />
+      <span class="text-xs font-mono font-bold text-zinc-500 dark:text-zinc-400 w-7 text-right shrink-0">{{ strokeWidth }}</span>
     </div>
 
     <!-- Canvas drawing box -->

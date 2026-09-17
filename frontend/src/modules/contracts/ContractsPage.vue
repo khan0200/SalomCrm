@@ -1444,7 +1444,7 @@ async function handleUnarchive(contract: Contract) {
             v-model="assignStudentIdInput"
             type="text"
             placeholder="Enter Student ID (e.g. G108)"
-            class="w-full px-3.5 py-2.5 bg-zinc-50 dark:bg-zinc-850 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm font-mono font-bold uppercase tracking-wider focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-500"
+            class="w-full px-3.5 py-2.5 bg-zinc-50 dark:bg-zinc-850 border-2 border-zinc-300 dark:border-zinc-700 rounded-xl text-sm font-mono font-bold uppercase tracking-wider focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-500"
             @keyup.enter="handleConfirmAssignStudentId"
           />
           <p class="text-[11px] text-zinc-400 mt-1.5 leading-relaxed">
@@ -1463,7 +1463,7 @@ async function handleUnarchive(contract: Contract) {
             min="0"
             step="1000"
             placeholder="0 — chegirma yo'q"
-            class="w-full px-3.5 py-2.5 bg-zinc-50 dark:bg-zinc-850 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm font-mono focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-500"
+            class="w-full px-3.5 py-2.5 bg-zinc-50 dark:bg-zinc-850 border-2 border-zinc-300 dark:border-zinc-700 rounded-xl text-sm font-mono focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-500"
           />
           <p class="text-[11px] text-zinc-400 mt-1.5 leading-relaxed">
             Shartnomadagi <code v-pre class="bg-zinc-100 dark:bg-zinc-800 px-1 rounded">{{discount}}</code> o'rnini bosadi va to'lovga qo'shiladi.
