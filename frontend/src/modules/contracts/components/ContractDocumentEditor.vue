@@ -73,6 +73,7 @@ import type {
   TextCanvasElement,
   TableCanvasElement,
   TableCellModel,
+  TableCellRange,
   PageMargins,
   AlignmentGuide,
   TextStyleProps,
@@ -194,38 +195,49 @@ const selectedTextElements = computed(() => (canvas.selectedElements.value as an
 // shared tools (font size, bold, colour, alignment) redirect onto cells:
 // the clicked cell when there is one, every cell of the selected table
 // otherwise. That keeps one toolbar working for both kinds of element.
-const activeTableCell = ref<{ elementId: string; r: number; c: number } | null>(null)
+const activeTableRange = ref<TableCellRange | null>(null)
 
 const selectedTables = computed(() =>
   (canvas.selectedElements.value as any[]).filter(el => el?.type === 'table') as TableCanvasElement[]
 )
 
+/** The anchor cell of the current block — what the toolbar reads current values from. */
 const activeCell = computed<TableCellModel | null>(() => {
-  const ref_ = activeTableCell.value
-  if (!ref_) return null
-  const table = selectedTables.value.find(t => t.id === ref_.elementId)
-  return table?.cells?.[ref_.r]?.[ref_.c] ?? null
+  const range = activeTableRange.value
+  if (!range) return null
+  const table = selectedTables.value.find(t => t.id === range.elementId)
+  return table?.cells?.[range.r1]?.[range.c1] ?? null
 })
 
-function onSelectTableCell(elementId: string, r: number, c: number) {
-  activeTableCell.value = { elementId, r, c }
+const activeCellCount = computed(() => {
+  const range = activeTableRange.value
+  if (!range) return 0
+  return (range.r2 - range.r1 + 1) * (range.c2 - range.c1 + 1)
+})
+
+function onSelectTableCells(elementId: string, r1: number, c1: number, r2: number, c2: number) {
+  activeTableRange.value = { elementId, r1, c1, r2, c2 }
 }
 
 /**
- * Applies `mutate` to the cells the user means: just the clicked cell when one
- * is active, otherwise every cell of each selected table. Returns whether any
- * table was actually touched, so callers can fall through to their text-element
- * behaviour when the selection holds no tables.
+ * Applies `mutate` to the cells the user means: every cell of the selected block
+ * when one is active, otherwise every cell of each selected table. Returns
+ * whether any table was actually touched, so callers can fall through to their
+ * text-element behaviour when the selection holds no tables.
  */
 function applyToTableCells(mutate: (cell: TableCellModel) => void): boolean {
   const tables = selectedTables.value
   if (!tables.length) return false
 
-  const target = activeTableCell.value
+  const range = activeTableRange.value
   for (const table of tables) {
-    if (target && target.elementId === table.id) {
-      const cell = table.cells?.[target.r]?.[target.c]
-      if (cell) mutate(cell)
+    if (range && range.elementId === table.id) {
+      for (let r = range.r1; r <= range.r2; r++) {
+        for (let c = range.c1; c <= range.c2; c++) {
+          const cell = table.cells?.[r]?.[c]
+          if (cell) mutate(cell)
+        }
+      }
     } else {
       table.cells?.forEach(row => row.forEach(mutate))
     }
@@ -245,9 +257,9 @@ function updateSelectedTables(updates: Partial<TableCanvasElement>) {
 watch(
   () => canvas.selectedElementIds.value.join(','),
   () => {
-    const target = activeTableCell.value
+    const target = activeTableRange.value
     if (target && !canvas.selectedElementIds.value.includes(target.elementId)) {
-      activeTableCell.value = null
+      activeTableRange.value = null
     }
   }
 )
@@ -1155,13 +1167,21 @@ function applyInlineFormat(command: 'bold' | 'italic' | 'underline' | 'strikeThr
     const container = (activeEl!.closest('.canvas-text-element') || activeEl) as HTMLElement
     if (container) el.content = container.innerHTML
   } else {
-    // Bold is the only one of these four the cell model carries; the rest stay
-    // inline markup inside the cell's own HTML, applied while editing it.
-    if (command === 'bold') {
-      applyToTableCells(cell => {
+    applyToTableCells(cell => {
+      if (command === 'bold') {
         cell.fontWeight = cell.fontWeight === 'bold' || cell.fontWeight === 700 ? 'normal' : 'bold'
-      })
-    }
+      } else if (command === 'italic') {
+        cell.fontStyle = cell.fontStyle === 'italic' ? 'normal' : 'italic'
+      } else {
+        const wanted = command === 'underline' ? 'underline' : 'line-through'
+        const current = cell.textDecoration && cell.textDecoration !== 'none' ? cell.textDecoration : ''
+        const parts = current.split(/\s+/).filter(Boolean)
+        const next = parts.includes(wanted)
+          ? parts.filter(p => p !== wanted)
+          : [...parts, wanted]
+        cell.textDecoration = next.length ? next.join(' ') : 'none'
+      }
+    })
     targets.forEach(el => {
       if (el.type === 'table') return
       if (!el.style) el.style = {}
@@ -1422,10 +1442,27 @@ function toggleFindReplace() {
 }
 
 // Table properties dropdown toggle
+const tablePropsMenuEl = ref<HTMLElement | null>(null)
+const tablePropsMenuFlipped = ref(false)
+
 function toggleTablePropsMenu() {
   const next = !showTablePropsMenu.value
   closeAllDropdowns()
   showTablePropsMenu.value = next
+  if (!next) return
+
+  // The button sits near the right end of a wide toolbar, so a left-anchored
+  // panel runs off screen and gets clipped. Measure once it is laid out and
+  // anchor it to whichever edge keeps it fully visible.
+  tablePropsMenuFlipped.value = false
+  nextTick(() => {
+    const el = tablePropsMenuEl.value
+    if (!el) return
+    const rect = el.getBoundingClientRect()
+    if (rect.right > window.innerWidth - 8) {
+      tablePropsMenuFlipped.value = true
+    }
+  })
 }
 
 // List dropdown toggle & active state (Canva / Word Style)
@@ -3408,15 +3445,20 @@ const shortcutCategories = computed(() => ({
 
         <div
           v-if="showTablePropsMenu"
-          class="absolute top-full left-0 mt-1.5 w-72 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-2xl p-3 space-y-3 z-50"
+          ref="tablePropsMenuEl"
+          class="absolute top-full mt-1.5 w-72 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-2xl p-3 space-y-3 z-50"
+          :class="tablePropsMenuFlipped ? 'right-0' : 'left-0'"
           @click.stop
         >
           <p class="text-[11px] text-zinc-500 dark:text-zinc-400 leading-snug">
-            <template v-if="activeCell">
+            <template v-if="activeCellCount > 1">
+              O'zgarishlar tanlangan <strong class="text-zinc-700 dark:text-zinc-200">{{ activeCellCount }} ta katakka</strong> qo'llanadi.
+            </template>
+            <template v-else-if="activeCell">
               Tekislash va ranglar <strong class="text-zinc-700 dark:text-zinc-200">tanlangan katakka</strong> qo'llanadi.
             </template>
             <template v-else>
-              Katakni bosing — o'zgarishlar faqat o'shanga tegadi. Hozir <strong class="text-zinc-700 dark:text-zinc-200">butun jadvalga</strong> qo'llanadi.
+              Katakni bosing yoki sudrab bir nechtasini tanlang. Hozir <strong class="text-zinc-700 dark:text-zinc-200">butun jadvalga</strong> qo'llanadi.
             </template>
           </p>
 
@@ -3920,7 +3962,7 @@ const shortcutCategories = computed(() => ({
           @clear-selection="canvas.clearSelection()"
           @double-click-element="canvas.editingElementId.value = (canvas.editingElementId.value === $event ? null : $event)"
           @update-element="(id, updates, record) => canvas.updateElement(id, updates, record !== false)"
-          @select-table-cell="onSelectTableCell"
+          @select-table-cells="onSelectTableCells"
           @update-element-bounds="(id, bounds) => canvas.updateElementBounds(id, bounds)"
           @duplicate-element="canvas.duplicateSelectedElements($event)"
           @delete-element="canvas.deleteSelectedElements($event)"

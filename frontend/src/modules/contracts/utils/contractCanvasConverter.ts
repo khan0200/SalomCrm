@@ -246,6 +246,8 @@ export function convertHtmlToCanvasDocument(
               color: htmlCell.style.color || undefined,
               fontSize: parseFloat(htmlCell.style.fontSize) || undefined,
               fontWeight: htmlCell.style.fontWeight || undefined,
+              fontStyle: (htmlCell.style.fontStyle as 'normal' | 'italic') || undefined,
+              textDecoration: htmlCell.style.textDecoration || undefined,
               colSpan: colSpan > 1 ? colSpan : undefined,
               rowSpan: rowSpan > 1 ? rowSpan : undefined,
             })
@@ -479,9 +481,11 @@ export function convertCanvasDocumentToHtml(
             const color = cell.color ? `color: ${cell.color};` : ''
             const fontSize = cell.fontSize ? `font-size: ${cell.fontSize}pt;` : ''
             const fontWeight = cell.fontWeight ? `font-weight: ${cell.fontWeight};` : ''
+            const fontStyle = cell.fontStyle ? `font-style: ${cell.fontStyle};` : ''
+            const textDecoration = cell.textDecoration ? `text-decoration: ${cell.textDecoration};` : ''
             const spanAttrs = `${cell.colSpan ? `colspan="${cell.colSpan}"` : ''} ${cell.rowSpan ? `rowspan="${cell.rowSpan}"` : ''}`
 
-            colsHtml += `<td ${spanAttrs} style="border: ${cellBorder}; padding: ${cellPadding}; ${bg}${align}${vAlign}${color}${fontSize}${fontWeight}">${cellContent}</td>`
+            colsHtml += `<td ${spanAttrs} style="border: ${cellBorder}; padding: ${cellPadding}; ${bg}${align}${vAlign}${color}${fontSize}${fontWeight}${fontStyle}${textDecoration}">${cellContent}</td>`
           })
           // Row heights are authored in mm like every other canvas dimension.
           // `height` (not `min-height`) is what a table row actually honours.

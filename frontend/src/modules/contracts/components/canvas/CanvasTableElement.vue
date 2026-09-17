@@ -27,11 +27,59 @@ const props = withDefaults(
 const emit = defineEmits<{
   'update:element': [updates: Partial<TableCanvasElement>]
   'update:cell': [rowIndex: number, colIndex: number, content: string]
-  'select-cell': [rowIndex: number, colIndex: number]
+  'select-cells': [r1: number, c1: number, r2: number, c2: number]
 }>()
 
-const activeCellCoord = ref<{ r: number; c: number } | null>(null)
+// Excel-style block selection: the anchor is where the drag/shift-click started,
+// the focus is the cell under the pointer now. Everything between them is
+// selected, so the pair is kept rather than a single coordinate.
+const anchorCell = ref<{ r: number; c: number } | null>(null)
+const focusCell = ref<{ r: number; c: number } | null>(null)
 const editingCellCoord = ref<{ r: number; c: number } | null>(null)
+const isDragSelecting = ref(false)
+
+// Which handle is mid-drag. Hover styling alone left the grip invisible the
+// moment the pointer moved off the 2px strip it was dragging, which is exactly
+// when the user most needs to see what they are resizing.
+const resizing = ref<{ axis: 'col' | 'row'; index: number } | null>(null)
+
+const selectionRect = computed(() => {
+  const a = anchorCell.value
+  const f = focusCell.value
+  if (!a || !f) return null
+  return {
+    r1: Math.min(a.r, f.r),
+    c1: Math.min(a.c, f.c),
+    r2: Math.max(a.r, f.r),
+    c2: Math.max(a.c, f.c),
+  }
+})
+
+const hasMultiSelection = computed(() => {
+  const rect = selectionRect.value
+  return Boolean(rect && (rect.r1 !== rect.r2 || rect.c1 !== rect.c2))
+})
+
+function isCellSelected(r: number, c: number): boolean {
+  const rect = selectionRect.value
+  if (!rect) return false
+  return r >= rect.r1 && r <= rect.r2 && c >= rect.c1 && c <= rect.c2
+}
+
+function emitSelection() {
+  const rect = selectionRect.value
+  if (!rect) return
+  emit('select-cells', rect.r1, rect.c1, rect.r2, rect.c2)
+}
+
+/**
+ * Sit on the opposite side from the element wrapper's own action bar, which
+ * uses the element's top unless it is within 16mm of the page edge. Sharing a
+ * side made the two bars overlap and swallow each other's buttons.
+ */
+const toolbarPositionClass = computed(() =>
+  props.element.y < 16 ? '-top-9 left-0' : 'top-[calc(100%+10px)] left-0'
+)
 
 const MM_TO_PX_BASE = 3.779527559
 // Cell font sizes are authored in pt like the rest of the document; the canvas
@@ -59,10 +107,33 @@ const cellPaddingPx = computed(() => {
 const MIN_COL_MM = 8
 const MIN_ROW_MM = 5
 
+/**
+ * While a grip is dragged the pointer routinely leaves the thin strip it grabbed
+ * (and passes over cells, whose own cursor would take over). Capturing the
+ * pointer keeps the events coming, and locking the cursor on <body> keeps the
+ * resize arrow on screen for the whole gesture instead of flicking back to the
+ * default white arrow the moment the pointer crosses a cell.
+ */
+function beginHandleDrag(axis: 'col' | 'row', index: number, e: PointerEvent) {
+  resizing.value = { axis, index }
+  try {
+    ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+  } catch {
+    /* capture is a nicety - dragging still works through the window listeners */
+  }
+  window.document.body.classList.add(axis === 'col' ? 'canvas-resizing-col' : 'canvas-resizing-row')
+}
+
+function endHandleDrag() {
+  resizing.value = null
+  window.document.body.classList.remove('canvas-resizing-col', 'canvas-resizing-row')
+}
+
 // Resizing Columns via Dragging Column Headers
 function onColumnResizeStart(colIdx: number, e: PointerEvent) {
   e.preventDefault()
   e.stopPropagation()
+  beginHandleDrag('col', colIdx, e)
 
   const startClientX = e.clientX
   const originalWidths = [...props.element.colWidths]
@@ -85,6 +156,7 @@ function onColumnResizeStart(colIdx: number, e: PointerEvent) {
   function onColUp() {
     window.removeEventListener('pointermove', onColMove)
     window.removeEventListener('pointerup', onColUp)
+    endHandleDrag()
   }
 
   window.addEventListener('pointermove', onColMove)
@@ -95,6 +167,7 @@ function onColumnResizeStart(colIdx: number, e: PointerEvent) {
 function onRowResizeStart(rowIdx: number, e: PointerEvent) {
   e.preventDefault()
   e.stopPropagation()
+  beginHandleDrag('row', rowIdx, e)
 
   const startClientY = e.clientY
   const originalHeights = [...props.element.rowHeights]
@@ -116,6 +189,7 @@ function onRowResizeStart(rowIdx: number, e: PointerEvent) {
   function onRowUp() {
     window.removeEventListener('pointermove', onRowMove)
     window.removeEventListener('pointerup', onRowUp)
+    endHandleDrag()
   }
 
   window.addEventListener('pointermove', onRowMove)
@@ -126,14 +200,49 @@ function onRowResizeStart(rowIdx: number, e: PointerEvent) {
 function onCellDoubleClick(r: number, c: number, e: MouseEvent) {
   e.stopPropagation()
   editingCellCoord.value = { r, c }
-  activeCellCoord.value = { r, c }
-  emit('select-cell', r, c)
+  anchorCell.value = { r, c }
+  focusCell.value = { r, c }
+  emitSelection()
 }
 
-function onCellClick(r: number, c: number, e: MouseEvent) {
-  if (editingCellCoord.value?.r === r && editingCellCoord.value?.c === c) return
-  activeCellCoord.value = { r, c }
-  emit('select-cell', r, c)
+function onCellPointerDown(r: number, c: number, e: PointerEvent) {
+  if (props.readonly) return
+  // Leave an in-progress cell edit alone: the pointer belongs to the caret then.
+  if (editingCellCoord.value) return
+  if (e.button !== 0) return
+
+  e.stopPropagation()
+
+  if (e.shiftKey && anchorCell.value) {
+    focusCell.value = { r, c }
+  } else {
+    anchorCell.value = { r, c }
+    focusCell.value = { r, c }
+    isDragSelecting.value = true
+    window.addEventListener('pointerup', onSelectionPointerUp, { once: true })
+  }
+  emitSelection()
+}
+
+function onCellPointerEnter(r: number, c: number) {
+  if (!isDragSelecting.value) return
+  const f = focusCell.value
+  if (f && f.r === r && f.c === c) return
+  focusCell.value = { r, c }
+  emitSelection()
+}
+
+function onSelectionPointerUp() {
+  isDragSelecting.value = false
+}
+
+function selectAllCells() {
+  const lastRow = props.element.cells.length - 1
+  if (lastRow < 0) return
+  const lastCol = Math.max(0, (props.element.cells[lastRow]?.length ?? 1) - 1)
+  anchorCell.value = { r: 0, c: 0 }
+  focusCell.value = { r: lastRow, c: lastCol }
+  emitSelection()
 }
 
 function onCellBlur(r: number, c: number, e: FocusEvent) {
@@ -257,6 +366,32 @@ function deleteRowAt(rowIdx: number) {
   })
 }
 
+/** Deletes every column the selection spans, keeping at least one behind. */
+function deleteSelectedColumns() {
+  const rect = selectionRect.value
+  if (!rect) return
+  const count = Math.min(rect.c2 - rect.c1 + 1, props.element.cols - 1)
+  if (count <= 0) return
+  for (let i = 0; i < count; i++) deleteColumnAt(rect.c1)
+  const lastCol = Math.max(0, props.element.cols - 1 - count)
+  anchorCell.value = { r: rect.r1, c: Math.min(rect.c1, lastCol) }
+  focusCell.value = { ...anchorCell.value }
+  emitSelection()
+}
+
+/** Deletes every row the selection spans, keeping at least one behind. */
+function deleteSelectedRows() {
+  const rect = selectionRect.value
+  if (!rect) return
+  const count = Math.min(rect.r2 - rect.r1 + 1, props.element.rows - 1)
+  if (count <= 0) return
+  for (let i = 0; i < count; i++) deleteRowAt(rect.r1)
+  const lastRow = Math.max(0, props.element.rows - 1 - count)
+  anchorCell.value = { r: Math.min(rect.r1, lastRow), c: rect.c1 }
+  focusCell.value = { ...anchorCell.value }
+  emitSelection()
+}
+
 // Variable replacement helper
 function renderCellContent(content: string): string {
   let text = content || ''
@@ -271,55 +406,74 @@ function renderCellContent(content: string): string {
   <div class="canvas-table-element w-full h-full relative font-serif select-none">
     <!-- Floating Table Quick Toolbar (when a cell or table is selected) -->
     <div
-      v-if="isSelected && activeCellCoord"
-      class="absolute -top-8 right-0 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 shadow-xl rounded-xl px-1.5 py-0.5 flex items-center gap-1 z-50 text-[11px] pointer-events-auto opacity-100 ring-1 ring-black/5 dark:ring-white/10"
+      v-if="isSelected && !readonly && anchorCell"
+      class="absolute bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 shadow-xl rounded-xl px-1.5 py-0.5 flex items-center gap-1 z-[90] text-[11px] pointer-events-auto opacity-100 ring-1 ring-black/5 dark:ring-white/10 whitespace-nowrap"
+      :class="toolbarPositionClass"
       :style="{
         transform: `scale(${100 / Math.max(25, props.zoomLevel)})`,
-        transformOrigin: 'bottom right'
+        transformOrigin: props.element.y < 16 ? 'bottom left' : 'top left'
       }"
       @pointerdown.stop.prevent
     >
       <button
         type="button"
-        @click="addColumnAfter(activeCellCoord.c)"
+        @click="addColumnAfter(selectionRect!.c2)"
         class="px-1.5 py-0.5 rounded hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-300 font-semibold flex items-center gap-1"
-        title="Add column right"
+        title="O'ngga ustun qo'shish"
       >
         <Columns class="w-3 h-3 text-blue-500" />
-        <span>+ Col</span>
+        <span>+ Ustun</span>
       </button>
 
       <button
         type="button"
-        @click="deleteColumnAt(activeCellCoord.c)"
+        @click="deleteSelectedColumns()"
         :disabled="element.cols <= 1"
         class="px-1.5 py-0.5 rounded hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-zinc-800 text-zinc-500 disabled:opacity-30"
-        title="Delete column"
+        title="Tanlangan ustun(lar)ni o'chirish"
       >
-        <span>- Col</span>
+        <span>− Ustun</span>
       </button>
 
       <div class="w-px h-3 bg-zinc-200 dark:bg-zinc-700"></div>
 
       <button
         type="button"
-        @click="addRowAfter(activeCellCoord.r)"
+        @click="addRowAfter(selectionRect!.r2)"
         class="px-1.5 py-0.5 rounded hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-300 font-semibold flex items-center gap-1"
-        title="Add row below"
+        title="Pastga qator qo'shish"
       >
         <Rows class="w-3 h-3 text-blue-500" />
-        <span>+ Row</span>
+        <span>+ Qator</span>
       </button>
 
       <button
         type="button"
-        @click="deleteRowAt(activeCellCoord.r)"
+        @click="deleteSelectedRows()"
         :disabled="element.rows <= 1"
         class="px-1.5 py-0.5 rounded hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-zinc-800 text-zinc-500 disabled:opacity-30"
-        title="Delete row"
+        title="Tanlangan qator(lar)ni o'chirish"
       >
-        <span>- Row</span>
+        <span>− Qator</span>
       </button>
+
+      <div class="w-px h-3 bg-zinc-200 dark:bg-zinc-700"></div>
+
+      <button
+        type="button"
+        @click="selectAllCells()"
+        class="px-1.5 py-0.5 rounded hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-300 font-semibold"
+        title="Barcha kataklarni tanlash"
+      >
+        <span>Hammasi</span>
+      </button>
+
+      <span
+        v-if="hasMultiSelection"
+        class="px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-300 font-bold tabular-nums"
+      >
+        {{ (selectionRect!.r2 - selectionRect!.r1 + 1) }}×{{ (selectionRect!.c2 - selectionRect!.c1 + 1) }}
+      </span>
     </div>
 
     <!-- Table Render -->
@@ -350,8 +504,9 @@ function renderCellContent(content: string): string {
             :colspan="cell.colSpan && cell.colSpan > 1 ? cell.colSpan : undefined"
             :rowspan="cell.rowSpan && cell.rowSpan > 1 ? cell.rowSpan : undefined"
             :class="[
-              activeCellCoord?.r === rIdx && activeCellCoord?.c === cIdx && isSelected
-                ? 'ring-2 ring-blue-500 ring-inset bg-blue-50/20'
+              isSelected && isCellSelected(rIdx, cIdx) ? 'canvas-cell-selected' : '',
+              isSelected && anchorCell?.r === rIdx && anchorCell?.c === cIdx
+                ? 'ring-2 ring-blue-500 ring-inset'
                 : ''
             ]"
             :style="{
@@ -363,9 +518,12 @@ function renderCellContent(content: string): string {
               fontFamily: `'Times New Roman', Times, serif`,
               fontSize: `${cell.fontSize ? cell.fontSize * PT_TO_PX : cellFontSizePx}px`,
               fontWeight: cell.fontWeight || 'normal',
+              fontStyle: cell.fontStyle || 'normal',
+              textDecoration: cell.textDecoration || 'none',
               padding: `${cellPaddingPx}px`
             }"
-            @click="onCellClick(rIdx, cIdx, $event)"
+            @pointerdown="onCellPointerDown(rIdx, cIdx, $event)"
+            @pointerenter="onCellPointerEnter(rIdx, cIdx)"
             @dblclick="onCellDoubleClick(rIdx, cIdx, $event)"
           >
             <!-- Cell Content (Editable when double clicked) -->
@@ -385,19 +543,27 @@ function renderCellContent(content: string): string {
 
             <!-- Column Resize Handle on right edge of top-row cells.
                  Skipped on spanned cells: their cIdx no longer maps onto a
-                 single column, so dragging one would resize the wrong column. -->
+                 single column, so dragging one would resize the wrong column.
+                 Stays lit for the whole drag (not just :hover) so the grip does
+                 not vanish the moment the pointer runs ahead of it. -->
             <div
               v-if="rIdx === 0 && isSelected && !readonly && !(cell.colSpan && cell.colSpan > 1)"
-              class="absolute top-0 right-0 bottom-0 w-1.5 hover:w-2 bg-transparent hover:bg-blue-500/50 cursor-col-resize z-20 transition-all pointer-events-auto"
+              class="canvas-col-grip absolute -top-px right-0 bottom-0 w-2 cursor-col-resize z-30 pointer-events-auto"
+              :class="resizing?.axis === 'col' && resizing.index === cIdx ? 'is-active' : ''"
               @pointerdown="onColumnResizeStart(cIdx, $event)"
-            ></div>
+            >
+              <span class="grip-line"></span>
+            </div>
 
             <!-- Row Resize Handle on the bottom edge of the first cell in a row -->
             <div
               v-if="cIdx === 0 && isSelected && !readonly && !(cell.rowSpan && cell.rowSpan > 1)"
-              class="absolute left-0 right-0 bottom-0 h-1.5 hover:h-2 bg-transparent hover:bg-blue-500/50 cursor-row-resize z-20 transition-all pointer-events-auto"
+              class="canvas-row-grip absolute left-0 -right-px bottom-0 h-2 cursor-row-resize z-30 pointer-events-auto"
+              :class="resizing?.axis === 'row' && resizing.index === rIdx ? 'is-active' : ''"
               @pointerdown="onRowResizeStart(rIdx, $event)"
-            ></div>
+            >
+              <span class="grip-line"></span>
+            </div>
           </td>
         </tr>
       </tbody>
@@ -414,5 +580,60 @@ function renderCellContent(content: string): string {
 .canvas-table-element span,
 .canvas-table-element p {
   font-family: 'Times New Roman', Times, Georgia, serif !important;
+}
+
+/* Block selection tint. Painted with a box-shadow inset rather than
+   background-color so a cell's own fill colour stays visible underneath. */
+.canvas-table-element td.canvas-cell-selected {
+  box-shadow: inset 0 0 0 9999px rgba(37, 99, 235, 0.13);
+}
+
+/* Resize grips: a hairline that thickens on hover and stays thick while the
+   drag is in flight. */
+.canvas-col-grip .grip-line,
+.canvas-row-grip .grip-line {
+  position: absolute;
+  background: transparent;
+  transition: background-color 0.12s ease;
+}
+
+.canvas-col-grip .grip-line {
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: 2px;
+}
+
+.canvas-row-grip .grip-line {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+}
+
+.canvas-col-grip:hover .grip-line,
+.canvas-row-grip:hover .grip-line,
+.canvas-col-grip.is-active .grip-line,
+.canvas-row-grip.is-active .grip-line {
+  background: #2563eb;
+}
+
+/* Keep the resize cursor for the whole gesture. Without this the pointer
+   crosses cells mid-drag and picks up their cursor instead. */
+body.canvas-resizing-col,
+body.canvas-resizing-col * {
+  cursor: col-resize !important;
+}
+
+body.canvas-resizing-row,
+body.canvas-resizing-row * {
+  cursor: row-resize !important;
+}
+
+/* Dragging a block selection should not paint the browser's own text
+   highlight over the cells. */
+body.canvas-resizing-col,
+body.canvas-resizing-row {
+  user-select: none;
 }
 </style>

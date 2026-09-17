@@ -63,6 +63,8 @@ export interface TableCellModel {
   textAlign?: 'left' | 'center' | 'right' | 'justify'
   verticalAlign?: 'top' | 'middle' | 'bottom'
   fontWeight?: string | number
+  fontStyle?: 'normal' | 'italic'
+  textDecoration?: string
   fontSize?: number
   borders?: {
     top?: string
@@ -83,6 +85,19 @@ export interface TableCanvasElement extends BaseCanvasElement {
   borderColor?: string
   borderStyle?: string
   density?: 'compact' | 'normal' | 'spacious'
+}
+
+/**
+ * A rectangular block of cells inside one table — what the toolbar formats.
+ * Always stored normalised (r1 <= r2, c1 <= c2) so callers can loop it directly
+ * without re-deriving which corner the user dragged from.
+ */
+export interface TableCellRange {
+  elementId: string
+  r1: number
+  c1: number
+  r2: number
+  c2: number
 }
 
 export interface SignatureCanvasElement extends BaseCanvasElement {
