@@ -34,6 +34,9 @@ const activeCellCoord = ref<{ r: number; c: number } | null>(null)
 const editingCellCoord = ref<{ r: number; c: number } | null>(null)
 
 const MM_TO_PX_BASE = 3.779527559
+// Cell font sizes are authored in pt like the rest of the document; the canvas
+// draws in px, and 1pt = 1/72in while 1px = 1/96in.
+const PT_TO_PX = 96 / 72
 
 function mmToPx(mm: number): number {
   return mm * MM_TO_PX_BASE
@@ -53,6 +56,9 @@ const cellPaddingPx = computed(() => {
   return base
 })
 
+const MIN_COL_MM = 8
+const MIN_ROW_MM = 5
+
 // Resizing Columns via Dragging Column Headers
 function onColumnResizeStart(colIdx: number, e: PointerEvent) {
   e.preventDefault()
@@ -64,7 +70,7 @@ function onColumnResizeStart(colIdx: number, e: PointerEvent) {
 
   function onColMove(moveEvent: PointerEvent) {
     const deltaMm = pxToMm(moveEvent.clientX - startClientX)
-    const newW = Math.max(10, currentW + deltaMm)
+    const newW = Math.max(MIN_COL_MM, currentW + deltaMm)
     const updatedWidths = [...originalWidths]
     updatedWidths[colIdx] = Math.round(newW * 10) / 10
 
@@ -83,6 +89,37 @@ function onColumnResizeStart(colIdx: number, e: PointerEvent) {
 
   window.addEventListener('pointermove', onColMove)
   window.addEventListener('pointerup', onColUp)
+}
+
+// Resizing Rows via dragging the bottom edge of a row's first cell
+function onRowResizeStart(rowIdx: number, e: PointerEvent) {
+  e.preventDefault()
+  e.stopPropagation()
+
+  const startClientY = e.clientY
+  const originalHeights = [...props.element.rowHeights]
+  const currentH = originalHeights[rowIdx] || 10
+
+  function onRowMove(moveEvent: PointerEvent) {
+    const deltaMm = pxToMm(moveEvent.clientY - startClientY)
+    const newH = Math.max(MIN_ROW_MM, currentH + deltaMm)
+    const updatedHeights = [...originalHeights]
+    updatedHeights[rowIdx] = Math.round(newH * 10) / 10
+
+    const totalH = updatedHeights.reduce((sum, h) => sum + h, 0)
+    emit('update:element', {
+      rowHeights: updatedHeights,
+      height: Math.round(totalH * 10) / 10,
+    })
+  }
+
+  function onRowUp() {
+    window.removeEventListener('pointermove', onRowMove)
+    window.removeEventListener('pointerup', onRowUp)
+  }
+
+  window.addEventListener('pointermove', onRowMove)
+  window.addEventListener('pointerup', onRowUp)
 }
 
 // Cell Double Click -> In-place edit cell content
@@ -135,18 +172,29 @@ function onCellPaste(r: number, c: number, e: ClipboardEvent) {
   }
 }
 
+function newCell(): TableCellModel {
+  return {
+    id: `cell_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+    content: '&nbsp;',
+  }
+}
+
 // Row & Column Operations
 function addColumnAfter(colIdx: number) {
   const newCols = props.element.cols + 1
-  const avgW = props.element.width / newCols
-  const newWidths = Array(newCols).fill(Math.round(avgW * 10) / 10)
+
+  // Split the source column in two rather than redistributing every column:
+  // rebuilding all widths from an average silently discarded whatever column
+  // sizing had been set up, which is never what adding one column should mean.
+  const newWidths = [...props.element.colWidths]
+  const sourceW = newWidths[colIdx] || 20
+  const halfW = Math.max(MIN_COL_MM, Math.round((sourceW / 2) * 10) / 10)
+  newWidths[colIdx] = halfW
+  newWidths.splice(colIdx + 1, 0, halfW)
 
   const newCells = props.element.cells.map(row => {
     const newRow = [...row]
-    newRow.splice(colIdx + 1, 0, {
-      id: `cell_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-      content: '&nbsp;',
-    })
+    newRow.splice(Math.min(colIdx + 1, newRow.length), 0, newCell())
     return newRow
   })
 
@@ -154,6 +202,7 @@ function addColumnAfter(colIdx: number) {
     cols: newCols,
     colWidths: newWidths,
     cells: newCells,
+    width: Math.round(newWidths.reduce((sum, w) => sum + w, 0) * 10) / 10,
   })
 }
 
@@ -174,11 +223,14 @@ function deleteColumnAt(colIdx: number) {
 
 function addRowAfter(rowIdx: number) {
   const newRows = props.element.rows + 1
-  const newRowHeights = [...props.element.rowHeights, 10]
-  const newRowCells: TableCellModel[] = Array.from({ length: props.element.cols }, () => ({
-    id: `cell_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-    content: '&nbsp;',
-  }))
+
+  // The height entry has to land beside its row: appending to the end left
+  // every row below the insertion point wearing its neighbour's height.
+  const newRowHeights = [...props.element.rowHeights]
+  const sourceH = newRowHeights[rowIdx] || 10
+  newRowHeights.splice(rowIdx + 1, 0, sourceH)
+
+  const newRowCells: TableCellModel[] = Array.from({ length: props.element.cols }, newCell)
 
   const newCells = [...props.element.cells]
   newCells.splice(rowIdx + 1, 0, newRowCells)
@@ -187,7 +239,7 @@ function addRowAfter(rowIdx: number) {
     rows: newRows,
     rowHeights: newRowHeights,
     cells: newCells,
-    height: props.element.height + 10,
+    height: Math.round(newRowHeights.reduce((sum, h) => sum + h, 0) * 10) / 10,
   })
 }
 
@@ -201,7 +253,7 @@ function deleteRowAt(rowIdx: number) {
     rows: newRows,
     rowHeights: newRowHeights,
     cells: newCells,
-    height: Math.max(15, props.element.height - 10),
+    height: Math.max(MIN_ROW_MM, Math.round(newRowHeights.reduce((sum, h) => sum + h, 0) * 10) / 10),
   })
 }
 
@@ -289,12 +341,14 @@ function renderCellContent(content: string): string {
         <tr
           v-for="(row, rIdx) in element.cells"
           :key="rIdx"
-          :style="{ minHeight: `${mmToPx(element.rowHeights[rIdx] || 10)}px` }"
+          :style="{ height: `${mmToPx(element.rowHeights[rIdx] || 10)}px` }"
         >
           <td
             v-for="(cell, cIdx) in row"
             :key="cell.id"
             class="relative transition-colors"
+            :colspan="cell.colSpan && cell.colSpan > 1 ? cell.colSpan : undefined"
+            :rowspan="cell.rowSpan && cell.rowSpan > 1 ? cell.rowSpan : undefined"
             :class="[
               activeCellCoord?.r === rIdx && activeCellCoord?.c === cIdx && isSelected
                 ? 'ring-2 ring-blue-500 ring-inset bg-blue-50/20'
@@ -307,7 +361,8 @@ function renderCellContent(content: string): string {
               verticalAlign: cell.verticalAlign || 'top',
               color: cell.color || '#111827',
               fontFamily: `'Times New Roman', Times, serif`,
-              fontSize: `${cellFontSizePx}px`,
+              fontSize: `${cell.fontSize ? cell.fontSize * PT_TO_PX : cellFontSizePx}px`,
+              fontWeight: cell.fontWeight || 'normal',
               padding: `${cellPaddingPx}px`
             }"
             @click="onCellClick(rIdx, cIdx, $event)"
@@ -328,11 +383,20 @@ function renderCellContent(content: string): string {
               v-html="renderCellContent(cell.content)"
             ></div>
 
-            <!-- Column Resize Handle on right edge of top-row cells -->
+            <!-- Column Resize Handle on right edge of top-row cells.
+                 Skipped on spanned cells: their cIdx no longer maps onto a
+                 single column, so dragging one would resize the wrong column. -->
             <div
-              v-if="rIdx === 0 && isSelected"
+              v-if="rIdx === 0 && isSelected && !readonly && !(cell.colSpan && cell.colSpan > 1)"
               class="absolute top-0 right-0 bottom-0 w-1.5 hover:w-2 bg-transparent hover:bg-blue-500/50 cursor-col-resize z-20 transition-all pointer-events-auto"
               @pointerdown="onColumnResizeStart(cIdx, $event)"
+            ></div>
+
+            <!-- Row Resize Handle on the bottom edge of the first cell in a row -->
+            <div
+              v-if="cIdx === 0 && isSelected && !readonly && !(cell.rowSpan && cell.rowSpan > 1)"
+              class="absolute left-0 right-0 bottom-0 h-1.5 hover:h-2 bg-transparent hover:bg-blue-500/50 cursor-row-resize z-20 transition-all pointer-events-auto"
+              @pointerdown="onRowResizeStart(rIdx, $event)"
             ></div>
           </td>
         </tr>

@@ -71,6 +71,7 @@ const emit = defineEmits<{
   'clear-selection': []
   'double-click-element': [id: string]
   'update-element': [id: string, updates: Partial<CanvasElement>, recordHistory?: boolean]
+  'select-table-cell': [id: string, rowIndex: number, colIndex: number]
   'update-element-bounds': [id: string, bounds: { x: number; y: number; width: number; height: number; rotation?: number }]
   'duplicate-element': [id: string]
   'delete-element': [id: string]
@@ -476,6 +477,7 @@ function confirmDeletePage() {
                 cells[r][c].content = val
                 emit('update-element', el.id, { cells })
               }"
+              @select-cell="(r, c) => emit('select-table-cell', el.id, r, c)"
             />
 
             <!-- Signature -->

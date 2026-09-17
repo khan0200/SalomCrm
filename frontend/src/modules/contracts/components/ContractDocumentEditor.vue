@@ -72,6 +72,7 @@ import type {
   CanvasElement,
   TextCanvasElement,
   TableCanvasElement,
+  TableCellModel,
   PageMargins,
   AlignmentGuide,
   TextStyleProps,
@@ -148,6 +149,7 @@ const showTableInsertMenu = ref(false)
 const showGuideMenu = ref(false)
 const showMarginMenu = ref(false)
 const showSpacingMenu = ref(false)
+const showTablePropsMenu = ref(false)
 const showListMenu = ref(false)
 const showCaseMenu = ref(false)
 const showFindReplace = ref(false)
@@ -185,6 +187,70 @@ function isTextLikeElement(el: any): boolean {
 // `canvas.selectedElement`, so formatting tools (bold, color, alignment,
 // case, spacing, list, copy-style) all apply to every selected element.
 const selectedTextElements = computed(() => (canvas.selectedElements.value as any[]).filter(isTextLikeElement))
+
+// ─── Table cell targeting ──────────────────────────────────────────────────
+// Tables are not text-like elements, so the formatting tools below would
+// otherwise skip them entirely. Clicking a cell records it here, and the
+// shared tools (font size, bold, colour, alignment) redirect onto cells:
+// the clicked cell when there is one, every cell of the selected table
+// otherwise. That keeps one toolbar working for both kinds of element.
+const activeTableCell = ref<{ elementId: string; r: number; c: number } | null>(null)
+
+const selectedTables = computed(() =>
+  (canvas.selectedElements.value as any[]).filter(el => el?.type === 'table') as TableCanvasElement[]
+)
+
+const activeCell = computed<TableCellModel | null>(() => {
+  const ref_ = activeTableCell.value
+  if (!ref_) return null
+  const table = selectedTables.value.find(t => t.id === ref_.elementId)
+  return table?.cells?.[ref_.r]?.[ref_.c] ?? null
+})
+
+function onSelectTableCell(elementId: string, r: number, c: number) {
+  activeTableCell.value = { elementId, r, c }
+}
+
+/**
+ * Applies `mutate` to the cells the user means: just the clicked cell when one
+ * is active, otherwise every cell of each selected table. Returns whether any
+ * table was actually touched, so callers can fall through to their text-element
+ * behaviour when the selection holds no tables.
+ */
+function applyToTableCells(mutate: (cell: TableCellModel) => void): boolean {
+  const tables = selectedTables.value
+  if (!tables.length) return false
+
+  const target = activeTableCell.value
+  for (const table of tables) {
+    if (target && target.elementId === table.id) {
+      const cell = table.cells?.[target.r]?.[target.c]
+      if (cell) mutate(cell)
+    } else {
+      table.cells?.forEach(row => row.forEach(mutate))
+    }
+  }
+  canvas.history.recordSnapshot(canvas.document.value)
+  return true
+}
+
+function updateSelectedTables(updates: Partial<TableCanvasElement>) {
+  const tables = selectedTables.value
+  if (!tables.length) return
+  tables.forEach(table => Object.assign(table, updates))
+  canvas.history.recordSnapshot(canvas.document.value)
+}
+
+// Clicking away from a table should stop aiming the toolbar at its last cell.
+watch(
+  () => canvas.selectedElementIds.value.join(','),
+  () => {
+    const target = activeTableCell.value
+    if (target && !canvas.selectedElementIds.value.includes(target.elementId)) {
+      activeTableCell.value = null
+    }
+  }
+)
 
 // Used only for read-only display purposes (e.g. what font size/color to
 // show in the toolbar) when multiple elements are selected - shows the
@@ -985,6 +1051,7 @@ function closeAllDropdowns() {
   showHighlightPicker.value = false
   showMarginMenu.value = false
   showSpacingMenu.value = false
+  showTablePropsMenu.value = false
   showListMenu.value = false
   showCaseMenu.value = false
   showFindReplace.value = false
@@ -1049,7 +1116,9 @@ function setFontSize(sizePt: number | string) {
   const num = typeof sizePt === 'string' ? parseInt(sizePt, 10) : sizePt
   const targets = canvas.selectedElements.value as any[]
   if (!targets.length) return
+  applyToTableCells(cell => { cell.fontSize = num })
   targets.forEach(el => {
+    if (el.type === 'table') return
     if (!el.style) el.style = {}
     el.style.fontSize = num
   })
@@ -1086,7 +1155,15 @@ function applyInlineFormat(command: 'bold' | 'italic' | 'underline' | 'strikeThr
     const container = (activeEl!.closest('.canvas-text-element') || activeEl) as HTMLElement
     if (container) el.content = container.innerHTML
   } else {
+    // Bold is the only one of these four the cell model carries; the rest stay
+    // inline markup inside the cell's own HTML, applied while editing it.
+    if (command === 'bold') {
+      applyToTableCells(cell => {
+        cell.fontWeight = cell.fontWeight === 'bold' || cell.fontWeight === 700 ? 'normal' : 'bold'
+      })
+    }
     targets.forEach(el => {
+      if (el.type === 'table') return
       if (!el.style) el.style = {}
       toggleWholeElement(el)
     })
@@ -1208,11 +1285,76 @@ function applyTextCase(mode: TextCaseMode) {
 }
 
 function setTextAlign(align: 'left' | 'center' | 'right' | 'justify') {
+  const appliedToTable = applyToTableCells(cell => { cell.textAlign = align })
   const targets = selectedTextElements.value as any[]
-  if (!targets.length) return
+  if (!targets.length) {
+    if (!appliedToTable) return
+    canvas.history.recordSnapshot(canvas.document.value)
+    return
+  }
   targets.forEach(el => {
     if (!el.style) el.style = {}
     el.style.textAlign = align
+  })
+  canvas.history.recordSnapshot(canvas.document.value)
+}
+
+function setCellVerticalAlign(align: 'top' | 'middle' | 'bottom') {
+  applyToTableCells(cell => { cell.verticalAlign = align })
+}
+
+// ─── Table properties (border / density / track distribution) ──────────────
+const TABLE_DENSITY_OPTIONS = [
+  { value: 'compact', label: 'Zich' },
+  { value: 'normal', label: 'Oddiy' },
+  { value: 'spacious', label: 'Keng' },
+] as const
+
+const CELL_VALIGN_OPTIONS = [
+  { value: 'top', label: 'Tepa' },
+  { value: 'middle', label: "O'rta" },
+  { value: 'bottom', label: 'Past' },
+] as const
+
+const currentTableBorderColor = computed(() => selectedTables.value[0]?.borderColor || '#94a3b8')
+const currentTableBorderWidth = computed(() => selectedTables.value[0]?.borderWidth || '1px')
+const currentTableBorderStyle = computed(() => selectedTables.value[0]?.borderStyle || 'solid')
+const currentTableDensity = computed(() => selectedTables.value[0]?.density || 'normal')
+
+function setTableBorderColor(color: string) {
+  updateSelectedTables({ borderColor: color })
+}
+
+function setTableBorderWidth(width: string) {
+  updateSelectedTables({ borderWidth: width })
+}
+
+function setTableBorderStyle(style: string) {
+  // A borderless table still needs a width the renderer can echo, so pair the
+  // two rather than leaving 'none' sitting next to a stale 1px.
+  updateSelectedTables(
+    style === 'none' ? { borderStyle: 'none', borderWidth: '0px' } : { borderStyle: style, borderWidth: currentTableBorderWidth.value === '0px' ? '1px' : currentTableBorderWidth.value }
+  )
+}
+
+function setTableDensity(density: 'compact' | 'normal' | 'spacious') {
+  updateSelectedTables({ density })
+}
+
+function distributeColumnsEvenly() {
+  selectedTables.value.forEach(table => {
+    if (!table.colWidths?.length) return
+    const even = Math.round((table.width / table.colWidths.length) * 100) / 100
+    table.colWidths = table.colWidths.map(() => even)
+  })
+  canvas.history.recordSnapshot(canvas.document.value)
+}
+
+function distributeRowsEvenly() {
+  selectedTables.value.forEach(table => {
+    if (!table.rowHeights?.length) return
+    const even = Math.round((table.height / table.rowHeights.length) * 100) / 100
+    table.rowHeights = table.rowHeights.map(() => even)
   })
   canvas.history.recordSnapshot(canvas.document.value)
 }
@@ -1277,6 +1419,13 @@ function toggleFindReplace() {
   } else {
     nextTick(() => updateCanvasHighlights())
   }
+}
+
+// Table properties dropdown toggle
+function toggleTablePropsMenu() {
+  const next = !showTablePropsMenu.value
+  closeAllDropdowns()
+  showTablePropsMenu.value = next
 }
 
 // List dropdown toggle & active state (Canva / Word Style)
@@ -1537,7 +1686,9 @@ function commitSpacingChange() {
 function setFontColor(color: string) {
   const targets = canvas.selectedElements.value as any[]
   if (!targets.length) return
+  applyToTableCells(cell => { cell.color = color })
   targets.forEach(el => {
+    if (el.type === 'table') return
     if (!el.style) el.style = {}
     el.style.color = color
   })
@@ -1548,15 +1699,13 @@ function setFontColor(color: string) {
 function setHighlightColor(color: string) {
   const targets = canvas.selectedElements.value as any[]
   if (!targets.length) return
+  // Fill the clicked cell when one is active, otherwise the whole table.
+  applyToTableCells(cell => {
+    cell.backgroundColor = color === '#ffffff' ? undefined : color
+  })
   targets.forEach(el => {
     if (el.type === 'table') {
-      // Apply fill to all cells in table
-      const table = el as TableCanvasElement
-      table.cells.forEach(row => {
-        row.forEach(c => {
-          c.backgroundColor = color === '#ffffff' ? undefined : color
-        })
-      })
+      return // filled per-cell by applyToTableCells above
     } else if (el.type === 'checkbox') {
       if (!el.style) el.style = {}
       const bg = color === '#ffffff' ? 'transparent' : color
@@ -3236,6 +3385,136 @@ const shortcutCategories = computed(() => ({
         </div>
       </div>
 
+      <!-- Table Properties: borders, density, vertical alignment.
+           Only meaningful while a table is selected, so the whole group hides
+           otherwise rather than sitting there permanently disabled. -->
+      <div
+        v-if="selectedTables.length"
+        class="relative px-1 border-r border-zinc-200 dark:border-zinc-700/60 editor-dropdown-container"
+        :class="{ 'z-50': showTablePropsMenu }"
+      >
+        <button
+          type="button"
+          @click.stop="toggleTablePropsMenu()"
+          class="toolbar-btn flex items-center gap-1 px-2 h-7 rounded-lg text-xs font-semibold"
+          :class="showTablePropsMenu
+            ? 'bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-400'
+            : 'text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800'"
+          title="Jadval: chegara, zichlik, tekislash"
+        >
+          <TableIcon class="w-3.5 h-3.5" />
+          <span>Jadval</span>
+        </button>
+
+        <div
+          v-if="showTablePropsMenu"
+          class="absolute top-full left-0 mt-1.5 w-72 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-2xl p-3 space-y-3 z-50"
+          @click.stop
+        >
+          <p class="text-[11px] text-zinc-500 dark:text-zinc-400 leading-snug">
+            <template v-if="activeCell">
+              Tekislash va ranglar <strong class="text-zinc-700 dark:text-zinc-200">tanlangan katakka</strong> qo'llanadi.
+            </template>
+            <template v-else>
+              Katakni bosing — o'zgarishlar faqat o'shanga tegadi. Hozir <strong class="text-zinc-700 dark:text-zinc-200">butun jadvalga</strong> qo'llanadi.
+            </template>
+          </p>
+
+          <!-- Border colour / width / style -->
+          <div class="space-y-1.5">
+            <span class="text-xs font-medium text-zinc-700 dark:text-zinc-300">Chegara</span>
+            <div class="flex items-center gap-1.5">
+              <input
+                type="color"
+                :value="currentTableBorderColor"
+                @input="setTableBorderColor(($event.target as HTMLInputElement).value)"
+                class="w-7 h-7 rounded-md border border-zinc-200 dark:border-zinc-700 cursor-pointer bg-transparent p-0.5"
+                title="Chegara rangi"
+              />
+              <select
+                :value="currentTableBorderWidth"
+                @change="setTableBorderWidth(($event.target as HTMLSelectElement).value)"
+                class="flex-1 h-7 px-1.5 text-xs bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-md focus:outline-none"
+                title="Chegara qalinligi"
+              >
+                <option value="0.5px">0.5 px</option>
+                <option value="1px">1 px</option>
+                <option value="1.5px">1.5 px</option>
+                <option value="2px">2 px</option>
+                <option value="3px">3 px</option>
+              </select>
+              <select
+                :value="currentTableBorderStyle"
+                @change="setTableBorderStyle(($event.target as HTMLSelectElement).value)"
+                class="flex-1 h-7 px-1.5 text-xs bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-md focus:outline-none"
+                title="Chegara uslubi"
+              >
+                <option value="solid">To'liq</option>
+                <option value="dashed">Chiziqli</option>
+                <option value="dotted">Nuqtali</option>
+                <option value="none">Yo'q</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Density -->
+          <div class="space-y-1.5">
+            <span class="text-xs font-medium text-zinc-700 dark:text-zinc-300">Ichki bo'shliq</span>
+            <div class="flex items-center gap-1">
+              <button
+                v-for="opt in TABLE_DENSITY_OPTIONS"
+                :key="opt.value"
+                type="button"
+                @click="setTableDensity(opt.value)"
+                class="flex-1 px-1.5 py-1 rounded-md text-[11px] font-semibold border transition-colors"
+                :class="currentTableDensity === opt.value
+                  ? 'bg-blue-50 dark:bg-blue-950/50 border-blue-300 dark:border-blue-800 text-blue-700 dark:text-blue-300'
+                  : 'bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100'"
+              >
+                {{ opt.label }}
+              </button>
+            </div>
+          </div>
+
+          <!-- Vertical alignment -->
+          <div class="space-y-1.5">
+            <span class="text-xs font-medium text-zinc-700 dark:text-zinc-300">Vertikal tekislash</span>
+            <div class="flex items-center gap-1">
+              <button
+                v-for="opt in CELL_VALIGN_OPTIONS"
+                :key="opt.value"
+                type="button"
+                @click="setCellVerticalAlign(opt.value)"
+                class="flex-1 px-1.5 py-1 rounded-md text-[11px] font-semibold border transition-colors"
+                :class="(activeCell?.verticalAlign || 'top') === opt.value
+                  ? 'bg-blue-50 dark:bg-blue-950/50 border-blue-300 dark:border-blue-800 text-blue-700 dark:text-blue-300'
+                  : 'bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100'"
+              >
+                {{ opt.label }}
+              </button>
+            </div>
+          </div>
+
+          <!-- Distribute tracks evenly -->
+          <div class="pt-2 border-t border-zinc-100 dark:border-zinc-800 flex items-center gap-1.5">
+            <button
+              type="button"
+              @click="distributeColumnsEvenly()"
+              class="flex-1 px-1.5 py-1 rounded-md text-[11px] font-semibold bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-200"
+            >
+              Ustunlarni tenglash
+            </button>
+            <button
+              type="button"
+              @click="distributeRowsEvenly()"
+              class="flex-1 px-1.5 py-1 rounded-md text-[11px] font-semibold bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-200"
+            >
+              Qatorlarni tenglash
+            </button>
+          </div>
+        </div>
+      </div>
+
       <!-- Page Addition Button -->
       <div class="flex items-center px-1.5 border-r border-zinc-200 dark:border-zinc-700/60">
         <button
@@ -3641,6 +3920,7 @@ const shortcutCategories = computed(() => ({
           @clear-selection="canvas.clearSelection()"
           @double-click-element="canvas.editingElementId.value = (canvas.editingElementId.value === $event ? null : $event)"
           @update-element="(id, updates, record) => canvas.updateElement(id, updates, record !== false)"
+          @select-table-cell="onSelectTableCell"
           @update-element-bounds="(id, bounds) => canvas.updateElementBounds(id, bounds)"
           @duplicate-element="canvas.duplicateSelectedElements($event)"
           @delete-element="canvas.deleteSelectedElements($event)"

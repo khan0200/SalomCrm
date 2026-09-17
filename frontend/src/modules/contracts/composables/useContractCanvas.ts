@@ -292,9 +292,40 @@ export function useContractCanvas(initialDoc?: ContractDocumentModel) {
     history.recordSnapshot(document.value)
   }
 
+  /**
+   * Keeps a table's column widths and row heights in step when the element box
+   * itself is resized. Without this the box grew while colWidths/rowHeights kept
+   * their old millimetres, so the geometry the editor showed and the geometry
+   * the PDF was built from drifted apart. Skipped when the caller already sent
+   * new tracks (the column/row drag handles do), to avoid scaling them twice.
+   */
+  function rescaleTableTracks(element: CanvasElement, updates: Partial<CanvasElement>) {
+    if (element.type !== 'table') return
+    const table = element as TableCanvasElement
+
+    const nextWidth = (updates as Partial<TableCanvasElement>).width
+    if (nextWidth != null && !('colWidths' in updates) && table.colWidths?.length) {
+      const total = table.colWidths.reduce((sum, w) => sum + w, 0)
+      if (total > 0 && Math.abs(total - nextWidth) > 0.01) {
+        const scale = nextWidth / total
+        table.colWidths = table.colWidths.map(w => Math.round(w * scale * 100) / 100)
+      }
+    }
+
+    const nextHeight = (updates as Partial<TableCanvasElement>).height
+    if (nextHeight != null && !('rowHeights' in updates) && table.rowHeights?.length) {
+      const total = table.rowHeights.reduce((sum, h) => sum + h, 0)
+      if (total > 0 && Math.abs(total - nextHeight) > 0.01) {
+        const scale = nextHeight / total
+        table.rowHeights = table.rowHeights.map(h => Math.round(h * scale * 100) / 100)
+      }
+    }
+  }
+
   function updateElement(id: string, updates: Partial<CanvasElement>, recordHistory = true) {
     const found = findElementAndPage(id)
     if (!found) return
+    rescaleTableTracks(found.element, updates)
     Object.assign(found.element, updates)
     activePageIndex.value = found.pageIndex
     if (recordHistory) {

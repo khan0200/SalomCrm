@@ -243,6 +243,9 @@ export function convertHtmlToCanvasDocument(
               backgroundColor: bg || undefined,
               textAlign: align,
               verticalAlign: vAlign,
+              color: htmlCell.style.color || undefined,
+              fontSize: parseFloat(htmlCell.style.fontSize) || undefined,
+              fontWeight: htmlCell.style.fontWeight || undefined,
               colSpan: colSpan > 1 ? colSpan : undefined,
               rowSpan: rowSpan > 1 ? rowSpan : undefined,
             })
@@ -250,11 +253,22 @@ export function convertHtmlToCanvasDocument(
           cells.push(rowCells)
         })
 
+        // Honour an authored <colgroup>/<tr height> so a table that was exported
+        // by convertCanvasDocumentToHtml round-trips back with its geometry
+        // rather than collapsing to evenly spaced columns.
+        const colEls = Array.from(tableEl.querySelectorAll('col'))
+        const authoredWidths = colEls
+          .map(c => parseFloat((c as HTMLElement).style.width))
+          .filter(w => Number.isFinite(w) && w > 0)
         const colW = contentWidth / maxCols
-        const colWidths = Array(maxCols).fill(colW)
-        const rowH = 10
-        const rowHeights = Array(rowCount).fill(rowH)
-        const estimatedTableHeight = Math.max(20, rowCount * 12)
+        const colWidths =
+          authoredWidths.length === maxCols ? authoredWidths : Array(maxCols).fill(colW)
+
+        const rowHeights = trs.map(tr => {
+          const h = parseFloat((tr as HTMLElement).style.height)
+          return Number.isFinite(h) && h > 0 ? h : 10
+        })
+        const estimatedTableHeight = Math.max(20, rowHeights.reduce((sum, h) => sum + h, 0))
 
         addElement(
           {
@@ -262,7 +276,7 @@ export function convertHtmlToCanvasDocument(
             type: 'table',
             x: margins.left,
             y: currentY,
-            width: contentWidth,
+            width: colWidths.reduce((sum, w) => sum + w, 0),
             height: estimatedTableHeight,
             zIndex: 1,
             rows: rowCount,
@@ -437,25 +451,45 @@ export function convertCanvasDocumentToHtml(
 
       if (el.type === 'table') {
         const table = el as TableCanvasElement
+        const cellPadding =
+          table.density === 'compact' ? '4px 6px' : table.density === 'spacious' ? '10px 14px' : '6px 10px'
+        const cellBorder = `${table.borderWidth || '1px'} ${table.borderStyle || 'solid'} ${table.borderColor || '#94a3b8'}`
+
+        // Column widths only survive into the PDF/print/signing output if they
+        // are emitted as a <colgroup>: `table-layout: fixed` alone distributes
+        // every column evenly, which silently discarded whatever widths the
+        // editor had been showing.
+        const colgroup = table.colWidths?.length
+          ? `<colgroup>${table.colWidths
+              .map(w => `<col style="width: ${Math.round(w * 100) / 100}mm;" />`)
+              .join('')}</colgroup>`
+          : ''
+
         let rowsHtml = ''
-        table.cells.forEach(row => {
+        table.cells.forEach((row, rowIdx) => {
           let colsHtml = ''
           row.forEach(cell => {
-            let cellContent = replaceVariablesInHtml(cell.content || '', pageVariableValues, {
+            const cellContent = replaceVariablesInHtml(cell.content || '', pageVariableValues, {
               skipHeuristics: pageVars.size > 0,
               excludedVariables: pageVars,
             })
             const bg = cell.backgroundColor ? `background-color: ${cell.backgroundColor};` : ''
             const align = cell.textAlign ? `text-align: ${cell.textAlign};` : ''
             const vAlign = cell.verticalAlign ? `vertical-align: ${cell.verticalAlign};` : ''
+            const color = cell.color ? `color: ${cell.color};` : ''
+            const fontSize = cell.fontSize ? `font-size: ${cell.fontSize}pt;` : ''
+            const fontWeight = cell.fontWeight ? `font-weight: ${cell.fontWeight};` : ''
             const spanAttrs = `${cell.colSpan ? `colspan="${cell.colSpan}"` : ''} ${cell.rowSpan ? `rowspan="${cell.rowSpan}"` : ''}`
 
-            colsHtml += `<td ${spanAttrs} style="border: ${table.borderWidth || '1px'} ${table.borderStyle || 'solid'} ${table.borderColor || '#94a3b8'}; padding: ${table.density === 'compact' ? '4px 6px' : table.density === 'spacious' ? '10px 14px' : '6px 10px'}; ${bg} ${align} ${vAlign}">${cellContent}</td>`
+            colsHtml += `<td ${spanAttrs} style="border: ${cellBorder}; padding: ${cellPadding}; ${bg}${align}${vAlign}${color}${fontSize}${fontWeight}">${cellContent}</td>`
           })
-          rowsHtml += `<tr>${colsHtml}</tr>`
+          // Row heights are authored in mm like every other canvas dimension.
+          // `height` (not `min-height`) is what a table row actually honours.
+          const rowH = table.rowHeights?.[rowIdx]
+          rowsHtml += `<tr${rowH ? ` style="height: ${Math.round(rowH * 100) / 100}mm;"` : ''}>${colsHtml}</tr>`
         })
 
-        innerContent = `<table style="width: 100%; height: 100%; border-collapse: collapse; table-layout: fixed;">${rowsHtml}</table>`
+        innerContent = `<table style="width: 100%; border-collapse: collapse; table-layout: fixed;">${colgroup}${rowsHtml}</table>`
       } else if (el.type === 'line') {
         const line = el as any
         const borderProp = line.orientation === 'vertical' ? 'border-left' : 'border-top'
