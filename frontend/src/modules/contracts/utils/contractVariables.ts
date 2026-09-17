@@ -146,6 +146,19 @@ export function resolveTenantRequisites(customUserOrTenant?: any): AgencyRequisi
   let req: any = null
   let isSodiq = false
   try {
+    // Super Admin "viewing as" another tenant (see TenantsPage.vue /
+    // stores/auth.ts activeTenantId) must win over the admin's own profile -
+    // the admin's own `user.tenant` is null, so without this check every
+    // lookup silently fell through to the hardcoded Unibridge fallback below
+    // no matter which tenant was actually being viewed.
+    const activeTenantId = typeof localStorage !== 'undefined' ? localStorage.getItem('active_tenant_id') : null
+    if (activeTenantId) {
+      const activeTenantName = (localStorage.getItem('active_tenant_name') || '').toLowerCase()
+      if (activeTenantId === 'sodiq' || activeTenantName.includes('sodiq') || activeTenantName.includes('unigate')) {
+        isSodiq = true
+      }
+    }
+
     let u = customUserOrTenant
     if (!u && typeof localStorage !== 'undefined') {
       const userStr = localStorage.getItem('user_profile')
@@ -153,10 +166,12 @@ export function resolveTenantRequisites(customUserOrTenant?: any): AgencyRequisi
     }
     if (u) {
       req = u?.tenant?.settings?.requisites || u?.settings?.requisites
-      const tId = u?.tenant?.id || u?.tenant?.slug || u?.tenant_id || u?.id || u?.slug || (typeof u?.tenant === 'string' ? u?.tenant : '')
-      const tName = (u?.tenant?.name || u?.name || '').toLowerCase()
-      if (tId === 'sodiq' || tName.includes('sodiq') || tName.includes('unigate')) {
-        isSodiq = true
+      if (!activeTenantId) {
+        const tId = u?.tenant?.id || u?.tenant?.slug || u?.tenant_id || u?.id || u?.slug || (typeof u?.tenant === 'string' ? u?.tenant : '')
+        const tName = (u?.tenant?.name || u?.name || '').toLowerCase()
+        if (tId === 'sodiq' || tName.includes('sodiq') || tName.includes('unigate')) {
+          isSodiq = true
+        }
       }
     }
   } catch {}

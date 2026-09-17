@@ -59,7 +59,7 @@ const activeTenantId = computed(() => authStore.activeTenantId)
 
 const switchTenant = (t: Tenant) => {
   if (t.id === activeTenantId.value) return
-  authStore.setActiveTenant(t.id)
+  authStore.setActiveTenant(t.id, t.name)
 }
 
 const exitTenantContext = () => {

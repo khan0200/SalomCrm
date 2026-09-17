@@ -85,6 +85,10 @@ const savedData = ref<AgencyRequisites>({ ...DEFAULT_REQUISITES })
 
 const tenantId = computed(() => {
   return (
+    // Super Admin "viewing as" another tenant must win - the admin's own
+    // `user.tenant` is null, so this used to always fall through to the
+    // hardcoded 'unibridge' default below regardless of the active tenant.
+    authStore.activeTenantId ||
     authStore.currentTenant?.id ||
     (authStore.user?.tenant as any)?.id ||
     (typeof authStore.user?.tenant === 'string' ? authStore.user.tenant : '') ||

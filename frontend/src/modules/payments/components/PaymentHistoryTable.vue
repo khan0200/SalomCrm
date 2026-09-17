@@ -170,7 +170,10 @@ const printReceipt = (payment: Payment) => {
   const notesLine = payment.notes || ''
   const methodLine = payment.method || '—'
   const receiverLine = payment.received_by || '—'
-  const companyName = authStore.currentTenant?.name?.toUpperCase() || 'SALOM CRM'
+  // Super Admin "viewing as" another tenant must win - the admin's own
+  // `user.tenant` is null, so this used to always fall back to the generic
+  // 'SALOM CRM' label regardless of which tenant was actually active.
+  const companyName = (authStore.activeTenantName || authStore.currentTenant?.name)?.toUpperCase() || 'SALOM CRM'
 
   const receiptHTML = `<!DOCTYPE html>
 <html lang="en">

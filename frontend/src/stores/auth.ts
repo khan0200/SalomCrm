@@ -16,6 +16,7 @@ export const useAuthStore = defineStore('auth', () => {
   const user = ref<UserProfile | null>(getInitialUser())
   const token = ref<string | null>(localStorage.getItem('access_token'))
   const activeTenantId = ref<string | null>(localStorage.getItem('active_tenant_id'))
+  const activeTenantName = ref<string | null>(localStorage.getItem('active_tenant_name'))
 
   const isAuthenticated = computed(() => !!token.value && !!user.value)
   const isSuperAdmin = computed(() => !!user.value?.is_superuser || user.value?.role === 'SUPER_ADMIN')
@@ -60,6 +61,10 @@ export const useAuthStore = defineStore('auth', () => {
     if (data.user.tenant?.id) {
       activeTenantId.value = data.user.tenant.id
       localStorage.setItem('active_tenant_id', data.user.tenant.id)
+      if (data.user.tenant.name) {
+        activeTenantName.value = data.user.tenant.name
+        localStorage.setItem('active_tenant_name', data.user.tenant.name)
+      }
     }
   }
 
@@ -75,6 +80,10 @@ export const useAuthStore = defineStore('auth', () => {
     if (data.user.tenant?.id) {
       activeTenantId.value = data.user.tenant.id
       localStorage.setItem('active_tenant_id', data.user.tenant.id)
+      if (data.user.tenant.name) {
+        activeTenantName.value = data.user.tenant.name
+        localStorage.setItem('active_tenant_name', data.user.tenant.name)
+      }
     }
   }
 
@@ -82,19 +91,27 @@ export const useAuthStore = defineStore('auth', () => {
     user.value = null
     token.value = null
     activeTenantId.value = null
+    activeTenantName.value = null
     localStorage.removeItem('access_token')
     localStorage.removeItem('refresh_token')
     localStorage.removeItem('user_profile')
     localStorage.removeItem('active_tenant_id')
+    localStorage.removeItem('active_tenant_name')
     window.location.href = '/login'
   }
 
-  const setActiveTenant = (tenantId: string | null) => {
+  const setActiveTenant = (tenantId: string | null, tenantName?: string | null) => {
     activeTenantId.value = tenantId
+    activeTenantName.value = tenantName || null
     if (tenantId) {
       localStorage.setItem('active_tenant_id', tenantId)
     } else {
       localStorage.removeItem('active_tenant_id')
+    }
+    if (tenantName) {
+      localStorage.setItem('active_tenant_name', tenantName)
+    } else {
+      localStorage.removeItem('active_tenant_name')
     }
     window.location.reload()
   }
@@ -106,9 +123,14 @@ export const useAuthStore = defineStore('auth', () => {
       user.value = data
       localStorage.setItem('user_profile', JSON.stringify(data))
       const tenantId = (data.tenant as any)?.id || (typeof data.tenant === 'string' ? data.tenant : null)
+      const tenantName = (data.tenant as any)?.name || null
       if (tenantId && !activeTenantId.value) {
         activeTenantId.value = tenantId
         localStorage.setItem('active_tenant_id', tenantId)
+        if (tenantName) {
+          activeTenantName.value = tenantName
+          localStorage.setItem('active_tenant_name', tenantName)
+        }
       }
     } catch (err) {
       logout()
@@ -119,6 +141,7 @@ export const useAuthStore = defineStore('auth', () => {
     user,
     token,
     activeTenantId,
+    activeTenantName,
     isAuthenticated,
     isSuperAdmin,
     isHeadManager,

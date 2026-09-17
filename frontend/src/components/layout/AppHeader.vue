@@ -97,6 +97,10 @@ const pageTitle = computed(() => {
 
 const tenantName = computed(() => {
   return (
+    // Super Admin "viewing as" another tenant overrides the admin's own
+    // (tenant-less) profile - without this, the header always fell back to
+    // the hardcoded default below regardless of which tenant was active.
+    authStore.activeTenantName ||
     authStore.currentTenant?.name ||
     (authStore.user as any)?.tenant_name ||
     (typeof authStore.user?.tenant === 'string' ? authStore.user.tenant : '') ||
@@ -106,6 +110,7 @@ const tenantName = computed(() => {
 
 const tenantSlug = computed(() => {
   return (
+    authStore.activeTenantId ||
     authStore.currentTenant?.slug ||
     (authStore.user?.tenant as any)?.slug ||
     (authStore.user as any)?.tenant_slug ||

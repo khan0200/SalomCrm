@@ -51,6 +51,11 @@ const uiStore = useUiStore()
 
 const tenantSlug = computed(() => {
   return (
+    // Super Admin "viewing as" another tenant must win, otherwise this
+    // builds an online-signing link pointing at the wrong tenant entirely
+    // (the admin's own `user.tenant` is null, so it always fell through to
+    // the hardcoded 'unibridge' default below regardless of the active tenant).
+    authStore.activeTenantId ||
     authStore.currentTenant?.slug ||
     (authStore.user?.tenant as any)?.slug ||
     (authStore.user as any)?.tenant_slug ||
