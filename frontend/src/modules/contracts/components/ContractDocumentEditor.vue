@@ -62,6 +62,15 @@ import {
   Hash,
   Search,
   Replace,
+  Grid3x3,
+  Grid2x2,
+  Rows3,
+  Columns3,
+  PanelTop,
+  PanelBottom,
+  PanelLeft,
+  PanelRight,
+  Ban,
 } from 'lucide-vue-next'
 import { CONTRACT_VARIABLES, type ContractVariableDef, buildVariableValues, resolveTenantRequisites, buildCompanyRequisitesHtml, buildClientRequisitesHtml } from '../utils/contractVariables'
 import { useUiStore } from '@/stores/ui'
@@ -231,7 +240,13 @@ function applyToTableCells(mutate: (cell: TableCellModel) => void): boolean {
 
   const range = activeTableRange.value
   for (const table of tables) {
-    if (range && range.elementId === table.id) {
+    if (range) {
+      // A specific cell range is active - it names exactly one table. Any
+      // OTHER table that happens to be co-selected (e.g. via marquee) must be
+      // left untouched rather than swept in full: the toolbar's "N ta katakka"
+      // note only ever describes that one table's cells, so silently also
+      // reformatting a second selected table's every cell would contradict it.
+      if (range.elementId !== table.id) continue
       for (let r = range.r1; r <= range.r2; r++) {
         for (let c = range.c1; c <= range.c2; c++) {
           const cell = table.cells?.[r]?.[c]
@@ -1362,10 +1377,12 @@ function applyBorderPreset(preset: BorderPreset) {
   const table = range ? selectedTables.value.find(t => t.id === range.elementId) : selectedTables.value[0]
   if (!table) return
 
-  const r1 = range?.r1 ?? 0
-  const c1 = range?.c1 ?? 0
-  const r2 = range?.r2 ?? table.rows - 1
-  const c2 = range?.c2 ?? table.cols - 1
+  // Clamped against the table's CURRENT size: a range captured before a row/
+  // column deletion could otherwise point past the live grid.
+  const r1 = Math.max(0, range?.r1 ?? 0)
+  const c1 = Math.max(0, range?.c1 ?? 0)
+  const r2 = Math.min(range?.r2 ?? table.rows - 1, table.rows - 1)
+  const c2 = Math.min(range?.c2 ?? table.cols - 1, table.cols - 1)
   const value = preset === 'none' ? 'none' : `${borderWidthChoice.value} ${borderStyleChoice.value} ${borderColorChoice.value}`
 
   for (let r = r1; r <= r2; r++) {
@@ -3582,18 +3599,44 @@ const shortcutCategories = computed(() => ({
               </select>
             </div>
             <div class="grid grid-cols-5 gap-1">
-              <button type="button" @click="applyBorderPreset('all')" class="px-1 py-1 rounded-md text-[10px] font-semibold bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:border-blue-300" title="Barcha borderlar">Hammasi</button>
-              <button type="button" @click="applyBorderPreset('outside')" class="px-1 py-1 rounded-md text-[10px] font-semibold bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:border-blue-300" title="Tashqi border">Tashqi</button>
-              <button type="button" @click="applyBorderPreset('inside')" class="px-1 py-1 rounded-md text-[10px] font-semibold bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:border-blue-300" title="Ichki borderlar">Ichki</button>
-              <button type="button" @click="applyBorderPreset('horizontal')" class="px-1 py-1 rounded-md text-[10px] font-semibold bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:border-blue-300" title="Ichki gorizontal">Gorizont</button>
-              <button type="button" @click="applyBorderPreset('vertical')" class="px-1 py-1 rounded-md text-[10px] font-semibold bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:border-blue-300" title="Ichki vertikal">Vertikal</button>
-              <button type="button" @click="applyBorderPreset('top')" class="px-1 py-1 rounded-md text-[10px] font-semibold bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:border-blue-300" title="Yuqori border">Yuqori</button>
-              <button type="button" @click="applyBorderPreset('bottom')" class="px-1 py-1 rounded-md text-[10px] font-semibold bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:border-blue-300" title="Pastki border">Pastki</button>
-              <button type="button" @click="applyBorderPreset('left')" class="px-1 py-1 rounded-md text-[10px] font-semibold bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:border-blue-300" title="Chap border">Chap</button>
-              <button type="button" @click="applyBorderPreset('right')" class="px-1 py-1 rounded-md text-[10px] font-semibold bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:border-blue-300" title="O'ng border">O'ng</button>
-              <button type="button" @click="applyBorderPreset('none')" class="px-1 py-1 rounded-md text-[10px] font-semibold bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900 text-rose-600 dark:text-rose-400 hover:bg-rose-100" title="Borderlarni olib tashlash">Yo'q</button>
+              <button type="button" @click="applyBorderPreset('all')" class="flex items-center justify-center p-1.5 rounded-md bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:border-blue-300" title="Barcha borderlar"><Grid3x3 class="w-4 h-4" /></button>
+              <button type="button" @click="applyBorderPreset('outside')" class="flex items-center justify-center p-1.5 rounded-md bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:border-blue-300" title="Tashqi border"><Square class="w-4 h-4" /></button>
+              <button type="button" @click="applyBorderPreset('inside')" class="flex items-center justify-center p-1.5 rounded-md bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:border-blue-300" title="Ichki borderlar"><Grid2x2 class="w-4 h-4" /></button>
+              <button type="button" @click="applyBorderPreset('horizontal')" class="flex items-center justify-center p-1.5 rounded-md bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:border-blue-300" title="Ichki gorizontal"><Rows3 class="w-4 h-4" /></button>
+              <button type="button" @click="applyBorderPreset('vertical')" class="flex items-center justify-center p-1.5 rounded-md bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:border-blue-300" title="Ichki vertikal"><Columns3 class="w-4 h-4" /></button>
+              <button type="button" @click="applyBorderPreset('top')" class="flex items-center justify-center p-1.5 rounded-md bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:border-blue-300" title="Yuqori border"><PanelTop class="w-4 h-4" /></button>
+              <button type="button" @click="applyBorderPreset('bottom')" class="flex items-center justify-center p-1.5 rounded-md bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:border-blue-300" title="Pastki border"><PanelBottom class="w-4 h-4" /></button>
+              <button type="button" @click="applyBorderPreset('left')" class="flex items-center justify-center p-1.5 rounded-md bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:border-blue-300" title="Chap border"><PanelLeft class="w-4 h-4" /></button>
+              <button type="button" @click="applyBorderPreset('right')" class="flex items-center justify-center p-1.5 rounded-md bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:border-blue-300" title="O'ng border"><PanelRight class="w-4 h-4" /></button>
+              <button type="button" @click="applyBorderPreset('none')" class="flex items-center justify-center p-1.5 rounded-md bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900 text-rose-600 dark:text-rose-400 hover:bg-rose-100" title="Borderlarni olib tashlash"><Ban class="w-4 h-4" /></button>
             </div>
           </div>
+
+          <!-- Vertical alignment: also cell-scoped, same rule as border above -->
+          <div class="space-y-1.5">
+            <span class="text-xs font-medium text-zinc-700 dark:text-zinc-300">Vertikal tekislash</span>
+            <div class="flex items-center gap-1">
+              <button
+                v-for="opt in CELL_VALIGN_OPTIONS"
+                :key="opt.value"
+                type="button"
+                @click="setCellVerticalAlign(opt.value)"
+                class="flex-1 px-1.5 py-1 rounded-md text-[11px] font-semibold border transition-colors"
+                :class="(activeCell?.verticalAlign || 'top') === opt.value
+                  ? 'bg-blue-50 dark:bg-blue-950/50 border-blue-300 dark:border-blue-800 text-blue-700 dark:text-blue-300'
+                  : 'bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100'"
+              >
+                {{ opt.label }}
+              </button>
+            </div>
+          </div>
+
+          <!-- Everything below (density + table-wide design) is never cell-scoped,
+               so it gets its own explicit note instead of inheriting the border/
+               vertical-align note above - that one only ever applies to those two. -->
+          <p class="text-[11px] text-zinc-500 dark:text-zinc-400 leading-snug pt-2 border-t border-zinc-100 dark:border-zinc-800">
+            Quyidagilar har doim <strong class="text-zinc-700 dark:text-zinc-200">butun jadvalga</strong> qo'llanadi.
+          </p>
 
           <!-- Density -->
           <div class="space-y-1.5">
@@ -3614,27 +3657,8 @@ const shortcutCategories = computed(() => ({
             </div>
           </div>
 
-          <!-- Vertical alignment -->
-          <div class="space-y-1.5">
-            <span class="text-xs font-medium text-zinc-700 dark:text-zinc-300">Vertikal tekislash</span>
-            <div class="flex items-center gap-1">
-              <button
-                v-for="opt in CELL_VALIGN_OPTIONS"
-                :key="opt.value"
-                type="button"
-                @click="setCellVerticalAlign(opt.value)"
-                class="flex-1 px-1.5 py-1 rounded-md text-[11px] font-semibold border transition-colors"
-                :class="(activeCell?.verticalAlign || 'top') === opt.value
-                  ? 'bg-blue-50 dark:bg-blue-950/50 border-blue-300 dark:border-blue-800 text-blue-700 dark:text-blue-300'
-                  : 'bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100'"
-              >
-                {{ opt.label }}
-              </button>
-            </div>
-          </div>
-
           <!-- Table-wide design: background, header row, zebra -->
-          <div class="space-y-1.5 pt-2 border-t border-zinc-100 dark:border-zinc-800">
+          <div class="space-y-1.5">
             <span class="text-xs font-medium text-zinc-700 dark:text-zinc-300">Jadval dizayni</span>
 
             <div class="flex items-center gap-1.5">

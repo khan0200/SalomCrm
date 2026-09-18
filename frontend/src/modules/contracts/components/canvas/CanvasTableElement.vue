@@ -298,7 +298,20 @@ function beginEdit(r: number, c: number) {
 
 function onCellPointerDown(r: number, c: number, e: PointerEvent) {
   if (props.readonly) return
-  if (editingCellCoord.value) return // the pointer belongs to the caret while editing
+  if (editingCellCoord.value) {
+    const ec = editingCellCoord.value
+    // A click INSIDE the cell currently being edited belongs to the caret -
+    // let it place the text cursor instead of hijacking it into a selection
+    // drag. A click on any OTHER cell, though, must first commit that edit;
+    // otherwise this handler used to bail out entirely (leaving anchor/focus
+    // pointed at the old cell), so the old cell kept showing as "selected"
+    // and the click's own pointerdown fell through uncommitted, occasionally
+    // still leaving the caret console mid-edit - the more the interaction
+    // repeated, the more it looked like typing and clicking flickered the
+    // selection between cells.
+    if (ec.r === r && ec.c === c) return
+    commitActiveEdit()
+  }
   if (e.button !== 0) return
 
   e.stopPropagation()
