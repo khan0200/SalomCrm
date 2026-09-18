@@ -48,6 +48,22 @@ export const CONTRACT_VARIABLES: ContractVariableDef[] = [
   { key: 'total_pages', token: '{{total_pages}}', label: 'Jami sahifalar soni', category: 'contract', example: '4' },
 ]
 
+/**
+ * Student.phone1/phone2 (and Contract.guardian_phone) are stored as bare
+ * local digits - see StudentDetailDrawer's own formatPhoneValue, which
+ * assumes exactly 9 raw digits with no country code. Printed contract text
+ * should still show the full international number, so the "+998" is added
+ * back here, at display time, rather than baked into the stored value
+ * (baking it in once broke the drawer: a stored "+998 XX-XXX-XX-XX" made
+ * that display function's naive "first 9 digits" math eat into the 998
+ * itself and truncate the real last 3 digits).
+ */
+function withUzPhonePrefix(raw: string): string {
+  const trimmed = (raw || '').trim()
+  if (!trimmed) return ''
+  return trimmed.startsWith('+998') ? trimmed : `+998 ${trimmed}`
+}
+
 export function formatCurrencyString(val: string | number | null | undefined): string {
   if (val === null || val === undefined || val === '') return '0 so\'m'
   const num = typeof val === 'number' ? val : parseFloat(String(val).replace(/[^0-9.-]+/g, ''))
@@ -417,8 +433,8 @@ export function buildVariableValues(
   const rawFullName = (student?.full_name || student?.fullName || student?.student_name || student?.client_name || '').toUpperCase().trim()
   const rawPassport = (student?.passport || student?.passport_number || student?.student_passport || student?.passportNumber || '').toUpperCase().trim()
   const rawDob = formatDateDot(student?.birthday || student?.date_of_birth || student?.dateOfBirth || '')
-  const rawPhone1 = student?.phone1 || student?.student_phone || student?.phone || student?.phone_1 || ''
-  const rawPhone2 = student?.phone2 || student?.phone_2 || ''
+  const rawPhone1 = withUzPhonePrefix(student?.phone1 || student?.student_phone || student?.phone || student?.phone_1 || '')
+  const rawPhone2 = withUzPhonePrefix(student?.phone2 || student?.phone_2 || '')
   const rawLevel = student?.level || student?.education_level || student?.educationLevel || student?.level_to_study || contractMeta?.educationLevel || (student ? 'Bakalavr' : '')
   const rawBranch = student?.office || student?.tenant_office_name || student?.branch || student?.office_name || contractMeta?.office || ''
   const rawEmail = student?.email || student?.student_email || student?.student_account?.email || (student?.snapshot_data && (student.snapshot_data.email || student.snapshot_data?.student_email)) || contractMeta?.email || ''
@@ -432,7 +448,7 @@ export function buildVariableValues(
   const rawGuardianFullName = (student?.guardian_full_name || student?.guardianFullName || '').toUpperCase().trim()
   const rawGuardianPassport = (student?.guardian_passport_number || student?.guardianPassportNumber || '').toUpperCase().trim()
   const rawGuardianRelation = student?.guardian_relation || student?.guardianRelation || ''
-  const rawGuardianPhone = student?.guardian_phone || student?.guardianPhone || ''
+  const rawGuardianPhone = withUzPhonePrefix(student?.guardian_phone || student?.guardianPhone || '')
   const rawGuardianAddress = student?.guardian_address || student?.guardianAddress || ''
   const rawGuardianSignature = student?.guardian_signature_data || student?.guardianSignatureData || ''
   const guardianSignatureHtml = rawGuardianSignature

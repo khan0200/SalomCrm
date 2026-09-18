@@ -119,24 +119,36 @@ watch(guardianRelationOption, (val) => {
   }
 })
 
-// Uzbek mobile numbers as +998 XX-XXX-XX-XX (9 digits after the country
-// code, grouped 2-3-2-2). Re-derives the whole formatted string from
-// whatever digits are currently in the field on every keystroke, so pasting,
-// mid-string edits, and backspacing all self-correct instead of drifting out
-// of the dash pattern.
+// Uzbek mobile numbers as XX-XXX-XX-XX (9 digits, grouped 2-3-2-2) - the
+// "+998" is shown as a fixed visual prefix next to the input (see template),
+// never stored as part of the value itself. Student.phone1/phone2 has always
+// been stored as bare local digits (see StudentDetailDrawer's own
+// formatPhoneValue), and Contract.phone1/phone2 gets copied verbatim into it
+// on promotion to a Student record - baking "+998" into the stored string
+// here would leak into a field that never expected a country code, silently
+// corrupting the truncation math on the other end.
+// Re-derives the whole formatted string from whatever digits are currently
+// in the field on every keystroke, so pasting, mid-string edits, and
+// backspacing all self-correct instead of drifting out of the dash pattern.
 function formatUzPhone(raw: string): string {
   const digits = raw.replace(/\D/g, '').replace(/^998/, '').slice(0, 9)
-  if (!digits) return ''
   let local = ''
   for (let i = 0; i < digits.length; i++) {
     if (i === 2 || i === 5 || i === 7) local += '-'
     local += digits[i]
   }
-  return `+998 ${local}`
+  return local
 }
 
 function isCompleteUzPhone(val: string): boolean {
   return val.replace(/\D/g, '').replace(/^998/, '').length === 9
+}
+
+// Display-only: the stored value is always bare local digits (see
+// formatUzPhone above); "+998" is added back wherever a phone number is
+// actually shown to a human (preview, review step, printed contract).
+function displayPhone(local: string): string {
+  return local ? `+998 ${local}` : ''
 }
 
 function onPhone1Input(e: Event) {
@@ -732,14 +744,17 @@ onMounted(() => {
               <label class="block text-xs font-bold uppercase tracking-wide text-black dark:text-white mb-1.5">
                 Mobil telefon 1 <span class="text-red-600">*</span>
               </label>
-              <input
-                :value="formData.phone1"
-                @input="onPhone1Input"
-                type="tel"
-                required
-                placeholder="+998 90-123-45-67"
-                class="w-full px-3.5 py-2.5 text-xs font-mono font-bold rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-black dark:text-white placeholder:text-zinc-400 focus:outline-hidden focus:border-black dark:focus:border-white transition-colors shadow-2xs"
-              />
+              <div class="flex items-stretch">
+                <span class="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-zinc-300 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800 text-xs font-mono font-bold text-zinc-500 dark:text-zinc-400">+998</span>
+                <input
+                  :value="formData.phone1"
+                  @input="onPhone1Input"
+                  type="tel"
+                  required
+                  placeholder="90-123-45-67"
+                  class="w-full px-3.5 py-2.5 text-xs font-mono font-bold rounded-r-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-black dark:text-white placeholder:text-zinc-400 focus:outline-hidden focus:border-black dark:focus:border-white transition-colors shadow-2xs"
+                />
+              </div>
             </div>
 
             <!-- Phone 2 -->
@@ -747,14 +762,17 @@ onMounted(() => {
               <label class="block text-xs font-bold uppercase tracking-wide text-black dark:text-white mb-1.5">
                 Mobil telefon 2 <span class="text-red-600">*</span>
               </label>
-              <input
-                :value="formData.phone2"
-                @input="onPhone2Input"
-                type="tel"
-                required
-                placeholder="+998 93-765-43-21"
-                class="w-full px-3.5 py-2.5 text-xs font-mono font-bold rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-black dark:text-white placeholder:text-zinc-400 focus:outline-hidden focus:border-black dark:focus:border-white transition-colors shadow-2xs"
-              />
+              <div class="flex items-stretch">
+                <span class="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-zinc-300 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800 text-xs font-mono font-bold text-zinc-500 dark:text-zinc-400">+998</span>
+                <input
+                  :value="formData.phone2"
+                  @input="onPhone2Input"
+                  type="tel"
+                  required
+                  placeholder="93-765-43-21"
+                  class="w-full px-3.5 py-2.5 text-xs font-mono font-bold rounded-r-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-black dark:text-white placeholder:text-zinc-400 focus:outline-hidden focus:border-black dark:focus:border-white transition-colors shadow-2xs"
+                />
+              </div>
             </div>
 
             <!-- Email -->
@@ -825,7 +843,7 @@ onMounted(() => {
               <p><strong>Ta'lim bosqichi:</strong> {{ formData.educationLevel || '—' }}</p>
               <p><strong>Qabul ofisi:</strong> {{ formData.office || '—' }}</p>
               <p><strong>Tug'ilgan sana:</strong> {{ formattedDob || '—' }}</p>
-              <p><strong>Telefonlar:</strong> {{ formData.phone1 || '—' }} / {{ formData.phone2 || '—' }}</p>
+              <p><strong>Telefonlar:</strong> {{ displayPhone(formData.phone1) || '—' }} / {{ displayPhone(formData.phone2) || '—' }}</p>
               <p><strong>Xizmat to'lovi:</strong> {{ formatPrice(selectedTariff?.price) }}</p>
               <p class="pt-2 text-zinc-600 dark:text-zinc-400 italic">
                 Shartnomaning barcha bandlari va yuridik kafolatlarini ko'rish uchun yuqoridagi "Shartnomani to'liq ochish" tugmasini bosing.
@@ -949,13 +967,16 @@ onMounted(() => {
               </div>
               <div>
                 <label class="text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 block mb-1">Telefon raqami</label>
-                <input
-                  :value="guardianData.phone"
-                  @input="onGuardianPhoneInput"
-                  type="tel"
-                  placeholder="+998 90-123-45-67"
-                  class="w-full h-9 px-3 text-xs rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-black dark:text-white focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white"
-                />
+                <div class="flex items-stretch">
+                  <span class="inline-flex items-center px-2.5 rounded-l-lg border border-r-0 border-zinc-300 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800 text-xs font-mono font-bold text-zinc-500 dark:text-zinc-400">+998</span>
+                  <input
+                    :value="guardianData.phone"
+                    @input="onGuardianPhoneInput"
+                    type="tel"
+                    placeholder="90-123-45-67"
+                    class="w-full h-9 px-3 text-xs rounded-r-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-black dark:text-white focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white"
+                  />
+                </div>
               </div>
               <div class="sm:col-span-2">
                 <label class="text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 block mb-1">Yashash manzili</label>
@@ -1078,7 +1099,7 @@ onMounted(() => {
 
             <div class="p-3.5 bg-zinc-50/70 dark:bg-zinc-850/50 rounded-lg border border-zinc-200 dark:border-zinc-800">
               <span class="text-xs font-bold uppercase tracking-wide text-zinc-700 dark:text-zinc-300 block mb-1">Telefon raqamlari</span>
-              <strong class="text-xs font-mono font-bold text-black dark:text-white">{{ formData.phone1 }} / {{ formData.phone2 }}</strong>
+              <strong class="text-xs font-mono font-bold text-black dark:text-white">{{ displayPhone(formData.phone1) }} / {{ displayPhone(formData.phone2) }}</strong>
             </div>
           </div>
 
