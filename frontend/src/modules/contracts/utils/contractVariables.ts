@@ -529,16 +529,35 @@ export function buildVariableValues(
 
     guardianfullname: rawGuardianFullName,
     guardian_full_name: rawGuardianFullName,
+    kafilname: rawGuardianFullName,
+    kafilfullname: rawGuardianFullName,
+    nameofkafil: rawGuardianFullName,
+    kafil_fio: rawGuardianFullName,
+
     guardianpassportnumber: rawGuardianPassport,
     guardian_passport_number: rawGuardianPassport,
+    passportnumberofkafil: rawGuardianPassport,
+    kafilpassport: rawGuardianPassport,
+    kafil_passport: rawGuardianPassport,
+
     guardianrelation: rawGuardianRelation,
     guardian_relation: rawGuardianRelation,
+    relationship: rawGuardianRelation,
+    kafilrelation: rawGuardianRelation,
+
     guardianphone: rawGuardianPhone,
     guardian_phone: rawGuardianPhone,
+    phoneofkafil: rawGuardianPhone,
+    kafilphone: rawGuardianPhone,
+
     guardianaddress: rawGuardianAddress,
     guardian_address: rawGuardianAddress,
+    addressofkafil: rawGuardianAddress,
+    kafiladdress: rawGuardianAddress,
+
     guardiansignature: guardianSignatureHtml,
     guardian_signature: guardianSignatureHtml,
+    kafilsignature: guardianSignatureHtml,
 
     qr_code: qrCodeHtml,
     qrcode: qrCodeHtml,
@@ -655,14 +674,31 @@ export const VARIABLE_FALLBACK_PLACEHOLDERS: Record<string, string> = {
 
   guardianfullname: '_________________________',
   guardian_full_name: '_________________________',
+  kafilname: '_________________________',
+  kafilfullname: '_________________________',
+  nameofkafil: '_________________________',
+  kafil_fio: '_________________________',
+
   guardianpassportnumber: '____ _________',
   guardian_passport_number: '____ _________',
+  passportnumberofkafil: '____ _________',
+  kafilpassport: '____ _________',
+  kafil_passport: '____ _________',
+
   guardianrelation: '______________',
   guardian_relation: '______________',
+  relationship: '______________',
+  kafilrelation: '______________',
+
   guardianphone: '+998 __ ___ __ __',
   guardian_phone: '+998 __ ___ __ __',
+  phoneofkafil: '+998 __ ___ __ __',
+  kafilphone: '+998 __ ___ __ __',
+
   guardianaddress: '_________________________________',
   guardian_address: '_________________________________',
+  addressofkafil: '_________________________________',
+  kafiladdress: '_________________________________',
 
   signature: '______________',
   imzo: '______________',

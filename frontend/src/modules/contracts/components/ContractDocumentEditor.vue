@@ -1752,7 +1752,21 @@ function toggleVariablePicker() {
   const next = !showVariablePicker.value
   closeAllDropdowns()
   showVariablePicker.value = next
+  variablePickerQuery.value = ''
 }
+
+// The list has grown past a glance-and-click size (student, contract, and
+// now guardian/kafil fields all together), so it needs to be searchable
+// rather than purely scrollable - matches both the Uzbek label and the
+// underlying {{token}}, so "kafil" finds every guardian variable at once.
+const variablePickerQuery = ref('')
+const filteredContractVariables = computed(() => {
+  const q = variablePickerQuery.value.trim().toLowerCase()
+  if (!q) return CONTRACT_VARIABLES
+  return CONTRACT_VARIABLES.filter(v =>
+    v.label.toLowerCase().includes(q) || v.token.toLowerCase().includes(q)
+  )
+})
 
 const isTextSelected = computed(() => selectedTextElements.value.length > 0)
 
@@ -4008,24 +4022,35 @@ const shortcutCategories = computed(() => ({
 
         <div
           v-if="showVariablePicker"
-          class="absolute top-full left-0 mt-1 w-64 bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-700 shadow-2xl p-2 z-[200] max-h-60 overflow-y-auto space-y-1 animate-scale-in"
+          class="absolute top-full left-0 mt-1 w-64 bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-700 shadow-2xl p-2 z-[200] animate-scale-in"
           @click.stop
         >
-          <div class="text-[10px] font-bold text-zinc-400 uppercase tracking-wider px-2 py-1">Insert Variable</div>
-          <button
-            v-for="v in CONTRACT_VARIABLES"
-            :key="v.key"
-            type="button"
-            @mousedown.prevent
-            @click="insertVariable(v.key)"
-            class="w-full text-left px-2 py-1.5 rounded-lg hover:bg-blue-50 dark:hover:bg-zinc-800 flex items-center justify-between text-xs cursor-pointer group"
-          >
-            <div>
-              <div class="font-bold text-zinc-800 dark:text-zinc-200 group-hover:text-blue-600">{{ v.label }}</div>
-              <div class="font-mono text-[9.5px] text-zinc-400">{{ v.token }}</div>
+          <input
+            v-model="variablePickerQuery"
+            type="text"
+            placeholder="Qidirish... (masalan: kafil)"
+            class="w-full h-8 px-2.5 mb-1.5 text-xs rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-1 focus:ring-blue-400"
+          />
+          <div class="max-h-72 overflow-y-auto space-y-1">
+            <div class="text-[10px] font-bold text-zinc-400 uppercase tracking-wider px-2 py-1">Insert Variable</div>
+            <button
+              v-for="v in filteredContractVariables"
+              :key="v.key"
+              type="button"
+              @mousedown.prevent
+              @click="insertVariable(v.key)"
+              class="w-full text-left px-2 py-1.5 rounded-lg hover:bg-blue-50 dark:hover:bg-zinc-800 flex items-center justify-between text-xs cursor-pointer group"
+            >
+              <div>
+                <div class="font-bold text-zinc-800 dark:text-zinc-200 group-hover:text-blue-600">{{ v.label }}</div>
+                <div class="font-mono text-[9.5px] text-zinc-400">{{ v.token }}</div>
+              </div>
+              <span class="text-blue-500 font-bold opacity-0 group-hover:opacity-100">+</span>
+            </button>
+            <div v-if="!filteredContractVariables.length" class="px-2 py-3 text-center text-xs text-zinc-400">
+              Hech narsa topilmadi
             </div>
-            <span class="text-blue-500 font-bold opacity-0 group-hover:opacity-100">+</span>
-          </button>
+          </div>
         </div>
       </div>
 

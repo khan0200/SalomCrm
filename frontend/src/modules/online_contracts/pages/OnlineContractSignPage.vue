@@ -109,6 +109,46 @@ const guardianSignatureData = ref('')
 const isGuardianSignatureModalOpen = ref(false)
 const isGuardianContractViewerOpen = ref(false)
 
+const GUARDIAN_RELATION_OPTIONS = ['Ota', 'Ona', 'Aka'] as const
+const guardianRelationOption = ref<'Ota' | 'Ona' | 'Aka' | 'Other' | ''>('')
+watch(guardianRelationOption, (val) => {
+  if (val === 'Other') {
+    guardianData.relation = ''
+  } else if (val) {
+    guardianData.relation = val
+  }
+})
+
+// Uzbek mobile numbers as +998 XX-XXX-XX-XX (9 digits after the country
+// code, grouped 2-3-2-2). Re-derives the whole formatted string from
+// whatever digits are currently in the field on every keystroke, so pasting,
+// mid-string edits, and backspacing all self-correct instead of drifting out
+// of the dash pattern.
+function formatUzPhone(raw: string): string {
+  const digits = raw.replace(/\D/g, '').replace(/^998/, '').slice(0, 9)
+  if (!digits) return ''
+  let local = ''
+  for (let i = 0; i < digits.length; i++) {
+    if (i === 2 || i === 5 || i === 7) local += '-'
+    local += digits[i]
+  }
+  return `+998 ${local}`
+}
+
+function isCompleteUzPhone(val: string): boolean {
+  return val.replace(/\D/g, '').replace(/^998/, '').length === 9
+}
+
+function onPhone1Input(e: Event) {
+  formData.phone1 = formatUzPhone((e.target as HTMLInputElement).value)
+}
+function onPhone2Input(e: Event) {
+  formData.phone2 = formatUzPhone((e.target as HTMLInputElement).value)
+}
+function onGuardianPhoneInput(e: Event) {
+  guardianData.phone = formatUzPhone((e.target as HTMLInputElement).value)
+}
+
 // Password Confirmation Modal
 const isPasswordModalOpen = ref(false)
 const accountPassword = ref('')
@@ -229,8 +269,8 @@ async function init() {
         if (contract.passport_number) formData.passportNumber = contract.passport_number.toUpperCase()
         if (contract.education_level) formData.educationLevel = contract.education_level
         if (contract.office) formData.office = contract.office
-        if (contract.phone1) formData.phone1 = contract.phone1
-        if (contract.phone2) formData.phone2 = contract.phone2
+        if (contract.phone1) formData.phone1 = formatUzPhone(contract.phone1)
+        if (contract.phone2) formData.phone2 = formatUzPhone(contract.phone2)
         if (contract.email) formData.email = contract.email
         if (contract.date_of_birth) {
           const s = contract.date_of_birth.trim()
@@ -260,8 +300,8 @@ async function init() {
         if (prof.profile.passport_number) formData.passportNumber = prof.profile.passport_number.toUpperCase()
         if (prof.profile.education_level) formData.educationLevel = prof.profile.education_level
         if (prof.profile.office) formData.office = prof.profile.office
-        if (prof.profile.phone1) formData.phone1 = prof.profile.phone1
-        if (prof.profile.phone2) formData.phone2 = prof.profile.phone2
+        if (prof.profile.phone1) formData.phone1 = formatUzPhone(prof.profile.phone1)
+        if (prof.profile.phone2) formData.phone2 = formatUzPhone(prof.profile.phone2)
         if (prof.user.email) formData.email = prof.user.email
         if (prof.profile.date_of_birth) {
           const s = prof.profile.date_of_birth.trim()
@@ -311,8 +351,8 @@ const isStep1Valid = computed(() => {
     !!formData.dobMonth &&
     !!formData.dobYear &&
     !!formData.office &&
-    formData.phone1.trim().length >= 7 &&
-    formData.phone2.trim().length >= 7 &&
+    isCompleteUzPhone(formData.phone1) &&
+    isCompleteUzPhone(formData.phone2) &&
     (!formData.email || formData.email.includes('@'))
   )
 })
@@ -334,7 +374,7 @@ const isGuardianInfoValid = computed(() => {
     guardianData.fullName.trim().length >= 3 &&
     guardianData.passportNumber.trim().length >= 6 &&
     guardianData.relation.trim().length > 0 &&
-    guardianData.phone.trim().length >= 7 &&
+    isCompleteUzPhone(guardianData.phone) &&
     guardianData.address.trim().length >= 3 &&
     !!guardianSignatureData.value
   )
@@ -693,10 +733,11 @@ onMounted(() => {
                 Mobil telefon 1 <span class="text-red-600">*</span>
               </label>
               <input
-                v-model="formData.phone1"
+                :value="formData.phone1"
+                @input="onPhone1Input"
                 type="tel"
                 required
-                placeholder="+998 90 123 45 67"
+                placeholder="+998 90-123-45-67"
                 class="w-full px-3.5 py-2.5 text-xs font-mono font-bold rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-black dark:text-white placeholder:text-zinc-400 focus:outline-hidden focus:border-black dark:focus:border-white transition-colors shadow-2xs"
               />
             </div>
@@ -707,10 +748,11 @@ onMounted(() => {
                 Mobil telefon 2 <span class="text-red-600">*</span>
               </label>
               <input
-                v-model="formData.phone2"
+                :value="formData.phone2"
+                @input="onPhone2Input"
                 type="tel"
                 required
-                placeholder="+998 93 765 43 21"
+                placeholder="+998 93-765-43-21"
                 class="w-full px-3.5 py-2.5 text-xs font-mono font-bold rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-black dark:text-white placeholder:text-zinc-400 focus:outline-hidden focus:border-black dark:focus:border-white transition-colors shadow-2xs"
               />
             </div>
@@ -889,19 +931,29 @@ onMounted(() => {
               </div>
               <div>
                 <label class="text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 block mb-1">Talabaga qarindoshligi</label>
+                <select
+                  v-model="guardianRelationOption"
+                  class="w-full h-9 px-3 text-xs rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-black dark:text-white focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white cursor-pointer"
+                >
+                  <option value="" disabled>Tanlang</option>
+                  <option v-for="opt in GUARDIAN_RELATION_OPTIONS" :key="opt" :value="opt">{{ opt }}</option>
+                  <option value="Other">Boshqa (qo'lda yozish)</option>
+                </select>
                 <input
+                  v-if="guardianRelationOption === 'Other'"
                   v-model="guardianData.relation"
                   type="text"
-                  placeholder="Otasi / Onasi / Vasiysi"
-                  class="w-full h-9 px-3 text-xs rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-black dark:text-white focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white"
+                  placeholder="Masalan: Tog'a, Vasiy"
+                  class="w-full h-9 px-3 mt-1.5 text-xs rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-black dark:text-white focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white"
                 />
               </div>
               <div>
                 <label class="text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 block mb-1">Telefon raqami</label>
                 <input
-                  v-model="guardianData.phone"
-                  type="text"
-                  placeholder="+998 90 123 45 67"
+                  :value="guardianData.phone"
+                  @input="onGuardianPhoneInput"
+                  type="tel"
+                  placeholder="+998 90-123-45-67"
                   class="w-full h-9 px-3 text-xs rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-black dark:text-white focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white"
                 />
               </div>
