@@ -10,6 +10,7 @@ import {
 import OnlineContractLayout from '../layouts/OnlineContractLayout.vue'
 import OnlineContractSignatureModal from '../components/OnlineContractSignatureModal.vue'
 import FullContractViewerModal from '../components/FullContractViewerModal.vue'
+import LegalBasisModal from '../components/LegalBasisModal.vue'
 import { getTariffSampleContractHtml } from '../utils/sampleContract'
 import { buildVariableValues } from '@/modules/contracts/utils/contractVariables'
 import {
@@ -84,11 +85,15 @@ const declarations = reactive({
   readFullContract: false,
   voluntarySign: false,
   confirmationCodeMeaning: false,
+  legalBasisAcknowledged: false,
 })
 
 // Contract Viewer Modal
 const isViewerModalOpen = ref(false)
 const hasReadFullContract = ref(false)
+
+// Legal Basis Modal
+const isLegalBasisModalOpen = ref(false)
 
 // Password Confirmation Modal
 const isPasswordModalOpen = ref(false)
@@ -283,7 +288,8 @@ const isStep2DeclarationsValid = computed(() => {
   return (
     declarations.readFullContract &&
     declarations.voluntarySign &&
-    declarations.confirmationCodeMeaning
+    declarations.confirmationCodeMeaning &&
+    declarations.legalBasisAcknowledged
   )
 })
 
@@ -769,6 +775,23 @@ onMounted(() => {
                 Kiritiladigan tasdiqlash kodi ushbu shartnomani rasman tasdiqlashimni bildiradi
               </span>
             </label>
+
+            <label class="flex items-start gap-3 cursor-pointer select-none p-2.5 rounded-lg border border-transparent hover:border-zinc-200 dark:hover:border-zinc-800 transition-colors">
+              <input
+                type="checkbox"
+                v-model="declarations.legalBasisAcknowledged"
+                class="mt-0.5 w-4 h-4 rounded border-zinc-400 dark:border-zinc-600 text-black focus:ring-black"
+              />
+              <span class="text-xs font-semibold text-black dark:text-white leading-snug">
+                Telefon, planshet va kompyuterlarda imzo qo'yib tasdiqlash
+                <button
+                  type="button"
+                  @click.prevent="isLegalBasisModalOpen = true"
+                  class="text-blue-600 dark:text-blue-400 underline underline-offset-2 hover:text-blue-700 dark:hover:text-blue-300 font-bold"
+                >ushbu</button>
+                qonunchilik moddalariga to'g'ri kelishidan xabarim bor, imzo rasmiy kuchga ega
+              </span>
+            </label>
           </div>
 
           <!-- Actions: Back & Continue to Review -->
@@ -1012,6 +1035,12 @@ onMounted(() => {
       :model-value="formData.signatureData"
       @confirm="handleSignatureConfirmed"
       @close="isSignatureModalOpen = false"
+    />
+
+    <!-- Legal Basis Modal -->
+    <LegalBasisModal
+      :is-open="isLegalBasisModalOpen"
+      @close="isLegalBasisModalOpen = false"
     />
   </OnlineContractLayout>
 </template>

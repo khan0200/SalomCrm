@@ -18,6 +18,7 @@ import {
   Calendar,
   Trash2,
   XCircle,
+  Scale,
 } from 'lucide-vue-next'
 import {
   onlineContractsApi,
@@ -475,6 +476,14 @@ function handleResubmit(contract: OnlineContractSummary) {
                   </span>
                 </div>
               </div>
+            </div>
+
+            <!-- Legal Basis Notice: electronic signature equivalence -->
+            <div class="p-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-850/60 border border-zinc-200 dark:border-zinc-800 flex items-start gap-2.5">
+              <Scale class="w-4 h-4 text-zinc-500 dark:text-zinc-400 shrink-0 mt-0.5" />
+              <p class="text-[11.5px] text-zinc-600 dark:text-zinc-400 leading-relaxed font-medium">
+                Tomonlar shartnoma va uning ilovalari Korxonaning axborot tizimi orqali elektron shaklda tuzilishi va Mijozning grafik (qo'lda chizilgan) imzosi, elektron pochta orqali tasdiqlash kodi hamda tizim tomonidan qayd etilgan sana, IP-manzil va qurilma ma'lumotlari birgalikda qo'lyozma imzoga tenglashtirilishini tan oladilar. Elektron nusxa qog'oz nusxa bilan bir xil yuridik kuchga ega.
+              </p>
             </div>
 
             <!-- Contextual Status Notice / Banner -->
