@@ -85,7 +85,10 @@ async function handleDownload() {
         studentName: data.value.full_name,
         verifiedAt: data.value.verified_at ? formatDate(data.value.verified_at) : undefined,
         status: data.value.status,
-      }
+      },
+      data.value.is_minor && data.value.guardian_contract_text
+        ? { content: data.value.guardian_contract_text, variableValues }
+        : undefined
     )
   } catch (err) {
     console.error('Failed to download PDF:', err)

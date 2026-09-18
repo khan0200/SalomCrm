@@ -31,6 +31,15 @@ export const CONTRACT_VARIABLES: ContractVariableDef[] = [
   { key: 'discount', token: '{{discount}}', label: 'Chegirma', category: 'financial', example: '1 000 000 so\'m' },
   { key: 'qr_code', token: '{{qr_code}}', label: 'QR-kod (tekshirish havolasi)', category: 'contract', example: '[QR-kod]' },
   { key: 'verification_link', token: '{{verification_link}}', label: 'Tekshirish havolasi (matn)', category: 'contract', example: `${CONTRACT_VERIFICATION_BASE_URL}/XXXX-XXXX-STUDENTID` },
+  // Only populated when the student is a minor (see is_minor on Contract) -
+  // resolve to '' for adult students, so placing these tokens in a normal
+  // contract template is harmless.
+  { key: 'guardianfullname', token: '{{guardianfullname}}', label: "Kafil F.I.O (ota-ona/vasiy)", category: 'student', example: 'ABDULLAYEV VALI' },
+  { key: 'guardianpassportnumber', token: '{{guardianpassportnumber}}', label: 'Kafil pasport raqami', category: 'student', example: 'AB1234567' },
+  { key: 'guardianrelation', token: '{{guardianrelation}}', label: 'Kafilning talabaga qarindoshligi', category: 'student', example: 'Otasi' },
+  { key: 'guardianphone', token: '{{guardianphone}}', label: 'Kafil telefon raqami', category: 'student', example: '+998 90 123 45 67' },
+  { key: 'guardianaddress', token: '{{guardianaddress}}', label: 'Kafil yashash manzili', category: 'student', example: 'Toshkent sh., ...' },
+  { key: 'guardiansignature', token: '{{guardiansignature}}', label: 'Kafil imzosi (rasm)', category: 'contract', example: '[Kafil imzosi]' },
   // Resolved per-page inside convertCanvasDocumentToHtml (contractCanvasConverter.ts),
   // not from this document-wide values map - the same {{token}} placed on any
   // page (e.g. by copy/pasting the element the toolbar's "Page Number" button
@@ -417,6 +426,21 @@ export function buildVariableValues(
   const rawSignature = contractMeta?.signatureData || student?.signature_data || student?.signatureData || ''
   const rawVerifCode = contractMeta?.verificationCode || student?.verification_code || student?.verificationCode || ''
 
+  // Guardian (kafil) fields: only ever set on a Contract when is_minor was
+  // true at signing time - empty string for every adult contract, so these
+  // tokens are safe to leave in a shared template.
+  const rawGuardianFullName = (student?.guardian_full_name || student?.guardianFullName || '').toUpperCase().trim()
+  const rawGuardianPassport = (student?.guardian_passport_number || student?.guardianPassportNumber || '').toUpperCase().trim()
+  const rawGuardianRelation = student?.guardian_relation || student?.guardianRelation || ''
+  const rawGuardianPhone = student?.guardian_phone || student?.guardianPhone || ''
+  const rawGuardianAddress = student?.guardian_address || student?.guardianAddress || ''
+  const rawGuardianSignature = student?.guardian_signature_data || student?.guardianSignatureData || ''
+  const guardianSignatureHtml = rawGuardianSignature
+    ? (rawGuardianSignature.startsWith('data:image/')
+        ? `<img src="${rawGuardianSignature}" style="max-height: 42px; max-width: 150px; object-fit: contain; vertical-align: middle; display: inline-block;" alt="Kafil imzosi" />`
+        : rawGuardianSignature)
+    : ''
+
   // Public verification QR: only exists once the agency has assigned a
   // Student ID and generated a code (see assign_student_id on the backend).
   // Before that, both tokens resolve to '' and simply render nothing.
@@ -502,6 +526,19 @@ export function buildVariableValues(
     verification_code: rawVerifCode,
     tasdiqlash_kodi: rawVerifCode,
     confirmation_code: rawVerifCode,
+
+    guardianfullname: rawGuardianFullName,
+    guardian_full_name: rawGuardianFullName,
+    guardianpassportnumber: rawGuardianPassport,
+    guardian_passport_number: rawGuardianPassport,
+    guardianrelation: rawGuardianRelation,
+    guardian_relation: rawGuardianRelation,
+    guardianphone: rawGuardianPhone,
+    guardian_phone: rawGuardianPhone,
+    guardianaddress: rawGuardianAddress,
+    guardian_address: rawGuardianAddress,
+    guardiansignature: guardianSignatureHtml,
+    guardian_signature: guardianSignatureHtml,
 
     qr_code: qrCodeHtml,
     qrcode: qrCodeHtml,
@@ -615,6 +652,17 @@ export const VARIABLE_FALLBACK_PLACEHOLDERS: Record<string, string> = {
   signed_date: '"___" _________ 2026 YIL',
   sana: '"___" _________ 2026 YIL',
   imzolangan_sana: '"___" _________ 2026 YIL',
+
+  guardianfullname: '_________________________',
+  guardian_full_name: '_________________________',
+  guardianpassportnumber: '____ _________',
+  guardian_passport_number: '____ _________',
+  guardianrelation: '______________',
+  guardian_relation: '______________',
+  guardianphone: '+998 __ ___ __ __',
+  guardian_phone: '+998 __ ___ __ __',
+  guardianaddress: '_________________________________',
+  guardian_address: '_________________________________',
 
   signature: '______________',
   imzo: '______________',

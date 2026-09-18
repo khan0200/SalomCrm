@@ -750,6 +750,19 @@ class Contract(TenantAwareModel):
 
     # Electronic Signature & Snapshot Integrity
     signature_data = models.TextField(blank=True, default='', help_text="Base64 data URL of student signature")
+
+    # Guardian (kafil) consent for minors: Fuqarolik kodeksi 27-modda requires
+    # a parent/guardian's written consent for a 14-18 year old's contract to
+    # be valid at all, so these are only populated (and required at submit
+    # time) when the student was under 18 on the day they signed.
+    is_minor = models.BooleanField(default=False, help_text="Student was under 18 at signing time")
+    guardian_full_name = models.CharField(max_length=255, blank=True, default='')
+    guardian_passport_number = models.CharField(max_length=50, blank=True, default='')
+    guardian_relation = models.CharField(max_length=100, blank=True, default='')
+    guardian_phone = models.CharField(max_length=50, blank=True, default='')
+    guardian_address = models.CharField(max_length=255, blank=True, default='')
+    guardian_signature_data = models.TextField(blank=True, default='', help_text="Base64 data URL of guardian signature")
+
     declarations_accepted = models.BooleanField(default=False)
     agreement_confirmations = models.JSONField(default=dict, blank=True)
     contract_hash = models.CharField(max_length=64, blank=True, default='', help_text="SHA-256 hash of immutable snapshot")

@@ -30,6 +30,7 @@ export interface TenantInfoResponse {
   offices: OnlineOffice[]
   education_levels: OnlineEducationLevel[]
   detail?: string
+  guardian_contract_text?: string
 }
 
 export interface StudentAuthResponse {
@@ -110,6 +111,14 @@ export interface SubmitContractPayload {
     confirmation_code_meaning: boolean
   }
   password: string
+  // Required only when the student is under 18 at signing time (Fuqarolik
+  // kodeksi 27-modda) - omitted entirely for adult students.
+  guardian_full_name?: string
+  guardian_passport_number?: string
+  guardian_relation?: string
+  guardian_phone?: string
+  guardian_address?: string
+  guardian_signature_data?: string
 }
 
 export interface PublicContractVerifyResponse {
@@ -127,6 +136,14 @@ export interface PublicContractVerifyResponse {
   phone1: string
   phone2: string
   signature_data: string
+  is_minor?: boolean
+  guardian_full_name?: string
+  guardian_passport_number?: string
+  guardian_relation?: string
+  guardian_phone?: string
+  guardian_address?: string
+  guardian_signature_data?: string
+  guardian_contract_text?: string
   content: string
   verification_code: string
   verified_at?: string
@@ -159,6 +176,14 @@ export interface ContractDetailOnlineResponse {
   phone1: string
   phone2: string
   signature_data: string
+  is_minor?: boolean
+  guardian_full_name?: string
+  guardian_passport_number?: string
+  guardian_relation?: string
+  guardian_phone?: string
+  guardian_address?: string
+  guardian_signature_data?: string
+  guardian_contract_text?: string
   content: string
   student_id_assigned?: string
   has_verification_code: boolean

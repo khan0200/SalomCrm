@@ -166,29 +166,41 @@ export function prepareContractHtml(
   return processedHtml
 }
 
+type Html2Canvas = typeof import('html2canvas').default
+
+interface VerificationMeta {
+  contractNumber?: string
+  studentId?: string
+  verifiedAt?: string
+  studentName?: string
+  status?: string
+}
+
 /**
- * Download document directly as PDF file
+ * Draws one logical document (canvas-JSON or plain HTML, whichever
+ * `rawOrHtml` turns out to be) onto pages of an already-created `pdf`
+ * instance, without ever calling `.save()` on it - that stays the caller's
+ * job, so a second document (e.g. the guardian consent appendix) can be
+ * drawn straight after the first onto the very same PDF file.
+ *
+ * `startNewPage` controls only whether THIS document's own first page needs
+ * an explicit `pdf.addPage()` before it: false for whichever document goes
+ * first in the file (jsPDF's constructor already gives it a blank page to
+ * draw on), true for every document appended after another one.
  */
-export async function downloadContractAsPdf(
-  title: string,
+async function renderDocumentIntoPdf(
+  pdf: JsPdfType,
+  html2canvas: Html2Canvas,
   rawOrHtml: string,
-  margins: PdfMarginOptions = { top: 20, right: 15, bottom: 20, left: 25 },
-  variableValues?: Record<string, string>,
-  signatureData?: string,
-  verificationMeta?: {
-    contractNumber?: string
-    studentId?: string
-    verifiedAt?: string
-    studentName?: string
-    status?: string
-  }
+  margins: PdfMarginOptions,
+  variableValues: Record<string, string> | undefined,
+  signatureData: string | undefined,
+  verificationMeta: VerificationMeta | undefined,
+  startNewPage: boolean
 ): Promise<void> {
-  const { jsPDF, html2canvas } = await loadPdfLibs()
-  const safeTitle = (title || 'shartnoma').replace(/[/\\?%*:|"<>]/g, '_')
   const mergedVars: Record<string, string> = { ...(variableValues || {}) }
   const badge = statusBadge(verificationMeta?.status)
 
-  // Inject signature variable if provided
   if (signatureData) {
     const sigImg = `<img src="${signatureData}" style="max-height: 55px; max-width: 170px; object-fit: contain; vertical-align: middle; display: inline-block;" alt="Talaba Imzosi" />`
     mergedVars['student_signature'] = sigImg
@@ -197,7 +209,6 @@ export async function downloadContractAsPdf(
     mergedVars['signature_data'] = signatureData
   }
 
-  // Verification banner template (used if signature was provided but not placed into any canvas/HTML variable)
   const verificationBanner = signatureData ? `
     <div style="margin: 20px 0 0; padding: 14px 18px; border: 1.5px solid #059669; border-radius: 10px; background: #f0fdf4; font-family: 'Times New Roman', serif; font-size: 11pt; color: #064e3b; page-break-inside: avoid;">
       <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -219,13 +230,6 @@ export async function downloadContractAsPdf(
   if (isCanvasDocumentJson(rawOrHtml)) {
     const doc = deserializeCanvasDocument(rawOrHtml)
     if (doc && Array.isArray(doc.pages) && doc.pages.length > 0) {
-      const pdf = new jsPDF({
-        unit: 'mm',
-        format: 'a4',
-        orientation: 'portrait',
-        compress: true,
-      })
-
       let signatureRendered = false
 
       for (let pageIdx = 0; pageIdx < doc.pages.length; pageIdx++) {
@@ -274,7 +278,6 @@ export async function downloadContractAsPdf(
         document.body.appendChild(pageContainer)
 
         try {
-          // Wait for any images to load
           const images = Array.from(pageContainer.querySelectorAll('img'))
           if (images.length > 0) {
             await Promise.all(
@@ -317,13 +320,10 @@ export async function downloadContractAsPdf(
             },
           })
 
-          if (pageIdx > 0) {
+          if (pageIdx > 0 || startNewPage) {
             pdf.addPage()
           }
 
-          // PNG (lossless), not JPEG: JPEG's chroma-subsampled compression
-          // blurs the sharp black-on-white edges of rendered text/lines no
-          // matter how high the quality is set - PNG keeps the page crisp.
           const imgData = canvas.toDataURL('image/png')
           pdf.addImage(imgData, 'PNG', 0, 0, 210, 297, undefined, 'FAST')
         } finally {
@@ -332,8 +332,6 @@ export async function downloadContractAsPdf(
           }
         }
       }
-
-      pdf.save(`${safeTitle}.pdf`)
       return
     }
   }
@@ -532,25 +530,19 @@ export async function downloadContractAsPdf(
       },
     })
 
-    const pdf = new jsPDF({
-      unit: 'mm',
-      format: 'a4',
-      orientation: 'portrait',
-      compress: true,
-    })
-
     const imgWidth = canvas.width
     const imgHeight = canvas.height
-    // PNG (lossless), not JPEG: see comment in the canvas-document branch above.
     const fullImgData = canvas.toDataURL('image/png')
     const scaledPdfHeight = (imgHeight * contentWidthMm) / imgWidth
 
     if (scaledPdfHeight <= contentHeightMm) {
+      if (startNewPage) pdf.addPage()
       pdf.addImage(fullImgData, 'PNG', marginLeft, marginTop, contentWidthMm, scaledPdfHeight, undefined, 'FAST')
     } else {
       const pageCanvasHeight = (imgWidth * contentHeightMm) / contentWidthMm
       let heightLeft = imgHeight
       let position = 0
+      let isFirstSlice = true
 
       while (heightLeft > 0) {
         const sliceCanvas = document.createElement('canvas')
@@ -564,7 +556,8 @@ export async function downloadContractAsPdf(
           sliceCtx.drawImage(canvas, 0, position, imgWidth, currentSliceHeight, 0, 0, imgWidth, currentSliceHeight)
         }
 
-        if (position > 0) pdf.addPage()
+        if (!isFirstSlice || startNewPage) pdf.addPage()
+        isFirstSlice = false
         const sliceData = sliceCanvas.toDataURL('image/png')
         const slicePdfHeight = (currentSliceHeight * contentWidthMm) / imgWidth
         pdf.addImage(sliceData, 'PNG', marginLeft, marginTop, contentWidthMm, slicePdfHeight, undefined, 'FAST')
@@ -573,13 +566,45 @@ export async function downloadContractAsPdf(
         heightLeft -= currentSliceHeight
       }
     }
-
-    pdf.save(`${safeTitle}.pdf`)
   } finally {
     if (container.parentNode) {
       container.parentNode.removeChild(container)
     }
   }
+}
+
+/**
+ * Download document directly as PDF file. When `appendix` is given (the
+ * guardian/kafillik consent template for a minor's contract), it is rendered
+ * as extra pages onto the SAME pdf, starting on a fresh page after the main
+ * document ends - one downloaded file, not two.
+ */
+export async function downloadContractAsPdf(
+  title: string,
+  rawOrHtml: string,
+  margins: PdfMarginOptions = { top: 20, right: 15, bottom: 20, left: 25 },
+  variableValues?: Record<string, string>,
+  signatureData?: string,
+  verificationMeta?: VerificationMeta,
+  appendix?: { content: string; variableValues?: Record<string, string> }
+): Promise<void> {
+  const { jsPDF, html2canvas } = await loadPdfLibs()
+  const safeTitle = (title || 'shartnoma').replace(/[/\\?%*:|"<>]/g, '_')
+
+  const pdf = new jsPDF({
+    unit: 'mm',
+    format: 'a4',
+    orientation: 'portrait',
+    compress: true,
+  })
+
+  await renderDocumentIntoPdf(pdf, html2canvas, rawOrHtml, margins, variableValues, signatureData, verificationMeta, false)
+
+  if (appendix?.content && appendix.content.trim()) {
+    await renderDocumentIntoPdf(pdf, html2canvas, appendix.content, margins, appendix.variableValues ?? variableValues, undefined, undefined, true)
+  }
+
+  pdf.save(`${safeTitle}.pdf`)
 }
 
 /**

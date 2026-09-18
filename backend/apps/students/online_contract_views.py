@@ -40,6 +40,25 @@ def normalize_code(val: str) -> str:
     return val.strip().upper()
 
 
+# Must match the literal name seeded per-tenant in
+# students/migrations/0019_add_guardian_appendix_tariff.py.
+GUARDIAN_TARIFF_NAME = "Kafillik shartnomasi (18 yoshga to'lmaganlar uchun)"
+
+
+def get_guardian_contract_text(tenant) -> str:
+    """
+    The guardian appendix's `contract_text` is looked up live (not frozen at
+    signing time) so a staff edit in the Contracts menu is reflected the next
+    time anyone views or re-downloads an old minor's contract - unlike the
+    student's own contract snapshot, this text carries no per-student data of
+    its own to freeze. `is_active` is deliberately ignored here: the template
+    is kept inactive forever so it never appears as a pickable tariff on the
+    public signing form, but that must not hide it from this lookup too.
+    """
+    tariff = TariffOption.objects.filter(tenant=tenant, name=GUARDIAN_TARIFF_NAME).first()
+    return tariff.contract_text if tariff else ''
+
+
 class TenantInfoView(APIView):
     """
     Public endpoint: GET /api/contracts/online/tenant-info/<slug>/
@@ -91,6 +110,7 @@ class TenantInfoView(APIView):
             'tariffs': list(tariffs),
             'offices': list(offices),
             'education_levels': list(education_levels),
+            'guardian_contract_text': get_guardian_contract_text(tenant),
         }, status=status.HTTP_200_OK)
 
 
@@ -475,6 +495,44 @@ class SubmitContractView(APIView):
         if not signature_data or not signature_data.startswith('data:image/'):
             return Response({'detail': 'A valid electronic signature is required.'}, status=status.HTTP_400_BAD_REQUEST)
 
+        # 4b. Minor detection (Fuqarolik kodeksi 27-modda): under 18 at signing
+        # time requires a parent/guardian's own consent and signature, or the
+        # contract is not validly formed at all.
+        from apps.students.services import normalize_date_to_iso
+        from datetime import date as _date
+
+        is_minor = False
+        iso_dob = normalize_date_to_iso(date_of_birth)
+        if iso_dob:
+            try:
+                dob_date = _date.fromisoformat(iso_dob)
+                today = timezone.now().date()
+                age = today.year - dob_date.year - ((today.month, today.day) < (dob_date.month, dob_date.day))
+                is_minor = age < 18
+            except ValueError:
+                pass
+
+        guardian_full_name = (data.get('guardian_full_name') or '').strip().upper()
+        guardian_passport_number = (data.get('guardian_passport_number') or '').strip().upper()
+        guardian_relation = (data.get('guardian_relation') or '').strip()
+        guardian_phone = (data.get('guardian_phone') or '').strip()
+        guardian_address = (data.get('guardian_address') or '').strip()
+        guardian_signature_data = (data.get('guardian_signature_data') or '').strip()
+
+        if is_minor:
+            if not guardian_full_name:
+                return Response({'detail': "Kafil (ota-ona/vasiy) F.I.O. kiritilishi shart."}, status=status.HTTP_400_BAD_REQUEST)
+            if not guardian_passport_number or len(guardian_passport_number) < 6:
+                return Response({'detail': "Kafilning to'g'ri pasport raqami kiritilishi shart."}, status=status.HTTP_400_BAD_REQUEST)
+            if not guardian_relation:
+                return Response({'detail': "Kafilning talabaga qarindoshligi kiritilishi shart."}, status=status.HTTP_400_BAD_REQUEST)
+            if not guardian_phone:
+                return Response({'detail': "Kafil telefon raqami kiritilishi shart."}, status=status.HTTP_400_BAD_REQUEST)
+            if not guardian_address:
+                return Response({'detail': "Kafil yashash manzili kiritilishi shart."}, status=status.HTTP_400_BAD_REQUEST)
+            if not guardian_signature_data or not guardian_signature_data.startswith('data:image/'):
+                return Response({'detail': "Kafilning elektron imzosi kiritilishi shart."}, status=status.HTTP_400_BAD_REQUEST)
+
         # 5. Declarations Checkboxes
         declarations = data.get('declarations') or {}
         decl1 = declarations.get('read_full_contract') or data.get('declaration_read') or False
@@ -507,6 +565,12 @@ class SubmitContractView(APIView):
             'tenant_name': tenant.name,
             'declarations': declarations,
             'signed_at': now.isoformat(),
+            'is_minor': is_minor,
+            'guardian_full_name': guardian_full_name,
+            'guardian_passport_number': guardian_passport_number,
+            'guardian_relation': guardian_relation,
+            'guardian_phone': guardian_phone,
+            'guardian_address': guardian_address,
         }
 
         # Calculate cryptographic hash (SHA-256) of document snapshot + signature
@@ -533,6 +597,13 @@ class SubmitContractView(APIView):
             phone1=phone1,
             phone2=phone2,
             signature_data=signature_data,
+            is_minor=is_minor,
+            guardian_full_name=guardian_full_name,
+            guardian_passport_number=guardian_passport_number,
+            guardian_relation=guardian_relation,
+            guardian_phone=guardian_phone,
+            guardian_address=guardian_address,
+            guardian_signature_data=guardian_signature_data,
             declarations_accepted=True,
             agreement_confirmations=declarations,
             snapshot_data=snapshot_data,
@@ -839,6 +910,14 @@ class PublicContractDetailView(APIView):
             'phone1': contract.phone1,
             'phone2': contract.phone2,
             'signature_data': contract.signature_data,
+            'is_minor': contract.is_minor,
+            'guardian_full_name': contract.guardian_full_name,
+            'guardian_passport_number': contract.guardian_passport_number,
+            'guardian_relation': contract.guardian_relation,
+            'guardian_phone': contract.guardian_phone,
+            'guardian_address': contract.guardian_address,
+            'guardian_signature_data': contract.guardian_signature_data,
+            'guardian_contract_text': get_guardian_contract_text(contract.tenant) if contract.is_minor else '',
             'content': contract.content,
             'student_id_assigned': contract.student_id_assigned,
             'has_verification_code': bool(contract.verification_code),
@@ -953,6 +1032,14 @@ class PublicVerifyContractView(APIView):
             'phone1': contract.phone1,
             'phone2': contract.phone2,
             'signature_data': contract.signature_data,
+            'is_minor': contract.is_minor,
+            'guardian_full_name': contract.guardian_full_name,
+            'guardian_passport_number': contract.guardian_passport_number,
+            'guardian_relation': contract.guardian_relation,
+            'guardian_phone': contract.guardian_phone,
+            'guardian_address': contract.guardian_address,
+            'guardian_signature_data': contract.guardian_signature_data,
+            'guardian_contract_text': get_guardian_contract_text(contract.tenant) if contract.is_minor else '',
             'content': contract.content,
             'verification_code': contract.verification_code,
             'verified_at': contract.verified_at.isoformat() if contract.verified_at else None,

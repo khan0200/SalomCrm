@@ -95,6 +95,20 @@ const hasReadFullContract = ref(false)
 // Legal Basis Modal
 const isLegalBasisModalOpen = ref(false)
 
+// Guardian (kafil) consent - required only when the student is under 18 at
+// signing time (Fuqarolik kodeksi 27-modda: a minor's contract is void
+// without the parent/guardian's own written consent and signature).
+const guardianData = reactive({
+  fullName: '',
+  passportNumber: '',
+  relation: '',
+  phone: '',
+  address: '',
+})
+const guardianSignatureData = ref('')
+const isGuardianSignatureModalOpen = ref(false)
+const isGuardianContractViewerOpen = ref(false)
+
 // Password Confirmation Modal
 const isPasswordModalOpen = ref(false)
 const accountPassword = ref('')
@@ -130,6 +144,21 @@ const formattedDob = computed(() => {
   return ''
 })
 
+// Fuqarolik kodeksi 27-modda: under 18 on the day of signing needs a
+// guardian's written consent for the contract to be valid at all.
+const isMinor = computed(() => {
+  if (!formData.dobDay || !formData.dobMonth || !formData.dobYear) return false
+  const dob = new Date(Number(formData.dobYear), Number(formData.dobMonth) - 1, Number(formData.dobDay))
+  if (Number.isNaN(dob.getTime())) return false
+  const today = new Date()
+  let age = today.getFullYear() - dob.getFullYear()
+  const notYetHadBirthdayThisYear =
+    today.getMonth() < dob.getMonth() ||
+    (today.getMonth() === dob.getMonth() && today.getDate() < dob.getDate())
+  if (notYetHadBirthdayThisYear) age -= 1
+  return age < 18
+})
+
 const variableValues = computed<Record<string, string>>(() => {
   return buildVariableValues(
     {
@@ -142,6 +171,12 @@ const variableValues = computed<Record<string, string>>(() => {
       phone2: formData.phone2 || '',
       signature_data: formData.signatureData || '',
       email: formData.email || authStore.user?.email || '',
+      guardian_full_name: isMinor.value ? (guardianData.fullName || '').toUpperCase().trim() : '',
+      guardian_passport_number: isMinor.value ? (guardianData.passportNumber || '').toUpperCase().trim() : '',
+      guardian_relation: isMinor.value ? guardianData.relation || '' : '',
+      guardian_phone: isMinor.value ? guardianData.phone || '' : '',
+      guardian_address: isMinor.value ? guardianData.address || '' : '',
+      guardian_signature_data: isMinor.value ? guardianSignatureData.value || '' : '',
     },
     {
       price: selectedTariff.value?.price,
@@ -293,9 +328,22 @@ const isStep2DeclarationsValid = computed(() => {
   )
 })
 
+const isGuardianInfoValid = computed(() => {
+  if (!isMinor.value) return true
+  return (
+    guardianData.fullName.trim().length >= 3 &&
+    guardianData.passportNumber.trim().length >= 6 &&
+    guardianData.relation.trim().length > 0 &&
+    guardianData.phone.trim().length >= 7 &&
+    guardianData.address.trim().length >= 3 &&
+    !!guardianSignatureData.value
+  )
+})
+
 const isStep2Valid = computed(() => {
   return (
     isStep2DeclarationsValid.value &&
+    isGuardianInfoValid.value &&
     !!formData.signatureData
   )
 })
@@ -306,8 +354,13 @@ function goToStep2() {
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
+function handleGuardianSignatureConfirmed(sigData: string) {
+  guardianSignatureData.value = sigData
+  isGuardianSignatureModalOpen.value = false
+}
+
 function handleProceedToReview() {
-  if (!isStep2DeclarationsValid.value) return
+  if (!isStep2DeclarationsValid.value || !isGuardianInfoValid.value) return
   isSignatureModalOpen.value = true
 }
 
@@ -321,7 +374,7 @@ function handleSignatureConfirmed(sigData: string) {
 
 function goToStep3() {
   if (!isStep2Valid.value) {
-    if (isStep2DeclarationsValid.value) {
+    if (isStep2DeclarationsValid.value && isGuardianInfoValid.value) {
       isSignatureModalOpen.value = true
     }
     return
@@ -372,6 +425,14 @@ async function handleFinalSubmit() {
         confirmation_code_meaning: declarations.confirmationCodeMeaning,
       },
       password: accountPassword.value,
+      ...(isMinor.value ? {
+        guardian_full_name: guardianData.fullName.toUpperCase().trim(),
+        guardian_passport_number: guardianData.passportNumber.toUpperCase().trim(),
+        guardian_relation: guardianData.relation.trim(),
+        guardian_phone: guardianData.phone.trim(),
+        guardian_address: guardianData.address.trim(),
+        guardian_signature_data: guardianSignatureData.value,
+      } : {}),
     })
 
     createdContractId.value = res.contract_id
@@ -794,6 +855,92 @@ onMounted(() => {
             </label>
           </div>
 
+          <!-- Guardian (kafil) consent: only for a student under 18 at signing time -->
+          <div v-if="isMinor" class="space-y-4 pt-4 border-t border-zinc-200 dark:border-zinc-850">
+            <div>
+              <h4 class="text-sm font-bold text-black dark:text-white tracking-tight flex items-center gap-2">
+                Kafil (ota-ona/vasiy) ma'lumotlari
+                <span class="px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 text-[10px] font-bold">18 yoshdan kichik</span>
+              </h4>
+              <p class="text-xs text-zinc-600 dark:text-zinc-400 font-medium mt-0.5">
+                Fuqarolik kodeksining 27-moddasiga ko'ra, voyaga yetmagan talaba nomidan tuzilgan shartnoma
+                ota-ona yoki vasiyning yozma roziligi va imzosi bilangina yuridik kuchga ega bo'ladi.
+              </p>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 block mb-1">F.I.O</label>
+                <input
+                  v-model="guardianData.fullName"
+                  type="text"
+                  placeholder="ABDULLAYEV VALI"
+                  class="w-full h-9 px-3 text-xs rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-black dark:text-white focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white"
+                />
+              </div>
+              <div>
+                <label class="text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 block mb-1">Pasport raqami</label>
+                <input
+                  v-model="guardianData.passportNumber"
+                  type="text"
+                  placeholder="AB1234567"
+                  class="w-full h-9 px-3 text-xs rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-black dark:text-white focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white"
+                />
+              </div>
+              <div>
+                <label class="text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 block mb-1">Talabaga qarindoshligi</label>
+                <input
+                  v-model="guardianData.relation"
+                  type="text"
+                  placeholder="Otasi / Onasi / Vasiysi"
+                  class="w-full h-9 px-3 text-xs rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-black dark:text-white focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white"
+                />
+              </div>
+              <div>
+                <label class="text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 block mb-1">Telefon raqami</label>
+                <input
+                  v-model="guardianData.phone"
+                  type="text"
+                  placeholder="+998 90 123 45 67"
+                  class="w-full h-9 px-3 text-xs rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-black dark:text-white focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white"
+                />
+              </div>
+              <div class="sm:col-span-2">
+                <label class="text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 block mb-1">Yashash manzili</label>
+                <input
+                  v-model="guardianData.address"
+                  type="text"
+                  placeholder="Toshkent sh., ..."
+                  class="w-full h-9 px-3 text-xs rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-black dark:text-white focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white"
+                />
+              </div>
+            </div>
+
+            <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+              <button
+                v-if="tenantInfo?.guardian_contract_text"
+                type="button"
+                @click="isGuardianContractViewerOpen = true"
+                class="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white hover:bg-zinc-50 dark:bg-zinc-800 dark:hover:bg-zinc-750 text-xs font-bold text-black dark:text-white transition-colors cursor-pointer shadow-2xs"
+              >
+                <Eye class="w-3.5 h-3.5 text-zinc-600 dark:text-zinc-400" />
+                <span>Kafillik shartnomasini ko'rish</span>
+              </button>
+
+              <button
+                type="button"
+                @click="isGuardianSignatureModalOpen = true"
+                class="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold transition-colors cursor-pointer shadow-2xs"
+                :class="guardianSignatureData
+                  ? 'border border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400'
+                  : 'border border-zinc-300 dark:border-zinc-700 bg-white hover:bg-zinc-50 dark:bg-zinc-800 dark:hover:bg-zinc-750 text-black dark:text-white'"
+              >
+                <CheckCircle2 v-if="guardianSignatureData" class="w-3.5 h-3.5" />
+                <span>{{ guardianSignatureData ? 'Kafil imzolandi (qayta chizish)' : 'Kafil imzosini qo\'yish' }}</span>
+              </button>
+            </div>
+          </div>
+
           <!-- Actions: Back & Continue to Review -->
           <div class="pt-5 border-t border-zinc-200 dark:border-zinc-850 flex items-center justify-between">
             <button
@@ -808,7 +955,7 @@ onMounted(() => {
             <button
               type="button"
               @click="handleProceedToReview"
-              :disabled="!isStep2DeclarationsValid"
+              :disabled="!isStep2DeclarationsValid || !isGuardianInfoValid"
               class="inline-flex items-center gap-2 px-6 py-2.5 rounded-lg bg-black hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-200 dark:text-black text-xs font-bold shadow-xs transition-all cursor-pointer active:scale-98 disabled:opacity-40"
             >
               <span>Tekshirish sahifasiga o'tish</span>
@@ -1041,6 +1188,24 @@ onMounted(() => {
     <LegalBasisModal
       :is-open="isLegalBasisModalOpen"
       @close="isLegalBasisModalOpen = false"
+    />
+
+    <!-- Guardian (kafil) Contract Viewer -->
+    <FullContractViewerModal
+      v-if="tenantInfo?.guardian_contract_text"
+      :is-open="isGuardianContractViewerOpen"
+      contract-title="Kafillik to'g'risida shartnoma"
+      :content="tenantInfo.guardian_contract_text"
+      :variable-values="variableValues"
+      @close="isGuardianContractViewerOpen = false"
+    />
+
+    <!-- Guardian (kafil) Signature Modal -->
+    <OnlineContractSignatureModal
+      :is-open="isGuardianSignatureModalOpen"
+      :model-value="guardianSignatureData"
+      @confirm="handleGuardianSignatureConfirmed"
+      @close="isGuardianSignatureModalOpen = false"
     />
   </OnlineContractLayout>
 </template>
