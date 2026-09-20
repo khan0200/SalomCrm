@@ -261,8 +261,33 @@ def deploy(client, path):
 
     run(client, "cd %s/frontend && (npm ci --no-audit --no-fund || npm install --no-audit --no-fund)" % path,
         label="Frontend dependencies", node=True)
-    run(client, "cd %s/frontend && npm run build" % path,
-        label="Building frontend", node=True)
+    code, _ = run(client, "cd %s/frontend && npm run build" % path,
+                  check=False, label="Building frontend", node=True)
+    if code != 0:
+        print("  Remote build failed (exit %s). Packaging and uploading local dist folder..." % code, flush=True)
+        import tarfile, tempfile, subprocess
+        dist_dir = os.path.join(os.path.dirname(__file__), "frontend", "dist")
+        if not os.path.exists(dist_dir) or not os.path.exists(os.path.join(dist_dir, "index.html")):
+            print("  Building frontend locally first...", flush=True)
+            subprocess.run(["npm", "run", "build"], cwd=os.path.join(os.path.dirname(__file__), "frontend"), check=True, shell=True)
+
+        tar_path = os.path.join(tempfile.gettempdir(), "salomcrm_frontend_dist.tar.gz")
+        if os.path.exists(tar_path):
+            os.remove(tar_path)
+        with tarfile.open(tar_path, "w:gz") as tar:
+            tar.add(dist_dir, arcname="dist")
+
+        sftp = client.open_sftp()
+        remote_tar = "%s/frontend/salomcrm_frontend_dist.tar.gz" % path
+        sftp.put(tar_path, remote_tar)
+        sftp.close()
+        try:
+            os.remove(tar_path)
+        except Exception:
+            pass
+        run(client, "cd %s/frontend && rm -rf dist && tar -xzf salomcrm_frontend_dist.tar.gz && rm -f salomcrm_frontend_dist.tar.gz" % path,
+            label="Extracting frontend build on server", check=True)
+        print("  Frontend build successfully deployed via fallback.")
 
     retire_systemd(client)
 
