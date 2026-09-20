@@ -365,9 +365,17 @@ const isStep1Valid = computed(() => {
     !!formData.office &&
     isCompleteUzPhone(formData.phone1) &&
     isCompleteUzPhone(formData.phone2) &&
-    (!formData.email || formData.email.includes('@'))
+    formData.email.trim().length > 0 &&
+    formData.email.includes('@')
   )
 })
+
+// Set only once the student tries to move past a step while it's still
+// incomplete - so a blank form doesn't greet them with red text on every
+// field before they've touched anything, but every unmet requirement lights
+// up together the moment they actually try to proceed.
+const attemptStep1 = ref(false)
+const attemptStep2 = ref(false)
 
 const isSignatureModalOpen = ref(false)
 
@@ -401,7 +409,10 @@ const isStep2Valid = computed(() => {
 })
 
 function goToStep2() {
-  if (!isStep1Valid.value) return
+  if (!isStep1Valid.value) {
+    attemptStep1.value = true
+    return
+  }
   currentStep.value = 2
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
@@ -412,7 +423,10 @@ function handleGuardianSignatureConfirmed(sigData: string) {
 }
 
 function handleProceedToReview() {
-  if (!isStep2DeclarationsValid.value || !isGuardianInfoValid.value) return
+  if (!isStep2DeclarationsValid.value || !isGuardianInfoValid.value) {
+    attemptStep2.value = true
+    return
+  }
   isSignatureModalOpen.value = true
 }
 
@@ -611,6 +625,9 @@ onMounted(() => {
                 {{ tariff.name }} — {{ formatPrice(tariff.price) }}
               </option>
             </select>
+            <p v-if="attemptStep1 && !selectedTariff" class="text-[11px] font-semibold text-red-600 dark:text-red-400">
+              Tarifni tanlang!
+            </p>
 
             <div v-if="selectedTariff" class="sm:hidden pt-1.5 flex items-center justify-between text-xs text-zinc-700">
               <span class="font-semibold">Shartnoma to'lovi:</span>
@@ -645,6 +662,9 @@ onMounted(() => {
                 placeholder="Masalan: AB1234567"
                 class="w-full px-3.5 py-2.5 text-xs font-mono font-bold rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-black dark:text-white placeholder:text-zinc-400 focus:outline-hidden focus:border-black dark:focus:border-white transition-colors shadow-2xs uppercase"
               />
+              <p v-if="attemptStep1 && formData.passportNumber.trim().length < 6" class="mt-1 text-[11px] font-semibold text-red-600 dark:text-red-400">
+                Pasport raqamini kiriting!
+              </p>
             </div>
 
             <!-- Full Name (as in Passport) -->
@@ -660,6 +680,9 @@ onMounted(() => {
                 placeholder="Pasport bo'yicha to'liq ismingiz"
                 class="w-full px-3.5 py-2.5 text-xs font-bold rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-black dark:text-white placeholder:text-zinc-400 focus:outline-hidden focus:border-black dark:focus:border-white transition-colors shadow-2xs uppercase"
               />
+              <p v-if="attemptStep1 && formData.fullName.trim().length < 3" class="mt-1 text-[11px] font-semibold text-red-600 dark:text-red-400">
+                F.I.O ni kiriting!
+              </p>
             </div>
 
             <!-- Education Level Dropdown -->
@@ -681,6 +704,9 @@ onMounted(() => {
                   {{ lvl.name }}
                 </option>
               </select>
+              <p v-if="attemptStep1 && !formData.educationLevel" class="mt-1 text-[11px] font-semibold text-red-600 dark:text-red-400">
+                Ta'lim bosqichini tanlang!
+              </p>
             </div>
 
             <!-- Tenant Office Dropdown -->
@@ -702,6 +728,9 @@ onMounted(() => {
                   {{ office.name }}
                 </option>
               </select>
+              <p v-if="attemptStep1 && !formData.office" class="mt-1 text-[11px] font-semibold text-red-600 dark:text-red-400">
+                Ofisni tanlang!
+              </p>
             </div>
 
             <!-- Date of Birth Picker -->
@@ -737,6 +766,9 @@ onMounted(() => {
                   <option v-for="y in years" :key="y" :value="y">{{ y }}</option>
                 </select>
               </div>
+              <p v-if="attemptStep1 && (!formData.dobDay || !formData.dobMonth || !formData.dobYear)" class="mt-1 text-[11px] font-semibold text-red-600 dark:text-red-400">
+                Tug'ilgan sanani to'liq kiriting!
+              </p>
             </div>
 
             <!-- Phone 1 -->
@@ -755,6 +787,9 @@ onMounted(() => {
                   class="w-full px-3.5 py-2.5 text-xs font-mono font-bold rounded-r-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-black dark:text-white placeholder:text-zinc-400 focus:outline-hidden focus:border-black dark:focus:border-white transition-colors shadow-2xs"
                 />
               </div>
+              <p v-if="attemptStep1 && !isCompleteUzPhone(formData.phone1)" class="mt-1 text-[11px] font-semibold text-red-600 dark:text-red-400">
+                Telefon raqamini to'liq kiriting!
+              </p>
             </div>
 
             <!-- Phone 2 -->
@@ -773,6 +808,9 @@ onMounted(() => {
                   class="w-full px-3.5 py-2.5 text-xs font-mono font-bold rounded-r-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-black dark:text-white placeholder:text-zinc-400 focus:outline-hidden focus:border-black dark:focus:border-white transition-colors shadow-2xs"
                 />
               </div>
+              <p v-if="attemptStep1 && !isCompleteUzPhone(formData.phone2)" class="mt-1 text-[11px] font-semibold text-red-600 dark:text-red-400">
+                Telefon raqamini to'liq kiriting!
+              </p>
             </div>
 
             <!-- Email -->
@@ -787,6 +825,12 @@ onMounted(() => {
                 placeholder="student@example.com"
                 class="w-full px-3.5 py-2.5 text-xs font-mono font-bold rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-black dark:text-white placeholder:text-zinc-400 focus:outline-hidden focus:border-black dark:focus:border-white transition-colors shadow-2xs"
               />
+              <p v-if="attemptStep1 && !formData.email.trim()" class="mt-1 text-[11px] font-semibold text-red-600 dark:text-red-400">
+                Email yozing!
+              </p>
+              <p v-else-if="attemptStep1 && !formData.email.includes('@')" class="mt-1 text-[11px] font-semibold text-red-600 dark:text-red-400">
+                Email manzili noto'g'ri!
+              </p>
             </div>
           </div>
 
@@ -874,6 +918,9 @@ onMounted(() => {
                 Shartnomani to'liq o'qib chiqdim va barcha bandlariga roziman
               </span>
             </label>
+            <p v-if="attemptStep2 && !declarations.readFullContract" class="text-[11px] font-semibold text-red-600 dark:text-red-400 pl-2.5">
+              Shartnomani o'qib chiqqaningizni tasdiqlang!
+            </p>
 
             <label class="flex items-start gap-3 cursor-pointer select-none p-2.5 rounded-lg border border-transparent hover:border-zinc-200 dark:hover:border-zinc-800 transition-colors">
               <input
@@ -885,6 +932,9 @@ onMounted(() => {
                 Shartnomani o'z erkin xohishim bilan imzoladim
               </span>
             </label>
+            <p v-if="attemptStep2 && !declarations.voluntarySign" class="text-[11px] font-semibold text-red-600 dark:text-red-400 pl-2.5">
+              Ushbu bandni tasdiqlang!
+            </p>
 
             <label class="flex items-start gap-3 cursor-pointer select-none p-2.5 rounded-lg border border-transparent hover:border-zinc-200 dark:hover:border-zinc-800 transition-colors">
               <input
@@ -896,6 +946,9 @@ onMounted(() => {
                 Kiritiladigan tasdiqlash kodi ushbu shartnomani rasman tasdiqlashimni bildiradi
               </span>
             </label>
+            <p v-if="attemptStep2 && !declarations.confirmationCodeMeaning" class="text-[11px] font-semibold text-red-600 dark:text-red-400 pl-2.5">
+              Ushbu bandni tasdiqlang!
+            </p>
 
             <label class="flex items-start gap-3 cursor-pointer select-none p-2.5 rounded-lg border border-transparent hover:border-zinc-200 dark:hover:border-zinc-800 transition-colors">
               <input
@@ -913,6 +966,9 @@ onMounted(() => {
                 qonunchilik moddalariga to'g'ri kelishidan xabarim bor, imzo rasmiy kuchga ega
               </span>
             </label>
+            <p v-if="attemptStep2 && !declarations.legalBasisAcknowledged" class="text-[11px] font-semibold text-red-600 dark:text-red-400 pl-2.5">
+              Ushbu bandni tasdiqlang!
+            </p>
           </div>
 
           <!-- Guardian (kafil) consent: only for a student under 18 at signing time -->
@@ -937,6 +993,9 @@ onMounted(() => {
                   placeholder="ABDULLAYEV VALI"
                   class="w-full h-9 px-3 text-xs rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-black dark:text-white focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white"
                 />
+                <p v-if="attemptStep2 && guardianData.fullName.trim().length < 3" class="mt-1 text-[11px] font-semibold text-red-600 dark:text-red-400">
+                  Kafil F.I.O sini kiriting!
+                </p>
               </div>
               <div>
                 <label class="text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 block mb-1">Pasport raqami</label>
@@ -946,6 +1005,9 @@ onMounted(() => {
                   placeholder="AB1234567"
                   class="w-full h-9 px-3 text-xs rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-black dark:text-white focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white"
                 />
+                <p v-if="attemptStep2 && guardianData.passportNumber.trim().length < 6" class="mt-1 text-[11px] font-semibold text-red-600 dark:text-red-400">
+                  Kafil pasport raqamini kiriting!
+                </p>
               </div>
               <div>
                 <label class="text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 block mb-1">Talabaga qarindoshligi</label>
@@ -964,6 +1026,9 @@ onMounted(() => {
                   placeholder="Masalan: Tog'a, Vasiy"
                   class="w-full h-9 px-3 mt-1.5 text-xs rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-black dark:text-white focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white"
                 />
+                <p v-if="attemptStep2 && !guardianData.relation.trim()" class="mt-1 text-[11px] font-semibold text-red-600 dark:text-red-400">
+                  Qarindoshlikni tanlang!
+                </p>
               </div>
               <div>
                 <label class="text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 block mb-1">Telefon raqami</label>
@@ -977,6 +1042,9 @@ onMounted(() => {
                     class="w-full h-9 px-3 text-xs rounded-r-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-black dark:text-white focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white"
                   />
                 </div>
+                <p v-if="attemptStep2 && !isCompleteUzPhone(guardianData.phone)" class="mt-1 text-[11px] font-semibold text-red-600 dark:text-red-400">
+                  Kafil telefon raqamini to'liq kiriting!
+                </p>
               </div>
               <div class="sm:col-span-2">
                 <label class="text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 block mb-1">Yashash manzili</label>
@@ -986,6 +1054,9 @@ onMounted(() => {
                   placeholder="Toshkent sh., ..."
                   class="w-full h-9 px-3 text-xs rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-black dark:text-white focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white"
                 />
+                <p v-if="attemptStep2 && guardianData.address.trim().length < 3" class="mt-1 text-[11px] font-semibold text-red-600 dark:text-red-400">
+                  Yashash manzilini kiriting!
+                </p>
               </div>
             </div>
 
@@ -1012,6 +1083,9 @@ onMounted(() => {
                 <span>{{ guardianSignatureData ? 'Kafil imzolandi (qayta chizish)' : 'Kafil imzosini qo\'yish' }}</span>
               </button>
             </div>
+            <p v-if="!guardianSignatureData" class="text-[11px] font-semibold text-red-600 dark:text-red-400">
+              Kafilning imzosi kutilmoqda!
+            </p>
           </div>
 
           <!-- Actions: Back & Continue to Review -->
