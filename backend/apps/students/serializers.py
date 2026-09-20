@@ -397,6 +397,7 @@ class ContractListSerializer(serializers.ModelSerializer):
     updated_by_name = serializers.SerializerMethodField()
     updated_by_branch_name = serializers.SerializerMethodField()
     email = serializers.SerializerMethodField()
+    guardian_contract_text = serializers.SerializerMethodField()
 
     class Meta:
         model = Contract
@@ -410,6 +411,9 @@ class ContractListSerializer(serializers.ModelSerializer):
             'student_id_assigned', 'verification_code', 'verification_code_expires_at',
             'verification_code_used', 'verified_at', 'rejection_reason',
             'rejected_at', 'rejected_by_name',
+            'is_minor', 'guardian_full_name', 'guardian_passport_number',
+            'guardian_relation', 'guardian_phone', 'guardian_address',
+            'guardian_signature_data', 'guardian_contract_text',
             'created_at', 'updated_at', 'signed_at', 'created_by_name',
             'updated_by_name', 'updated_by_branch_name'
         )
@@ -446,6 +450,18 @@ class ContractListSerializer(serializers.ModelSerializer):
         if obj.updated_by and obj.updated_by.branch:
             return obj.updated_by.branch.name
         return None
+
+    def get_guardian_contract_text(self, obj):
+        # ContractPreviewModal.vue skips its own extra detail fetch whenever
+        # the row handed to it (from THIS serializer, via the /contracts
+        # table) already has non-empty `content` - which it always does -
+        # so without this field here too, the guardian appendix silently
+        # never rendered in the preview or staff PDF download for any
+        # contract opened straight from the table.
+        if not obj.is_minor:
+            return ''
+        from .services import get_guardian_contract_text
+        return get_guardian_contract_text(obj.tenant)
 
     def get_email(self, obj):
         if obj.student_account and getattr(obj.student_account, 'email', None):
