@@ -5,6 +5,8 @@ import { X, Eraser, Check } from 'lucide-vue-next'
 const props = defineProps<{
   isOpen: boolean
   modelValue?: string
+  /** Whose signature this is - only changes the header wording. */
+  role?: 'student' | 'guardian'
 }>()
 
 const emit = defineEmits<{
@@ -23,9 +25,50 @@ let ctx: CanvasRenderingContext2D | null = null
 let lastX = 0
 let lastY = 0
 
+// Every finished stroke is kept as its own point list (not just burned into
+// pixels) so the thickness slider can restyle the WHOLE signature at any
+// time, not only the strokes drawn after it was last moved - a canvas alone
+// has no memory of "how it got there" once ctx.stroke() runs, so redrawing
+// at a new width means replaying every point ourselves.
+let strokes: { x: number; y: number }[][] = []
+let currentStroke: { x: number; y: number }[] = []
+// A signature loaded from `modelValue` (re-opening an already-signed pad)
+// arrives as a flat PNG, not points - kept separately so it still forms the
+// base layer under any new/replayed vector strokes instead of being wiped
+// the first time the slider moves.
+let backgroundImage: HTMLImageElement | null = null
+
 watch(strokeWidth, (val) => {
   if (ctx) ctx.lineWidth = val
+  redrawAll()
 })
+
+function redrawAll() {
+  const canvas = canvasRef.value
+  if (!canvas || !ctx) return
+  const rect = canvas.getBoundingClientRect()
+  ctx.clearRect(0, 0, rect.width, rect.height)
+  if (backgroundImage) {
+    ctx.drawImage(backgroundImage, 0, 0, rect.width, rect.height)
+  }
+  for (const stroke of strokes) {
+    if (stroke.length === 1) {
+      // A single tap/click with no drag - draw it as a dot, same as the
+      // live-drawing path below would for a stroke that never moved.
+      ctx.beginPath()
+      ctx.arc(stroke[0].x, stroke[0].y, ctx.lineWidth / 2, 0, Math.PI * 2)
+      ctx.fillStyle = ctx.strokeStyle as string
+      ctx.fill()
+      continue
+    }
+    ctx.beginPath()
+    ctx.moveTo(stroke[0].x, stroke[0].y)
+    for (let i = 1; i < stroke.length; i++) {
+      ctx.lineTo(stroke[i].x, stroke[i].y)
+    }
+    ctx.stroke()
+  }
+}
 
 function initCanvas() {
   const canvas = canvasRef.value
@@ -47,9 +90,14 @@ function initCanvas() {
   ctx.lineCap = 'round'
   ctx.lineJoin = 'round'
 
+  strokes = []
+  currentStroke = []
+  backgroundImage = null
+
   if (props.modelValue) {
     const img = new Image()
     img.onload = () => {
+      backgroundImage = img
       ctx?.drawImage(img, 0, 0, rect.width, rect.height)
       hasSignature.value = true
     }
@@ -82,6 +130,7 @@ function startDrawing(e: MouseEvent | TouchEvent) {
   const pos = getPos(e)
   lastX = pos.x
   lastY = pos.y
+  currentStroke = [pos]
 }
 
 function draw(e: MouseEvent | TouchEvent) {
@@ -96,6 +145,7 @@ function draw(e: MouseEvent | TouchEvent) {
 
   lastX = pos.x
   lastY = pos.y
+  currentStroke.push(pos)
   hasSignature.value = true
 }
 
@@ -103,6 +153,10 @@ function stopDrawing(e?: MouseEvent | TouchEvent) {
   if (!isDrawing.value) return
   if (e) e.preventDefault()
   isDrawing.value = false
+  if (currentStroke.length) {
+    strokes.push(currentStroke)
+    currentStroke = []
+  }
 }
 
 function clearCanvas() {
@@ -110,6 +164,9 @@ function clearCanvas() {
   if (!canvas || !ctx) return
   const rect = canvas.getBoundingClientRect()
   ctx.clearRect(0, 0, rect.width, rect.height)
+  strokes = []
+  currentStroke = []
+  backgroundImage = null
   hasSignature.value = false
 }
 
@@ -166,7 +223,7 @@ onBeforeUnmount(() => {
         <div class="px-5 py-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between shrink-0">
           <div>
             <h3 class="text-sm sm:text-base font-bold text-black dark:text-white tracking-tight">
-              Shartnomani imzoyingiz bilan tasdiqlang
+              {{ role === 'guardian' ? "Kafilning elektron imzosi" : "Talaba elektron imzosi" }}
             </h3>
             <p class="text-xs text-zinc-600 dark:text-zinc-400 mt-0.5">
               Quyidagi maydonga sichqoncha yoki barmog'ingiz bilan imzo cheking

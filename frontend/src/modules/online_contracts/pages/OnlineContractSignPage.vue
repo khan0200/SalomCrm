@@ -1253,6 +1253,7 @@ onMounted(() => {
     <OnlineContractSignatureModal
       :is-open="isSignatureModalOpen"
       :model-value="formData.signatureData"
+      role="student"
       @confirm="handleSignatureConfirmed"
       @close="isSignatureModalOpen = false"
     />
@@ -1277,6 +1278,7 @@ onMounted(() => {
     <OnlineContractSignatureModal
       :is-open="isGuardianSignatureModalOpen"
       :model-value="guardianSignatureData"
+      role="guardian"
       @confirm="handleGuardianSignatureConfirmed"
       @close="isGuardianSignatureModalOpen = false"
     />
