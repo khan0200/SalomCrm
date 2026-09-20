@@ -46,6 +46,7 @@ export interface Contract {
   updated_at: string
   created_by_name?: string | null
   updated_by_name?: string | null
+  updated_by_branch_name?: string | null
 }
 
 export interface ContractCreatePayload {

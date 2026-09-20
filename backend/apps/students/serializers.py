@@ -394,6 +394,8 @@ class ContractListSerializer(serializers.ModelSerializer):
     student_passport = serializers.SerializerMethodField()
     created_by_name = serializers.SerializerMethodField()
     rejected_by_name = serializers.SerializerMethodField()
+    updated_by_name = serializers.SerializerMethodField()
+    updated_by_branch_name = serializers.SerializerMethodField()
     email = serializers.SerializerMethodField()
 
     class Meta:
@@ -408,7 +410,8 @@ class ContractListSerializer(serializers.ModelSerializer):
             'student_id_assigned', 'verification_code', 'verification_code_expires_at',
             'verification_code_used', 'verified_at', 'rejection_reason',
             'rejected_at', 'rejected_by_name',
-            'created_at', 'updated_at', 'signed_at', 'created_by_name'
+            'created_at', 'updated_at', 'signed_at', 'created_by_name',
+            'updated_by_name', 'updated_by_branch_name'
         )
         read_only_fields = ('id', 'version', 'created_at', 'updated_at')
 
@@ -429,6 +432,19 @@ class ContractListSerializer(serializers.ModelSerializer):
     def get_rejected_by_name(self, obj):
         if obj.rejected_by:
             return getattr(obj.rejected_by, 'full_name', None) or getattr(obj.rejected_by, 'email', None) or str(obj.rejected_by)
+        return None
+
+    def get_updated_by_name(self, obj):
+        # Reflects whichever staff member most recently touched the contract
+        # (assign-student-id, regenerate-code, etc. all set this) - for a
+        # pending/verified contract this is effectively "who confirmed it".
+        if obj.updated_by:
+            return getattr(obj.updated_by, 'full_name', None) or getattr(obj.updated_by, 'email', None) or str(obj.updated_by)
+        return None
+
+    def get_updated_by_branch_name(self, obj):
+        if obj.updated_by and obj.updated_by.branch:
+            return obj.updated_by.branch.name
         return None
 
     def get_email(self, obj):

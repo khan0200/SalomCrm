@@ -2166,7 +2166,7 @@ class ContractViewSet(viewsets.ModelViewSet):
                 Q(student__passport__icontains=search)
             )
 
-        return qs.select_related('student', 'created_by', 'updated_by').order_by('-created_at')
+        return qs.select_related('student', 'created_by', 'updated_by', 'updated_by__branch').order_by('-created_at')
 
     def get_serializer_class(self):
         if self.action == 'list':
