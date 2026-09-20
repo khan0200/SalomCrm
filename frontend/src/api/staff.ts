@@ -6,6 +6,7 @@ export interface StaffCreatePayload {
   email: string
   role: UserRole
   password?: string
+  branch?: string | number | null
 }
 
 export const staffApi = {

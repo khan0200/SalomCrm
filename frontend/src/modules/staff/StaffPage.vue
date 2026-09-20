@@ -9,7 +9,8 @@ import type { UserProfile, UserRole } from '@/types'
 import {
   Users, Plus, Loader2, Mail, ShieldCheck, Pencil, Trash2, AlertTriangle,
   ShieldAlert, CheckCircle2, XCircle, Eye, Edit3, Trash, CreditCard,
-  UserCog, BarChart2, Settings, BookOpen, FolderOpen, Crown, Shield, User
+  UserCog, BarChart2, Settings, BookOpen, FolderOpen, Crown, Shield, User,
+  Building2
 } from 'lucide-vue-next'
 
 import AddStaffModal from './components/AddStaffModal.vue'
@@ -365,6 +366,7 @@ const colorMap: Record<string, { bg: string; text: string; border: string; icon:
                 <th class="px-4 py-3">Name</th>
                 <th class="px-4 py-3">Email</th>
                 <th class="px-4 py-3">Role</th>
+                <th class="px-4 py-3">Branch</th>
                 <th class="px-4 py-3">Status</th>
                 <th class="px-4 py-3 text-right">Actions</th>
               </tr>
@@ -408,6 +410,13 @@ const colorMap: Record<string, { bg: string; text: string; border: string; icon:
                     <ShieldCheck class="w-3 h-3" />
                     {{ roleLabels[member.role] || member.role }}
                   </span>
+                </td>
+                <td class="px-4 py-3">
+                  <span v-if="(member as any).branch_name" class="flex items-center gap-1.5 text-zinc-600 dark:text-zinc-400">
+                    <Building2 class="w-3 h-3 shrink-0" />
+                    {{ (member as any).branch_name }}
+                  </span>
+                  <span v-else class="text-zinc-400 dark:text-zinc-600 italic">Not assigned</span>
                 </td>
                 <td class="px-4 py-3">
                   <span

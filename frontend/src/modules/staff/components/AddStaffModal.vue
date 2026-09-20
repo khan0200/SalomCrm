@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue'
 import BaseModal from '@/components/common/BaseModal.vue'
 import { AlertCircle, UserPlus, Loader2 } from 'lucide-vue-next'
 import type { UserRole, UserProfile } from '@/types'
+import { useOffices } from '@/composables/useOffices'
 
 const props = defineProps<{
   isOpen: boolean
@@ -12,14 +13,17 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'close'): void
-  (e: 'submit', data: { full_name: string; email: string; role: UserRole; password: string }): void
+  (e: 'submit', data: { full_name: string; email: string; role: UserRole; password: string; branch: string | null }): void
 }>()
+
+const { officesRegistry, fetchOffices } = useOffices()
 
 const blankForm = () => ({
   full_name: '',
   email: '',
   role: 'STAFF' as UserRole,
   password: '',
+  branch: '' as string,
 })
 
 const form = ref(blankForm())
@@ -37,12 +41,18 @@ const isEditing = computed(() => !!props.member)
 watch(() => props.isOpen, (open) => {
   if (open) {
     error.value = null
+    fetchOffices()
     if (props.member) {
       form.value = {
         full_name: props.member.full_name,
         email: props.member.email,
         role: props.member.role,
         password: '',
+        // GET /users/ (the list this modal's `member` prop comes from) returns
+        // `branch` as a plain FK id, not the nested {id,name} object the
+        // UserProfile type declares - that shape only matches the login
+        // response. Guard with a plain truthy/String() cast either way.
+        branch: (props.member as any).branch ? String((props.member as any).branch) : '',
       }
     } else {
       form.value = blankForm()
@@ -75,6 +85,7 @@ const handleSubmit = () => {
     full_name: form.value.full_name.trim(),
     email: form.value.email.trim().toLowerCase(),
     role: form.value.role,
+    branch: form.value.branch || null,
   }
   if (form.value.password) {
     payload.password = form.value.password
@@ -133,6 +144,22 @@ const handleSubmit = () => {
         </select>
         <p class="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1">
           {{ roleOptions.find(o => o.value === form.role)?.hint }}
+        </p>
+      </div>
+
+      <div>
+        <label class="block font-bold text-zinc-700 dark:text-zinc-300 mb-1">Branch / Office</label>
+        <select
+          v-model="form.branch"
+          class="w-full px-3 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 font-semibold focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none cursor-pointer"
+        >
+          <option value="">Not assigned</option>
+          <option v-for="office in officesRegistry" :key="office.id" :value="String(office.id)">
+            {{ office.name }}
+          </option>
+        </select>
+        <p class="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1">
+          Which office this team member works out of.
         </p>
       </div>
 
