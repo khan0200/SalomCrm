@@ -199,6 +199,17 @@ function getStudentVisaStatus(student: VisaStudent): string {
   return raw || 'PENDING'
 }
 
+function formatStatusName(statusValue: string | undefined | null): string {
+  const raw = (statusValue || '').toUpperCase().trim()
+  if (raw.includes('APPROV') || raw.includes('PASSED') || raw.includes('ISSUED') || raw.includes('허가') || raw.includes('TASDIQ')) return 'Approved'
+  if (raw.includes('REJECT') || raw.includes('CANCEL') || raw.includes('RETURN') || raw.includes('EXPIRED') || raw.includes('불허') || raw.includes('RAD') || raw.includes('BEKOR')) return 'Cancelled'
+  if (raw.includes('REVIEW') || raw.includes('PROCESSING') || raw.includes('SIMSA') || raw.includes('심사')) return 'Under Review'
+  if (raw.includes('SUPPLEM') || raw.includes('보완')) return 'Supplement Needed'
+  if (raw.includes('RECEIV') || raw.includes('SUBMIT') || raw.includes('JEOMSU') || raw.includes('접수') || raw.includes('APP')) return 'Application'
+  if (!raw || raw.includes('PEND') || raw === 'UNKNOWN') return 'Pending'
+  return raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase()
+}
+
 function isPdfEligible(student: VisaStudent): boolean {
   const s = getStudentVisaStatus(student)
   return s.includes('APPROV') || s.includes('VISA USED')
@@ -664,19 +675,23 @@ async function checkStudentVisa(
     }
 
     if (changed) {
+      const formattedOld = formatStatusName(oldStatus)
+      const formattedNew = formatStatusName(newStatus)
       const exists = sessionChanges.value.some(c => c.passport === student.passport)
       if (!exists) {
         sessionChanges.value.push({
           fullName: student.full_name,
           passport: student.passport,
-          oldStatus: oldStatus,
-          newStatus: newStatus
+          oldStatus: formattedOld,
+          newStatus: formattedNew
         })
       }
       if (!silent) {
+        const bucket = bucketForStatus(newStatus)
         uiStore.addToast({
-          type: 'success',
-          message: `🎉 ${student.full_name}: Viza statusi o'zgardi! (${oldStatus} ➔ ${newStatus})`
+          type: bucket,
+          title: student.full_name,
+          message: `${formattedOld} >>> ${formattedNew}`
         })
       }
     }
@@ -804,7 +819,7 @@ async function runBatchCheck(list: VisaStudent[]) {
     if (changedCount > 0) {
       showReportModal.value = true
       uiStore.addToast({
-        type: 'success',
+        type: 'info',
         message: `Viza tekshiruvi yakunlandi: ${completedCount}/${toCheck.length} ta tekshirildi (${changedCount} ta o'zgarish).`
       })
     } else {

@@ -1,20 +1,39 @@
 <script setup lang="ts">
 import { useUiStore } from '@/stores/ui'
-import { CheckCircle2, AlertCircle, AlertTriangle, Info, X } from 'lucide-vue-next'
+import { CheckCircle2, AlertCircle, AlertTriangle, Info, X, XCircle, Clock, FileText } from 'lucide-vue-next'
 
 const uiStore = useUiStore()
 
 const getIcon = (type: string) => {
   switch (type) {
-    case 'success': return CheckCircle2
-    case 'error': return AlertCircle
-    case 'warning': return AlertTriangle
-    default: return Info
+    case 'approved':
+    case 'success':
+      return CheckCircle2
+    case 'cancelled':
+      return XCircle
+    case 'error':
+      return AlertCircle
+    case 'application':
+      return FileText
+    case 'pending':
+      return Clock
+    case 'warning':
+      return AlertTriangle
+    default:
+      return Info
   }
 }
 
 const getStyles = (type: string) => {
   switch (type) {
+    case 'pending':
+      return 'bg-[#0f2042] border-[#1c3870] text-white shadow-xl shadow-blue-950/30'
+    case 'application':
+      return 'bg-orange-500 border-orange-600 text-white shadow-xl shadow-orange-950/20'
+    case 'approved':
+      return 'bg-emerald-600 border-emerald-700 text-white shadow-xl shadow-emerald-950/20'
+    case 'cancelled':
+      return 'bg-red-600 border-red-700 text-white shadow-xl shadow-red-950/20'
     case 'success':
       return 'bg-emerald-50 border-emerald-200 text-emerald-900 dark:bg-emerald-950/80 dark:border-emerald-800 dark:text-emerald-200'
     case 'error':
@@ -47,8 +66,8 @@ const getStyles = (type: string) => {
       >
         <component :is="getIcon(toast.type)" class="w-4 h-4 mt-0.5 shrink-0" />
         <div class="flex-1 min-w-0">
-          <h4 v-if="toast.title" class="font-bold mb-0.5">{{ toast.title }}</h4>
-          <p class="leading-relaxed opacity-90">{{ toast.message }}</p>
+          <h4 v-if="toast.title" class="font-bold mb-0.5 break-words">{{ toast.title }}</h4>
+          <p class="leading-relaxed opacity-90 whitespace-pre-line font-medium">{{ toast.message }}</p>
         </div>
         <button
           @click="uiStore.removeToast(toast.id)"

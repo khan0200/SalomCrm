@@ -196,8 +196,12 @@ async function saveManualVisaStatus() {
     const updated = await visaApi.updateVisaStudent(props.student.passport, payload)
     emit('updated', updated)
     showAssignStatusModal.value = false
+    const statusType: 'approved' | 'cancelled' | 'pending' =
+      manualStatus.value === 'APPROVED' ? 'approved' :
+      manualStatus.value === 'CANCELLED' ? 'cancelled' : 'pending'
     uiStore.addToast({
-      type: 'success',
+      type: statusType,
+      title: props.student.full_name,
       message: `Visa holati ${manualStatus.value} ga o'zgartirildi ✓`
     })
   } catch (err: any) {

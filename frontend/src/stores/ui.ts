@@ -3,7 +3,7 @@ import { ref } from 'vue'
 
 export interface ToastMessage {
   id: string
-  type: 'success' | 'error' | 'warning' | 'info'
+  type: 'success' | 'error' | 'warning' | 'info' | 'pending' | 'application' | 'approved' | 'cancelled'
   title?: string
   message: string
   duration?: number
