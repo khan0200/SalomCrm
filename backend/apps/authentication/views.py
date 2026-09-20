@@ -211,10 +211,14 @@ class UserViewSet(viewsets.ModelViewSet):
         # leaked every tenant's users into that tenant's Staff page.
         tenant = getattr(self.request, 'tenant', None) or getattr(user, 'tenant', None)
         # This endpoint backs the internal Staff page only (see staffApi.getStaff),
-        # never a "list every account" view - a student who registers to sign an
-        # online contract gets a User row too (role=STUDENT), and without this
-        # exclusion every one of them showed up in the team members table.
-        base = User.objects.exclude(role=UserRole.STUDENT)
+        # never a "list every account" view. Two roles never belong there:
+        # - STUDENT: a real User row is created for every online-contract
+        #   sign-up, and without this they show up as "team members".
+        # - SUPER_ADMIN: platform-wide by definition, not any one tenant's
+        #   staff - even if one happens to have a `tenant` FK set (e.g. a
+        #   leftover from account creation), that must never make them look
+        #   like that tenant's employee.
+        base = User.objects.exclude(role__in=[UserRole.STUDENT, UserRole.SUPER_ADMIN])
         if user.is_superuser or getattr(user, 'role', '') == 'SUPER_ADMIN':
             tenant_id = self.request.query_params.get('tenant_id')
             if tenant_id:
