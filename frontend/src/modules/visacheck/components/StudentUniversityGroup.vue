@@ -11,6 +11,7 @@ import VisaTypeBadge from './VisaTypeBadge.vue'
 import CopyField from './CopyField.vue'
 import { formatTimestampCompact } from '../useTimeAgo'
 import { parseRejectionReasons } from '../utils/rejectionParser'
+import { getReasonUzbek } from '../constants/cancellationReasons'
 import { getStatusAppliedDate } from '../utils/statusDateHelper'
 
 const props = defineProps<{
@@ -223,9 +224,17 @@ const groupHasSelected = computed(() =>
               >
                 {{ rejItem.number }}
               </span>
-              <span class="text-[12px] font-normal leading-tight text-neutral-800 dark:text-neutral-200">
-                {{ rejItem.text }}
-              </span>
+              <div class="min-w-0 flex-1">
+                <span class="text-[12px] font-medium leading-tight text-neutral-800 dark:text-neutral-200 block">
+                  {{ rejItem.text }}
+                </span>
+                <span
+                  v-if="rejItem.number && getReasonUzbek(rejItem.number)"
+                  class="text-[10.5px] text-neutral-500 dark:text-neutral-400 font-normal leading-tight block mt-0.5"
+                >
+                  {{ getReasonUzbek(rejItem.number) }}
+                </span>
+              </div>
             </div>
           </div>
 
@@ -348,9 +357,17 @@ const groupHasSelected = computed(() =>
                     >
                       {{ rejItem.number }}
                     </span>
-                    <span class="text-[12px] font-normal leading-tight text-neutral-800 dark:text-neutral-200">
-                      {{ rejItem.text }}
-                    </span>
+                    <div class="min-w-0 flex-1">
+                      <span class="text-[12px] font-medium leading-tight text-neutral-800 dark:text-neutral-200 block">
+                        {{ rejItem.text }}
+                      </span>
+                      <span
+                        v-if="rejItem.number && getReasonUzbek(rejItem.number)"
+                        class="text-[10.5px] text-neutral-500 dark:text-neutral-400 font-normal leading-tight block mt-0.5"
+                      >
+                        {{ getReasonUzbek(rejItem.number) }}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </td>

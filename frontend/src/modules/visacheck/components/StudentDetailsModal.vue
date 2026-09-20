@@ -10,8 +10,8 @@ import { useUiStore } from '@/stores/ui'
 import { useAuthStore } from '@/stores/auth'
 import CopyField from './CopyField.vue'
 import StatusBadge from './StatusBadge.vue'
-import VisaTypeBadge from './VisaTypeBadge.vue'
-import { CANCELLATION_REASONS, type CancellationReasonOption } from '../constants/cancellationReasons'
+import { CANCELLATION_REASONS, getReasonUzbek, type CancellationReasonOption } from '../constants/cancellationReasons'
+import { formatStatusName } from '../utils/statusHelper'
 
 const props = defineProps<{
   isOpen: boolean
@@ -68,7 +68,6 @@ const manualStatus = ref<'APPROVED' | 'CANCELLED' | 'PENDING'>('PENDING')
 const selectedReasons = ref<string[]>([])
 const customReasonText = ref('')
 const reasonsDropdownOpen = ref(false)
-const reasonSearchQuery = ref('')
 const savingStatus = ref(false)
 
 function openAssignStatusModal() {
@@ -96,7 +95,6 @@ function openAssignStatusModal() {
   selectedReasons.value = preSelected
   customReasonText.value = customParts.join('; ')
   reasonsDropdownOpen.value = false
-  reasonSearchQuery.value = ''
   showAssignStatusModal.value = true
 }
 
@@ -124,17 +122,6 @@ function selectAllReasons() {
 function clearAllReasons() {
   selectedReasons.value = []
 }
-
-const filteredReasons = computed(() => {
-  const q = reasonSearchQuery.value.trim().toLowerCase()
-  if (!q) return CANCELLATION_REASONS
-  return CANCELLATION_REASONS.filter(r =>
-    r.number.includes(q) ||
-    r.korean.toLowerCase().includes(q) ||
-    r.uzbek.toLowerCase().includes(q) ||
-    r.english.toLowerCase().includes(q)
-  )
-})
 
 function buildCompiledRejectionReason(): string {
   const parts: string[] = []
@@ -193,6 +180,8 @@ async function saveManualVisaStatus() {
       }
     }
 
+    const oldFormatted = formatStatusName(props.student.status || 'Pending')
+    const newFormatted = formatStatusName(manualStatus.value)
     const updated = await visaApi.updateVisaStudent(props.student.passport, payload)
     emit('updated', updated)
     showAssignStatusModal.value = false
@@ -202,7 +191,7 @@ async function saveManualVisaStatus() {
     uiStore.addToast({
       type: statusType,
       title: props.student.full_name,
-      message: `Visa holati ${manualStatus.value} ga o'zgartirildi ✓`
+      message: `${oldFormatted} >>> ${newFormatted}`
     })
   } catch (err: any) {
     uiStore.addToast({
@@ -460,9 +449,17 @@ async function clearField(fieldName: ManagementField) {
                         {{ item.number }}
                       </span>
                       <XCircle v-else class="size-4.5 text-[#E02424] shrink-0 mt-0.5" />
-                      <span class="text-[12.5px] text-zinc-900 dark:text-zinc-100 font-normal leading-snug">
-                        {{ item.text }}
-                      </span>
+                      <div class="min-w-0 flex-1 space-y-0.5">
+                        <span class="text-[12.5px] text-zinc-900 dark:text-zinc-100 font-medium leading-snug block">
+                          {{ item.text }}
+                        </span>
+                        <span
+                          v-if="getReasonUzbek(item.number)"
+                          class="text-[11px] text-rose-700/85 dark:text-rose-300/85 font-normal leading-tight block"
+                        >
+                          {{ getReasonUzbek(item.number) }}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -999,24 +996,11 @@ async function clearField(fieldName: ManagementField) {
                   <!-- Reasons List (Dropdown / collapsible) -->
                   <div
                     v-if="reasonsDropdownOpen"
-                    class="mt-1.5 max-h-56 overflow-y-auto rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-xl p-2 space-y-1 scrollbar-thin"
+                    class="mt-1.5 max-h-72 overflow-y-auto rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-xl p-2 space-y-1 scrollbar-thin"
                   >
-                    <!-- Search inside reasons -->
-                    <div class="sticky top-0 bg-white dark:bg-zinc-900 pb-2 pt-0.5 border-b border-slate-100 dark:border-zinc-800 z-10">
-                      <div class="relative">
-                        <Search class="size-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                        <input
-                          v-model="reasonSearchQuery"
-                          type="text"
-                          placeholder="Search reasons by number, Korean or Uzbek..."
-                          class="w-full h-8 pl-8 pr-3 text-xs rounded-md border border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-950 text-slate-800 dark:text-zinc-200 focus:outline-none focus:border-blue-500"
-                        />
-                      </div>
-                    </div>
-
                     <!-- Items -->
                     <div
-                      v-for="opt in filteredReasons"
+                      v-for="opt in CANCELLATION_REASONS"
                       :key="opt.number"
                       @click="toggleReason(opt.number)"
                       class="flex items-start gap-2.5 p-2 rounded-md hover:bg-slate-100 dark:hover:bg-zinc-800 cursor-pointer transition-colors"

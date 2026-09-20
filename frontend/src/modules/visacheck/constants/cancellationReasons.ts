@@ -3,71 +3,101 @@ export interface CancellationReasonOption {
   korean: string
   uzbek: string
   english: string
+  russian?: string
 }
 
 /**
- * Standard refusal / cancellation reasons established by the Ministry of Justice
- * and Korean diplomatic missions (visa.go.kr 불허사유).
+ * Official 11 refusal / cancellation reasons established by the Embassy of the
+ * Republic of Korea (거부사유 / Viza inkor etilishi sababi / visa.go.kr 불허사유).
  */
 export const CANCELLATION_REASONS: CancellationReasonOption[] = [
   {
     number: '1',
-    korean: '유효한 여권을 소지하지 않았거나, 입국목적 및 체류기간을 소명하지 못함',
-    uzbek: 'Amaldagi pasport mavjud emas yoki kirish maqsadi va qolish muddati asoslanmagan',
-    english: 'Does not hold a valid passport or failed to clarify the purpose and period of stay'
+    korean: '귀하는 유효한 여권 등을 소지하지 않았거나, 필요한 서류를 제출하지 않았습니다.',
+    uzbek: 'Siz yaroqli pasportga ega emassiz yoki zaruriy hujjatlarni topshirmagansiz.',
+    english: 'You do not possess a valid passport or failed to submit required documents.',
+    russian: 'У вас отсутствует действительный паспорт / проездной документ или не представлены необходимые документы.'
   },
   {
     number: '2',
-    korean: '출입국관리법 제11조(입국의 금지 등) 각 호의 어느 하나에 해당함',
-    uzbek: 'Immigratsiya qonunining 11-moddasi (kirishni taqiqlash) bandlariga to\'g\'ri keladi',
-    english: 'Falls under any subparagraph of Article 11 (Entry Prohibition) of the Immigration Act'
+    korean: '귀하는 출입국관리법 제11조(입국의 금지) 제1항에 해당합니다.',
+    uzbek: "Migratsiya qonunining 11-bo'lim (davlatga kirishga oid taqiq) 1-bandiga sizning taalluqliligingiz bor.",
+    english: 'You fall under Article 11, Paragraph 1 (Entry Prohibition) of the Immigration Act.',
+    russian: 'Вы попадаете под 11-ю статью 1 параграфа «Закона об иммиграционном контроле» (запрет на въезд).'
   },
   {
     number: '3',
-    korean: '과거 대한민국 법률을 위반한 사실이 있음',
-    uzbek: 'Ilgari Koreya Respublikasi qonunlarini buzganlik holati mavjud',
-    english: 'Has a history of violating the laws of the Republic of Korea'
+    korean: '귀하는 과거 대한민국 체류 중 대한민국 법률을 위반한 사실이 있습니다.',
+    uzbek: 'Koreya Respublikasiga avvalgi tashrifingizda Koreya Respublikasining qonunchiligini buzgansiz.',
+    english: 'You have a record of violating the laws of the Republic of Korea during your previous stay.',
+    russian: 'Вы нарушали законодательство Республики Корея в период предыдущих пребываниях в Р.К.'
   },
   {
     number: '4',
-    korean: '입국목적을 소명할 수 있는 자료를 제출하지 못함',
-    uzbek: 'Kirish maqsadini tasdiqlovchi yetarli asos/hujjatlar taqdim etilmagan',
-    english: 'Failed to submit materials that prove the purpose of entry'
+    korean: '귀하의 입국목적을 소명할 충분한 서류를 제출하지 않았습니다.',
+    uzbek: 'Tashrif maqsadingizni yoritib berishda yetarli hujjat(lar)ni topshirmagansiz.',
+    english: 'You failed to submit sufficient documents to prove the purpose of entry.',
+    russian: 'Вы не предоставили дополнительных документов, подтверждающих цель вашей поездки в Р.К.'
   },
   {
     number: '5',
-    korean: '대한민국 체류 중 필요한 경비 및 귀국경비 부담 능력이 없음',
-    uzbek: 'Koreyada yashash, ta\'lim va vataniga qaytish xarajatlarini qoplash mablag\'i yetarli emas',
-    english: 'Lacks the financial ability to bear living expenses during stay and return costs'
+    korean: '귀하는 대한민국 출입국관리법 제10조에 따른 체류자격의 요건을 충족시키지 못했습니다.',
+    uzbek: "Tashrif maqsadingiz Koreya Respublikasining migratsiya qonuni 10-bo'limida keltirilgan Koreya Respublikasida istiqomat qilishga oid talablarga mos kelmaydi.",
+    english: 'You failed to meet the requirements for the status of stay pursuant to Article 10 of the Immigration Act.',
+    russian: 'Цель вашей поездки не соответствует условиям статуса пребывания, утвержденным Иммиграционным законодательством Республики Корея.'
   },
   {
     number: '6',
-    korean: '초청자(가족, 대학 등)와의 관계를 소명하지 못함',
-    uzbek: 'Taklif qiluvchi muassasa (universitet) yoki shaxs bilan aloqasi asoslanmagan',
-    english: 'Failed to substantiate relationship with the inviter (family, university, etc.)'
+    korean: '귀하가 제출한 서류는 진정성이 확인되지 않습니다.',
+    uzbek: 'Siz topshirgan hujjatlarning haqiqiyligi tasdiqlanmadi (soxtalashtirilgan yoki noaniq).',
+    english: 'The authenticity of the documents you submitted could not be verified.',
+    russian: 'Невозможно было установить подлинность предоставленных вами документов.'
   },
   {
     number: '7',
-    korean: '제출한 서류의 진위가 불분명하거나 위·변조됨',
-    uzbek: 'Taqdim etilgan hujjatlarning haqiqiyligi noaniq yoki soxtalashtirilgan/o\'zgartirilgan',
-    english: 'The authenticity of submitted documents is unclear, forged, or altered'
+    korean: '귀하의 입국목적을 충분히 소명하지 못하였습니다.',
+    uzbek: "Siz tashrif maqsadingizni to'liq yoritib bera olmagansiz.",
+    english: 'You failed to sufficiently explain the purpose of your entry.',
+    russian: 'Цель вашей поездки не достаточно обоснована.'
   },
   {
     number: '8',
-    korean: '입국목적에 부합하는 체류자격 요건을 갖추지 못함',
-    uzbek: 'Kirish maqsadiga mos keluvchi viza toifasi va talablariga javob bermaydi',
-    english: 'Does not meet the eligibility requirements for the status of stay corresponding to purpose'
+    korean: '가족관계 및 경제적 여건이 예정한 체류기간 내에 귀국할 것임을 소명하지 못하였습니다.(소득·자산 불충분 등)',
+    uzbek: "Siz belgilangan istiqomat muddatida o'z davlatingizga qaytib kela olishingizni tasdiqlab bera olmagansiz (daromad/sarmoya, ota-ona daromadi yetarli emasligi sababli).",
+    english: 'You failed to demonstrate, through your family ties and economic circumstances, that you would return home within the intended period of stay.',
+    russian: 'Ваше семейное и финансовое положение недостаточно убедительны, чтобы вы смогли вернуться обратно на родину по окончании периода пребывания.'
   },
   {
     number: '9',
-    korean: '과거 불법체류 등 체류질서를 위반할 우려가 상당함',
-    uzbek: 'Ilgari noqonuniy qolish yoki immigratsiya tartibini buzish xavfi mavjud',
-    english: 'High risk of illegal stay or violation of immigration order based on past history'
+    korean: '귀하를 초청한 자의 초청자격이 부적격합니다.',
+    uzbek: "Sizni taklif qiluvchining taklif qilish vakolati to'liq emas.",
+    english: 'The inviter lacks the qualification or competence to invite.',
+    russian: 'Приглашающая сторона недостаточно компетентна в оформлении пригласительного письма.'
   },
   {
     number: '10',
-    korean: '기타 사유',
-    uzbek: 'Boshqa rasmiy sabablar',
-    english: 'Other official refusal reasons'
+    korean: '귀하를 초청한 자와의 관계를 입증하지 못했습니다.',
+    uzbek: 'Siz taklif qiluvchi bilan aloqadorligingizni asoslab bera olmagansiz.',
+    english: 'You failed to substantiate your relationship with the inviter.',
+    russian: 'Вы не смогли подтвердить отношение с приглашающей стороной.'
+  },
+  {
+    number: '11',
+    korean: '기타',
+    uzbek: 'Boshqa sabablar (qo\'shimcha izohda ko\'rsatiladi).',
+    english: 'Other (details specified in note).',
+    russian: 'Другое.'
   }
 ]
+
+export function getReasonByNumber(num: string | number | undefined | null): CancellationReasonOption | undefined {
+  if (num === undefined || num === null) return undefined
+  const s = String(num).trim()
+  return CANCELLATION_REASONS.find(r => r.number === s)
+}
+
+export function getReasonUzbek(num: string | number | undefined | null): string {
+  const reason = getReasonByNumber(num)
+  return reason ? reason.uzbek : ''
+}
+

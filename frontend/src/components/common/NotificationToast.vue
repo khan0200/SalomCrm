@@ -47,7 +47,7 @@ const getStyles = (type: string) => {
 </script>
 
 <template>
-  <div class="fixed bottom-5 right-5 z-50 flex flex-col gap-2.5 max-w-sm pointer-events-none">
+  <div class="fixed bottom-5 right-5 z-[9999] flex flex-col gap-2.5 max-w-sm pointer-events-none">
     <transition-group
       enter-active-class="transition duration-200 ease-out"
       enter-from-class="transform translate-y-2 opacity-0"
