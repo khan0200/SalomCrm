@@ -1328,6 +1328,16 @@ async function handleUnarchive(contract: Contract) {
                           </span>
                         </div>
 
+                        <!-- View: available for any status, always shown -->
+                        <button
+                          type="button"
+                          @click.stop="openContractPreview(contract)"
+                          class="p-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-850 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-all cursor-pointer shadow-2xs active:scale-95 shrink-0"
+                          title="Ko'rish"
+                        >
+                          <Eye class="w-3.5 h-3.5" />
+                        </button>
+
                         <!-- Archive / Unarchive: available for any status, always shown -->
                         <button
                           type="button"
@@ -1436,6 +1446,14 @@ async function handleUnarchive(contract: Contract) {
             <span class="text-zinc-400">Tariff:</span>
             <span class="font-semibold text-zinc-800 dark:text-zinc-200">{{ assigningContract.tariff_name }}</span>
           </div>
+          <button
+            type="button"
+            @click="isAssignModalOpen = false; previewContract = assigningContract"
+            class="w-full inline-flex items-center justify-center gap-1.5 mt-1 pt-2 border-t border-zinc-200 dark:border-zinc-750 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 font-semibold transition-colors cursor-pointer"
+          >
+            <Eye class="w-3.5 h-3.5" />
+            <span>Shartnomani o'qish</span>
+          </button>
         </div>
 
         <!-- Student ID Input -->

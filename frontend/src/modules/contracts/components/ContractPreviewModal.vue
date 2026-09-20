@@ -285,6 +285,45 @@ function formatRejectionDate(dateStr?: string | null): string {
 
       <!-- Right: Actions Toolbar -->
       <div class="flex items-center gap-2 flex-wrap" v-if="activeContract">
+        <!-- Tasdiqlash kodi: generatsiya qilish (Pending, kod hali yo'q) -->
+        <button
+          v-if="activeContract.status === 'pending' && !activeContract.verification_code"
+          type="button"
+          @click="emit('assign', activeContract)"
+          class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-black text-white dark:bg-zinc-100 dark:hover:bg-white dark:text-zinc-950 text-xs font-medium shadow-2xs transition-all active:scale-[0.98] cursor-pointer"
+          title="Student ID biriktirish va tasdiqlash kodi berish"
+        >
+          <KeyRound class="w-3.5 h-3.5 text-zinc-300 dark:text-zinc-600" />
+          <span>Tasdiqlash kodini generatsiya qilish</span>
+        </button>
+
+        <!-- Tasdiqlash kodi: allaqachon berilgan bo'lsa, ko'rsatish + nusxalash + qayta olish -->
+        <div
+          v-else-if="activeContract.status === 'pending' && activeContract.verification_code"
+          class="flex items-center gap-1.5"
+        >
+          <div class="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-zinc-100 dark:bg-zinc-800/80 border border-zinc-200/80 dark:border-zinc-700/80 rounded-lg">
+            <span class="font-mono font-semibold text-xs text-zinc-900 dark:text-zinc-100 tracking-wider">{{ activeContract.verification_code }}</span>
+            <button
+              type="button"
+              @click="copyCodeToClipboard(activeContract.verification_code)"
+              class="p-0.5 hover:text-zinc-900 dark:hover:text-zinc-100 text-zinc-400 transition-colors cursor-pointer"
+              title="Kodni nusxalash"
+            >
+              <Check v-if="copyFeedback" class="w-3.5 h-3.5 text-emerald-500" />
+              <Copy v-else class="w-3.5 h-3.5" />
+            </button>
+          </div>
+          <button
+            type="button"
+            @click="emit('regenerate', activeContract)"
+            class="p-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 text-zinc-400 hover:text-amber-600 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+            title="Kodni qayta olish"
+          >
+            <RotateCcw class="w-3.5 h-3.5 text-amber-500" />
+          </button>
+        </div>
+
         <!-- Bekor qilish (Reject - Pending yoki Verified holatida) -->
         <button
           v-if="activeContract.status === 'pending' || activeContract.status === 'verified'"
