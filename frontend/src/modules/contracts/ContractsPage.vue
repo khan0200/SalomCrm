@@ -38,6 +38,7 @@ import {
   ArchiveRestore,
 } from 'lucide-vue-next'
 import { downloadContractAsPdf } from './utils/contractPdf'
+import { vReveal } from '@/directives/reveal'
 import {
   isCanvasDocumentJson,
   deserializeCanvasDocument,
@@ -849,7 +850,7 @@ async function handleUnarchive(contract: Contract) {
               <PanelLeftClose class="w-3.5 h-3.5" />
             </button>
           </div>
-          <div class="p-1.5 space-y-0.5 overflow-y-auto max-h-[calc(100vh-190px)]">
+          <div class="p-1.5 space-y-0.5 overflow-y-auto scroll-smooth max-h-[calc(100vh-190px)]">
             <!-- Loading -->
             <div v-if="isTariffsLoading" class="p-3 space-y-2">
               <div v-for="i in 4" :key="i" class="h-9 bg-zinc-100 dark:bg-zinc-850/60 rounded-lg animate-pulse" />
@@ -877,8 +878,9 @@ async function handleUnarchive(contract: Contract) {
 
               <!-- Each tariff -->
               <button
-                v-for="tariff in tariffs"
+                v-for="(tariff, tariffIdx) in tariffs"
                 :key="tariff.id"
+                v-reveal="Math.min(tariffIdx, 8) * 25"
                 type="button"
                 @click="selectTariff(tariff)"
                 class="w-full flex items-center justify-between rounded-lg text-left transition-all cursor-pointer border group"
@@ -1173,7 +1175,7 @@ async function handleUnarchive(contract: Contract) {
                   <span>New Contract</span>
                 </button>
               </div>
-              <div v-else class="overflow-x-auto">
+              <div v-else class="overflow-x-auto scroll-smooth">
                 <table class="w-full text-left border-collapse text-xs">
                   <thead class="bg-zinc-50/75 dark:bg-zinc-900/60 border-b border-zinc-200/80 dark:border-zinc-800 text-[11px] font-medium text-zinc-400 uppercase tracking-wider select-none">
                     <tr>
@@ -1185,8 +1187,9 @@ async function handleUnarchive(contract: Contract) {
                   </thead>
                   <tbody class="divide-y divide-zinc-100 dark:divide-zinc-800/60">
                     <tr
-                      v-for="contract in contracts"
+                      v-for="(contract, contractIdx) in contracts"
                       :key="contract.id"
+                      v-reveal="Math.min(contractIdx, 10) * 22"
                       class="hover:bg-zinc-50/70 dark:hover:bg-zinc-850/40 transition-colors group cursor-pointer"
                       @click="openContractPreview(contract)"
                     >

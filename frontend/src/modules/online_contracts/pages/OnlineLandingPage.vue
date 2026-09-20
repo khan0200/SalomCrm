@@ -30,6 +30,7 @@ import OnlineContractLayout from '../layouts/OnlineContractLayout.vue'
 import TenantNotFoundPage from './TenantNotFoundPage.vue'
 import TenantInactivePage from './TenantInactivePage.vue'
 import FullContractViewerModal from '../components/FullContractViewerModal.vue'
+import { vReveal } from '@/directives/reveal'
 
 const route = useRoute()
 const router = useRouter()
@@ -159,17 +160,18 @@ onMounted(() => {
 </script>
 
 <template>
-  <div v-if="isLoading" class="min-h-screen flex items-center justify-center bg-[#fafafa] dark:bg-[#09090b]">
+  <Transition name="page-fade" mode="out-in">
+  <div v-if="isLoading" key="loading" class="min-h-screen flex items-center justify-center bg-[#fafafa] dark:bg-[#09090b]">
     <div class="flex flex-col items-center gap-3 text-zinc-400">
       <Loader2 class="w-6 h-6 animate-spin text-zinc-900 dark:text-white" />
       <span class="text-xs font-mono tracking-tight">Yuklanmoqda...</span>
     </div>
   </div>
 
-  <TenantNotFoundPage v-else-if="isNotFound" />
-  <TenantInactivePage v-else-if="isInactive" :company-name="tenantInfo?.name" />
+  <TenantNotFoundPage v-else-if="isNotFound" key="not-found" />
+  <TenantInactivePage v-else-if="isInactive" key="inactive" :company-name="tenantInfo?.name" />
 
-  <OnlineContractLayout v-else :tenant-info="tenantInfo">
+  <OnlineContractLayout v-else key="content" :tenant-info="tenantInfo">
     <!-- Resend-style Minimalist Hero Section (Mobile Optimized) -->
     <section class="pt-2 sm:pt-6 pb-10 sm:pb-14 border-b border-zinc-200/80 dark:border-zinc-800/80">
       <div class="max-w-3xl">
@@ -288,8 +290,9 @@ onMounted(() => {
       <!-- Tariffs Grid -->
       <div v-if="filteredTariffs.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
         <div
-          v-for="tariff in filteredTariffs"
+          v-for="(tariff, tariffIdx) in filteredTariffs"
           :key="tariff.id"
+          v-reveal="Math.min(tariffIdx, 6) * 40"
           class="group relative bg-white dark:bg-zinc-900/40 border border-zinc-200/80 dark:border-zinc-800/80 hover:border-zinc-400 dark:hover:border-zinc-600 rounded-xl p-5 sm:p-6 transition-all duration-200 flex flex-col justify-between shadow-2xs hover:shadow-xs"
         >
           <div>
@@ -406,7 +409,7 @@ onMounted(() => {
 
       <div class="grid grid-cols-1 md:grid-cols-3 gap-3.5 sm:gap-6">
         <!-- Step 1 -->
-        <div class="p-4 sm:p-5 rounded-xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-zinc-900/40">
+        <div v-reveal="0" class="p-4 sm:p-5 rounded-xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-zinc-900/40">
           <div class="font-mono text-xs font-bold text-zinc-400 mb-2 sm:mb-3">01</div>
           <h3 class="text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-1 sm:mb-1.5">
             Shartnomani tanlang va yuklab oling
@@ -417,7 +420,7 @@ onMounted(() => {
         </div>
 
         <!-- Step 2 -->
-        <div class="p-4 sm:p-5 rounded-xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-zinc-900/40">
+        <div v-reveal="60" class="p-4 sm:p-5 rounded-xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-zinc-900/40">
           <div class="font-mono text-xs font-bold text-zinc-400 mb-2 sm:mb-3">02</div>
           <h3 class="text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-1 sm:mb-1.5">
             Ma'lumotlarni onlayn kiriting
@@ -428,7 +431,7 @@ onMounted(() => {
         </div>
 
         <!-- Step 3 -->
-        <div class="p-4 sm:p-5 rounded-xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-zinc-900/40">
+        <div v-reveal="120" class="p-4 sm:p-5 rounded-xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-zinc-900/40">
           <div class="font-mono text-xs font-bold text-zinc-400 mb-2 sm:mb-3">03</div>
           <h3 class="text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-1 sm:mb-1.5">
             Elektron imzolang va tasdiqlang
@@ -458,7 +461,7 @@ onMounted(() => {
       <!-- 4 Pillars Grid -->
       <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5 sm:gap-5 mb-6 sm:mb-8">
         <!-- Pillar 1 -->
-        <div class="p-4 sm:p-6 rounded-xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-zinc-900/40">
+        <div v-reveal="0" class="p-4 sm:p-6 rounded-xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-zinc-900/40">
           <div class="flex items-center justify-between mb-3 sm:mb-4">
             <div class="w-8 sm:w-9 h-8 sm:h-9 rounded-lg bg-zinc-100 dark:bg-zinc-850 flex items-center justify-center text-zinc-900 dark:text-zinc-100 border border-zinc-200/60 dark:border-zinc-800">
               <Scale class="w-4 h-4" />
@@ -476,7 +479,7 @@ onMounted(() => {
         </div>
 
         <!-- Pillar 2 -->
-        <div class="p-4 sm:p-6 rounded-xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-zinc-900/40">
+        <div v-reveal="60" class="p-4 sm:p-6 rounded-xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-zinc-900/40">
           <div class="flex items-center justify-between mb-3 sm:mb-4">
             <div class="w-8 sm:w-9 h-8 sm:h-9 rounded-lg bg-zinc-100 dark:bg-zinc-850 flex items-center justify-center text-zinc-900 dark:text-zinc-100 border border-zinc-200/60 dark:border-zinc-800">
               <Lock class="w-4 h-4" />
@@ -494,7 +497,7 @@ onMounted(() => {
         </div>
 
         <!-- Pillar 3 -->
-        <div class="p-4 sm:p-6 rounded-xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-zinc-900/40">
+        <div v-reveal="120" class="p-4 sm:p-6 rounded-xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-zinc-900/40">
           <div class="flex items-center justify-between mb-3 sm:mb-4">
             <div class="w-8 sm:w-9 h-8 sm:h-9 rounded-lg bg-zinc-100 dark:bg-zinc-850 flex items-center justify-center text-zinc-900 dark:text-zinc-100 border border-zinc-200/60 dark:border-zinc-800">
               <QrCode class="w-4 h-4" />
@@ -512,7 +515,7 @@ onMounted(() => {
         </div>
 
         <!-- Pillar 4 -->
-        <div class="p-4 sm:p-6 rounded-xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-zinc-900/40">
+        <div v-reveal="180" class="p-4 sm:p-6 rounded-xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-zinc-900/40">
           <div class="flex items-center justify-between mb-3 sm:mb-4">
             <div class="w-8 sm:w-9 h-8 sm:h-9 rounded-lg bg-zinc-100 dark:bg-zinc-850 flex items-center justify-center text-zinc-900 dark:text-zinc-100 border border-zinc-200/60 dark:border-zinc-800">
               <KeyRound class="w-4 h-4" />
@@ -565,8 +568,9 @@ onMounted(() => {
 
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
         <div
-          v-for="office in tenantInfo?.offices || []"
+          v-for="(office, officeIdx) in tenantInfo?.offices || []"
           :key="office.id"
+          v-reveal="Math.min(officeIdx, 6) * 40"
           class="p-3.5 sm:p-4 rounded-xl bg-white dark:bg-zinc-900/40 border border-zinc-200/80 dark:border-zinc-800/80 flex items-center gap-3 shadow-2xs"
         >
           <div class="w-8 h-8 rounded-lg bg-zinc-100 dark:bg-zinc-850 border border-zinc-200/60 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 flex items-center justify-center shrink-0">
@@ -592,4 +596,16 @@ onMounted(() => {
       @close="isPreviewModalOpen = false"
     />
   </OnlineContractLayout>
+  </Transition>
 </template>
+
+<style scoped>
+.page-fade-enter-active,
+.page-fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+.page-fade-enter-from,
+.page-fade-leave-to {
+  opacity: 0;
+}
+</style>

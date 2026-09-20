@@ -11,6 +11,21 @@ img {
   display: inline-block;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
 :root {
   font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --background: #f8fafc;
@@ -95,6 +110,20 @@ button, input, select, textarea, optgroup {
 
 .animate-fade-in {
   animation: fadeIn 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Page/panel-level entrance - a touch more pronounced than .animate-fade-in
+   since it's meant for a whole view swapping in (page body, modal, dropdown),
+   not an inline element. Was referenced across the app (ContractsPage,
+   SettingsPage, several modals) without ever being defined, so those spots
+   silently got no animation at all until now. */
+@keyframes pageIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-page-in {
+  animation: pageIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 /* Drawer animations matching UniApp2 */
