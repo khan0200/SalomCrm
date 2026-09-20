@@ -10,6 +10,7 @@ from .serializers import (
     CustomTokenObtainPairSerializer, UserSerializer,
     UserCreateUpdateSerializer, ChangePasswordSerializer
 )
+from .models import UserRole
 from .telegram_auth import verify_telegram_authorization
 
 User = get_user_model()
@@ -209,14 +210,19 @@ class UserViewSet(viewsets.ModelViewSet):
         # when a Super Admin switches into a tenant's context. Ignoring it here
         # leaked every tenant's users into that tenant's Staff page.
         tenant = getattr(self.request, 'tenant', None) or getattr(user, 'tenant', None)
+        # This endpoint backs the internal Staff page only (see staffApi.getStaff),
+        # never a "list every account" view - a student who registers to sign an
+        # online contract gets a User row too (role=STUDENT), and without this
+        # exclusion every one of them showed up in the team members table.
+        base = User.objects.exclude(role=UserRole.STUDENT)
         if user.is_superuser or getattr(user, 'role', '') == 'SUPER_ADMIN':
             tenant_id = self.request.query_params.get('tenant_id')
             if tenant_id:
-                return User.objects.filter(tenant_id=tenant_id)
+                return base.filter(tenant_id=tenant_id)
             if tenant:
-                return User.objects.filter(tenant=tenant)
-            return User.objects.all()
-        return User.objects.filter(tenant=tenant)
+                return base.filter(tenant=tenant)
+            return base
+        return base.filter(tenant=tenant)
 
     def _target_tenant(self):
         """
