@@ -18,6 +18,7 @@ import {
   ArchiveRestore,
 } from 'lucide-vue-next'
 import BaseModal from '@/components/common/BaseModal.vue'
+import { useAuthStore } from '@/stores/auth'
 import { contractsApi, type Contract } from '@/api/contracts'
 import { downloadContractAsPdf } from '@/modules/contracts/utils/contractPdf'
 import {
@@ -31,6 +32,8 @@ const props = defineProps<{
   isOpen: boolean
   contract: Contract | null
 }>()
+
+const authStore = useAuthStore()
 
 const emit = defineEmits<{
   close: []
@@ -287,7 +290,7 @@ function formatRejectionDate(dateStr?: string | null): string {
       <div class="flex items-center gap-2 flex-wrap" v-if="activeContract">
         <!-- Tasdiqlash kodi: generatsiya qilish (Pending, kod hali yo'q) -->
         <button
-          v-if="activeContract.status === 'pending' && !activeContract.verification_code"
+          v-if="activeContract.status === 'pending' && !activeContract.verification_code && authStore.isManager"
           type="button"
           @click="emit('assign', activeContract)"
           class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-black text-white dark:bg-zinc-100 dark:hover:bg-white dark:text-zinc-950 text-xs font-medium shadow-2xs transition-all active:scale-[0.98] cursor-pointer"
@@ -315,6 +318,7 @@ function formatRejectionDate(dateStr?: string | null): string {
             </button>
           </div>
           <button
+            v-if="authStore.isManager"
             type="button"
             @click="emit('regenerate', activeContract)"
             class="p-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 text-zinc-400 hover:text-amber-600 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
@@ -326,7 +330,7 @@ function formatRejectionDate(dateStr?: string | null): string {
 
         <!-- Bekor qilish (Reject - Pending yoki Verified holatida) -->
         <button
-          v-if="activeContract.status === 'pending' || activeContract.status === 'verified'"
+          v-if="(activeContract.status === 'pending' || activeContract.status === 'verified') && authStore.isManager"
           type="button"
           @click="emit('reject', activeContract)"
           class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-rose-200 dark:border-rose-900/60 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-xs font-medium transition-colors cursor-pointer"
@@ -338,7 +342,7 @@ function formatRejectionDate(dateStr?: string | null): string {
 
         <!-- Shartnomani butunlay o'chirish (Permanently Delete - Faqat Rejected holatida) -->
         <button
-          v-if="activeContract.status === 'rejected'"
+          v-if="activeContract.status === 'rejected' && authStore.isManager"
           type="button"
           @click="emit('delete', activeContract)"
           class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-rose-200 dark:border-rose-900/60 bg-rose-50/80 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/60 text-xs font-medium transition-all shadow-2xs cursor-pointer active:scale-95"
@@ -350,6 +354,7 @@ function formatRejectionDate(dateStr?: string | null): string {
 
         <!-- Arxivlash / Arxivdan qaytarish (istalgan holatdagi shartnoma uchun) -->
         <button
+          v-if="authStore.isManager"
           type="button"
           @click="activeContract.is_archived ? emit('unarchive', activeContract) : emit('archive', activeContract)"
           class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-all shadow-2xs cursor-pointer active:scale-95"

@@ -1265,17 +1265,20 @@ async function handleUnarchive(contract: Contract) {
                             </span>
                           </div>
 
-                          <!-- Tasdiqlash Button (if code not generated yet) -->
-                          <button
-                            v-if="!contract.verification_code"
-                            type="button"
-                            @click.stop="openAssignModal(contract)"
-                            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-black text-white dark:bg-zinc-100 dark:hover:bg-white dark:text-zinc-950 text-xs font-medium shadow-2xs transition-all active:scale-[0.98] cursor-pointer"
-                            title="Student ID biriktirish va tasdiqlash kodi berish"
-                          >
-                            <KeyRound class="w-3.5 h-3.5 text-zinc-300 dark:text-zinc-600" />
-                            <span>Tasdiqlash</span>
-                          </button>
+                          <!-- Tasdiqlash Button (if code not generated yet) - Manager+ only,
+                               matches the rest of the app's "Staff views, doesn't confirm" rule -->
+                          <template v-if="!contract.verification_code">
+                            <button
+                              v-if="authStore.isManager"
+                              type="button"
+                              @click.stop="openAssignModal(contract)"
+                              class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-black text-white dark:bg-zinc-100 dark:hover:bg-white dark:text-zinc-950 text-xs font-medium shadow-2xs transition-all active:scale-[0.98] cursor-pointer"
+                              title="Student ID biriktirish va tasdiqlash kodi berish"
+                            >
+                              <KeyRound class="w-3.5 h-3.5 text-zinc-300 dark:text-zinc-600" />
+                              <span>Tasdiqlash</span>
+                            </button>
+                          </template>
 
                           <!-- If Code Already Generated: Show Code + Copy + Regenerate -->
                           <template v-else>
@@ -1292,6 +1295,7 @@ async function handleUnarchive(contract: Contract) {
                               </button>
                             </div>
                             <button
+                              v-if="authStore.isManager"
                               type="button"
                               @click.stop="handleRegenerateCode(contract)"
                               :disabled="isRegenerating"
@@ -1319,6 +1323,7 @@ async function handleUnarchive(contract: Contract) {
                           </div>
 
                           <button
+                            v-if="authStore.isManager"
                             type="button"
                             @click.stop="deletingContract = contract"
                             class="p-1.5 rounded-lg border border-rose-200 dark:border-rose-900/60 bg-rose-50/70 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/60 transition-all cursor-pointer shadow-2xs active:scale-95"
@@ -1352,8 +1357,9 @@ async function handleUnarchive(contract: Contract) {
                           <Eye class="w-3.5 h-3.5" />
                         </button>
 
-                        <!-- Archive / Unarchive: available for any status, always shown -->
+                        <!-- Archive / Unarchive: available for any status, Manager+ only -->
                         <button
+                          v-if="authStore.isManager"
                           type="button"
                           @click.stop="contract.is_archived ? handleUnarchive(contract) : handleArchive(contract)"
                           class="p-1.5 rounded-lg border transition-all cursor-pointer shadow-2xs active:scale-95 shrink-0"

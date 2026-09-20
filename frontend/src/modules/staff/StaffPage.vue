@@ -10,7 +10,7 @@ import {
   Users, Plus, Loader2, Mail, ShieldCheck, Pencil, Trash2, AlertTriangle,
   ShieldAlert, CheckCircle2, XCircle, Eye, Edit3, Trash, CreditCard,
   UserCog, BarChart2, Settings, BookOpen, FolderOpen, Crown, Shield, User,
-  Building2
+  Building2, FileSignature
 } from 'lucide-vue-next'
 
 import AddStaffModal from './components/AddStaffModal.vue'
@@ -202,9 +202,25 @@ const permissionGroups: PermGroup[] = [
       { label: "To'lovlar sahifasini ko'rish", headManager: 'full', manager: 'full', staff: 'none', note: "Staff kira olmaydi" },
       { label: "To'lov qo'shish", headManager: 'full', manager: 'full', staff: 'none' },
       { label: "To'lovni tahrirlash", headManager: 'full', manager: 'full', staff: 'none' },
-      { label: "To'lovni o'chirish", headManager: 'full', manager: 'none', staff: 'none', note: 'Faqat Head Manager' },
+      { label: "To'lovni o'chirish", headManager: 'full', manager: 'full', staff: 'none' },
       { label: "Hisobot / statistikani ko'rish", headManager: 'full', manager: 'full', staff: 'none' },
       { label: "Pul chiqarish (Withdraw)", headManager: 'full', manager: 'full', staff: 'none' },
+    ],
+  },
+  {
+    category: 'Shartnomalar (Contracts)',
+    icon: FileSignature,
+    color: 'teal',
+    rows: [
+      { label: "Shartnomalar jadvalini ko'rish", headManager: 'full', manager: 'full', staff: 'full' },
+      { label: 'Yangi shartnoma yaratish / nusxalash (qoralama)', headManager: 'full', manager: 'full', staff: 'full' },
+      { label: "Tarif/kafillik shablon matnini tahrirlash", headManager: 'full', manager: 'full', staff: 'none' },
+      { label: "Student ID biriktirish va tasdiqlash kodi berish", headManager: 'full', manager: 'full', staff: 'none' },
+      { label: 'Tasdiqlash kodini qayta generatsiya qilish', headManager: 'full', manager: 'full', staff: 'none' },
+      { label: 'Shartnomani rad etish (bekor qilish)', headManager: 'full', manager: 'full', staff: 'none' },
+      { label: 'Arxivlash / arxivdan qaytarish', headManager: 'full', manager: 'full', staff: 'none' },
+      { label: "Rad etilgan shartnomani butunlay o'chirish", headManager: 'full', manager: 'full', staff: 'none' },
+      { label: "Shartnomani ko'rish / PDF yuklab olish", headManager: 'full', manager: 'full', staff: 'full' },
     ],
   },
   {
@@ -238,7 +254,7 @@ const permissionGroups: PermGroup[] = [
       { label: "Tarif rejalarini boshqarish", headManager: 'full', manager: 'full', staff: 'none' },
       { label: "Custom taglarni boshqarish", headManager: 'full', manager: 'full', staff: 'none' },
       { label: "Universitetlarni boshqarish", headManager: 'full', manager: 'full', staff: 'none' },
-      { label: "Ofislarni boshqarish", headManager: 'full', manager: 'none', staff: 'none', note: 'Faqat Head Manager' },
+      { label: "Ofislarni boshqarish", headManager: 'full', manager: 'full', staff: 'none' },
       { label: "Koordinatorlarni boshqarish", headManager: 'full', manager: 'full', staff: 'none' },
     ],
   },
@@ -263,6 +279,7 @@ const colorMap: Record<string, { bg: string; text: string; border: string; icon:
   amber:   { bg: 'bg-amber-50 dark:bg-amber-950/30',   text: 'text-amber-700 dark:text-amber-300',   border: 'border-amber-200 dark:border-amber-800',   icon: 'text-amber-500' },
   rose:    { bg: 'bg-rose-50 dark:bg-rose-950/30',     text: 'text-rose-700 dark:text-rose-300',     border: 'border-rose-200 dark:border-rose-800',     icon: 'text-rose-500' },
   indigo:  { bg: 'bg-indigo-50 dark:bg-indigo-950/30',  text: 'text-indigo-700 dark:text-indigo-300',  border: 'border-indigo-200 dark:border-indigo-800',  icon: 'text-indigo-500' },
+  teal:    { bg: 'bg-teal-50 dark:bg-teal-950/30',     text: 'text-teal-700 dark:text-teal-300',     border: 'border-teal-200 dark:border-teal-800',     icon: 'text-teal-500' },
 }
 </script>
 
@@ -492,7 +509,7 @@ const colorMap: Record<string, { bg: string; text: string; border: string; icon:
             </div>
           </div>
           <p class="text-[10px] text-amber-700 dark:text-amber-300 leading-relaxed">
-            Talabalar, to'lovlar va sozlamalarni boshqara oladi. Lekin xodimlarni qo'sha olmaydi va to'lovlarni o'chira olmaydi.
+            Talabalar, to'lovlar, shartnomalar va sozlamalarni to'liq boshqara oladi. Lekin xodimlar bo'limiga kira olmaydi.
           </p>
         </div>
         <!-- Staff -->
@@ -507,7 +524,7 @@ const colorMap: Record<string, { bg: string; text: string; border: string; icon:
             </div>
           </div>
           <p class="text-[10px] text-zinc-600 dark:text-zinc-400 leading-relaxed">
-            Faqat talabalar ro'yxatini ko'rish va o'z profilini tahrirlash imkoniyatiga ega. To'lovlar va sozlamalarga kirish yo'q.
+            Talabalar ro'yxatini ko'rish, shartnoma yaratish/ko'rish va o'z profilini tahrirlash imkoniyatiga ega. To'lovlar, sozlamalar va shartnomani tasdiqlash/rad etish/o'chirishga kirish yo'q.
           </p>
         </div>
       </div>

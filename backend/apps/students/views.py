@@ -2116,6 +2116,23 @@ class ContractViewSet(viewsets.ModelViewSet):
     permission_classes = [IsTenantUser]
     pagination_class = None
 
+    # STAFF may view and create/duplicate contracts, matching every other
+    # module's "view + create, no destructive actions" rule - but every
+    # agency-facing action here (assigning a Student ID, generating or
+    # regenerating the verification code, rejecting, archiving, or deleting)
+    # used to run under the class-level IsTenantUser too, silently letting
+    # STAFF do everything a Manager can on live contracts. Those specific
+    # actions now require Manager+.
+    MANAGER_ONLY_ACTIONS = {
+        'destroy', 'archive', 'unarchive',
+        'assign_student_id', 'regenerate_code', 'reject_contract',
+    }
+
+    def get_permissions(self):
+        if self.action in self.MANAGER_ONLY_ACTIONS:
+            return [IsTenantManager()]
+        return super().get_permissions()
+
     def get_queryset(self):
         req: Any = self.request
         user = req.user
