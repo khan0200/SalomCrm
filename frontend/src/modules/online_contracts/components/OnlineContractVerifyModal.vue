@@ -95,7 +95,10 @@ async function handleDownloadPdf() {
       { top: 15, right: 15, bottom: 15, left: 15 },
       variableValues,
       detail.signature_data,
-      verificationMeta
+      verificationMeta,
+      detail.is_minor && detail.guardian_contract_text
+        ? { content: detail.guardian_contract_text, variableValues }
+        : undefined
     )
   } catch (err) {
     console.error('Failed to download PDF:', err)
