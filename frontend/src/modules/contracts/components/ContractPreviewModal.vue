@@ -423,8 +423,12 @@ function formatRejectionDate(dateStr?: string | null): string {
       </div>
     </div>
 
-    <!-- Scrollable Multi-Page A4 Document Sheet View -->
-    <div class="p-4 sm:p-8 bg-zinc-100 dark:bg-zinc-950 max-h-[78vh] overflow-y-auto flex flex-col items-center gap-8">
+    <!-- Multi-Page A4 Document Sheet View - scrolling lives on BaseModal's own
+         body wrapper (max-h-[75vh] overflow-y-auto around the whole slot);
+         a second overflow-y-auto here nested two nested scroll containers
+         with mismatched heights, so scrolling either one stopped short of
+         the real bottom and both scrollbars showed up side by side. -->
+    <div class="p-4 sm:p-8 bg-zinc-100 dark:bg-zinc-950 flex flex-col items-center gap-8">
       <div v-if="isLoadingDetail" class="py-16 flex flex-col items-center justify-center text-zinc-400 gap-2">
         <Loader2 class="w-7 h-7 animate-spin text-blue-600 mb-2" />
         <span class="text-xs font-mono">Shartnoma ma'lumotlari yuklanmoqda...</span>
