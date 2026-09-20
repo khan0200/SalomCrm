@@ -468,6 +468,7 @@ class ContractDetailSerializer(serializers.ModelSerializer):
     updated_by_name = serializers.SerializerMethodField()
     rejected_by_name = serializers.SerializerMethodField()
     email = serializers.SerializerMethodField()
+    guardian_contract_text = serializers.SerializerMethodField()
 
     class Meta:
         model = Contract
@@ -480,6 +481,7 @@ class ContractDetailSerializer(serializers.ModelSerializer):
             'education_level', 'date_of_birth', 'office', 'phone1', 'phone2',
             'signature_data', 'is_minor', 'guardian_full_name', 'guardian_passport_number',
             'guardian_relation', 'guardian_phone', 'guardian_address', 'guardian_signature_data',
+            'guardian_contract_text',
             'declarations_accepted', 'agreement_confirmations',
             'contract_hash', 'student_id_assigned', 'verification_code',
             'verification_code_expires_at', 'verification_code_generated_at',
@@ -527,6 +529,16 @@ class ContractDetailSerializer(serializers.ModelSerializer):
         if obj.snapshot_data and isinstance(obj.snapshot_data, dict):
             return obj.snapshot_data.get('email', '')
         return ''
+
+    def get_guardian_contract_text(self, obj):
+        # Staff-facing counterpart of the same field on the public/student
+        # endpoints (PublicContractDetailView, PublicVerifyContractView) -
+        # without this, downloading a minor's contract from the internal
+        # Contracts admin never included the guardian consent appendix pages.
+        if not obj.is_minor:
+            return ''
+        from .services import get_guardian_contract_text
+        return get_guardian_contract_text(obj.tenant)
 
 
 class ContractCreateUpdateSerializer(serializers.ModelSerializer):

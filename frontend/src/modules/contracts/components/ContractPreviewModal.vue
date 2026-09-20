@@ -167,7 +167,10 @@ async function handleDownload(format: 'pdf' | 'doc' = 'pdf') {
       { top: 20, right: 15, bottom: 20, left: 25 },
       contractVariables.value,
       c.signature_data || undefined,
-      verificationMeta
+      verificationMeta,
+      c.is_minor && c.guardian_contract_text
+        ? { content: c.guardian_contract_text, variableValues: contractVariables.value }
+        : undefined
     )
   } catch (err) {
     console.error('Failed to download PDF:', err)

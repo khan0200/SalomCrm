@@ -33,6 +33,14 @@ export interface Contract {
   phone1?: string | null
   phone2?: string | null
   signature_data?: string | null
+  is_minor?: boolean
+  guardian_full_name?: string | null
+  guardian_passport_number?: string | null
+  guardian_relation?: string | null
+  guardian_phone?: string | null
+  guardian_address?: string | null
+  guardian_signature_data?: string | null
+  guardian_contract_text?: string | null
   student_id_assigned?: string | null
   verification_code?: string | null
   verification_code_expires_at?: string | null

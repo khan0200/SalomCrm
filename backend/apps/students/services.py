@@ -131,3 +131,28 @@ def permanent_delete_student(student, user=None):
             description=f"Student {student.id} ({student.full_name}) marked as permanently deleted (data retained)."
         )
         return student
+
+
+# Must match the literal name seeded per-tenant in
+# students/migrations/0019_add_guardian_appendix_tariff.py and used as the
+# default in default_options.py's seed_default_options.
+GUARDIAN_TARIFF_NAME = "Kafillik shartnomasi (18 yoshga to'lmaganlar uchun)"
+
+
+def get_guardian_contract_text(tenant) -> str:
+    """
+    The guardian appendix's `contract_text` is looked up live (not frozen at
+    signing time) so a staff edit in the Contracts menu is reflected the next
+    time anyone views or re-downloads an old minor's contract - unlike the
+    student's own contract snapshot, this text carries no per-student data of
+    its own to freeze. `is_active` is deliberately ignored here: the template
+    is kept inactive forever so it never appears as a pickable tariff on the
+    public signing form, but that must not hide it from this lookup too.
+
+    Shared by both the public online-contract endpoints and the internal
+    ContractDetailSerializer (staff-facing preview/PDF download), so a
+    minor's guardian appendix appears regardless of which side downloads it.
+    """
+    from .models import TariffOption
+    tariff = TariffOption.objects.filter(tenant=tenant, name=GUARDIAN_TARIFF_NAME).first()
+    return tariff.contract_text if tariff else ''

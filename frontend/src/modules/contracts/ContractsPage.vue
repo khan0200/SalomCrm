@@ -315,7 +315,10 @@ async function handleDownloadContract(contract: Contract, format: 'pdf' | 'doc' 
         { top: 20, right: 15, bottom: 20, left: 25 },
         variableValues,
         contract.signature_data || undefined,
-        verificationMeta
+        verificationMeta,
+        (contract as any).is_minor && (contract as any).guardian_contract_text
+          ? { content: (contract as any).guardian_contract_text, variableValues }
+          : undefined
       )
     } catch (e) {
       console.error('PDF download error:', e)
