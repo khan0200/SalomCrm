@@ -316,8 +316,8 @@ async function handleDownloadContract(contract: Contract, format: 'pdf' | 'doc' 
         variableValues,
         contract.signature_data || undefined,
         verificationMeta,
-        (contract as any).is_minor && (contract as any).guardian_contract_text
-          ? { content: (contract as any).guardian_contract_text, variableValues }
+        contract.is_minor && contract.guardian_contract_text
+          ? { content: contract.guardian_contract_text, variableValues }
           : undefined
       )
     } catch (e) {
