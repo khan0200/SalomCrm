@@ -1271,6 +1271,7 @@ onMounted(() => {
       contract-title="Kafillik to'g'risida shartnoma"
       :content="tenantInfo.guardian_contract_text"
       :variable-values="variableValues"
+      read-only
       @close="isGuardianContractViewerOpen = false"
     />
 

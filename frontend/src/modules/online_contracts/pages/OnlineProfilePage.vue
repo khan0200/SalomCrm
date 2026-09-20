@@ -49,6 +49,7 @@ const selectedContractForVerify = ref<OnlineContractSummary | null>(null)
 const isViewerModalOpen = ref(false)
 const viewerContractTitle = ref('')
 const viewerContractContent = ref('')
+const viewerAppendixContent = ref('')
 const viewerVariableValues = ref<Record<string, string>>({})
 
 const isCancelModalOpen = ref(false)
@@ -204,6 +205,7 @@ async function openViewContractModal(contract: OnlineContractSummary) {
     const detail = await onlineContractsApi.getContractDetail(contract.id)
     viewerContractTitle.value = `${detail.contract_number} — ${detail.title}`
     viewerContractContent.value = detail.content
+    viewerAppendixContent.value = detail.is_minor && detail.guardian_contract_text ? detail.guardian_contract_text : ''
     viewerVariableValues.value = buildVariableValues(detail, {
       contractNumber: detail.contract_number,
       price: detail.tariff_price,
@@ -695,7 +697,9 @@ function handleResubmit(contract: OnlineContractSummary) {
       :is-open="isViewerModalOpen"
       :contract-title="viewerContractTitle"
       :content="viewerContractContent"
+      :appendix-content="viewerAppendixContent"
       :variable-values="viewerVariableValues"
+      read-only
       @close="isViewerModalOpen = false"
     />
 

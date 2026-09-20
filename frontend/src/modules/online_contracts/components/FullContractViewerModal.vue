@@ -13,6 +13,17 @@ const props = defineProps<{
   contractTitle: string
   content: string
   variableValues?: Record<string, string>
+  /** A minor's guardian consent text - rendered as extra pages after the
+   * main contract, same as how the downloaded PDF appends it. */
+  appendixContent?: string
+  /**
+   * True when this is opened purely to re-read an already-signed contract
+   * (e.g. the student's own "Ko'rish" button on a verified contract) rather
+   * than as part of the signing flow - hides the "before signing, read
+   * carefully" framing and the "I've read it" confirmation bar, since
+   * neither means anything once the contract is already final.
+   */
+  readOnly?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -34,21 +45,21 @@ function resetZoom() {
   zoom.value = 0.85
 }
 
-const isCanvas = computed(() => isCanvasDocumentJson(props.content || ''))
+interface RenderedPage {
+  html: string
+  isCanvas: boolean
+}
 
-const renderedPages = computed<string[]>(() => {
-  const raw = props.content || ''
-  if (!raw) return ['<p style="text-align:center;color:#6b7280;margin-top:40px;">Shartnoma matni mavjud emas</p>']
+function pagesFromContent(raw: string, vars?: Record<string, string>): RenderedPage[] {
+  if (!raw) return []
 
   if (isCanvasDocumentJson(raw)) {
     const doc = deserializeCanvasDocument(raw)
     if (doc && doc.pages?.length) {
-      return doc.pages.map(page => {
-        return convertCanvasDocumentToHtml(
-          { ...doc, pages: [page] },
-          props.variableValues
-        )
-      })
+      return doc.pages.map(page => ({
+        html: convertCanvasDocumentToHtml({ ...doc, pages: [page] }, vars),
+        isCanvas: true,
+      }))
     }
   }
 
@@ -58,10 +69,19 @@ const renderedPages = computed<string[]>(() => {
     .replace(/(?:═{5,}\s*\d+-BET\s*═{5,}|={5,}\s*\d+-BET\s*={5,}|_{10,}\s*\d+-BET\s*_{10,})/gi, '<hr data-page-break="true" />')
 
   // Substitute variable values (or fallback placeholders)
-  cleaned = replaceVariablesInHtml(cleaned, props.variableValues || {})
+  cleaned = replaceVariablesInHtml(cleaned, vars || {})
 
   const parts = cleaned.split(/<hr[^>]*\/?>/i).map(p => p.trim()).filter(p => p.length > 0)
-  return parts.length > 0 ? parts : [cleaned]
+  return (parts.length > 0 ? parts : [cleaned]).map(html => ({ html, isCanvas: false }))
+}
+
+const renderedPages = computed<RenderedPage[]>(() => {
+  const mainPages = pagesFromContent(props.content || '', props.variableValues)
+  const appendixPages = pagesFromContent(props.appendixContent || '', props.variableValues)
+  const pages = [...mainPages, ...appendixPages]
+  return pages.length > 0
+    ? pages
+    : [{ html: '<p style="text-align:center;color:#6b7280;margin-top:40px;">Shartnoma matni mavjud emas</p>', isCanvas: false }]
 })
 
 function handleConfirm() {
@@ -90,7 +110,9 @@ function handleConfirm() {
               {{ contractTitle || "Shartnoma to'liq matni" }}
             </h3>
             <p class="text-xs text-zinc-500">
-              Shartnomani imzolashdan oldin barcha sahifalarni diqqat bilan o'qib chiqing.
+              {{ readOnly
+                ? "Shartnomaning to'liq matni"
+                : "Shartnomani imzolashdan oldin barcha sahifalarni diqqat bilan o'qib chiqing." }}
             </p>
           </div>
         </div>
@@ -140,14 +162,14 @@ function handleConfirm() {
       <!-- Contract A4 Pages Viewer Area -->
       <div class="flex-1 overflow-y-auto bg-zinc-200/70 dark:bg-zinc-950 p-6 flex flex-col items-center">
         <div
-          v-for="(pageHtml, idx) in renderedPages"
+          v-for="(page, idx) in renderedPages"
           :key="idx"
           class="relative bg-white text-zinc-900 shadow-2xl rounded-xs shrink-0 origin-top transition-transform"
           :style="{
             width: '210mm',
             minHeight: '297mm',
-            height: isCanvas ? '297mm' : 'auto',
-            padding: isCanvas ? '0' : '20mm 20mm',
+            height: page.isCanvas ? '297mm' : 'auto',
+            padding: page.isCanvas ? '0' : '20mm 20mm',
             transform: `scale(${zoom})`,
             transformOrigin: 'top center',
             marginBottom: `${(zoom - 1) * 297 * 3.78 + 24}px`,
@@ -155,21 +177,32 @@ function handleConfirm() {
             fontSize: '13px',
             lineHeight: '1.6',
             boxSizing: 'border-box',
-            overflow: isCanvas ? 'hidden' : 'visible'
+            overflow: page.isCanvas ? 'hidden' : 'visible'
           }"
         >
           <!-- Page Number Indicator (only for non-canvas) -->
-          <div v-if="!isCanvas" class="absolute right-4 bottom-3 text-[11px] text-zinc-400 select-none">
+          <div v-if="!page.isCanvas" class="absolute right-4 bottom-3 text-[11px] text-zinc-400 select-none">
             Sahifa {{ idx + 1 }} / {{ renderedPages.length }}
           </div>
 
           <!-- Page HTML Content -->
-          <div v-html="pageHtml" :class="{ 'legacy-contract-page text-justify': !isCanvas }" />
+          <div v-html="page.html" :class="{ 'legacy-contract-page text-justify': !page.isCanvas }" />
         </div>
       </div>
 
-      <!-- Bottom Confirmation Bar -->
-      <div class="px-6 py-4 border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex flex-col sm:flex-row items-center justify-between gap-3">
+      <!-- Bottom bar: read-only view just needs a close button - the
+           "I've read it" confirmation only makes sense while signing. -->
+      <div v-if="readOnly" class="px-6 py-4 border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex justify-end">
+        <button
+          type="button"
+          @click="emit('close')"
+          class="px-5 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+        >
+          Yopish
+        </button>
+      </div>
+
+      <div v-else class="px-6 py-4 border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex flex-col sm:flex-row items-center justify-between gap-3">
         <div class="text-xs text-zinc-500">
           Shartnomaning barcha sahifalari bilan tanishib chiqqaningizni tasdiqlang.
         </div>

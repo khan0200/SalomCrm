@@ -96,7 +96,32 @@ async function copyCodeToClipboard(code: string) {
 const isDownloadingPdf = ref(false)
 const showDownloadMenu = ref(false)
 
-const isCanvas = computed(() => isCanvasDocumentJson(activeContract.value?.content || ''))
+interface RenderedPage {
+  html: string
+  isCanvas: boolean
+}
+
+function pagesFromContent(raw: string | undefined, vars: Record<string, string>): RenderedPage[] {
+  if (!raw) return []
+
+  if (isCanvasDocumentJson(raw)) {
+    const doc = deserializeCanvasDocument(raw)
+    if (doc) {
+      return doc.pages.map(p => ({
+        html: convertCanvasDocumentToHtml({ ...doc, pages: [p] }, vars),
+        isCanvas: true,
+      }))
+    }
+  }
+
+  let cleaned = raw
+    .replace(/^[\s\S]*?(?:1-BET\s*═{5,}|1-BET\s*={5,}|={10,}\s*1-BET\s*={10,}|═{10,}\s*1-BET\s*═{10,})/i, '')
+    .replace(/(?:═{5,}\s*\d+-BET\s*═{5,}|={5,}\s*\d+-BET\s*={5,}|_{10,}\s*\d+-BET\s*_{10,})/gi, '<hr data-page-break="true" />')
+
+  cleaned = replaceVariablesInHtml(cleaned, vars)
+  const parts = cleaned.split(/<hr[^>]*\/?>/i).map(p => p.trim()).filter(p => p.length > 0)
+  return (parts.length > 0 ? parts : [cleaned]).map(html => ({ html, isCanvas: false }))
+}
 
 const contractVariables = computed<Record<string, string>>(() => {
   const c = activeContract.value
@@ -114,31 +139,17 @@ const contractVariables = computed<Record<string, string>>(() => {
   })
 })
 
-const splitPages = computed<string[]>(() => {
+const splitPages = computed<RenderedPage[]>(() => {
   const c = activeContract.value
-  const raw = c?.content
-  if (!raw) return []
-
-  if (isCanvasDocumentJson(raw)) {
-    const doc = deserializeCanvasDocument(raw)
-    if (doc) {
-      return doc.pages.map(p => {
-        return convertCanvasDocumentToHtml({
-          ...doc,
-          pages: [p],
-        }, contractVariables.value)
-      })
-    }
-  }
-
-  // Standardize any ASCII page markers
-  let cleaned = raw
-    .replace(/^[\s\S]*?(?:1-BET\s*═{5,}|1-BET\s*={5,}|={10,}\s*1-BET\s*={10,}|═{10,}\s*1-BET\s*═{10,})/i, '')
-    .replace(/(?:═{5,}\s*\d+-BET\s*═{5,}|={5,}\s*\d+-BET\s*={5,}|_{10,}\s*\d+-BET\s*_{10,})/gi, '<hr data-page-break="true" />')
-  
-  cleaned = replaceVariablesInHtml(cleaned, contractVariables.value)
-  const parts = cleaned.split(/<hr[^>]*\/?>/i).map(p => p.trim()).filter(p => p.length > 0)
-  return parts.length > 0 ? parts : [cleaned]
+  if (!c) return []
+  const mainPages = pagesFromContent(c.content, contractVariables.value)
+  // A minor's guardian consent appendix - same pages the PDF download
+  // appends, so "Ko'rish" in the internal Contracts admin matches what
+  // staff actually hand the student.
+  const appendixPages = c.is_minor
+    ? pagesFromContent(c.guardian_contract_text || '', contractVariables.value)
+    : []
+  return [...mainPages, ...appendixPages]
 })
 
 async function handleDownload(format: 'pdf' | 'doc' = 'pdf') {
@@ -420,21 +431,21 @@ function formatRejectionDate(dateStr?: string | null): string {
       </div>
       <template v-else-if="splitPages.length > 0">
         <div
-          v-for="(pageHtml, pageIndex) in splitPages"
+          v-for="(page, pageIndex) in splitPages"
           :key="pageIndex"
           class="preview-a4-sheet relative bg-white text-zinc-900 shadow-xl border border-zinc-200/90 font-serif rounded-xs"
-          :class="isCanvas ? 'is-canvas-sheet p-0 overflow-hidden w-[210mm] min-h-[297mm] shrink-0' : 'p-8 sm:p-14 min-h-[1050px] w-full max-w-[794px]'"
+          :class="page.isCanvas ? 'is-canvas-sheet p-0 overflow-hidden w-[210mm] min-h-[297mm] shrink-0' : 'p-8 sm:p-14 min-h-[1050px] w-full max-w-[794px]'"
           style="font-family: 'Times New Roman', Times, serif;"
         >
           <!-- Top Page badge (non-canvas only) -->
-          <div v-if="!isCanvas" class="absolute top-4 right-6 text-[10.5px] uppercase font-bold tracking-widest text-zinc-400 select-none no-print">
+          <div v-if="!page.isCanvas" class="absolute top-4 right-6 text-[10.5px] uppercase font-bold tracking-widest text-zinc-400 select-none no-print">
             Page {{ pageIndex + 1 }} / {{ splitPages.length }}
           </div>
 
-          <div v-html="pageHtml" />
+          <div v-html="page.html" />
 
           <!-- Bottom page footer (non-canvas only) -->
-          <div v-if="!isCanvas" class="absolute bottom-5 inset-x-0 text-center text-[11px] text-zinc-400 select-none font-serif tracking-widest no-print">
+          <div v-if="!page.isCanvas" class="absolute bottom-5 inset-x-0 text-center text-[11px] text-zinc-400 select-none font-serif tracking-widest no-print">
             — {{ pageIndex + 1 }} —
           </div>
         </div>

@@ -593,6 +593,7 @@ onMounted(() => {
       :is-open="isPreviewModalOpen"
       :contract-title="previewContractTitle"
       :content="previewContractContent"
+      read-only
       @close="isPreviewModalOpen = false"
     />
   </OnlineContractLayout>
