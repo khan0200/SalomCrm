@@ -4,9 +4,6 @@ venv/
 env/
 .env
 *.env
-*firebase-credentials*.json
-*firebase-adminsdk*.json
-*serviceAccountKey*.json
 
 # Python
 __pycache__/

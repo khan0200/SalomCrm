@@ -1,6 +1,5 @@
 import hashlib
 import json
-import secrets
 from datetime import timedelta
 from decimal import Decimal
 from django.utils import timezone
@@ -18,7 +17,6 @@ from apps.core.email_service import generate_numeric_otp, send_otp_email
 from .models import (
     StudentProfile,
     EmailVerificationCode,
-    PhoneVerificationRecord,
     Contract,
     ContractAuditEvent,
     TariffOption,
@@ -40,26 +38,6 @@ def normalize_code(val: str) -> str:
     if not val:
         return ''
     return val.strip().upper()
-
-
-def normalize_crm_phone(val: str) -> str:
-    """
-    Normalizes a phone string for CRM Student / Contract storage.
-    For Uzbek numbers: strips country code (+998) and returns bare local digits
-    formatted as 'XX-XXX-XX-XX' (e.g. '90-123-45-67') so that StudentDetailDrawer
-    and Student models display them as expected without country code.
-    For foreign/international numbers: preserves full international '+...' format.
-    """
-    if not val:
-        return ''
-    s = val.strip()
-    digits = ''.join(c for c in s if c.isdigit())
-    if s.startswith('+998') or s.startswith('998') or (not s.startswith('+') and len(digits) == 9):
-        uz_digits = digits[3:] if digits.startswith('998') else digits
-        if len(uz_digits) == 9:
-            return f"{uz_digits[0:2]}-{uz_digits[2:5]}-{uz_digits[5:7]}-{uz_digits[7:9]}"
-        return uz_digits
-    return s
 
 
 # Shared with ContractDetailSerializer (backend/apps/students/serializers.py)
@@ -180,124 +158,6 @@ class SendOtpView(APIView):
         return Response({
             'detail': 'Verification code sent to your email.',
             'expires_in_seconds': 600
-        }, status=status.HTTP_200_OK)
-
-
-class PhoneOtpRateThrottle(AnonRateThrottle):
-    """Rate limiter for phone OTP verification — max 5 attempts per minute per IP."""
-    rate = '5/min'
-
-
-class VerifyPhoneOtpView(APIView):
-    """
-    Public endpoint: POST /api/contracts/online/verify-phone/
-
-    Firebase Phone Auth idToken ni server-side da tekshirib, telefon raqami
-    kiritilgan phone bilan mosligini taqqoslaydi va session_token qaytaradi.
-
-    Frontend bu session_token ni localStorage da saqlaydi va keyinchalik
-    SubmitContractView ga phone1_session_token sifatida yuboradi.
-
-    Request body:
-      {
-        "id_token": "<firebase-id-token>",
-        "phone": "90-123-45-67",          # talaba kiritgan (local format)
-        "phone_type": "phone1",           # yoki "guardian_phone"
-        "tenant_slug": "salomkorea"
-      }
-
-    Response (200):
-      {
-        "verified": true,
-        "session_token": "abc123...",
-        "phone": "+998901234567",
-        "expires_in": 7200
-      }
-    """
-    permission_classes = [permissions.AllowAny]
-    throttle_classes = [PhoneOtpRateThrottle]
-
-    def post(self, request):
-        id_token = (request.data.get('id_token') or '').strip()
-        phone_local = (request.data.get('phone') or '').strip()
-        phone_type = (request.data.get('phone_type') or '').strip()
-        tenant_slug = (request.data.get('tenant_slug') or '').strip()
-
-        # --- 1. Input validation ---
-        if not id_token:
-            return Response({'detail': 'id_token talab qilinadi.'}, status=status.HTTP_400_BAD_REQUEST)
-
-        if phone_type not in ('phone1', 'guardian_phone'):
-            return Response(
-                {'detail': 'phone_type "phone1" yoki "guardian_phone" bo\'lishi kerak.'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        if not tenant_slug:
-            return Response({'detail': 'tenant_slug talab qilinadi.'}, status=status.HTTP_400_BAD_REQUEST)
-
-        tenant = Tenant.objects.filter(slug=tenant_slug, is_active=True).first()
-        if not tenant:
-            return Response({'detail': 'Tenant topilmadi yoki faol emas.'}, status=status.HTTP_404_NOT_FOUND)
-
-        # --- 2. Firebase token verification ---
-        try:
-            from config.firebase import verify_firebase_phone_token
-            firebase_phone, firebase_uid = verify_firebase_phone_token(id_token)
-        except FileNotFoundError as exc:
-            return Response(
-                {'detail': f'Firebase sozlanmagan: {exc}'},
-                status=status.HTTP_503_SERVICE_UNAVAILABLE
-            )
-        except Exception as exc:
-            return Response(
-                {'detail': f'Firebase token noto\'g\'ri yoki muddati o\'tgan: {exc}'},
-                status=status.HTTP_401_UNAUTHORIZED
-            )
-
-        # --- 3. Phone number match check ---
-        # Normalize digits:
-        # If Uzbek: compare 9 local digits
-        # If international (e.g. +82...): compare all digits
-        fb_digits = ''.join(c for c in firebase_phone if c.isdigit())
-        in_digits = ''.join(c for c in phone_local if c.isdigit())
-
-        fb_cmp = fb_digits[3:] if fb_digits.startswith('998') else fb_digits
-        in_cmp = in_digits[3:] if in_digits.startswith('998') else in_digits
-
-        if not fb_cmp or fb_cmp != in_cmp:
-            return Response(
-                {
-                    'detail': (
-                        'Tasdiqlangan telefon raqami kiritilgan raqam bilan mos kelmadi. '
-                        'Iltimos, aynan shu raqamga SMS yuborilganini tekshiring.'
-                    )
-                },
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        # --- 4. Create session token and record ---
-        now = timezone.now()
-        session_token = secrets.token_hex(32)   # 64 ta hexadecimal belgi
-        expires_at = now + timedelta(hours=2)
-
-        PhoneVerificationRecord.objects.create(
-            phone=firebase_phone,
-            phone_local=phone_local,
-            phone_type=phone_type,
-            tenant=tenant,
-            firebase_uid=firebase_uid,
-            session_token=session_token,
-            expires_at=expires_at,
-            is_used=False,
-            ip_address=get_client_ip(request),
-        )
-
-        return Response({
-            'verified': True,
-            'session_token': session_token,
-            'phone': firebase_phone,
-            'expires_in': 7200,
         }, status=status.HTTP_200_OK)
 
 
@@ -622,41 +482,6 @@ class SubmitContractView(APIView):
         if not signature_data or not signature_data.startswith('data:image/'):
             return Response({'detail': 'A valid electronic signature is required.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # 4a. Phone1 verification token check
-        # Talaba phone1 ni Firebase Phone Auth bilan tasdiqlab, session_token olishi shart.
-        phone1_session_token = (data.get('phone1_session_token') or '').strip()
-        if not phone1_session_token:
-            return Response(
-                {'detail': 'Mobil telefon 1 tasdiqlanmagan. Iltimos, telefon raqamingizni SMS orqali tasdiqlang.'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        now_ts = timezone.now()
-        phone1_record = PhoneVerificationRecord.objects.filter(
-            session_token=phone1_session_token,
-            phone_type='phone1',
-            tenant=tenant,
-            is_used=False,
-            expires_at__gt=now_ts,
-        ).first()
-
-        if not phone1_record:
-            return Response(
-                {'detail': 'Telefon tasdiqlash sessiyasi topilmadi yoki muddati o\'tgan. Qayta tasdiqlang.'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        # phone1 raqami session da saqlangan raqam bilan mos kelishini tekshirish
-        p1_fb = ''.join(c for c in phone1_record.phone if c.isdigit())
-        p1_in = ''.join(c for c in phone1 if c.isdigit())
-        p1_fb_cmp = p1_fb[3:] if p1_fb.startswith('998') else p1_fb
-        p1_in_cmp = p1_in[3:] if p1_in.startswith('998') else p1_in
-        if p1_fb_cmp != p1_in_cmp:
-            return Response(
-                {'detail': 'Tasdiqlangan telefon 1 raqami kiritilgan raqam bilan mos kelmadi.'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
         # 4b. Minor detection (Fuqarolik kodeksi 27-modda): under 18 at signing
         # time requires a parent/guardian's own consent and signature, or the
         # contract is not validly formed at all.
@@ -695,38 +520,6 @@ class SubmitContractView(APIView):
             if not guardian_signature_data or not guardian_signature_data.startswith('data:image/'):
                 return Response({'detail': "Kafilning elektron imzosi kiritilishi shart."}, status=status.HTTP_400_BAD_REQUEST)
 
-            # Guardian phone verification token check
-            guardian_phone_session_token = (data.get('guardian_phone_session_token') or '').strip()
-            if not guardian_phone_session_token:
-                return Response(
-                    {'detail': 'Kafil telefon raqami tasdiqlanmagan. Kafilning telefoniga SMS yuborib, tasdiqlang.'},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-
-            guardian_phone_record = PhoneVerificationRecord.objects.filter(
-                session_token=guardian_phone_session_token,
-                phone_type='guardian_phone',
-                tenant=tenant,
-                is_used=False,
-                expires_at__gt=now_ts,
-            ).first()
-
-            if not guardian_phone_record:
-                return Response(
-                    {'detail': 'Kafil telefon tasdiqlash sessiyasi topilmadi yoki muddati o\'tgan. Qayta tasdiqlang.'},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-
-            g_fb = ''.join(c for c in guardian_phone_record.phone if c.isdigit())
-            g_in = ''.join(c for c in guardian_phone if c.isdigit())
-            g_fb_cmp = g_fb[3:] if g_fb.startswith('998') else g_fb
-            g_in_cmp = g_in[3:] if g_in.startswith('998') else g_in
-            if g_fb_cmp != g_in_cmp:
-                return Response(
-                    {'detail': 'Tasdiqlangan kafil telefon raqami kiritilgan raqam bilan mos kelmadi.'},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-
         # 5. Declarations Checkboxes
         declarations = data.get('declarations') or {}
         decl1 = declarations.get('read_full_contract') or data.get('declaration_read') or False
@@ -743,14 +536,6 @@ class SubmitContractView(APIView):
         base_content = tariff.contract_text or ''
         now = timezone.now()
 
-        # Normalize phone numbers for storage:
-        # Uzbek numbers are stored as bare local digits 'XX-XXX-XX-XX' (without +998 country code)
-        # so StudentDetailDrawer and Student models format them as expected!
-        # International numbers (e.g. +82...) preserve full international format.
-        phone1_stored = normalize_crm_phone(phone1)
-        phone2_stored = normalize_crm_phone(phone2)
-        guardian_phone_stored = normalize_crm_phone(guardian_phone) if is_minor else ''
-
         # Build comprehensive snapshot
         snapshot_data = {
             'tariff_id': str(tariff.id),
@@ -761,8 +546,8 @@ class SubmitContractView(APIView):
             'education_level': education_level,
             'date_of_birth': date_of_birth,
             'office': office,
-            'phone1': phone1_stored,
-            'phone2': phone2_stored,
+            'phone1': phone1,
+            'phone2': phone2,
             'email': user.email,
             'tenant_name': tenant.name,
             'declarations': declarations,
@@ -771,7 +556,7 @@ class SubmitContractView(APIView):
             'guardian_full_name': guardian_full_name,
             'guardian_passport_number': guardian_passport_number,
             'guardian_relation': guardian_relation,
-            'guardian_phone': guardian_phone_stored,
+            'guardian_phone': guardian_phone,
             'guardian_address': guardian_address,
         }
 
@@ -796,14 +581,14 @@ class SubmitContractView(APIView):
             education_level=education_level,
             date_of_birth=date_of_birth,
             office=office,
-            phone1=phone1_stored,
-            phone2=phone2_stored,
+            phone1=phone1,
+            phone2=phone2,
             signature_data=signature_data,
             is_minor=is_minor,
             guardian_full_name=guardian_full_name,
             guardian_passport_number=guardian_passport_number,
             guardian_relation=guardian_relation,
-            guardian_phone=guardian_phone_stored,
+            guardian_phone=guardian_phone,
             guardian_address=guardian_address,
             guardian_signature_data=guardian_signature_data,
             declarations_accepted=True,
@@ -822,21 +607,11 @@ class SubmitContractView(APIView):
         profile, _ = StudentProfile.objects.get_or_create(user=user, defaults={'tenant': tenant})
         profile.passport_number = passport_number
         profile.date_of_birth = date_of_birth
-        profile.phone1 = phone1_stored
-        profile.phone2 = phone2_stored
+        profile.phone1 = phone1
+        profile.phone2 = phone2
         profile.education_level = education_level
         profile.office = office
         profile.save()
-
-        # Mark phone verification session tokens as used (one-time use)
-        phone1_record.is_used = True
-        phone1_record.save(update_fields=['is_used'])
-        if is_minor and 'guardian_phone_record' in dir():
-            try:
-                guardian_phone_record.is_used = True
-                guardian_phone_record.save(update_fields=['is_used'])
-            except Exception:
-                pass
 
         # Record Audit Log
         ContractAuditEvent.objects.create(
