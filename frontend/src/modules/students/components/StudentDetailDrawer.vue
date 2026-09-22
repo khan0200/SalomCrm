@@ -688,6 +688,18 @@ const computedBalance = computed(() => {
   return Math.abs(balance) < 0.01 ? 0 : balance
 })
 
+// Each finance widget shows what % of the tariff price it represents
+// (e.g. Discount of 1,160,000 on a tariff of 6,400,000 -> "18.12%")
+const percentOfTariff = (amount: number) => {
+  if (!computedTariffPrice.value) return null
+  return (amount / computedTariffPrice.value) * 100
+}
+const formatPercent = (value: number | null) => value === null ? null : `${value.toFixed(2)}%`
+
+const computedBalancePercent = computed(() => computedBalance.value === 0 ? 'FULL' : formatPercent(percentOfTariff(computedBalance.value)))
+const computedPaymentsDonePercent = computed(() => formatPercent(percentOfTariff(computedPaymentsDone.value)))
+const computedDiscountPercent = computed(() => formatPercent(percentOfTariff(computedDiscount.value)))
+
 // University Data from Settings
 const { data: settingsUniversitiesData } = useQuery({
   queryKey: ['settings-universities'],
@@ -2490,7 +2502,10 @@ const handleRestoreStudent = () => {
                         <span v-if="student.tariff" class="inline-flex self-start px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase bg-emerald-600 text-white shadow-2xs">
                           {{ student.tariff }}
                         </span>
-                        <span v-else class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
+                        <span v-if="student.tariff && computedTariffPrice > 0" class="text-[12px] font-bold text-zinc-600 dark:text-zinc-300">
+                          {{ formatCurrency(computedTariffPrice) }}
+                        </span>
+                        <span v-else-if="!student.tariff" class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
                       </div>
                     </div>
                   </div>
@@ -3179,8 +3194,9 @@ const handleRestoreStudent = () => {
                       </button>
                     </div>
                     <div v-if="isPaymentsLoading && !studentPaymentsData" class="h-5 w-28 bg-white/30 rounded-md animate-pulse mt-0.5" />
-                    <div v-else class="mt-0.5 text-[14.5px] font-extrabold tracking-tight font-mono leading-tight">
-                      {{ formatCurrency(computedBalance) }}
+                    <div v-else class="mt-0.5 flex items-baseline gap-1.5 flex-wrap">
+                      <span class="text-[14.5px] font-extrabold tracking-tight font-mono leading-tight">{{ formatCurrency(computedBalance) }}</span>
+                      <span v-if="computedBalancePercent" class="text-[11px] font-bold text-white/75">({{ computedBalancePercent }})</span>
                     </div>
                   </div>
 
@@ -3203,8 +3219,9 @@ const handleRestoreStudent = () => {
                       </button>
                     </div>
                     <div v-if="isPaymentsLoading && !studentPaymentsData" class="h-5 w-28 bg-white/30 rounded-md animate-pulse mt-0.5" />
-                    <div v-else class="mt-0.5 text-[14.5px] font-extrabold tracking-tight font-mono leading-tight">
-                      {{ formatCurrency(computedPaymentsDone) }}
+                    <div v-else class="mt-0.5 flex items-baseline gap-1.5 flex-wrap">
+                      <span class="text-[14.5px] font-extrabold tracking-tight font-mono leading-tight">{{ formatCurrency(computedPaymentsDone) }}</span>
+                      <span v-if="computedPaymentsDonePercent" class="text-[11px] font-bold text-white/75">({{ computedPaymentsDonePercent }})</span>
                     </div>
                   </div>
 
@@ -3227,8 +3244,9 @@ const handleRestoreStudent = () => {
                       </button>
                     </div>
                     <div v-if="isPaymentsLoading && !studentPaymentsData" class="h-5 w-24 bg-white/30 rounded-md animate-pulse mt-0.5" />
-                    <div v-else class="mt-0.5 text-[14.5px] font-extrabold tracking-tight font-mono leading-tight">
-                      {{ formatCurrency(computedDiscount) }}
+                    <div v-else class="mt-0.5 flex items-baseline gap-1.5 flex-wrap">
+                      <span class="text-[14.5px] font-extrabold tracking-tight font-mono leading-tight">{{ formatCurrency(computedDiscount) }}</span>
+                      <span v-if="computedDiscountPercent" class="text-[11px] font-bold text-white/75">({{ computedDiscountPercent }})</span>
                     </div>
                   </div>
 
