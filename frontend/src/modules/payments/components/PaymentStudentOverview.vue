@@ -47,7 +47,7 @@ const tariffRef = ref<HTMLElement | null>(null)
 const balanceRef = ref<HTMLElement | null>(null)
 const groupRef = ref<HTMLElement | null>(null)
 
-const STATUS_FILTER_OPTIONS = ['Active', 'Archive']
+const STATUS_FILTER_OPTIONS = ['Active', 'Archive', 'Permanently Deleted']
 
 const availableTariffs = computed<string[]>(() => {
   if (props.tariffOptions && props.tariffOptions.length > 0) {
@@ -165,7 +165,21 @@ onUnmounted(() => {
               :checked="selectedStatuses.includes(opt)"
               class="h-3.5 w-3.5 rounded border-zinc-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
             />
-            <span>{{ opt }}</span>
+            <span class="flex items-center gap-1.5">
+              <span
+                v-if="opt === 'Active'"
+                class="w-1.5 h-1.5 rounded-full bg-emerald-500"
+              />
+              <span
+                v-else-if="opt === 'Archive'"
+                class="w-1.5 h-1.5 rounded-full bg-amber-500"
+              />
+              <span
+                v-else
+                class="w-1.5 h-1.5 rounded-full bg-rose-500"
+              />
+              <span>{{ opt }}</span>
+            </span>
           </div>
         </div>
       </div>
@@ -449,8 +463,14 @@ onUnmounted(() => {
             {{ student.full_name }}
           </div>
           <span
-            v-if="student.is_deleted"
-            class="px-1.5 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20 shrink-0"
+            v-if="student.is_permanently_deleted"
+            class="px-1.5 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase bg-rose-600/15 text-rose-700 dark:text-rose-400 border border-rose-600/25 shrink-0"
+          >
+            Permanently Deleted
+          </span>
+          <span
+            v-else-if="student.is_deleted"
+            class="px-1.5 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 shrink-0"
           >
             Archive
           </span>
@@ -528,8 +548,14 @@ onUnmounted(() => {
                       {{ student.full_name }}
                     </span>
                     <span
-                      v-if="student.is_deleted"
-                      class="px-1.5 py-0.5 rounded text-[9.5px] font-bold tracking-wider uppercase bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20 shrink-0"
+                      v-if="student.is_permanently_deleted"
+                      class="px-1.5 py-0.5 rounded text-[9.5px] font-bold tracking-wider uppercase bg-rose-600/15 text-rose-700 dark:text-rose-400 border border-rose-600/25 shrink-0"
+                    >
+                      Permanently Deleted
+                    </span>
+                    <span
+                      v-else-if="student.is_deleted"
+                      class="px-1.5 py-0.5 rounded text-[9.5px] font-bold tracking-wider uppercase bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 shrink-0"
                     >
                       Archive
                     </span>

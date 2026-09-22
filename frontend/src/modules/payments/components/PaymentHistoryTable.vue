@@ -19,6 +19,7 @@ const props = defineProps<{
   selectedReceiver: string
   paymentMethods: string[]
   paymentReceivers: string[]
+  selectedStatus?: string
   viewMode: 'grid' | 'table'
 }>()
 
@@ -26,6 +27,7 @@ const emit = defineEmits<{
   (e: 'update:searchQuery', val: string): void
   (e: 'update:selectedMethod', val: string): void
   (e: 'update:selectedReceiver', val: string): void
+  (e: 'update:selectedStatus', val: string): void
   (e: 'update:viewMode', val: 'grid' | 'table'): void
   (e: 'open-edit', payment: Payment): void
   (e: 'delete-payment', payment: Payment): void
@@ -276,6 +278,18 @@ const printReceipt = (payment: Payment) => {
       >
         <option value="all">All Receivers</option>
         <option v-for="r in paymentReceivers" :key="r" :value="r">{{ r }}</option>
+      </select>
+
+      <!-- Student Status Filter -->
+      <select
+        :value="selectedStatus || 'all'"
+        @change="emit('update:selectedStatus', ($event.target as HTMLSelectElement).value)"
+        class="px-3 py-2 text-xs border border-zinc-200 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-850 text-zinc-700 dark:text-zinc-200 cursor-pointer shadow-2xs font-semibold focus:outline-none"
+      >
+        <option value="all">All Statuses</option>
+        <option value="active">Active</option>
+        <option value="archived">Archived</option>
+        <option value="permanently_deleted">Permanently Deleted</option>
       </select>
 
       <!-- Export Excel Button -->

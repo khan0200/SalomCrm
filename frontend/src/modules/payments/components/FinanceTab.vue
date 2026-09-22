@@ -1150,13 +1150,21 @@ const getKpiDateRange = (preset: DatePreset, customStart?: string, customEnd?: s
 const matchesKpiStudentCriteria = (studentId?: string | null, studentObj?: Student) => {
   const s = studentObj || getStudent(studentId)
 
-  // Status Filter: Active vs Archive
+  // Status Filter: Active vs Archive vs Permanently Deleted
   if (kpiSelectedStatuses.value.length > 0) {
-    const isArchived = s?.is_deleted === true
+    const isPermDeleted = s?.is_permanently_deleted === true
+    const isArchived = s?.is_deleted === true && !isPermDeleted
+    const isActive = !s?.is_deleted && !isPermDeleted
+
     const wantsActive = kpiSelectedStatuses.value.includes('ACTIVE')
     const wantsArchive = kpiSelectedStatuses.value.includes('ARCHIVE')
-    if (wantsActive && !wantsArchive && isArchived) return false
-    if (wantsArchive && !wantsActive && !isArchived) return false
+    const wantsPermDeleted = kpiSelectedStatuses.value.includes('PERMANENTLY_DELETED')
+
+    const matchActive = wantsActive && isActive
+    const matchArchive = wantsArchive && isArchived
+    const matchPermDeleted = wantsPermDeleted && isPermDeleted
+
+    if (!matchActive && !matchArchive && !matchPermDeleted) return false
   }
 
   // Tariff Filter
@@ -1583,7 +1591,7 @@ const exportCollectedExcel = async () => {
       'Group': s?.student_group || '—',
       'Coordinator': s?.coordinator || '—',
       'Level': s?.level || '—',
-      'Status': s?.is_deleted ? 'Archive' : 'Active',
+      'Status': s?.is_permanently_deleted ? 'Permanently Deleted' : (s?.is_deleted ? 'Archive' : 'Active'),
       'Payment Method': p.method || '—',
       'Received By': p.received_by || '—',
       'Amount (UZS)': Number(p.amount) || 0,
@@ -1622,7 +1630,7 @@ const exportDebtExcel = async () => {
       'Level': s.level || '—',
       'Outstanding Debt (UZS)': Math.abs(Number(s.balance) || 0),
       'Discount (UZS)': Number(s.discount) || 0,
-      'Status': s.is_deleted ? 'Archive' : 'Active'
+      'Status': s?.is_permanently_deleted ? 'Permanently Deleted' : (s?.is_deleted ? 'Archive' : 'Active')
     }
   })
 
@@ -1663,7 +1671,7 @@ const exportDiscountExcel = async () => {
       'Tariff': s?.tariff || '—',
       'Group': s?.student_group || '—',
       'Coordinator': s?.coordinator || '—',
-      'Status': s?.is_deleted ? 'Archive' : 'Active',
+      'Status': s?.is_permanently_deleted ? 'Permanently Deleted' : (s?.is_deleted ? 'Archive' : 'Active'),
       'Discount Amount (UZS)': Math.abs(Number(p.amount) || 0),
       'Granted By': p.received_by || '—',
       'Date & Time': formatDateTime(p.created_at),
@@ -1708,7 +1716,7 @@ const exportWithdrawalExcel = async () => {
       'Tariff': s?.tariff || '—',
       'Group': s?.student_group || '—',
       'Coordinator': s?.coordinator || '—',
-      'Status': s?.is_deleted ? 'Archive' : 'Active',
+      'Status': s?.is_permanently_deleted ? 'Permanently Deleted' : (s?.is_deleted ? 'Archive' : 'Active'),
       'Payment Method': p.method || '—',
       'Authorized / Processed By': p.received_by || '—',
       'Withdrawal Amount (UZS)': Math.abs(Number(p.amount) || 0),
@@ -3140,6 +3148,10 @@ const exportWithdrawalExcel = async () => {
                   <label class="px-3 py-1.5 flex items-center gap-2 hover:bg-zinc-50 dark:hover:bg-zinc-700 cursor-pointer">
                     <input type="checkbox" :checked="kpiSelectedStatuses.includes('ARCHIVE')" @change="toggleKpiList(kpiSelectedStatuses, 'ARCHIVE')" class="rounded text-blue-600" />
                     <span>Archive</span>
+                  </label>
+                  <label class="px-3 py-1.5 flex items-center gap-2 hover:bg-zinc-50 dark:hover:bg-zinc-700 cursor-pointer">
+                    <input type="checkbox" :checked="kpiSelectedStatuses.includes('PERMANENTLY_DELETED')" @change="toggleKpiList(kpiSelectedStatuses, 'PERMANENTLY_DELETED')" class="rounded text-blue-600" />
+                    <span>Permanently Deleted</span>
                   </label>
                 </div>
               </div>

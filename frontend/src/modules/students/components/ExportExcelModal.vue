@@ -14,7 +14,8 @@ import {
   Contact,
   Bookmark,
   Check,
-  MoreVertical
+  MoreVertical,
+  UserCheck
 } from 'lucide-vue-next'
 import type { Student } from '@/types'
 import { ROW_COLOR_MAP } from '@/types'
@@ -28,6 +29,7 @@ const props = defineProps<{
   students: Student[]
   folders?: { id: string | number; name: string }[]
   options?: any
+  currentFolder?: string
 }>()
 
 const emit = defineEmits<{
@@ -42,6 +44,7 @@ const { compareStudentIds } = useAlphanumericSort()
 // ── Search & Filter State inside Modal ──────────────────────────────
 const searchType = ref<'all' | 'id' | 'name' | 'phone' | 'university'>('all')
 const searchQuery = ref('')
+const selectedStatuses = ref<string[]>(['active'])
 const selectedFolders = ref<string[]>([])
 const selectedTariffs = ref<string[]>([])
 const selectedLevels = ref<string[]>([])
@@ -51,6 +54,7 @@ const selectedTags = ref<string[]>([])
 const selectedLeads = ref<string[]>([])
 
 // Dropdown open states
+const isStatusDropdownOpen = ref(false)
 const isFolderDropdownOpen = ref(false)
 const isTariffDropdownOpen = ref(false)
 const isLevelDropdownOpen = ref(false)
@@ -60,6 +64,7 @@ const isTagDropdownOpen = ref(false)
 const isLeadDropdownOpen = ref(false)
 
 const closeAllDropdowns = () => {
+  isStatusDropdownOpen.value = false
   isFolderDropdownOpen.value = false
   isTariffDropdownOpen.value = false
   isLevelDropdownOpen.value = false
@@ -69,8 +74,9 @@ const closeAllDropdowns = () => {
   isLeadDropdownOpen.value = false
 }
 
-type DropdownKey = 'folder' | 'tariff' | 'level' | 'group' | 'cert' | 'tag' | 'lead'
+type DropdownKey = 'status' | 'folder' | 'tariff' | 'level' | 'group' | 'cert' | 'tag' | 'lead'
 const dropdownRefs: Record<DropdownKey, typeof isFolderDropdownOpen> = {
+  status: isStatusDropdownOpen,
   folder: isFolderDropdownOpen,
   tariff: isTariffDropdownOpen,
   level: isLevelDropdownOpen,
@@ -85,6 +91,57 @@ const toggleDropdown = (key: DropdownKey) => {
   closeAllDropdowns()
   target.value = !wasOpen
 }
+
+// Status Helpers & Counts
+const statusCounts = computed(() => {
+  const list = props.students || []
+  let active = 0
+  let archived = 0
+  let permDeleted = 0
+  for (const s of list) {
+    if (s.is_permanently_deleted) {
+      permDeleted++
+    } else if (s.is_deleted) {
+      archived++
+    } else {
+      active++
+    }
+  }
+  return {
+    all: list.length,
+    active,
+    archived,
+    permanently_deleted: permDeleted,
+  }
+})
+
+const isStatusActive = (status: 'all' | 'active' | 'archived' | 'permanently_deleted') => {
+  if (status === 'all') {
+    return selectedStatuses.value.length === 3 || selectedStatuses.value.length === 0
+  }
+  return selectedStatuses.value.length === 1 && selectedStatuses.value[0] === status
+}
+
+const setSingleStatus = (status: 'all' | 'active' | 'archived' | 'permanently_deleted') => {
+  if (status === 'all') {
+    selectedStatuses.value = ['active', 'archived', 'permanently_deleted']
+  } else {
+    selectedStatuses.value = [status]
+  }
+}
+
+const statusButtonLabel = computed(() => {
+  if (selectedStatuses.value.length === 0 || selectedStatuses.value.length === 3) {
+    return 'Status: All'
+  }
+  if (selectedStatuses.value.length === 1) {
+    const s = selectedStatuses.value[0]
+    if (s === 'active') return 'Status: Active'
+    if (s === 'archived') return 'Status: Archived'
+    if (s === 'permanently_deleted') return 'Status: Perm Deleted'
+  }
+  return `Status · ${selectedStatuses.value.length}`
+})
 
 const toggleInList = (list: string[], value: string) => {
   const idx = list.indexOf(value)
@@ -274,6 +331,12 @@ const FIELD_GROUPS: FieldGroup[] = [
       { key: 'office', label: 'Office', checked: false, get: (s) => s.office || '' },
       { key: 'balance', label: 'Balance (UZS)', checked: false, get: (s) => s.balance || 0 },
       { key: 'discount', label: 'Discount (UZS)', checked: false, get: (s) => s.discount || 0 },
+      {
+        key: 'status',
+        label: 'Status',
+        checked: false,
+        get: (s) => s.is_permanently_deleted ? 'Permanently Deleted' : (s.is_deleted ? 'Archived' : 'Active')
+      },
     ]
   }
 ]
@@ -296,6 +359,13 @@ watch(() => props.isOpen, (open) => {
 
     searchQuery.value = ''
     searchType.value = 'all'
+    if (props.currentFolder === 'deleted' || props.currentFolder === 'archive') {
+      selectedStatuses.value = ['archived']
+    } else if (props.currentFolder === 'permanently_deleted') {
+      selectedStatuses.value = ['permanently_deleted']
+    } else {
+      selectedStatuses.value = ['active']
+    }
     selectedFolders.value = []
     selectedTariffs.value = []
     selectedLevels.value = []
@@ -431,15 +501,33 @@ const filteredStudents = computed(() => {
       if (!matchNo && !matchLead) return false
     }
 
+    // Status Filter (Active, Archived, Permanently Deleted)
+    if (selectedStatuses.value.length > 0 && selectedStatuses.value.length < 3) {
+      const isPermDeleted = !!s.is_permanently_deleted
+      const isArchived = !!s.is_deleted && !isPermDeleted
+      const isActive = !s.is_deleted && !isPermDeleted
+
+      const matchActive = selectedStatuses.value.includes('active') && isActive
+      const matchArchived = selectedStatuses.value.includes('archived') && isArchived
+      const matchPermDeleted = selectedStatuses.value.includes('permanently_deleted') && isPermDeleted
+
+      if (!matchActive && !matchArchived && !matchPermDeleted) return false
+    }
+
     return true
   })
 
-  // Active students always before archived ones; stable within each group.
-  return [...filtered].sort((a, b) => Number(!!a.is_deleted) - Number(!!b.is_deleted))
+  // Active students always before archived ones, then permanently deleted; stable within each group.
+  return [...filtered].sort((a, b) => {
+    const scoreA = a.is_permanently_deleted ? 2 : (a.is_deleted ? 1 : 0)
+    const scoreB = b.is_permanently_deleted ? 2 : (b.is_deleted ? 1 : 0)
+    return scoreA - scoreB
+  })
 })
 
 // ── Active filter summary (chips + clear-all) ────────────────────────
 const hasActiveFilters = computed(() =>
+  (selectedStatuses.value.length > 0 && selectedStatuses.value.length < 3 && !(selectedStatuses.value.length === 1 && selectedStatuses.value[0] === 'active')) ||
   selectedFolders.value.length > 0 ||
   selectedTariffs.value.length > 0 ||
   selectedLevels.value.length > 0 ||
@@ -451,6 +539,21 @@ const hasActiveFilters = computed(() =>
 
 const activeFilterChips = computed(() => {
   const chips: { key: string; label: string; clear: () => void }[] = []
+  if (selectedStatuses.value.length > 0 && selectedStatuses.value.length < 3 && !(selectedStatuses.value.length === 1 && selectedStatuses.value[0] === 'active')) {
+    const names: Record<string, string> = {
+      active: 'Active',
+      archived: 'Archived',
+      permanently_deleted: 'Permanently Deleted'
+    }
+    const label = selectedStatuses.value.length === 1
+      ? `Status: ${names[selectedStatuses.value[0]] || selectedStatuses.value[0]}`
+      : `Status: ${selectedStatuses.value.length}`
+    chips.push({
+      key: 'status',
+      label,
+      clear: () => { selectedStatuses.value = ['active'] }
+    })
+  }
   if (selectedFolders.value.length > 0) {
     const label = selectedFolders.value.length === 1
       ? (selectedFolders.value[0] === 'NO_FOLDER' ? 'Folder: No Folder' : `Folder: ${(foldersList.value as any[]).find((f: any) => String(f.id).toLowerCase() === String(selectedFolders.value[0]).toLowerCase())?.name || '1'}`)
@@ -498,6 +601,7 @@ const activeFilterChips = computed(() => {
 
 const clearAllExcelFilters = () => {
   searchQuery.value = ''
+  selectedStatuses.value = ['active']
   selectedFolders.value = []
   selectedTariffs.value = []
   selectedLevels.value = []
@@ -824,6 +928,59 @@ onUnmounted(() => {
         class="mb-4 space-y-3 bg-zinc-50 dark:bg-zinc-850/60 border border-zinc-200 dark:border-zinc-750 rounded-xl p-3.5 shadow-2xs"
         @click.stop
       >
+        <!-- Status Filter Segmented Tabs (Active / Archived / Permanently Deleted / All) -->
+        <div class="flex items-center justify-between gap-2 flex-wrap pb-0.5">
+          <div class="inline-flex items-center p-1 rounded-xl bg-zinc-200/70 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700/80 gap-1 text-xs font-semibold">
+            <button
+              type="button"
+              @click="setSingleStatus('active')"
+              :class="isStatusActive('active')
+                ? 'bg-white dark:bg-zinc-700 text-emerald-600 dark:text-emerald-400 shadow-xs font-bold'
+                : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'"
+              class="px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5"
+            >
+              <span class="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
+              <span>Active</span>
+              <span class="text-[11px] opacity-75 font-mono">({{ statusCounts.active }})</span>
+            </button>
+            <button
+              type="button"
+              @click="setSingleStatus('archived')"
+              :class="isStatusActive('archived')
+                ? 'bg-white dark:bg-zinc-700 text-amber-600 dark:text-amber-400 shadow-xs font-bold'
+                : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'"
+              class="px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5"
+            >
+              <span class="w-2 h-2 rounded-full bg-amber-500 shrink-0"></span>
+              <span>Archived</span>
+              <span class="text-[11px] opacity-75 font-mono">({{ statusCounts.archived }})</span>
+            </button>
+            <button
+              type="button"
+              @click="setSingleStatus('permanently_deleted')"
+              :class="isStatusActive('permanently_deleted')
+                ? 'bg-white dark:bg-zinc-700 text-rose-600 dark:text-rose-400 shadow-xs font-bold'
+                : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'"
+              class="px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5"
+            >
+              <span class="w-2 h-2 rounded-full bg-rose-500 shrink-0"></span>
+              <span>Permanently Deleted</span>
+              <span class="text-[11px] opacity-75 font-mono">({{ statusCounts.permanently_deleted }})</span>
+            </button>
+            <button
+              type="button"
+              @click="setSingleStatus('all')"
+              :class="isStatusActive('all')
+                ? 'bg-white dark:bg-zinc-700 text-blue-600 dark:text-blue-400 shadow-xs font-bold'
+                : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'"
+              class="px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5"
+            >
+              <span>All Statuses</span>
+              <span class="text-[11px] opacity-75 font-mono">({{ statusCounts.all }})</span>
+            </button>
+          </div>
+        </div>
+
         <!-- Search Row -->
         <div class="flex items-stretch gap-0 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 overflow-hidden focus-within:border-blue-500 transition-colors">
           <div class="relative shrink-0 border-r border-zinc-200 dark:border-zinc-700">
@@ -851,7 +1008,89 @@ onUnmounted(() => {
         </div>
 
         <!-- Filter Grid -->
-        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-2">
+        <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-4 xl:grid-cols-8 gap-2">
+          <!-- Status Filter Dropdown -->
+          <div class="relative filter-dropdown-container">
+            <button
+              type="button"
+              @click="toggleDropdown('status')"
+              class="w-full h-9 px-2.5 rounded-lg text-xs font-semibold flex items-center justify-between cursor-pointer border transition-colors"
+              :class="(selectedStatuses.length > 0 && selectedStatuses.length < 3)
+                ? 'bg-blue-50 dark:bg-blue-950/40 border-blue-300 dark:border-blue-800 text-blue-700 dark:text-blue-300'
+                : 'bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:border-zinc-300 dark:hover:border-zinc-600'"
+            >
+              <div class="flex items-center gap-1.5 truncate">
+                <UserCheck class="w-3.5 h-3.5 shrink-0 opacity-70" />
+                <span class="truncate">{{ statusButtonLabel }}</span>
+              </div>
+              <ChevronDown class="w-3.5 h-3.5 shrink-0 ml-1 opacity-60" />
+            </button>
+            <div
+              v-if="isStatusDropdownOpen"
+              class="absolute left-0 mt-1 w-56 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 shadow-xl py-1 z-40 max-h-60 overflow-y-auto text-xs"
+              @click.stop
+            >
+              <label class="px-3 py-1.5 flex items-center justify-between hover:bg-zinc-50 dark:hover:bg-zinc-700 cursor-pointer font-bold">
+                <div class="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    :checked="selectedStatuses.length === 0 || selectedStatuses.length === 3"
+                    @change="selectedStatuses = (selectedStatuses.length === 3 ? [] : ['active', 'archived', 'permanently_deleted'])"
+                    class="rounded text-blue-600"
+                  />
+                  <span>All Statuses</span>
+                </div>
+                <span class="text-[11px] text-zinc-400 font-mono">({{ statusCounts.all }})</span>
+              </label>
+              <div class="h-px bg-zinc-100 dark:bg-zinc-700 my-1" />
+              <label class="px-3 py-1.5 flex items-center justify-between hover:bg-zinc-50 dark:hover:bg-zinc-700 cursor-pointer">
+                <div class="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    :checked="selectedStatuses.includes('active')"
+                    @change="toggleInList(selectedStatuses, 'active')"
+                    class="rounded text-blue-600"
+                  />
+                  <span class="flex items-center gap-1.5">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                    <span>Active</span>
+                  </span>
+                </div>
+                <span class="text-[11px] text-zinc-400 font-mono">({{ statusCounts.active }})</span>
+              </label>
+              <label class="px-3 py-1.5 flex items-center justify-between hover:bg-zinc-50 dark:hover:bg-zinc-700 cursor-pointer">
+                <div class="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    :checked="selectedStatuses.includes('archived')"
+                    @change="toggleInList(selectedStatuses, 'archived')"
+                    class="rounded text-blue-600"
+                  />
+                  <span class="flex items-center gap-1.5">
+                    <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                    <span>Archived</span>
+                  </span>
+                </div>
+                <span class="text-[11px] text-zinc-400 font-mono">({{ statusCounts.archived }})</span>
+              </label>
+              <label class="px-3 py-1.5 flex items-center justify-between hover:bg-zinc-50 dark:hover:bg-zinc-700 cursor-pointer">
+                <div class="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    :checked="selectedStatuses.includes('permanently_deleted')"
+                    @change="toggleInList(selectedStatuses, 'permanently_deleted')"
+                    class="rounded text-blue-600"
+                  />
+                  <span class="flex items-center gap-1.5">
+                    <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+                    <span>Permanently Deleted</span>
+                  </span>
+                </div>
+                <span class="text-[11px] text-zinc-400 font-mono">({{ statusCounts.permanently_deleted }})</span>
+              </label>
+            </div>
+          </div>
+
           <!-- Folder Filter Dropdown -->
           <div class="relative filter-dropdown-container">
             <button
@@ -1186,7 +1425,9 @@ onUnmounted(() => {
               class="hover:bg-blue-50/50 dark:hover:bg-blue-950/20 cursor-pointer transition-colors"
               :class="[
                 selectedStudentIds.includes(s.id) ? 'bg-blue-50/30 dark:bg-blue-950/10' : '',
-                s.is_deleted ? 'opacity-60' : ''
+                s.is_permanently_deleted
+                  ? 'opacity-60 bg-rose-500/5'
+                  : (s.is_deleted ? 'opacity-70 bg-amber-500/5' : '')
               ]"
               :style="getRowStripeStyle(s)"
             >
@@ -1204,11 +1445,17 @@ onUnmounted(() => {
                 </div>
               </td>
               <td class="p-2.5 align-top">
-                <div class="flex items-center gap-1.5">
+                <div class="flex items-center gap-1.5 flex-wrap">
                   <span class="font-bold text-zinc-900 dark:text-zinc-100 uppercase">{{ s.full_name }}</span>
                   <span
-                    v-if="s.is_deleted"
-                    class="px-1.5 py-0.5 rounded text-[9px] font-bold tracking-wider uppercase bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20 shrink-0"
+                    v-if="s.is_permanently_deleted"
+                    class="px-1.5 py-0.5 rounded text-[9px] font-bold tracking-wider uppercase bg-rose-600/15 text-rose-700 dark:text-rose-400 border border-rose-600/25 shrink-0"
+                  >
+                    Permanently Deleted
+                  </span>
+                  <span
+                    v-else-if="s.is_deleted"
+                    class="px-1.5 py-0.5 rounded text-[9px] font-bold tracking-wider uppercase bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 shrink-0"
                   >
                     Archive
                   </span>

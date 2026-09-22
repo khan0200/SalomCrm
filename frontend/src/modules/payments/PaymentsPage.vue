@@ -28,7 +28,7 @@ const PAYMENT_METHODS_DEFAULT = ['CARD', 'CASH', 'BANK']
 const RECEIVED_BY_DEFAULT = ['ADMIN']
 const NOTE_PILLS_DEFAULT = ['DISCOUNT', 'SHARTNOMA UCHUN', 'QARZ', 'ELCHIXONA UCHUN']
 
-const STATUS_FILTER_OPTIONS = ['Active', 'Archive']
+const STATUS_FILTER_OPTIONS = ['Active', 'Archive', 'Permanently Deleted']
 const BALANCE_FILTER_OPTIONS = [
   'Balance < 0 (Debt)',
   'Balance = 0 (Fully Paid)',
@@ -120,6 +120,7 @@ const studentsPage = ref(1)
 const historySearch = ref('')
 const selectedMethod = ref('all')
 const selectedReceiver = ref('all')
+const historySelectedStatus = ref('all')
 const historyPage = ref(1)
 
 // Modals State
@@ -296,8 +297,15 @@ const filteredStudents = computed(() => {
     }
 
     if (selectedStatuses.value.length > 0 && selectedStatuses.value.length < STATUS_FILTER_OPTIONS.length) {
-      if (selectedStatuses.value.includes('Active') && s.is_deleted) return false
-      if (selectedStatuses.value.includes('Archive') && !s.is_deleted) return false
+      const isPermDeleted = !!s.is_permanently_deleted
+      const isArchived = !!s.is_deleted && !isPermDeleted
+      const isActive = !s.is_deleted && !isPermDeleted
+
+      const matchActive = selectedStatuses.value.includes('Active') && isActive
+      const matchArchived = selectedStatuses.value.includes('Archive') && isArchived
+      const matchPermDeleted = selectedStatuses.value.includes('Permanently Deleted') && isPermDeleted
+
+      if (!matchActive && !matchArchived && !matchPermDeleted) return false
     }
 
     if (selectedTariffs.value.length > 0) {
@@ -346,10 +354,10 @@ const filteredStudents = computed(() => {
 
 const sortedStudents = computed(() => {
   return [...filteredStudents.value].sort((a, b) => {
-    // Archived students always sort after active ones, regardless of ID order
-    const aArchived = a.is_deleted ? 1 : 0
-    const bArchived = b.is_deleted ? 1 : 0
-    if (aArchived !== bArchived) return aArchived - bArchived
+    // Active students first, then archived, then permanently deleted
+    const aScore = a.is_permanently_deleted ? 2 : (a.is_deleted ? 1 : 0)
+    const bScore = b.is_permanently_deleted ? 2 : (b.is_deleted ? 1 : 0)
+    if (aScore !== bScore) return aScore - bScore
     return compareStudentIds(a, b, sortOrder.value)
   })
 })
@@ -373,6 +381,18 @@ const filteredPayments = computed(() => {
     }
     if (selectedMethod.value !== 'all' && p.method !== selectedMethod.value) return false
     if (selectedReceiver.value !== 'all' && p.received_by !== selectedReceiver.value) return false
+
+    if (historySelectedStatus.value !== 'all') {
+      const s = allStudents.value.find(student => student.id === p.student_id)
+      const isPermDeleted = !!s?.is_permanently_deleted
+      const isArchived = !!s?.is_deleted && !isPermDeleted
+      const isActive = !s?.is_deleted && !isPermDeleted
+
+      if (historySelectedStatus.value === 'active' && !isActive) return false
+      if (historySelectedStatus.value === 'archived' && !isArchived) return false
+      if (historySelectedStatus.value === 'permanently_deleted' && !isPermDeleted) return false
+    }
+
     return true
   })
 })
@@ -757,7 +777,7 @@ const exportStudentOverviewToExcel = async () => {
       'Discount (UZS)': discount,
       'Balance (UZS)': balance,
       'Financial Status': finStatus,
-      'Status': s.is_deleted ? 'Archived' : 'Active'
+      'Status': s.is_permanently_deleted ? 'Permanently Deleted' : (s.is_deleted ? 'Archived' : 'Active')
     }
   })
 
@@ -811,11 +831,15 @@ const exportPaymentHistoryToExcel = async () => {
       txType = 'Discount'
     }
 
+    const student = allStudents.value.find(s => s.id === p.student_id)
+    const studentStatus = student ? (student.is_permanently_deleted ? 'Permanently Deleted' : (student.is_deleted ? 'Archived' : 'Active')) : '—'
+
     return {
       No: index + 1,
       'Payment ID': p.id ? String(p.id).toUpperCase() : '',
       'Student ID': p.student_id || '—',
       'Student Name': p.student_full_name || p.student_name || 'General Payment',
+      'Status': studentStatus,
       'Amount (UZS)': p.amount !== undefined ? Number(p.amount) : '',
       'Transaction Type': txType,
       'Payment Method': p.method || '',
@@ -830,6 +854,7 @@ const exportPaymentHistoryToExcel = async () => {
     { wch: 20 },  // Payment ID
     { wch: 15 },  // Student ID
     { wch: 30 },  // Student Name
+    { wch: 18 },  // Status
     { wch: 18 },  // Amount (UZS)
     { wch: 18 },  // Transaction Type
     { wch: 18 },  // Payment Method
@@ -972,12 +997,14 @@ const exportPaymentHistoryToExcel = async () => {
         :search-query="historySearch"
         :selected-method="selectedMethod"
         :selected-receiver="selectedReceiver"
+        :selected-status="historySelectedStatus"
         :payment-methods="paymentMethods"
         :payment-receivers="paymentReceivers"
         :view-mode="viewMode"
         @update:search-query="historySearch = $event"
         @update:selected-method="selectedMethod = $event"
         @update:selected-receiver="selectedReceiver = $event"
+        @update:selected-status="historySelectedStatus = $event"
         @update:view-mode="viewMode = $event"
         @open-edit="openEditModal"
         @delete-payment="handleDeletePayment"

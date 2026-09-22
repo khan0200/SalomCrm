@@ -1092,6 +1092,7 @@ dashboardStore.onExportExcel = handleExportExcel
       :students="allStudents"
       :folders="folders"
       :options="options"
+      :current-folder="activeFolder"
       @close="dashboardStore.isExcelModalOpen = false"
       @open-detail="openDetail"
     />
