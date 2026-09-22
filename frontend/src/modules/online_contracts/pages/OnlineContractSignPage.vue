@@ -136,23 +136,7 @@ async function confirmGuardianOtp() {
   syncGuardianState()
 }
 
-// phone1 raqami o'zgarganda verification reset qilinsin
-watch(() => formData.phone1, () => {
-  if (phone1IsVerified.value) {
-    phone1Verifier?.reset()
-    syncPhone1State()
-    phone1OtpCode.value = ''
-  }
-})
 
-watch(() => guardianData.phone, () => {
-  if (guardianIsVerified.value) {
-    guardianVerifier?.reset()
-    syncGuardianState()
-    guardianOtpCode.value = ''
-  }
-})
-// ────────────────────────────────────────────────────────────────────────────
 
 // Selected Tariff
 const selectedTariffId = ref<string>('')
@@ -186,6 +170,15 @@ watch(() => formData.fullName, (newVal) => {
 watch(() => formData.passportNumber, (newVal) => {
   if (newVal && newVal !== newVal.toUpperCase()) {
     formData.passportNumber = newVal.toUpperCase()
+  }
+})
+
+// phone1 raqami o'zgarganda verification reset qilinsin
+watch(() => formData.phone1, () => {
+  if (phone1IsVerified.value) {
+    phone1Verifier?.reset()
+    syncPhone1State()
+    phone1OtpCode.value = ''
   }
 })
 
@@ -225,6 +218,15 @@ watch(guardianRelationOption, (val) => {
     guardianData.relation = ''
   } else if (val) {
     guardianData.relation = val
+  }
+})
+
+// guardian_phone raqami o'zgarganda verification reset qilinsin
+watch(() => guardianData.phone, () => {
+  if (guardianIsVerified.value) {
+    guardianVerifier?.reset()
+    syncGuardianState()
+    guardianOtpCode.value = ''
   }
 })
 

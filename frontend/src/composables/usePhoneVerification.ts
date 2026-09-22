@@ -121,6 +121,8 @@ export function usePhoneVerification(phoneType: PhoneType, tenantSlug: string) {
         error.value = 'Juda ko\'p urinish. Bir oz kutib qayta urinib ko\'ring.'
       } else if (code === 'auth/quota-exceeded') {
         error.value = 'SMS kvotasi tugagan. Administratorga murojaat qiling.'
+      } else if (code === 'auth/operation-not-allowed' || String(err?.message || '').includes('SMS unable to be sent until this region enabled')) {
+        error.value = 'Firebase: Ushbu davlat (hudud) uchun SMS yuborish yoqilmagan (SMS Region Policy). Iltimos, Firebase konsolida ushbu davlatni yoqing yoki test raqamlari ro\'yxatiga qo\'shing.'
       } else {
         error.value = err?.message || 'SMS yuborishda xatolik yuz berdi.'
       }
