@@ -248,6 +248,22 @@ def sync_code(client, path):
 def deploy(client, path):
     sync_code(client, path)
 
+    # Transfer gitignored secrets (Firebase credentials & frontend .env)
+    try:
+        sftp = client.open_sftp()
+        local_creds = os.path.join(os.path.dirname(__file__), "backend", "firebase-credentials.json")
+        if os.path.exists(local_creds):
+            print("  Uploading firebase-credentials.json to server...", flush=True)
+            sftp.put(local_creds, "%s/backend/firebase-credentials.json" % path)
+
+        local_front_env = os.path.join(os.path.dirname(__file__), "frontend", ".env")
+        if os.path.exists(local_front_env):
+            print("  Uploading frontend/.env to server...", flush=True)
+            sftp.put(local_front_env, "%s/frontend/.env" % path)
+        sftp.close()
+    except Exception as e:
+        print("  Warning: failed to upload secrets via SFTP: %s" % e, flush=True)
+
     # venv lives at the repo root, one level above backend/
     run(client,
         "cd %s/backend && ../venv/bin/pip install -q -r requirements.txt gunicorn" % path,
