@@ -680,6 +680,47 @@ class EmailVerificationCode(TimeStampedModel):
         return f"OTP for {self.email} (used={self.is_used})"
 
 
+class PhoneVerificationRecord(TimeStampedModel):
+    """
+    Firebase Phone Auth orqali tasdiqlangan telefon raqamlarini saqlaydi.
+
+    Shartnoma to'ldirishda talaba phone1 va (voyaga yetmagan bo'lsa) guardian_phone
+    ni Firebase Phone Auth bilan tasdiqlagandan so'ng bu yozuv yaratiladi.
+    SubmitContractView session_token orqali bu yozuvni topib, telefon tasdiqlangan
+    yoki yo'qligini va muddati o'tmaganligini tekshiradi.
+    """
+    PHONE_TYPE_CHOICES = [
+        ('phone1', 'Talaba telefoni 1'),
+        ('guardian_phone', 'Kafil telefoni'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    phone = models.CharField(max_length=50, db_index=True)        # "+998901234567" (E.164 format)
+    phone_local = models.CharField(max_length=20, blank=True, default='')  # "90-123-45-67" (local format)
+    phone_type = models.CharField(max_length=20, choices=PHONE_TYPE_CHOICES, db_index=True)
+    tenant = models.ForeignKey(
+        'tenants.Tenant',
+        on_delete=models.CASCADE,
+        related_name='phone_verification_records'
+    )
+    firebase_uid = models.CharField(max_length=128, blank=True, default='')
+    session_token = models.CharField(max_length=64, unique=True, db_index=True)  # secrets.token_hex(32)
+    expires_at = models.DateTimeField()       # verified_at + 2 soat
+    is_used = models.BooleanField(default=False, db_index=True)   # submit paytida True ga o'tadi
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'crm_phone_verification_records'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['session_token', 'is_used']),
+            models.Index(fields=['phone', 'tenant']),
+        ]
+
+    def __str__(self):
+        return f"PhoneVerify({self.phone_type}) {self.phone} (used={self.is_used})"
+
+
 class Contract(TenantAwareModel):
     """
     Multi-tenant Contract model.

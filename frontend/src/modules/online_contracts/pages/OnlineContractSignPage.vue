@@ -13,6 +13,7 @@ import FullContractViewerModal from '../components/FullContractViewerModal.vue'
 import LegalBasisModal from '../components/LegalBasisModal.vue'
 import { getTariffSampleContractHtml } from '../utils/sampleContract'
 import { buildVariableValues } from '@/modules/contracts/utils/contractVariables'
+import { usePhoneVerification } from '@/composables/usePhoneVerification'
 import {
   FileText,
   User,
@@ -29,6 +30,9 @@ import {
   Eye,
   EyeOff,
   Check,
+  Phone,
+  ShieldCheckIcon,
+  KeyRound,
 } from 'lucide-vue-next'
 
 const route = useRoute()
@@ -45,6 +49,111 @@ const tenantInfo = ref<TenantInfoResponse | null>(null)
 // Step Tracking: 1 = Form & Tariff, 2 = Contract Read & Sign, 3 = Review & Submit
 const currentStep = ref<1 | 2 | 3>(1)
 
+// ── Firebase Phone Verification ──────────────────────────────────────────────
+// phone1 va guardian_phone uchun alohida verifier instance
+// tenantSlug computed bo'lgani uchun verifier'larni init paytida yaratamiz
+const phone1OtpCode = ref('')
+const guardianOtpCode = ref('')
+
+// Composable'lar onMounted da init qilinadi (tenantSlug tayyor bo'lganda)
+let phone1Verifier: ReturnType<typeof usePhoneVerification> | null = null
+let guardianVerifier: ReturnType<typeof usePhoneVerification> | null = null
+
+// Reactive proxy refs — template uchun
+const phone1Step = ref<'idle' | 'sending' | 'code_sent' | 'verifying' | 'verified'>('idle')
+const phone1Loading = ref(false)
+const phone1Error = ref<string | null>(null)
+const phone1IsVerified = ref(false)
+const phone1SessionToken = ref<string | null>(null)
+
+const guardianStep = ref<'idle' | 'sending' | 'code_sent' | 'verifying' | 'verified'>('idle')
+const guardianLoading = ref(false)
+const guardianError = ref<string | null>(null)
+const guardianIsVerified = ref(false)
+const guardianSessionToken = ref<string | null>(null)
+
+function syncPhone1State() {
+  if (!phone1Verifier) return
+  phone1Step.value = phone1Verifier.step.value
+  phone1Loading.value = phone1Verifier.loading.value
+  phone1Error.value = phone1Verifier.error.value
+  phone1IsVerified.value = phone1Verifier.isVerified.value
+  phone1SessionToken.value = phone1Verifier.sessionToken.value
+}
+
+function syncGuardianState() {
+  if (!guardianVerifier) return
+  guardianStep.value = guardianVerifier.step.value
+  guardianLoading.value = guardianVerifier.loading.value
+  guardianError.value = guardianVerifier.error.value
+  guardianIsVerified.value = guardianVerifier.isVerified.value
+  guardianSessionToken.value = guardianVerifier.sessionToken.value
+}
+
+async function sendPhone1Otp() {
+  if (!phone1Verifier) {
+    phone1Verifier = usePhoneVerification('phone1', tenantSlug.value)
+  }
+  phone1Error.value = null
+  try {
+    await phone1Verifier.sendOtp(formData.phone1, 'recaptcha-phone1')
+  } catch {
+    // error is set inside composable
+  }
+  syncPhone1State()
+}
+
+async function confirmPhone1Otp() {
+  if (!phone1Verifier) return
+  try {
+    await phone1Verifier.confirmOtp(phone1OtpCode.value, formData.phone1)
+  } catch {
+    // error is set inside composable
+  }
+  syncPhone1State()
+}
+
+async function sendGuardianOtp() {
+  if (!guardianVerifier) {
+    guardianVerifier = usePhoneVerification('guardian_phone', tenantSlug.value)
+  }
+  guardianError.value = null
+  try {
+    await guardianVerifier.sendOtp(guardianData.phone, 'recaptcha-guardian')
+  } catch {
+    // error is set inside composable
+  }
+  syncGuardianState()
+}
+
+async function confirmGuardianOtp() {
+  if (!guardianVerifier) return
+  try {
+    await guardianVerifier.confirmOtp(guardianOtpCode.value, guardianData.phone)
+  } catch {
+    // error is set inside composable
+  }
+  syncGuardianState()
+}
+
+// phone1 raqami o'zgarganda verification reset qilinsin
+watch(() => formData.phone1, () => {
+  if (phone1IsVerified.value) {
+    phone1Verifier?.reset()
+    syncPhone1State()
+    phone1OtpCode.value = ''
+  }
+})
+
+watch(() => guardianData.phone, () => {
+  if (guardianIsVerified.value) {
+    guardianVerifier?.reset()
+    syncGuardianState()
+    guardianOtpCode.value = ''
+  }
+})
+// ────────────────────────────────────────────────────────────────────────────
+
 // Selected Tariff
 const selectedTariffId = ref<string>('')
 const selectedTariff = computed<OnlineTariff | null>(() => {
@@ -52,7 +161,7 @@ const selectedTariff = computed<OnlineTariff | null>(() => {
   return tenantInfo.value.tariffs.find(t => String(t.id) === selectedTariffId.value) || null
 })
 
-// Student Form Data (empty by default)
+// Student Form Data (starts with +998 by default, but user can backspace/erase it)
 const formData = reactive({
   passportNumber: '',
   fullName: '',
@@ -61,8 +170,8 @@ const formData = reactive({
   dobMonth: '',
   dobYear: '',
   office: '',
-  phone1: '',
-  phone2: '',
+  phone1: '+998 ',
+  phone2: '+998 ',
   email: authStore.user?.email || '',
   signatureData: '',
 })
@@ -102,7 +211,7 @@ const guardianData = reactive({
   fullName: '',
   passportNumber: '',
   relation: '',
-  phone: '',
+  phone: '+998 ',
   address: '',
 })
 const guardianSignatureData = ref('')
@@ -119,46 +228,82 @@ watch(guardianRelationOption, (val) => {
   }
 })
 
-// Uzbek mobile numbers as XX-XXX-XX-XX (9 digits, grouped 2-3-2-2) - the
-// "+998" is shown as a fixed visual prefix next to the input (see template),
-// never stored as part of the value itself. Student.phone1/phone2 has always
-// been stored as bare local digits (see StudentDetailDrawer's own
-// formatPhoneValue), and Contract.phone1/phone2 gets copied verbatim into it
-// on promotion to a Student record - baking "+998" into the stored string
-// here would leak into a field that never expected a country code, silently
-// corrupting the truncation math on the other end.
-// Re-derives the whole formatted string from whatever digits are currently
-// in the field on every keystroke, so pasting, mid-string edits, and
-// backspacing all self-correct instead of drifting out of the dash pattern.
-function formatUzPhone(raw: string): string {
-  const digits = raw.replace(/\D/g, '').replace(/^998/, '').slice(0, 9)
-  let local = ''
-  for (let i = 0; i < digits.length; i++) {
-    if (i === 2 || i === 5 || i === 7) local += '-'
-    local += digits[i]
+/**
+ * Format phone input on keystroke:
+ * - Initially or if typing Uzbek number (+998, 998, or raw digits):
+ *   formats as "+998 XX-XXX-XX-XX"
+ * - User CAN backspace and erase "+998" to type any international number (e.g. "+82 10-2614-1012", "+7...", etc.)!
+ */
+function formatPhoneInput(raw: string): string {
+  if (!raw) return ''
+  const trimmed = raw.trimStart()
+  if (trimmed === '+' || trimmed === '') return trimmed
+
+  const allDigits = trimmed.replace(/\D/g, '')
+
+  // If Uzbek number (+998, 998, or typing digits without +)
+  if (trimmed.startsWith('+998') || trimmed.startsWith('998') || (!trimmed.startsWith('+') && allDigits.length <= 9)) {
+    const local = allDigits.replace(/^998/, '').slice(0, 9)
+    let formatted = ''
+    for (let i = 0; i < local.length; i++) {
+      if (i === 2 || i === 5 || i === 7) formatted += '-'
+      formatted += local[i]
+    }
+    return local ? `+998 ${formatted}` : '+998 '
   }
-  return local
+
+  // International format (e.g. +82 10-2614-1012): allow +, numbers, spaces, dashes
+  return trimmed.replace(/[^\d+\-\s]/g, '')
 }
 
-function isCompleteUzPhone(val: string): boolean {
-  return val.replace(/\D/g, '').replace(/^998/, '').length === 9
+function isCompletePhone(val: string): boolean {
+  if (!val) return false
+  const trimmed = val.trim()
+  const digits = trimmed.replace(/\D/g, '')
+  if (trimmed.startsWith('+998') || trimmed.startsWith('998') || (!trimmed.startsWith('+') && digits.length === 9)) {
+    return digits.replace(/^998/, '').length === 9
+  }
+  return digits.length >= 7 && digits.length <= 15
 }
 
-// Display-only: the stored value is always bare local digits (see
-// formatUzPhone above); "+998" is added back wherever a phone number is
-// actually shown to a human (preview, review step, printed contract).
-function displayPhone(local: string): string {
-  return local ? `+998 ${local}` : ''
+/**
+ * Converts input phone value to storage format.
+ * IMPORTANT: For Uzbek numbers, strips country code (+998) and returns bare local "XX-XXX-XX-XX"
+ * (e.g. "90-123-45-67") so StudentDetailDrawer and Student models format without country code.
+ * For foreign/international numbers, returns full international format.
+ */
+function toStoragePhone(val: string): string {
+  if (!val) return ''
+  const trimmed = val.trim()
+  const digits = trimmed.replace(/\D/g, '')
+  if (trimmed.startsWith('+998') || trimmed.startsWith('998') || (!trimmed.startsWith('+') && digits.length === 9)) {
+    const local = digits.replace(/^998/, '').slice(0, 9)
+    let formatted = ''
+    for (let i = 0; i < local.length; i++) {
+      if (i === 2 || i === 5 || i === 7) formatted += '-'
+      formatted += local[i]
+    }
+    return formatted // "90-123-45-67" (country code siz!)
+  }
+  return trimmed
+}
+
+// Display-only for previews or printed contracts
+function displayPhone(val: string): string {
+  if (!val) return ''
+  const trimmed = val.trim()
+  if (trimmed.startsWith('+')) return trimmed
+  return `+998 ${trimmed}`
 }
 
 function onPhone1Input(e: Event) {
-  formData.phone1 = formatUzPhone((e.target as HTMLInputElement).value)
+  formData.phone1 = formatPhoneInput((e.target as HTMLInputElement).value)
 }
 function onPhone2Input(e: Event) {
-  formData.phone2 = formatUzPhone((e.target as HTMLInputElement).value)
+  formData.phone2 = formatPhoneInput((e.target as HTMLInputElement).value)
 }
 function onGuardianPhoneInput(e: Event) {
-  guardianData.phone = formatUzPhone((e.target as HTMLInputElement).value)
+  guardianData.phone = formatPhoneInput((e.target as HTMLInputElement).value)
 }
 
 // Password Confirmation Modal
@@ -281,8 +426,8 @@ async function init() {
         if (contract.passport_number) formData.passportNumber = contract.passport_number.toUpperCase()
         if (contract.education_level) formData.educationLevel = contract.education_level
         if (contract.office) formData.office = contract.office
-        if (contract.phone1) formData.phone1 = formatUzPhone(contract.phone1)
-        if (contract.phone2) formData.phone2 = formatUzPhone(contract.phone2)
+        if (contract.phone1) formData.phone1 = formatPhoneInput(contract.phone1)
+        if (contract.phone2) formData.phone2 = formatPhoneInput(contract.phone2)
         if (contract.email) formData.email = contract.email
         if (contract.date_of_birth) {
           const s = contract.date_of_birth.trim()
@@ -312,8 +457,8 @@ async function init() {
         if (prof.profile.passport_number) formData.passportNumber = prof.profile.passport_number.toUpperCase()
         if (prof.profile.education_level) formData.educationLevel = prof.profile.education_level
         if (prof.profile.office) formData.office = prof.profile.office
-        if (prof.profile.phone1) formData.phone1 = formatUzPhone(prof.profile.phone1)
-        if (prof.profile.phone2) formData.phone2 = formatUzPhone(prof.profile.phone2)
+        if (prof.profile.phone1) formData.phone1 = formatPhoneInput(prof.profile.phone1)
+        if (prof.profile.phone2) formData.phone2 = formatPhoneInput(prof.profile.phone2)
         if (prof.user.email) formData.email = prof.user.email
         if (prof.profile.date_of_birth) {
           const s = prof.profile.date_of_birth.trim()
@@ -363,10 +508,11 @@ const isStep1Valid = computed(() => {
     !!formData.dobMonth &&
     !!formData.dobYear &&
     !!formData.office &&
-    isCompleteUzPhone(formData.phone1) &&
-    isCompleteUzPhone(formData.phone2) &&
+    isCompletePhone(formData.phone1) &&
+    isCompletePhone(formData.phone2) &&
     formData.email.trim().length > 0 &&
-    formData.email.includes('@')
+    formData.email.includes('@') &&
+    phone1IsVerified.value  // ← Telefon 1 Firebase bilan tasdiqlangan bo'lishi shart
   )
 })
 
@@ -394,7 +540,8 @@ const isGuardianInfoValid = computed(() => {
     guardianData.fullName.trim().length >= 3 &&
     guardianData.passportNumber.trim().length >= 6 &&
     guardianData.relation.trim().length > 0 &&
-    isCompleteUzPhone(guardianData.phone) &&
+    isCompletePhone(guardianData.phone) &&
+    guardianIsVerified.value &&  // ← Kafil telefoni SMS bilan tasdiqlangan bo'lishi shart
     guardianData.address.trim().length >= 3 &&
     !!guardianSignatureData.value
   )
@@ -481,8 +628,8 @@ async function handleFinalSubmit() {
       education_level: formData.educationLevel,
       date_of_birth: formattedDob.value,
       office: formData.office,
-      phone1: formData.phone1.trim(),
-      phone2: formData.phone2.trim(),
+      phone1: toStoragePhone(formData.phone1),
+      phone2: toStoragePhone(formData.phone2),
       email: formData.email.trim(),
       signature_data: formData.signatureData,
       declarations: {
@@ -491,13 +638,16 @@ async function handleFinalSubmit() {
         confirmation_code_meaning: declarations.confirmationCodeMeaning,
       },
       password: accountPassword.value,
+      // Firebase Phone Auth session tokenlar
+      phone1_session_token: phone1SessionToken.value || '',
       ...(isMinor.value ? {
         guardian_full_name: guardianData.fullName.toUpperCase().trim(),
         guardian_passport_number: guardianData.passportNumber.toUpperCase().trim(),
         guardian_relation: guardianData.relation.trim(),
-        guardian_phone: guardianData.phone.trim(),
+        guardian_phone: toStoragePhone(guardianData.phone),
         guardian_address: guardianData.address.trim(),
         guardian_signature_data: guardianSignatureData.value,
+        guardian_phone_session_token: guardianSessionToken.value || '',
       } : {}),
     })
 
@@ -771,23 +921,100 @@ onMounted(() => {
               </p>
             </div>
 
-            <!-- Phone 1 -->
-            <div>
+            <!-- Phone 1 + Firebase OTP Verification -->
+            <div class="sm:col-span-2">
               <label class="block text-xs font-bold uppercase tracking-wide text-black dark:text-white mb-1.5">
                 Mobil telefon 1 <span class="text-red-600">*</span>
+                <span class="ml-1 text-[10px] font-normal text-zinc-500 normal-case">(SMS orqali tasdiqlanadi)</span>
               </label>
-              <div class="flex items-stretch">
-                <span class="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-zinc-300 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800 text-xs font-mono font-bold text-zinc-500 dark:text-zinc-400">+998</span>
-                <input
-                  :value="formData.phone1"
-                  @input="onPhone1Input"
-                  type="tel"
-                  required
-                  placeholder="90-123-45-67"
-                  class="w-full px-3.5 py-2.5 text-xs font-mono font-bold rounded-r-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-black dark:text-white placeholder:text-zinc-400 focus:outline-hidden focus:border-black dark:focus:border-white transition-colors shadow-2xs"
-                />
+
+              <!-- reCAPTCHA invisible container -->
+              <div id="recaptcha-phone1"></div>
+
+              <!-- Phone input + Send OTP button -->
+              <div class="flex items-stretch gap-2">
+                <div class="flex-1">
+                  <input
+                    :value="formData.phone1"
+                    @input="onPhone1Input"
+                    type="tel"
+                    required
+                    :disabled="phone1IsVerified"
+                    placeholder="+998 90-123-45-67"
+                    class="w-full px-3.5 py-2.5 text-xs font-mono font-bold rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-black dark:text-white placeholder:text-zinc-400 focus:outline-hidden focus:border-black dark:focus:border-white transition-colors shadow-2xs disabled:opacity-60"
+                  />
+                </div>
+
+                <!-- Verified badge -->
+                <template v-if="phone1IsVerified">
+                  <div class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-400/50 text-emerald-700 dark:text-emerald-300 text-xs font-bold whitespace-nowrap">
+                    <CheckCircle2 class="w-3.5 h-3.5" />
+                    Tasdiqlandi
+                  </div>
+                </template>
+
+                <!-- Send OTP button -->
+                <template v-else-if="phone1Step === 'idle' || phone1Step === 'sending'">
+                  <button
+                    type="button"
+                    @click="sendPhone1Otp"
+                    :disabled="!isCompletePhone(formData.phone1) || phone1Loading"
+                    class="px-3 py-2 rounded-lg bg-zinc-900 hover:bg-zinc-700 dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-black text-xs font-bold transition-all disabled:opacity-40 whitespace-nowrap cursor-pointer inline-flex items-center gap-1.5"
+                  >
+                    <Loader2 v-if="phone1Loading" class="w-3.5 h-3.5 animate-spin" />
+                    <Phone v-else class="w-3.5 h-3.5" />
+                    SMS yuborish
+                  </button>
+                </template>
+
+                <!-- Resend button when code sent -->
+                <template v-else>
+                  <button
+                    type="button"
+                    @click="sendPhone1Otp"
+                    :disabled="phone1Loading"
+                    class="px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 text-xs font-bold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-all disabled:opacity-40 whitespace-nowrap cursor-pointer"
+                  >
+                    Qayta yuborish
+                  </button>
+                </template>
               </div>
-              <p v-if="attemptStep1 && !isCompleteUzPhone(formData.phone1)" class="mt-1 text-[11px] font-semibold text-red-600 dark:text-red-400">
+
+              <!-- OTP code input (shown after SMS sent) -->
+              <div v-if="phone1Step === 'code_sent' || phone1Step === 'verifying'" class="mt-2.5 flex items-stretch gap-2">
+                <div class="relative flex-1">
+                  <KeyRound class="w-3.5 h-3.5 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <input
+                    v-model="phone1OtpCode"
+                    type="text"
+                    maxlength="6"
+                    placeholder="6 xonali SMS kod"
+                    class="w-full pl-9 pr-3 py-2.5 text-xs font-mono tracking-widest text-center rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-black dark:text-white focus:outline-hidden focus:border-black dark:focus:border-white transition-colors shadow-2xs"
+                  />
+                </div>
+                <button
+                  type="button"
+                  @click="confirmPhone1Otp"
+                  :disabled="phone1OtpCode.length < 6 || phone1Loading"
+                  class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all disabled:opacity-40 cursor-pointer inline-flex items-center gap-1.5"
+                >
+                  <Loader2 v-if="phone1Loading" class="w-3.5 h-3.5 animate-spin" />
+                  <Check v-else class="w-3.5 h-3.5" />
+                  Tasdiqlash
+                </button>
+              </div>
+
+              <!-- Error message -->
+              <p v-if="phone1Error" class="mt-1.5 text-[11px] font-semibold text-red-600 dark:text-red-400 flex items-center gap-1">
+                <AlertCircle class="w-3 h-3 shrink-0" />
+                {{ phone1Error }}
+              </p>
+
+              <!-- Validation error (tried to proceed without verification) -->
+              <p v-if="attemptStep1 && !phone1IsVerified && isCompletePhone(formData.phone1)" class="mt-1 text-[11px] font-semibold text-amber-600 dark:text-amber-400">
+                ⚠️ Telefon raqamini SMS orqali tasdiqlang!
+              </p>
+              <p v-if="attemptStep1 && !isCompletePhone(formData.phone1)" class="mt-1 text-[11px] font-semibold text-red-600 dark:text-red-400">
                 Telefon raqamini to'liq kiriting!
               </p>
             </div>
@@ -797,18 +1024,17 @@ onMounted(() => {
               <label class="block text-xs font-bold uppercase tracking-wide text-black dark:text-white mb-1.5">
                 Mobil telefon 2 <span class="text-red-600">*</span>
               </label>
-              <div class="flex items-stretch">
-                <span class="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-zinc-300 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800 text-xs font-mono font-bold text-zinc-500 dark:text-zinc-400">+998</span>
+              <div>
                 <input
                   :value="formData.phone2"
                   @input="onPhone2Input"
                   type="tel"
                   required
-                  placeholder="93-765-43-21"
-                  class="w-full px-3.5 py-2.5 text-xs font-mono font-bold rounded-r-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-black dark:text-white placeholder:text-zinc-400 focus:outline-hidden focus:border-black dark:focus:border-white transition-colors shadow-2xs"
+                  placeholder="+998 93-765-43-21"
+                  class="w-full px-3.5 py-2.5 text-xs font-mono font-bold rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-black dark:text-white placeholder:text-zinc-400 focus:outline-hidden focus:border-black dark:focus:border-white transition-colors shadow-2xs"
                 />
               </div>
-              <p v-if="attemptStep1 && !isCompleteUzPhone(formData.phone2)" class="mt-1 text-[11px] font-semibold text-red-600 dark:text-red-400">
+              <p v-if="attemptStep1 && !isCompletePhone(formData.phone2)" class="mt-1 text-[11px] font-semibold text-red-600 dark:text-red-400">
                 Telefon raqamini to'liq kiriting!
               </p>
             </div>
@@ -1030,19 +1256,96 @@ onMounted(() => {
                   Qarindoshlikni tanlang!
                 </p>
               </div>
-              <div>
-                <label class="text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 block mb-1">Telefon raqami</label>
-                <div class="flex items-stretch">
-                  <span class="inline-flex items-center px-2.5 rounded-l-lg border border-r-0 border-zinc-300 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800 text-xs font-mono font-bold text-zinc-500 dark:text-zinc-400">+998</span>
-                  <input
-                    :value="guardianData.phone"
-                    @input="onGuardianPhoneInput"
-                    type="tel"
-                    placeholder="90-123-45-67"
-                    class="w-full h-9 px-3 text-xs rounded-r-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-black dark:text-white focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white"
-                  />
+              <div class="sm:col-span-2">
+                <label class="text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 block mb-1">
+                  Telefon raqami
+                  <span class="ml-1 text-[10px] font-normal text-zinc-500 normal-case">(SMS orqali tasdiqlanadi)</span>
+                </label>
+
+                <!-- reCAPTCHA invisible container -->
+                <div id="recaptcha-guardian"></div>
+
+                <!-- Phone input row -->
+                <div class="flex items-stretch gap-2">
+                  <div class="flex-1">
+                    <input
+                      :value="guardianData.phone"
+                      @input="onGuardianPhoneInput"
+                      type="tel"
+                      :disabled="guardianIsVerified"
+                      placeholder="+998 90-123-45-67"
+                      class="w-full h-9 px-3 text-xs rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-black dark:text-white focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white disabled:opacity-60"
+                    />
+                  </div>
+
+                  <!-- Verified badge -->
+                  <template v-if="guardianIsVerified">
+                    <div class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-400/50 text-emerald-700 dark:text-emerald-300 text-xs font-bold whitespace-nowrap">
+                      <CheckCircle2 class="w-3.5 h-3.5" />
+                      Tasdiqlandi
+                    </div>
+                  </template>
+
+                  <!-- Send OTP button -->
+                  <template v-else-if="guardianStep === 'idle' || guardianStep === 'sending'">
+                    <button
+                      type="button"
+                      @click="sendGuardianOtp"
+                      :disabled="!isCompletePhone(guardianData.phone) || guardianLoading"
+                      class="h-9 px-3 rounded-lg bg-zinc-900 hover:bg-zinc-700 dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-black text-xs font-bold transition-all disabled:opacity-40 whitespace-nowrap cursor-pointer inline-flex items-center gap-1.5"
+                    >
+                      <Loader2 v-if="guardianLoading" class="w-3.5 h-3.5 animate-spin" />
+                      <Phone v-else class="w-3.5 h-3.5" />
+                      SMS
+                    </button>
+                  </template>
+
+                  <!-- Resend button -->
+                  <template v-else>
+                    <button
+                      type="button"
+                      @click="sendGuardianOtp"
+                      :disabled="guardianLoading"
+                      class="h-9 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 text-xs font-bold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-all disabled:opacity-40 whitespace-nowrap cursor-pointer"
+                    >
+                      Qayta
+                    </button>
+                  </template>
                 </div>
-                <p v-if="attemptStep2 && !isCompleteUzPhone(guardianData.phone)" class="mt-1 text-[11px] font-semibold text-red-600 dark:text-red-400">
+
+                <!-- OTP code input -->
+                <div v-if="guardianStep === 'code_sent' || guardianStep === 'verifying'" class="mt-2 flex items-stretch gap-2">
+                  <div class="relative flex-1">
+                    <KeyRound class="w-3.5 h-3.5 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <input
+                      v-model="guardianOtpCode"
+                      type="text"
+                      maxlength="6"
+                      placeholder="6 xonali SMS kod"
+                      class="w-full pl-9 pr-3 h-9 text-xs font-mono tracking-widest text-center rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-black dark:text-white focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    @click="confirmGuardianOtp"
+                    :disabled="guardianOtpCode.length < 6 || guardianLoading"
+                    class="h-9 px-4 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all disabled:opacity-40 cursor-pointer inline-flex items-center gap-1.5"
+                  >
+                    <Loader2 v-if="guardianLoading" class="w-3.5 h-3.5 animate-spin" />
+                    <Check v-else class="w-3.5 h-3.5" />
+                    OK
+                  </button>
+                </div>
+
+                <!-- Error -->
+                <p v-if="guardianError" class="mt-1 text-[11px] font-semibold text-red-600 dark:text-red-400 flex items-center gap-1">
+                  <AlertCircle class="w-3 h-3 shrink-0" />
+                  {{ guardianError }}
+                </p>
+                <p v-if="attemptStep2 && !guardianIsVerified && isCompletePhone(guardianData.phone)" class="mt-1 text-[11px] font-semibold text-amber-600 dark:text-amber-400">
+                  ⚠️ Kafil telefon raqamini SMS orqali tasdiqlang!
+                </p>
+                <p v-if="attemptStep2 && !isCompletePhone(guardianData.phone)" class="mt-1 text-[11px] font-semibold text-red-600 dark:text-red-400">
                   Kafil telefon raqamini to'liq kiriting!
                 </p>
               </div>

@@ -111,6 +111,9 @@ export interface SubmitContractPayload {
     confirmation_code_meaning: boolean
   }
   password: string
+  // Phone verification session tokens (required — Firebase Phone Auth)
+  phone1_session_token: string
+  guardian_phone_session_token?: string  // faqat is_minor=true bo'lganda
   // Required only when the student is under 18 at signing time (Fuqarolik
   // kodeksi 27-modda) - omitted entirely for adult students.
   guardian_full_name?: string
@@ -212,6 +215,17 @@ export const onlineContractsApi = {
   // 2. Request Email OTP
   async sendOtp(email: string, tenant_slug: string): Promise<{ detail: string; expires_in_seconds: number }> {
     const { data } = await apiClient.post('/contracts/online/send-otp/', { email, tenant_slug })
+    return data
+  },
+
+  // 2b. Verify Phone OTP (Firebase Phone Auth) — session_token qaytaradi
+  async verifyPhone(payload: {
+    id_token: string
+    phone: string
+    phone_type: 'phone1' | 'guardian_phone'
+    tenant_slug: string
+  }): Promise<{ verified: boolean; session_token: string; phone: string; expires_in: number }> {
+    const { data } = await apiClient.post('/contracts/online/verify-phone/', payload)
     return data
   },
 

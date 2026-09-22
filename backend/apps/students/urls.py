@@ -20,6 +20,7 @@ from .views import (
 from .online_contract_views import (
     TenantInfoView,
     SendOtpView,
+    VerifyPhoneOtpView,
     StudentSignUpView,
     StudentSignInView,
     StudentProfileView,
@@ -74,6 +75,7 @@ urlpatterns = [
     path('contracts/online/tenant-info/<slug:slug>/', TenantInfoView.as_view(), name='online-contract-tenant-info'),
     path('contracts/online/send-otp/', SendOtpView.as_view(), name='online-contract-send-otp'),
     path('contracts/online/send-otp/<slug:tenant_slug>/', SendOtpView.as_view(), name='online-contract-send-otp-slug'),
+    path('contracts/online/verify-phone/', VerifyPhoneOtpView.as_view(), name='online-contract-verify-phone'),
     path('contracts/online/sign-up/', StudentSignUpView.as_view(), name='online-contract-sign-up'),
     path('contracts/online/sign-up/<slug:tenant_slug>/', StudentSignUpView.as_view(), name='online-contract-sign-up-slug'),
     path('contracts/online/sign-in/', StudentSignInView.as_view(), name='online-contract-sign-in'),
