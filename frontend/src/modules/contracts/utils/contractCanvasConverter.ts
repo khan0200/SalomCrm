@@ -675,6 +675,48 @@ export function convertCanvasDocumentToHtml(
           .canvas-a4-page-print p[style*="border-bottom"] {
             padding-bottom: 2px !important;
           }
+          /* List styling travels with the HTML itself (instead of living only
+             in CanvasTextElement.vue's global style block) so bulleted/numbered
+             lists render identically wherever this converter's output is
+             injected via v-html - including modules that never load the
+             canvas editor component, like the student-facing contract viewer. */
+          .canvas-text-element ol {
+            list-style-type: decimal !important;
+            padding-left: 1.8em !important;
+            margin: 0.3em 0 !important;
+            font-family: inherit !important;
+          }
+          .canvas-text-element ol ol {
+            list-style-type: lower-alpha !important;
+            padding-left: 1.6em !important;
+            margin: 0.15em 0 !important;
+          }
+          .canvas-text-element ol ol ol {
+            list-style-type: lower-roman !important;
+            padding-left: 1.6em !important;
+            margin: 0.15em 0 !important;
+          }
+          .canvas-text-element ul {
+            list-style-type: disc !important;
+            padding-left: 1.8em !important;
+            margin: 0.3em 0 !important;
+            font-family: inherit !important;
+          }
+          .canvas-text-element ul ul {
+            list-style-type: circle !important;
+            padding-left: 1.6em !important;
+            margin: 0.15em 0 !important;
+          }
+          .canvas-text-element ul ul ul {
+            list-style-type: square !important;
+            padding-left: 1.6em !important;
+            margin: 0.15em 0 !important;
+          }
+          .canvas-text-element li {
+            margin: 0.15em 0 !important;
+            font-family: inherit !important;
+            line-height: inherit !important;
+          }
         </style>
         ${elementsHtml}
         ${footerHtml}
