@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import { Eraser, Check, AlertCircle } from 'lucide-vue-next'
+import { trimSignatureCanvas } from '../utils/trimSignature'
 
 const props = defineProps<{
   modelValue?: string
@@ -40,7 +41,7 @@ function initCanvas() {
   if (!ctx) return
 
   ctx.scale(dpr, dpr)
-  ctx.strokeStyle = '#0f172a'
+  ctx.strokeStyle = '#1e3a8a'
   ctx.lineWidth = strokeWidth.value
   ctx.lineCap = 'round'
   ctx.lineJoin = 'round'
@@ -49,7 +50,15 @@ function initCanvas() {
   if (currentSrc) {
     const img = new Image()
     img.onload = () => {
-      ctx?.drawImage(img, 0, 0, rect.width, rect.height)
+      // A previously-trimmed signature is small and rarely square - draw it
+      // centered at its own aspect ratio instead of stretching it to fill
+      // the whole pad.
+      const scale = Math.min(rect.width / img.width, rect.height / img.height, 1)
+      const drawWidth = img.width * scale
+      const drawHeight = img.height * scale
+      const offsetX = (rect.width - drawWidth) / 2
+      const offsetY = (rect.height - drawHeight) / 2
+      ctx?.drawImage(img, offsetX, offsetY, drawWidth, drawHeight)
       hasSignature.value = true
     }
     img.src = currentSrc
@@ -117,8 +126,9 @@ function clearCanvas() {
 function exportSignature() {
   const canvas = canvasRef.value
   if (!canvas || !hasSignature.value) return
-  // Transparent clean PNG
-  const dataUrl = canvas.toDataURL('image/png')
+  // Trim to the ink's bounding box so the signature lands in the same spot
+  // on the document regardless of where it was drawn on the pad.
+  const dataUrl = trimSignatureCanvas(canvas)
   previewDataUrl.value = dataUrl
   emit('update:modelValue', dataUrl)
   emit('change', dataUrl)

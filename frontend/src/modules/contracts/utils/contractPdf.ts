@@ -74,7 +74,7 @@ export function prepareContractHtml(
 
   // Inject signature variable if provided
   if (signatureData) {
-    const sigImg = `<img src="${signatureData}" style="max-height: 55px; max-width: 170px; object-fit: contain; vertical-align: middle; display: inline-block;" alt="Talaba Imzosi" />`
+    const sigImg = `<img src="${signatureData}" style="max-height: 55px; max-width: 170px; object-fit: contain; vertical-align: bottom; display: inline-block;" alt="Talaba Imzosi" />`
     mergedVars['student_signature'] = sigImg
     mergedVars['signature'] = sigImg
     mergedVars['imzo'] = sigImg
@@ -202,7 +202,7 @@ async function renderDocumentIntoPdf(
   const badge = statusBadge(verificationMeta?.status)
 
   if (signatureData) {
-    const sigImg = `<img src="${signatureData}" style="max-height: 55px; max-width: 170px; object-fit: contain; vertical-align: middle; display: inline-block;" alt="Talaba Imzosi" />`
+    const sigImg = `<img src="${signatureData}" style="max-height: 55px; max-width: 170px; object-fit: contain; vertical-align: bottom; display: inline-block;" alt="Talaba Imzosi" />`
     mergedVars['student_signature'] = sigImg
     mergedVars['signature'] = sigImg
     mergedVars['imzo'] = sigImg

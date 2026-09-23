@@ -453,7 +453,7 @@ export function buildVariableValues(
   const rawGuardianSignature = student?.guardian_signature_data || student?.guardianSignatureData || ''
   const guardianSignatureHtml = rawGuardianSignature
     ? (rawGuardianSignature.startsWith('data:image/')
-        ? `<img src="${rawGuardianSignature}" style="max-height: 42px; max-width: 150px; object-fit: contain; vertical-align: middle; display: inline-block;" alt="Kafil imzosi" />`
+        ? `<img src="${rawGuardianSignature}" style="max-height: 42px; max-width: 150px; object-fit: contain; vertical-align: bottom; display: inline-block;" alt="Kafil imzosi" />`
         : rawGuardianSignature)
     : ''
 
@@ -474,7 +474,7 @@ export function buildVariableValues(
 
   const signatureHtml = rawSignature
     ? (rawSignature.startsWith('data:image/')
-        ? `<img src="${rawSignature}" style="max-height: 42px; max-width: 150px; object-fit: contain; vertical-align: middle; display: inline-block;" alt="Imzo" />`
+        ? `<img src="${rawSignature}" style="max-height: 42px; max-width: 150px; object-fit: contain; vertical-align: bottom; display: inline-block;" alt="Imzo" />`
         : rawSignature)
     : ''
 
@@ -1006,7 +1006,7 @@ export function replaceVariablesInHtml(
   if (!isExcluded('signature', 'imzo', 'student_signature', 'signature_data', 'verification_code', 'tasdiqlash_kodi') && (signature || verifCode)) {
     let sigSnippet = ''
     if (signature && signature.startsWith('data:image/')) {
-      sigSnippet += `<img src="${signature}" style="max-height: 38px; max-width: 140px; object-fit: contain; vertical-align: middle; display: inline-block; margin-right: 8px;" alt="Imzo" />`
+      sigSnippet += `<img src="${signature}" style="max-height: 38px; max-width: 140px; object-fit: contain; vertical-align: bottom; display: inline-block; margin-right: 8px;" alt="Imzo" />`
     } else if (signature && signature.includes('<img')) {
       sigSnippet += signature + ' '
     }

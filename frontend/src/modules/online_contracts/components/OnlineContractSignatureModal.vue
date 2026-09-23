@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { X, Eraser, Check } from 'lucide-vue-next'
+import { trimSignatureCanvas } from '../utils/trimSignature'
 
 const props = defineProps<{
   isOpen: boolean
@@ -37,6 +38,10 @@ let currentStroke: { x: number; y: number }[] = []
 // base layer under any new/replayed vector strokes instead of being wiped
 // the first time the slider moves.
 let backgroundImage: HTMLImageElement | null = null
+// A trimmed signature is small and rarely square - drawn centered at its
+// own aspect ratio (computed once on load) instead of stretched to fill
+// the whole pad. redrawAll() reuses this same rect on every restroke.
+let backgroundImageRect: { x: number; y: number; w: number; h: number } | null = null
 
 watch(strokeWidth, (val) => {
   if (ctx) ctx.lineWidth = val
@@ -48,8 +53,9 @@ function redrawAll() {
   if (!canvas || !ctx) return
   const rect = canvas.getBoundingClientRect()
   ctx.clearRect(0, 0, rect.width, rect.height)
-  if (backgroundImage) {
-    ctx.drawImage(backgroundImage, 0, 0, rect.width, rect.height)
+  if (backgroundImage && backgroundImageRect) {
+    const r = backgroundImageRect
+    ctx.drawImage(backgroundImage, r.x, r.y, r.w, r.h)
   }
   for (const stroke of strokes) {
     if (stroke.length === 1) {
@@ -85,7 +91,7 @@ function initCanvas() {
   if (!ctx) return
 
   ctx.scale(dpr, dpr)
-  ctx.strokeStyle = '#0f172a'
+  ctx.strokeStyle = '#1e3a8a'
   ctx.lineWidth = strokeWidth.value
   ctx.lineCap = 'round'
   ctx.lineJoin = 'round'
@@ -93,12 +99,17 @@ function initCanvas() {
   strokes = []
   currentStroke = []
   backgroundImage = null
+  backgroundImageRect = null
 
   if (props.modelValue) {
     const img = new Image()
     img.onload = () => {
       backgroundImage = img
-      ctx?.drawImage(img, 0, 0, rect.width, rect.height)
+      const scale = Math.min(rect.width / img.width, rect.height / img.height, 1)
+      const w = img.width * scale
+      const h = img.height * scale
+      backgroundImageRect = { x: (rect.width - w) / 2, y: (rect.height - h) / 2, w, h }
+      ctx?.drawImage(img, backgroundImageRect.x, backgroundImageRect.y, w, h)
       hasSignature.value = true
     }
     img.src = props.modelValue
@@ -173,7 +184,9 @@ function clearCanvas() {
 function handleConfirm() {
   const canvas = canvasRef.value
   if (!canvas || !hasSignature.value) return
-  const dataUrl = canvas.toDataURL('image/png')
+  // Trim to the ink's bounding box so the signature lands in the same spot
+  // on the document regardless of where it was drawn on the pad.
+  const dataUrl = trimSignatureCanvas(canvas)
   emit('update:modelValue', dataUrl)
   emit('confirm', dataUrl)
   emit('close')
