@@ -1426,6 +1426,64 @@ const currentYear = new Date().getFullYear()
 const validDateYears = Array.from({ length: 20 }, (_, i) => String(currentYear - 8 + i))
 const dateMonths = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0'))
 
+// Official TOPIK PBT/IBT session dates (test date + valid-until date, per
+// topik.go.kr's published schedule). Valid date = result-announcement date
+// + 2 years - 1 day, NOT test date + 2 years - this is why these are looked
+// up directly instead of reusing the generic +2-years-from-test-date rule
+// below, which every other certificate type still relies on.
+const TOPIK_PBT_SESSIONS = [
+  { session: '95', test_date: '2024-07-13', valid_date: '2026-08-21' },
+  { session: '96', test_date: '2024-10-12', valid_date: '2026-11-27' },
+  { session: '97', test_date: '2024-11-10', valid_date: '2026-12-18' },
+  { session: '98', test_date: '2025-01-19', valid_date: '2027-02-26' },
+  { session: '99', test_date: '2025-04-13', valid_date: '2027-05-29' },
+  { session: '100', test_date: '2025-05-11', valid_date: '2027-06-25' },
+  { session: '101', test_date: '2025-07-13', valid_date: '2027-08-20' },
+  { session: '102', test_date: '2025-10-19', valid_date: '2027-12-10' },
+  { session: '103', test_date: '2025-11-16', valid_date: '2027-12-22' },
+  { session: '104', test_date: '2026-01-11', valid_date: '2028-02-11' },
+  { session: '105', test_date: '2026-04-12', valid_date: '2028-05-28' },
+  { session: '106', test_date: '2026-05-17', valid_date: '2028-06-24' },
+  { session: '107', test_date: '2026-07-05', valid_date: '2028-08-12' },
+  { session: '108', test_date: '2026-10-18', valid_date: '2028-12-09' },
+  { session: '109', test_date: '2026-11-15', valid_date: '2028-12-21' },
+]
+const TOPIK_IBT_SESSIONS = [
+  { session: '1', test_date: '2023-11-18', valid_date: '2025-12-18' },
+  { session: '2', test_date: '2024-03-22', valid_date: '2026-04-15' },
+  { session: '3', test_date: '2024-06-07', valid_date: '2026-07-01' },
+  { session: '4', test_date: '2024-09-27', valid_date: '2026-10-21' },
+  { session: '5', test_date: '2025-02-22', valid_date: '2027-03-13' },
+  { session: '6', test_date: '2025-03-22', valid_date: '2027-04-10' },
+  { session: '7', test_date: '2025-06-14', valid_date: '2027-07-03' },
+  { session: '8', test_date: '2025-09-13', valid_date: '2027-10-01' },
+  { session: '9', test_date: '2025-10-25', valid_date: '2027-11-13' },
+  { session: '10', test_date: '2025-11-29', valid_date: '2027-12-18' },
+  { session: '11', test_date: '2026-02-28', valid_date: '2028-03-19' },
+  { session: '12', test_date: '2026-03-21', valid_date: '2028-04-09' },
+  { session: '13', test_date: '2026-06-13', valid_date: '2028-07-02' },
+  { session: '14', test_date: '2026-09-12', valid_date: '2028-10-01' },
+  { session: '15', test_date: '2026-10-24', valid_date: '2028-11-12' },
+  { session: '16', test_date: '2026-11-28', valid_date: '2028-12-17' },
+]
+const selectedTopikPbtSession = ref('')
+const selectedTopikIbtSession = ref('')
+
+function applyTopikSession(format: 'PBT' | 'IBT', session: string) {
+  const list = format === 'PBT' ? TOPIK_PBT_SESSIONS : TOPIK_IBT_SESSIONS
+  const found = list.find(s => s.session === session)
+  if (format === 'PBT') {
+    selectedTopikPbtSession.value = session
+    selectedTopikIbtSession.value = ''
+  } else {
+    selectedTopikIbtSession.value = session
+    selectedTopikPbtSession.value = ''
+  }
+  if (!found) return
+  certForm.value.test_date = found.test_date
+  certForm.value.valid_date = found.valid_date
+}
+
 const getTestDateParts = () => {
   const parts = certForm.value.test_date ? certForm.value.test_date.split('-') : ['', '', '']
   return { y: parts[0] || '', m: parts[1] || '', d: parts[2] || '' }
@@ -1475,6 +1533,8 @@ const updateCertValidDate = (field: 'y' | 'm' | 'd', val: string) => {
 
 // Certificate Modal Handlers
 const openCertModal = (slot: 1 | 2 | 3) => {
+  selectedTopikPbtSession.value = ''
+  selectedTopikIbtSession.value = ''
   if (!props.student || !authStore.canEdit) return
   certModalSlot.value = slot
   const s = props.student
@@ -4095,6 +4155,36 @@ const handleRestoreStudent = () => {
                   placeholder="e.g. 6.0 or 1400"
                   class="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 px-3 py-2 rounded-xl outline-none focus:border-blue-500 font-bold text-xs"
                 />
+              </div>
+
+              <!-- TOPIK PBT / IBT session pickers: auto-fill Test Date + Valid Date -->
+              <div v-if="certForm.type === 'TOPIK'" class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-[11px] font-bold uppercase text-zinc-500 mb-1.5 tracking-wider">
+                    TOPIK PBT
+                  </label>
+                  <select
+                    :value="selectedTopikPbtSession"
+                    @change="applyTopikSession('PBT', ($event.target as HTMLSelectElement).value)"
+                    class="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 px-3 py-2 rounded-xl outline-none focus:border-blue-500 font-bold text-xs"
+                  >
+                    <option value="">-- Tanlang --</option>
+                    <option v-for="s in TOPIK_PBT_SESSIONS" :key="s.session" :value="s.session">TOPIK {{ s.session }}</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-[11px] font-bold uppercase text-zinc-500 mb-1.5 tracking-wider">
+                    TOPIK IBT
+                  </label>
+                  <select
+                    :value="selectedTopikIbtSession"
+                    @change="applyTopikSession('IBT', ($event.target as HTMLSelectElement).value)"
+                    class="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 px-3 py-2 rounded-xl outline-none focus:border-blue-500 font-bold text-xs"
+                  >
+                    <option value="">-- Tanlang --</option>
+                    <option v-for="s in TOPIK_IBT_SESSIONS" :key="s.session" :value="s.session">IBT {{ s.session }}</option>
+                  </select>
+                </div>
               </div>
 
               <!-- Test Date & Valid Date (3-select picker with auto 2-year valid date calculation) -->
