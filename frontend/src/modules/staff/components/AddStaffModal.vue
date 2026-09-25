@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import BaseModal from '@/components/common/BaseModal.vue'
-import { AlertCircle, UserPlus, Loader2 } from 'lucide-vue-next'
+import {
+  AlertCircle, UserPlus, Loader2, User, Mail, Building2, KeyRound, Globe, Lock
+} from 'lucide-vue-next'
 import type { UserRole, UserProfile, DataScope } from '@/types'
 import { useOffices } from '@/composables/useOffices'
 
@@ -108,96 +110,139 @@ const handleSubmit = () => {
     :subtitle="isEditing
       ? 'Update the details, role, or password for this team member.'
       : 'The new account is created inside your agency automatically.'"
-    max-width="max-w-md"
+    max-width="max-w-2xl"
     @close="emit('close')"
   >
-    <form @submit.prevent="handleSubmit" class="space-y-4 text-xs">
+    <form @submit.prevent="handleSubmit" class="space-y-5 text-xs">
       <div v-if="error" class="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 flex items-center gap-2 font-semibold">
         <AlertCircle class="w-4 h-4 shrink-0" />
         <span>{{ error }}</span>
       </div>
 
-      <div>
-        <label class="block font-bold text-zinc-700 dark:text-zinc-300 mb-1">Full Name <span class="text-rose-500">*</span></label>
-        <input
-          v-model="form.full_name"
-          type="text"
-          placeholder="e.g. Aziz Karimov"
-          required
-          class="w-full px-3 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 font-semibold focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none"
-        />
+      <!-- Basic info -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label class="block font-bold text-zinc-700 dark:text-zinc-300 mb-1">Full Name <span class="text-rose-500">*</span></label>
+          <div class="relative">
+            <User class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-400 pointer-events-none" />
+            <input
+              v-model="form.full_name"
+              type="text"
+              placeholder="e.g. Aziz Karimov"
+              required
+              class="w-full pl-9 pr-3 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 font-semibold focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label class="block font-bold text-zinc-700 dark:text-zinc-300 mb-1">Email <span class="text-rose-500">*</span></label>
+          <div class="relative">
+            <Mail class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-400 pointer-events-none" />
+            <input
+              v-model="form.email"
+              type="email"
+              placeholder="staff@agency.com"
+              required
+              class="w-full pl-9 pr-3 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 font-medium focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none"
+            />
+          </div>
+        </div>
       </div>
 
-      <div>
-        <label class="block font-bold text-zinc-700 dark:text-zinc-300 mb-1">Email <span class="text-rose-500">*</span></label>
-        <input
-          v-model="form.email"
-          type="email"
-          placeholder="staff@agency.com"
-          required
-          class="w-full px-3 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 font-medium focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none"
-        />
+      <!-- Role & Branch -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label class="block font-bold text-zinc-700 dark:text-zinc-300 mb-1">Role <span class="text-rose-500">*</span></label>
+          <select
+            v-model="form.role"
+            class="w-full px-3 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 font-semibold focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none cursor-pointer"
+          >
+            <option v-for="opt in roleOptions" :key="opt.value" :value="opt.value">
+              {{ opt.label }}
+            </option>
+          </select>
+          <p class="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1">
+            {{ roleOptions.find(o => o.value === form.role)?.hint }}
+          </p>
+        </div>
+
+        <div>
+          <label class="block font-bold text-zinc-700 dark:text-zinc-300 mb-1">Branch / Office</label>
+          <div class="relative">
+            <Building2 class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-400 pointer-events-none z-10" />
+            <select
+              v-model="form.branch"
+              class="w-full pl-9 pr-3 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 font-semibold focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none cursor-pointer"
+            >
+              <option value="">Not assigned</option>
+              <option v-for="office in officesRegistry" :key="office.id" :value="String(office.id)">
+                {{ office.name }}
+              </option>
+            </select>
+          </div>
+          <p class="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1">
+            Which office this team member works out of.
+          </p>
+        </div>
       </div>
 
+      <!-- Access to Data -->
       <div>
-        <label class="block font-bold text-zinc-700 dark:text-zinc-300 mb-1">Role <span class="text-rose-500">*</span></label>
-        <select
-          v-model="form.role"
-          class="w-full px-3 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 font-semibold focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none cursor-pointer"
-        >
-          <option v-for="opt in roleOptions" :key="opt.value" :value="opt.value">
-            {{ opt.label }}
-          </option>
-        </select>
-        <p class="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1">
-          {{ roleOptions.find(o => o.value === form.role)?.hint }}
-        </p>
+        <label class="block font-bold text-zinc-700 dark:text-zinc-300 mb-1.5">Access to Data</label>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <button
+            type="button"
+            @click="form.data_scope = 'ALL'"
+            class="text-left p-3 rounded-xl border-2 transition-all cursor-pointer"
+            :class="form.data_scope === 'ALL'
+              ? 'border-sky-500 bg-sky-50 dark:bg-sky-950/40'
+              : 'border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600'"
+          >
+            <div class="flex items-center gap-1.5 mb-1">
+              <Globe class="w-3.5 h-3.5 shrink-0" :class="form.data_scope === 'ALL' ? 'text-sky-600 dark:text-sky-400' : 'text-zinc-400'" />
+              <span class="font-bold" :class="form.data_scope === 'ALL' ? 'text-sky-700 dark:text-sky-300' : 'text-zinc-700 dark:text-zinc-300'">All Data</span>
+            </div>
+            <p class="text-[10px] text-zinc-500 dark:text-zinc-400 leading-snug">
+              Every branch's students, payments, and contracts.
+            </p>
+          </button>
+
+          <button
+            type="button"
+            @click="form.data_scope = 'BRANCH_ONLY'"
+            class="text-left p-3 rounded-xl border-2 transition-all cursor-pointer"
+            :class="form.data_scope === 'BRANCH_ONLY'
+              ? 'border-amber-500 bg-amber-50 dark:bg-amber-950/40'
+              : 'border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600'"
+          >
+            <div class="flex items-center gap-1.5 mb-1">
+              <Lock class="w-3.5 h-3.5 shrink-0" :class="form.data_scope === 'BRANCH_ONLY' ? 'text-amber-600 dark:text-amber-400' : 'text-zinc-400'" />
+              <span class="font-bold" :class="form.data_scope === 'BRANCH_ONLY' ? 'text-amber-700 dark:text-amber-300' : 'text-zinc-700 dark:text-zinc-300'">Branch Only</span>
+            </div>
+            <p class="text-[10px] text-zinc-500 dark:text-zinc-400 leading-snug">
+              Only the branch selected above - regardless of role.
+            </p>
+          </button>
+        </div>
       </div>
 
-      <div>
-        <label class="block font-bold text-zinc-700 dark:text-zinc-300 mb-1">Branch / Office</label>
-        <select
-          v-model="form.branch"
-          class="w-full px-3 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 font-semibold focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none cursor-pointer"
-        >
-          <option value="">Not assigned</option>
-          <option v-for="office in officesRegistry" :key="office.id" :value="String(office.id)">
-            {{ office.name }}
-          </option>
-        </select>
-        <p class="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1">
-          Which office this team member works out of.
-        </p>
-      </div>
-
-      <div>
-        <label class="block font-bold text-zinc-700 dark:text-zinc-300 mb-1">Access to Data</label>
-        <select
-          v-model="form.data_scope"
-          class="w-full px-3 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 font-semibold focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none cursor-pointer"
-        >
-          <option value="ALL">All data (every branch)</option>
-          <option value="BRANCH_ONLY">Only their branch's data</option>
-        </select>
-        <p class="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1">
-          {{ form.data_scope === 'BRANCH_ONLY'
-            ? "Restricted to students, payments, and contracts from the branch selected above - regardless of role."
-            : 'Can see students, payments, and contracts from every branch in the agency.' }}
-        </p>
-      </div>
-
+      <!-- Password -->
       <div>
         <label class="block font-bold text-zinc-700 dark:text-zinc-300 mb-1">
           {{ isEditing ? 'New Password' : 'Temporary Password' }}
           <span v-if="!isEditing" class="text-rose-500">*</span>
         </label>
-        <input
-          v-model="form.password"
-          type="password"
-          placeholder="••••••••"
-          :required="!isEditing"
-          class="w-full px-3 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 font-medium focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none"
-        />
+        <div class="relative">
+          <KeyRound class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-400 pointer-events-none" />
+          <input
+            v-model="form.password"
+            type="password"
+            placeholder="••••••••"
+            :required="!isEditing"
+            class="w-full pl-9 pr-3 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 font-medium focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none"
+          />
+        </div>
         <p class="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1">
           {{ isEditing
             ? 'Leave blank to keep the current password.'

@@ -10,7 +10,7 @@ import {
   Users, Plus, Loader2, Mail, ShieldCheck, Pencil, Trash2, AlertTriangle,
   ShieldAlert, CheckCircle2, XCircle, Eye, Edit3, Trash, CreditCard,
   UserCog, BarChart2, Settings, BookOpen, FolderOpen, Crown, Shield, User,
-  Building2, FileSignature
+  Building2, FileSignature, Globe, Lock
 } from 'lucide-vue-next'
 
 import AddStaffModal from './components/AddStaffModal.vue'
@@ -384,6 +384,7 @@ const colorMap: Record<string, { bg: string; text: string; border: string; icon:
                 <th class="px-4 py-3">Email</th>
                 <th class="px-4 py-3">Role</th>
                 <th class="px-4 py-3">Branch</th>
+                <th class="px-4 py-3">Access</th>
                 <th class="px-4 py-3">Status</th>
                 <th class="px-4 py-3 text-right">Actions</th>
               </tr>
@@ -434,12 +435,20 @@ const colorMap: Record<string, { bg: string; text: string; border: string; icon:
                     {{ (member as any).branch_name }}
                   </span>
                   <span v-else class="text-zinc-400 dark:text-zinc-600 italic">Not assigned</span>
+                </td>
+                <td class="px-4 py-3">
                   <span
-                    v-if="(member as any).data_scope === 'BRANCH_ONLY'"
-                    title="Can only see this branch's students, payments, and contracts"
-                    class="mt-1 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-400 border border-amber-200 dark:border-amber-800"
+                    class="px-2 py-0.5 rounded-full text-[10px] font-bold inline-flex items-center gap-1"
+                    :class="(member as any).data_scope === 'BRANCH_ONLY'
+                      ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
+                      : 'bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300'"
+                    :title="(member as any).data_scope === 'BRANCH_ONLY'
+                      ? 'Can only see this branch\'s students, payments, and contracts'
+                      : 'Can see students, payments, and contracts from every branch'"
                   >
-                    Only this branch
+                    <Lock v-if="(member as any).data_scope === 'BRANCH_ONLY'" class="w-3 h-3" />
+                    <Globe v-else class="w-3 h-3" />
+                    {{ (member as any).data_scope === 'BRANCH_ONLY' ? 'Branch Only' : 'All Data' }}
                   </span>
                 </td>
                 <td class="px-4 py-3">
