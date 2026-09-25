@@ -123,6 +123,12 @@ const routes = [
     meta: { studentOnly: true, title: 'Mening Shartnomalarim' }
   },
   {
+    path: '/contracts/online/:tenantname/verification',
+    name: 'online-verification',
+    component: () => import('@/modules/online_contracts/pages/OnlineVerificationPage.vue'),
+    meta: { studentOnly: true, title: 'Shaxsni tasdiqlash' }
+  },
+  {
     path: '/contracts/online/:tenantname/contracts/sign',
     name: 'online-contract-sign',
     component: () => import('@/modules/online_contracts/pages/OnlineContractSignPage.vue'),

@@ -19,6 +19,7 @@ from .views import (
 )
 from .online_contract_views import (
     TenantInfoView,
+    TariffContractTextView,
     SendOtpView,
     StudentSignUpView,
     StudentSignInView,
@@ -30,6 +31,10 @@ from .online_contract_views import (
     PublicContractDetailView,
     CancelOnlineContractView,
     PublicVerifyContractView,
+    IdentityVerificationStartView,
+    IdentityVerificationStatusView,
+    IdentityVerificationConfirmView,
+    IdentityVerificationWebhookView,
 )
 
 router = DefaultRouter()
@@ -72,6 +77,7 @@ urlpatterns = [
 
     # Online Student Contracts API
     path('contracts/online/tenant-info/<slug:slug>/', TenantInfoView.as_view(), name='online-contract-tenant-info'),
+    path('contracts/online/tariff-contract-text/<int:tariff_id>/', TariffContractTextView.as_view(), name='online-tariff-contract-text'),
     path('contracts/online/send-otp/', SendOtpView.as_view(), name='online-contract-send-otp'),
     path('contracts/online/send-otp/<slug:tenant_slug>/', SendOtpView.as_view(), name='online-contract-send-otp-slug'),
     path('contracts/online/sign-up/', StudentSignUpView.as_view(), name='online-contract-sign-up'),
@@ -85,6 +91,12 @@ urlpatterns = [
     path('contracts/online/<uuid:contract_id>/audit-view/', LogContractViewAuditView.as_view(), name='online-contract-audit-view'),
     path('contracts/online/<uuid:contract_id>/detail/', PublicContractDetailView.as_view(), name='online-contract-detail'),
     path('contracts/online/<uuid:contract_id>/cancel/', CancelOnlineContractView.as_view(), name='online-contract-cancel'),
+
+    # Identity verification (Didit KYC) - gates first-time contract creation
+    path('contracts/online/verification/start/', IdentityVerificationStartView.as_view(), name='online-verification-start'),
+    path('contracts/online/verification/status/', IdentityVerificationStatusView.as_view(), name='online-verification-status'),
+    path('contracts/online/verification/confirm/', IdentityVerificationConfirmView.as_view(), name='online-verification-confirm'),
+    path('contracts/online/verification/webhook/', IdentityVerificationWebhookView.as_view(), name='online-verification-webhook'),
 
     # Public verification: GET /api/contracts/public/<verification_code>/
     # No auth - see PublicVerifyContractView docstring.

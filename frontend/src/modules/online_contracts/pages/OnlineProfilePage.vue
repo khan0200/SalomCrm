@@ -92,6 +92,10 @@ async function handleConfirmCancel() {
   }
 }
 
+const newContractRouteName = computed(() =>
+  profileData.value?.is_identity_verified ? 'online-contract-sign' : 'online-verification'
+)
+
 const isDownloadingPdfId = ref<string | null>(null)
 let pollTimer: any = null
 
@@ -338,6 +342,26 @@ function handleResubmit(contract: OnlineContractSummary) {
         </div>
       </section>
 
+      <!-- Identity verification reminder - shown until the student completes it once -->
+      <div
+        v-if="profileData && !profileData.is_identity_verified"
+        class="flex items-center justify-between gap-3 p-4 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50"
+      >
+        <div class="flex items-center gap-3">
+          <ShieldAlert class="w-5 h-5 text-amber-500 shrink-0" />
+          <div>
+            <p class="text-xs font-semibold text-amber-800 dark:text-amber-300">Shaxsingiz hali tasdiqlanmagan</p>
+            <p class="text-[11px] text-amber-700 dark:text-amber-400 mt-0.5">Yangi shartnoma tuzishdan oldin hujjatingiz va yuzingizni bir marta tasdiqlashingiz kerak.</p>
+          </div>
+        </div>
+        <router-link
+          :to="{ name: 'online-verification', params: { tenantname: tenantSlug } }"
+          class="shrink-0 inline-flex items-center px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-medium transition-colors"
+        >
+          Tasdiqlash
+        </router-link>
+      </div>
+
       <!-- 2. MY CONTRACTS SECTION -->
       <section class="space-y-4">
         <div class="flex items-center justify-between gap-4">
@@ -364,9 +388,9 @@ function handleResubmit(contract: OnlineContractSummary) {
               <span class="hidden sm:inline">Yangilash</span>
             </button>
 
-            <!-- New contract button -->
+            <!-- New contract button - routes through identity verification first if not done yet -->
             <router-link
-              :to="{ name: 'online-contract-sign', params: { tenantname: tenantSlug } }"
+              :to="{ name: newContractRouteName, params: { tenantname: tenantSlug } }"
               class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:hover:bg-white dark:text-zinc-950 text-xs font-medium transition-all shadow-xs active:scale-98"
             >
               <Plus class="w-3.5 h-3.5" />
@@ -666,7 +690,7 @@ function handleResubmit(contract: OnlineContractSummary) {
           </p>
           <div class="flex flex-col sm:flex-row items-center justify-center gap-3">
             <router-link
-              :to="{ name: 'online-contract-sign', params: { tenantname: tenantSlug } }"
+              :to="{ name: newContractRouteName, params: { tenantname: tenantSlug } }"
               class="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:hover:bg-white dark:text-zinc-950 text-xs font-medium shadow-xs transition-all active:scale-98"
             >
               <FileSignature class="w-3.5 h-3.5" />

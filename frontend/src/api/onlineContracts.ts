@@ -77,6 +77,14 @@ export interface OnlineContractSummary {
   has_signature: boolean
 }
 
+export type IdentityVerificationStatus =
+  | 'NOT_STARTED'
+  | 'IN_PROGRESS'
+  | 'PENDING_REVIEW'
+  | 'VERIFIED'
+  | 'DECLINED'
+  | 'ABANDONED'
+
 export interface StudentProfileResponse {
   user: {
     id: string
@@ -92,6 +100,24 @@ export interface StudentProfileResponse {
     office: string
   }
   contracts: OnlineContractSummary[]
+  is_identity_verified: boolean
+  verification_status: IdentityVerificationStatus
+}
+
+export interface VerificationStartResponse {
+  session_id: string
+  url: string
+  status: IdentityVerificationStatus
+}
+
+export interface VerificationStatusResponse {
+  status: IdentityVerificationStatus
+  document_type?: 'PASSPORT' | 'ID_CARD'
+  extracted?: {
+    full_name: string
+    document_number: string
+    date_of_birth: string
+  }
 }
 
 export interface SubmitContractPayload {
@@ -209,6 +235,13 @@ export const onlineContractsApi = {
     return data
   },
 
+  // 1b. Get one tariff's full contract text, on demand (deliberately not
+  // included in getTenantInfo's tariff list - see backend TenantInfoView).
+  async getTariffContractText(tariffId: string | number): Promise<{ id: number; contract_text: string }> {
+    const { data } = await apiClient.get(`/contracts/online/tariff-contract-text/${tariffId}/`)
+    return data
+  },
+
   // 2. Request Email OTP
   async sendOtp(email: string, tenant_slug: string): Promise<{ detail: string; expires_in_seconds: number }> {
     const { data } = await apiClient.post('/contracts/online/send-otp/', { email, tenant_slug })
@@ -216,7 +249,7 @@ export const onlineContractsApi = {
   },
 
   // 3. Verify OTP & Complete Sign Up
-  async signUp(payload: { email: string; password: string; code: string; tenant_slug: string }): Promise<StudentAuthResponse> {
+  async signUp(payload: { full_name: string; email: string; password: string; code: string; tenant_slug: string }): Promise<StudentAuthResponse> {
     const { data } = await apiClient.post<StudentAuthResponse>('/contracts/online/sign-up/', payload)
     return data
   },
@@ -236,6 +269,23 @@ export const onlineContractsApi = {
   // 6. Update Student Profile
   async updateProfile(payload: Partial<StudentProfileResponse['profile']> & { full_name?: string }): Promise<any> {
     const { data } = await apiClient.patch('/contracts/online/profile/', payload)
+    return data
+  },
+
+  // 6b. Identity Verification (Didit KYC) - required before a student's
+  // first contract can be created.
+  async startVerification(documentType: 'PASSPORT' | 'ID_CARD'): Promise<VerificationStartResponse> {
+    const { data } = await apiClient.post('/contracts/online/verification/start/', { document_type: documentType })
+    return data
+  },
+
+  async getVerificationStatus(): Promise<VerificationStatusResponse> {
+    const { data } = await apiClient.get('/contracts/online/verification/status/')
+    return data
+  },
+
+  async confirmVerification(payload: { full_name: string; document_number: string; date_of_birth: string }): Promise<{ detail: string; status: IdentityVerificationStatus }> {
+    const { data } = await apiClient.post('/contracts/online/verification/confirm/', payload)
     return data
   },
 

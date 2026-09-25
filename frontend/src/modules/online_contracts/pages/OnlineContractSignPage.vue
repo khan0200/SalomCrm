@@ -242,7 +242,26 @@ const variableValues = computed<Record<string, string>>(() => {
   )
 })
 
+// getTenantInfo's tariff list no longer carries contract_text (each one is
+// 250-350KB of HTML - fine for one tariff, not for fetching all of them just
+// to list prices). The one the visitor actually selected is fetched here.
+const fetchedContractText = ref<string>('')
+
+watch(selectedTariffId, async (id) => {
+  fetchedContractText.value = ''
+  if (!id) return
+  try {
+    const res = await onlineContractsApi.getTariffContractText(id)
+    fetchedContractText.value = res.contract_text || ''
+  } catch {
+    // Falls back to the generated sample below.
+  }
+}, { immediate: true })
+
 const effectiveContractText = computed(() => {
+  if (fetchedContractText.value.trim()) {
+    return fetchedContractText.value
+  }
   if (selectedTariff.value?.contract_text && selectedTariff.value.contract_text.trim()) {
     return selectedTariff.value.contract_text
   }
@@ -262,6 +281,23 @@ function formatPrice(val: number | string | undefined): string {
 async function init() {
   isLoading.value = true
   try {
+    // Identity must be verified once (document scan + face match) before a
+    // student's first contract - checked here too, not just via the
+    // "Yangi shartnoma" button on the profile page, since this page is
+    // reachable directly by URL.
+    if (!resubmitContractId.value) {
+      try {
+        const profile = await onlineContractsApi.getProfile()
+        if (!profile.is_identity_verified) {
+          router.replace({ name: 'online-verification', params: { tenantname: tenantSlug.value } })
+          return
+        }
+      } catch {
+        // If the profile check itself fails, fall through and let the rest
+        // of init() surface the real error (e.g. an expired session).
+      }
+    }
+
     const tInfo = await onlineContractsApi.getTenantInfo(tenantSlug.value)
     tenantInfo.value = tInfo
 

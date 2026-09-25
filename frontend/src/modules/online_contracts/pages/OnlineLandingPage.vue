@@ -106,6 +106,19 @@ function formatPrice(val: number | string | undefined): string {
 /**
  * Handle direct sample PDF download for a tariff
  */
+async function fetchTariffContractText(tariff: OnlineTariff): Promise<string | undefined> {
+  // getTenantInfo's list doesn't carry contract_text (see backend
+  // TenantInfoView) - fetched lazily here, only for the one tariff the
+  // visitor actually acted on.
+  if (tariff.contract_text) return tariff.contract_text
+  try {
+    const res = await onlineContractsApi.getTariffContractText(tariff.id)
+    return res.contract_text
+  } catch {
+    return undefined
+  }
+}
+
 async function handleDownloadSamplePdf(tariff: OnlineTariff) {
   const tariffIdStr = String(tariff.id)
   if (downloadingTariffId.value) return
@@ -113,7 +126,8 @@ async function handleDownloadSamplePdf(tariff: OnlineTariff) {
   downloadingTariffId.value = tariffIdStr
   try {
     const companyName = tenantInfo.value?.name || 'Konsalting Kompaniyasi'
-    const contractHtml = getTariffSampleContractHtml(companyName, tariff)
+    const contractText = await fetchTariffContractText(tariff)
+    const contractHtml = getTariffSampleContractHtml(companyName, { ...tariff, contract_text: contractText })
     const safeTitle = `${companyName}_${tariff.name}_Shartnoma`.replace(/[^a-zA-Z0-9_\u0400-\u04FF]/g, '_')
 
     await downloadContractAsPdf(
@@ -135,11 +149,20 @@ async function handleDownloadSamplePdf(tariff: OnlineTariff) {
   }
 }
 
-function handleViewContract(tariff: OnlineTariff) {
-  const companyName = tenantInfo.value?.name || 'Konsalting Kompaniyasi'
-  previewContractTitle.value = `${tariff.name} — Namunaviy Shartnoma`
-  previewContractContent.value = getTariffSampleContractHtml(companyName, tariff)
-  isPreviewModalOpen.value = true
+const isLoadingPreview = ref<string | null>(null)
+
+async function handleViewContract(tariff: OnlineTariff) {
+  if (isLoadingPreview.value) return
+  isLoadingPreview.value = String(tariff.id)
+  try {
+    const companyName = tenantInfo.value?.name || 'Konsalting Kompaniyasi'
+    const contractText = await fetchTariffContractText(tariff)
+    previewContractTitle.value = `${tariff.name} — Namunaviy Shartnoma`
+    previewContractContent.value = getTariffSampleContractHtml(companyName, { ...tariff, contract_text: contractText })
+    isPreviewModalOpen.value = true
+  } finally {
+    isLoadingPreview.value = null
+  }
 }
 
 function handleSelectTariffToSign(tariff: OnlineTariff) {
@@ -359,9 +382,11 @@ onMounted(() => {
               <button
                 type="button"
                 @click="handleViewContract(tariff)"
-                class="hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors cursor-pointer flex items-center gap-1 py-1"
+                :disabled="isLoadingPreview === String(tariff.id)"
+                class="hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors cursor-pointer flex items-center gap-1 py-1 disabled:opacity-60"
               >
-                <Eye class="w-3 h-3" />
+                <Loader2 v-if="isLoadingPreview === String(tariff.id)" class="w-3 h-3 animate-spin" />
+                <Eye v-else class="w-3 h-3" />
                 <span>Ko'rish</span>
               </button>
 

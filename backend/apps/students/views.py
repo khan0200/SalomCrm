@@ -121,6 +121,7 @@ class StudentViewSet(viewsets.ModelViewSet):
         # branch's students; everyone else (HEAD_MANAGER, SUPER_ADMIN, or an
         # ALL-scope STAFF/MANAGER) is unaffected - see apps.core.access.
         qs = qs.filter(branch_scope_filter(user))
+        qs = qs.select_related('created_by')
 
         # For detail actions (retrieve, update, set_color, set_folders, etc.), return base queryset
         if self.action != 'list':

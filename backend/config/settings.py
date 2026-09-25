@@ -87,7 +87,7 @@ DATABASE_URL = os.getenv('DATABASE_URL')
 if DATABASE_URL:
     import urllib.parse
     url = urllib.parse.urlparse(DATABASE_URL)
-    sslmode = os.getenv('DB_SSLMODE', 'prefer')
+    sslmode = os.getenv('DB_SSLMODE', 'disable')
     if url.query:
         query_params = urllib.parse.parse_qs(url.query)
         if 'sslmode' in query_params:
@@ -100,8 +100,16 @@ if DATABASE_URL:
             'PASSWORD': urllib.parse.unquote(url.password or ''),
             'HOST': url.hostname or 'localhost',
             'PORT': url.port or 5432,
+            # Reusing connections over public WAN avoids 3+ second TCP/SSL setup per request
+            'CONN_MAX_AGE': int(os.getenv('DB_CONN_MAX_AGE', '300')),
             'OPTIONS': {
                 'sslmode': sslmode,
+                'connect_timeout': int(os.getenv('DB_CONNECT_TIMEOUT', '30')),
+                'keepalives': 1,
+                'keepalives_idle': 30,
+                'keepalives_interval': 5,
+                'keepalives_count': 5,
+                'options': f"-c statement_timeout={os.getenv('DB_STATEMENT_TIMEOUT', '120000')}",
             },
         }
     }
@@ -114,6 +122,16 @@ elif os.getenv('DB_ENGINE') == 'postgresql' and os.getenv('DB_NAME'):
             'PASSWORD': os.getenv('DB_PASSWORD', 'postgres'),
             'HOST': os.getenv('DB_HOST', 'localhost'),
             'PORT': os.getenv('DB_PORT', '5432'),
+            'CONN_MAX_AGE': int(os.getenv('DB_CONN_MAX_AGE', '300')),
+            'OPTIONS': {
+                'sslmode': os.getenv('DB_SSLMODE', 'disable'),
+                'connect_timeout': int(os.getenv('DB_CONNECT_TIMEOUT', '30')),
+                'keepalives': 1,
+                'keepalives_idle': 30,
+                'keepalives_interval': 5,
+                'keepalives_count': 5,
+                'options': f"-c statement_timeout={os.getenv('DB_STATEMENT_TIMEOUT', '120000')}",
+            },
         }
     }
 else:
@@ -123,6 +141,11 @@ else:
             'NAME': BASE_DIR / 'db.sqlite3',
         }
     }
+
+# Detect a dead pooled connection (e.g. the remote DB or a NAT/firewall in
+# between silently dropped it) and transparently open a fresh one, instead
+# of handing a broken connection to the next request.
+DATABASES['default']['CONN_HEALTH_CHECKS'] = True
 
 
 
@@ -272,4 +295,14 @@ TELEGRAM_BOT_USERNAME = os.getenv('TELEGRAM_BOT_USERNAME', 'Koreavizabot')
 # Resend Email Settings
 RESEND_API_KEY = os.getenv('RESEND_API_KEY', '')
 RESEND_FROM_EMAIL = os.getenv('RESEND_FROM_EMAIL', 'Salom Korea <shartnomalar@salomkorea.uz>')
+
+# Didit Identity Verification (KYC) Settings
+# A workflow must be created in the Didit dashboard first (selecting ID
+# Verification + Face Match + Liveness) - its id goes in DIDIT_WORKFLOW_ID.
+# Until these are set, IdentityVerificationStartView returns a clear 503
+# rather than attempting a request with an empty API key.
+DIDIT_API_KEY = os.getenv('DIDIT_API_KEY', '')
+DIDIT_WORKFLOW_ID = os.getenv('DIDIT_WORKFLOW_ID', '')
+DIDIT_WEBHOOK_SECRET = os.getenv('DIDIT_WEBHOOK_SECRET', '')
+DIDIT_BASE_URL = os.getenv('DIDIT_BASE_URL', 'https://verification.didit.me')
 

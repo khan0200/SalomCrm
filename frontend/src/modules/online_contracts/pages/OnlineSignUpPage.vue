@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { onlineContractsApi } from '@/api/onlineContracts'
 import {
+  User,
   Mail,
   Lock,
   KeyRound,
@@ -41,6 +42,7 @@ onMounted(() => {
 
 const tenantSlug = computed(() => (route.params.tenantname as string) || '')
 
+const fullName = ref('')
 const email = ref('')
 const password = ref('')
 const confirmPassword = ref('')
@@ -77,6 +79,11 @@ const formattedCountdown = computed(() => {
 async function handleSendOtp() {
   errorMessage.value = ''
   successMessage.value = ''
+
+  if (!fullName.value.trim()) {
+    errorMessage.value = "Iltimos, to'liq ismingizni kiriting."
+    return
+  }
 
   if (!email.value || !email.value.includes('@')) {
     errorMessage.value = "Iltimos, to'g'ri email manzilini kiriting."
@@ -116,6 +123,7 @@ async function handleVerifyAndRegister() {
   isVerifying.value = true
   try {
     const data = await onlineContractsApi.signUp({
+      full_name: fullName.value.trim(),
       email: email.value,
       password: password.value,
       code: otpCode.value.trim().toUpperCase(),
@@ -202,8 +210,24 @@ async function handleVerifyAndRegister() {
         <span>{{ successMessage }}</span>
       </div>
 
-      <!-- Step 1: Email & Password -->
+      <!-- Step 1: Full Name, Email & Password -->
       <form v-if="!isOtpSent" @submit.prevent="handleSendOtp" class="space-y-4">
+        <div>
+          <label class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">
+            To'liq ismingiz
+          </label>
+          <div class="relative">
+            <User class="w-3.5 h-3.5 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              v-model="fullName"
+              type="text"
+              required
+              placeholder="Ism Familiya"
+              class="w-full pl-9 pr-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 text-xs text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-hidden focus:border-zinc-400 dark:focus:border-zinc-600 transition-colors"
+            />
+          </div>
+        </div>
+
         <div>
           <label class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">
             Email manzilingiz
@@ -308,6 +332,7 @@ async function handleVerifyAndRegister() {
               <span>{{ formattedCountdown }}</span>
             </span>
           </div>
+          <p class="text-[11px] text-zinc-500 dark:text-zinc-400 mb-1.5">Kodni olish uchun emailni tekshiring!</p>
 
           <div class="relative">
             <KeyRound class="w-3.5 h-3.5 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />

@@ -1,5 +1,6 @@
 import hashlib
 import json
+import logging
 from datetime import timedelta
 from decimal import Decimal
 from django.utils import timezone
@@ -22,7 +23,12 @@ from .models import (
     TariffOption,
     EducationLevelOption,
     Student,
+    IdentityVerification,
+    IdentityVerificationStatus,
 )
+from apps.core import didit_service
+
+logger = logging.getLogger(__name__)
 
 
 def get_client_ip(request):
@@ -76,8 +82,15 @@ class TenantInfoView(APIView):
         # Load available tariffs for this tenant. Inactive tariffs (new ones
         # whose contract text isn't ready yet, or ones staff paused) are
         # never shown on the public signing portal.
+        #
+        # contract_text is deliberately excluded here: each one is a full
+        # formatted contract document (250-350KB of HTML), so a tenant with
+        # ~10 tariffs turns this single landing-page load into a multi-MB
+        # response. The one full-text a visitor actually needs (to preview
+        # or sign a specific tariff) is fetched lazily via
+        # TariffContractTextView instead.
         tariffs = TariffOption.objects.filter(tenant=tenant, is_active=True).values(
-            'id', 'name', 'price', 'contract_text'
+            'id', 'name', 'price'
         )
 
         # Load offices / branches
@@ -99,6 +112,27 @@ class TenantInfoView(APIView):
             'education_levels': list(education_levels),
             'guardian_contract_text': get_guardian_contract_text(tenant),
         }, status=status.HTTP_200_OK)
+
+
+class TariffContractTextView(APIView):
+    """
+    Public endpoint: GET /api/contracts/online/tariff-contract-text/<id>/
+    Returns one tariff's full contract document text, on demand - split out
+    of TenantInfoView so loading the landing page (which lists every active
+    tariff) doesn't have to pull every tariff's 250-350KB contract text just
+    to render a pricing list. The pricing/name fields are effectively public
+    already (shown on the same landing page), so this carries no more
+    exposure than that.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request, tariff_id):
+        tariff = TariffOption.objects.filter(id=tariff_id, is_active=True).values(
+            'id', 'contract_text'
+        ).first()
+        if not tariff:
+            return Response({'detail': 'Tariff not found.'}, status=status.HTTP_404_NOT_FOUND)
+        return Response(tariff, status=status.HTTP_200_OK)
 
 
 class SendOtpView(APIView):
@@ -173,9 +207,10 @@ class StudentSignUpView(APIView):
         password = (request.data.get('password') or '').strip()
         code = (request.data.get('code') or request.data.get('otp') or '').strip()
         tenant_slug = tenant_slug or (request.data.get('tenant_slug') or '').strip()
+        full_name = (request.data.get('full_name') or '').strip()
 
-        if not email or not password or not code or not tenant_slug:
-            return Response({'detail': 'Email, password, verification code, and tenant are required.'}, status=status.HTTP_400_BAD_REQUEST)
+        if not email or not password or not code or not tenant_slug or not full_name:
+            return Response({'detail': 'Full name, email, password, verification code, and tenant are required.'}, status=status.HTTP_400_BAD_REQUEST)
 
         if len(password) < 6:
             return Response({'detail': 'Password must be at least 6 characters long.'}, status=status.HTTP_400_BAD_REQUEST)
@@ -215,13 +250,13 @@ class StudentSignUpView(APIView):
         if user:
             if user.role != UserRole.STUDENT:
                 return Response({'detail': 'An administrative account already exists with this email.'}, status=status.HTTP_400_BAD_REQUEST)
-            # Update tenant and password
+            # Update tenant, password, and name
             user.tenant = tenant
             user.set_password(password)
+            user.full_name = full_name
             user.is_active = True
             user.save()
         else:
-            full_name = email.split('@')[0].capitalize()
             user = User.objects.create_user(
                 email=email,
                 password=password,
@@ -379,6 +414,12 @@ class StudentProfileView(APIView):
                 'office': profile.office or '',
             },
             'contracts': contracts_data,
+            'is_identity_verified': profile.is_identity_verified,
+            'verification_status': (
+                profile.latest_identity_verification.status
+                if profile.latest_identity_verification
+                else IdentityVerificationStatus.NOT_STARTED
+            ),
         }, status=status.HTTP_200_OK)
 
     def patch(self, request):
@@ -401,6 +442,213 @@ class StudentProfileView(APIView):
         return Response({'detail': 'Profile updated successfully.'}, status=status.HTTP_200_OK)
 
 
+class IdentityVerificationStartView(APIView):
+    """
+    Public-portal endpoint: POST /api/contracts/online/verification/start/
+    Starts (or resumes) a Didit KYC session for the authenticated student and
+    returns the hosted URL to redirect them to for document + selfie
+    capture. A student with no verified/pending-review attempt and no
+    currently-open session gets a fresh one; one already IN_PROGRESS is
+    reused so refreshing the page doesn't spawn duplicate sessions.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        user = request.user
+        if getattr(user, 'role', None) != UserRole.STUDENT:
+            return Response({'detail': 'This endpoint is for student accounts only.'}, status=status.HTTP_403_FORBIDDEN)
+
+        profile, _ = StudentProfile.objects.get_or_create(user=user, defaults={'tenant': user.tenant})
+        document_type = (request.data.get('document_type') or 'PASSPORT').strip().upper()
+        if document_type not in ('PASSPORT', 'ID_CARD'):
+            return Response({'detail': 'document_type must be PASSPORT or ID_CARD.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        existing = profile.latest_identity_verification
+        if existing and existing.status == IdentityVerificationStatus.IN_PROGRESS and existing.session_url:
+            return Response({
+                'session_id': existing.session_id,
+                'url': existing.session_url,
+                'status': existing.status,
+            }, status=status.HTTP_200_OK)
+
+        verification = IdentityVerification.objects.create(
+            student_profile=profile,
+            document_type=document_type,
+            session_id='',
+            status=IdentityVerificationStatus.IN_PROGRESS,
+        )
+
+        try:
+            session = didit_service.create_verification_session(vendor_data=str(verification.id))
+        except didit_service.DiditNotConfigured as e:
+            verification.delete()
+            return Response({'detail': str(e)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        except Exception:
+            verification.delete()
+            logger.exception('Failed to create Didit verification session')
+            return Response(
+                {'detail': "Tekshiruv xizmatiga ulanib bo'lmadi. Birozdan so'ng qayta urinib ko'ring."},
+                status=status.HTTP_502_BAD_GATEWAY
+            )
+
+        verification.session_id = session.get('session_id', '')
+        verification.session_url = session.get('url', '')
+        verification.save(update_fields=['session_id', 'session_url'])
+
+        return Response({
+            'session_id': verification.session_id,
+            'url': verification.session_url,
+            'status': verification.status,
+        }, status=status.HTTP_201_CREATED)
+
+
+class IdentityVerificationStatusView(APIView):
+    """
+    Public-portal endpoint: GET /api/contracts/online/verification/status/
+    Polled by the frontend while the student is off completing the Didit
+    hosted flow (or waiting on the webhook), and once more to show the
+    extracted fields for confirmation.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        profile = StudentProfile.objects.filter(user=request.user).first()
+        verification = profile.latest_identity_verification if profile else None
+
+        if not verification:
+            return Response({'status': IdentityVerificationStatus.NOT_STARTED})
+
+        data = {
+            'status': verification.status,
+            'document_type': verification.document_type,
+        }
+        if verification.status == IdentityVerificationStatus.PENDING_REVIEW:
+            data['extracted'] = {
+                'full_name': verification.extracted_full_name or '',
+                'document_number': verification.extracted_document_number or '',
+                'date_of_birth': verification.extracted_date_of_birth or '',
+            }
+        return Response(data, status=status.HTTP_200_OK)
+
+
+class IdentityVerificationConfirmView(APIView):
+    """
+    Public-portal endpoint: POST /api/contracts/online/verification/confirm/
+    The student reviews the fields Didit's OCR extracted from their document
+    (pre-filled, editable) and confirms them here. This never re-runs the
+    identity check itself (Didit already approved the document/face-match/
+    liveness for the verification to have reached PENDING_REVIEW at all) -
+    it only lets the student correct an OCR typo before it becomes their
+    permanent profile data, and marks the verification VERIFIED.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        profile = StudentProfile.objects.filter(user=request.user).first()
+        verification = profile.latest_identity_verification if profile else None
+
+        if not verification or verification.status != IdentityVerificationStatus.PENDING_REVIEW:
+            return Response(
+                {'detail': "Tasdiqlash uchun tayyor tekshiruv topilmadi."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        full_name = (request.data.get('full_name') or '').strip()
+        document_number = (request.data.get('document_number') or '').strip()
+        date_of_birth = (request.data.get('date_of_birth') or '').strip()
+
+        if not full_name or not document_number or not date_of_birth:
+            return Response(
+                {'detail': "To'liq ism, hujjat raqami va tug'ilgan sana to'ldirilishi shart."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        request.user.full_name = full_name.upper()
+        request.user.save(update_fields=['full_name'])
+
+        profile.passport_number = document_number.upper()
+        profile.date_of_birth = date_of_birth
+        profile.save(update_fields=['passport_number', 'date_of_birth'])
+
+        verification.extracted_full_name = full_name
+        verification.extracted_document_number = document_number
+        verification.extracted_date_of_birth = date_of_birth
+        verification.status = IdentityVerificationStatus.VERIFIED
+        verification.confirmed_at = timezone.now()
+        verification.save(update_fields=[
+            'extracted_full_name', 'extracted_document_number', 'extracted_date_of_birth',
+            'status', 'confirmed_at'
+        ])
+
+        return Response({'detail': 'Shaxsingiz muvaffaqiyatli tasdiqlandi.', 'status': verification.status})
+
+
+class IdentityVerificationWebhookView(APIView):
+    """
+    Public endpoint: POST /api/contracts/online/verification/webhook/
+    Called by Didit whenever a session's status changes. Never trusts the
+    payload's own field values unless the HMAC signature (X-Signature +
+    X-Timestamp, per Didit's docs) checks out against DIDIT_WEBHOOK_SECRET.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        signature = request.headers.get('X-Signature', '')
+        timestamp = request.headers.get('X-Timestamp', '')
+        if not didit_service.verify_webhook_signature(request.data, signature, timestamp):
+            return Response({'detail': 'Invalid signature.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+        session_id = request.data.get('session_id')
+        vendor_data = request.data.get('vendor_data')
+        if not session_id:
+            return Response({'detail': 'session_id is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        verification = None
+        if vendor_data:
+            verification = IdentityVerification.objects.filter(id=vendor_data).first()
+        if not verification:
+            verification = IdentityVerification.objects.filter(session_id=session_id).first()
+        if not verification:
+            logger.warning('Didit webhook for unknown session_id=%s', session_id)
+            return Response({'detail': 'Unknown session.'}, status=status.HTTP_404_NOT_FOUND)
+
+        if not verification.session_id:
+            verification.session_id = session_id
+
+        # The webhook payload already carries the decision inline (per
+        # Didit's docs: {session_id, status, webhook_type, vendor_data,
+        # timestamp, decision}) - only fall back to a fresh API fetch if a
+        # given event type ever omits it.
+        decision = request.data.get('decision')
+        if not decision:
+            try:
+                decision = didit_service.get_session_decision(session_id)
+            except Exception:
+                logger.exception('Failed to fetch Didit decision for session_id=%s', session_id)
+                return Response({'detail': 'Could not fetch decision.'}, status=status.HTTP_502_BAD_GATEWAY)
+
+        verification.raw_decision = decision
+        didit_status = (request.data.get('status') or (decision or {}).get('status') or '').upper()
+
+        if didit_status == 'APPROVED':
+            extracted = didit_service.extract_fields_from_decision(decision)
+            verification.extracted_full_name = extracted['full_name']
+            verification.extracted_document_number = extracted['document_number']
+            verification.extracted_date_of_birth = extracted['date_of_birth']
+            verification.face_match_result = extracted['face_match_result']
+            verification.liveness_result = extracted['liveness_result']
+            verification.status = IdentityVerificationStatus.PENDING_REVIEW
+        elif didit_status == 'DECLINED':
+            verification.status = IdentityVerificationStatus.DECLINED
+        elif didit_status in ('EXPIRED', 'ABANDONED', 'KYC EXPIRED', 'KYC_EXPIRED'):
+            verification.status = IdentityVerificationStatus.ABANDONED
+        else:
+            verification.status = IdentityVerificationStatus.IN_PROGRESS
+
+        verification.save()
+        return Response({'detail': 'ok'}, status=status.HTTP_200_OK)
+
+
 class SubmitContractView(APIView):
     """
     Authenticated endpoint: POST /api/contracts/online/submit-contract/
@@ -418,6 +666,17 @@ class SubmitContractView(APIView):
 
         if not tenant:
             return Response({'detail': 'No tenant associated with your account.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # 0. Identity must be verified (document scan + face match via Didit)
+        # before a first contract can ever be created - re-checked here, not
+        # just gated in the UI, since this is the endpoint that actually
+        # creates a binding contract.
+        profile = StudentProfile.objects.filter(user=user).first()
+        if not profile or not profile.is_identity_verified:
+            return Response(
+                {'detail': "Shartnoma tuzishdan oldin shaxsingizni tasdiqlashingiz kerak."},
+                status=status.HTTP_403_FORBIDDEN
+            )
 
         # 1. Validate account password
         password = (data.get('password') or '').strip()
