@@ -178,11 +178,19 @@ def extract_fields_from_decision(decision: dict) -> dict:
     id_verifications = decision.get('id_verifications') or []
     if id_verifications:
         doc = _unwrap(id_verifications[0], 'id_verification')
-        full_name = doc.get('full_name')
-        if not full_name:
-            parts = [doc.get('first_name'), doc.get('last_name')]
-            full_name = ' '.join(p for p in parts if p).strip() or None
-        result['full_name'] = full_name
+        # Didit's own `full_name` is first_name-then-last_name (e.g. "Jasurbek
+        # Begijon Ugli Abdurazzakov"). This CRM's convention - matching the
+        # passport MRZ order and every existing Student record - is surname
+        # first, all uppercase ("ABDURAZZAKOV JASURBEK BEGIJON UGLI"), so
+        # last_name/first_name are preferred over the ready-made field
+        # whenever both are present.
+        last_name = doc.get('last_name')
+        first_name = doc.get('first_name')
+        if last_name or first_name:
+            full_name = ' '.join(p for p in (last_name, first_name) if p).strip()
+        else:
+            full_name = doc.get('full_name') or ''
+        result['full_name'] = full_name.upper() or None
         result['document_number'] = doc.get('document_number')
         result['date_of_birth'] = doc.get('date_of_birth')
 
