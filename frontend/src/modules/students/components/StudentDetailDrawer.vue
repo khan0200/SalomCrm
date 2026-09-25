@@ -64,7 +64,6 @@ const nameLanguage = ref<'EN' | 'KR'>('EN')
 // Accordion Collapsible States (Contact open by default)
 const contactExpanded = ref(true)
 const eduExpanded = ref(false)
-const isFamilyOpen = ref(true)
 
 const toggleSection = (sec: 'contact' | 'education') => {
   if (sec === 'contact') {
@@ -2417,7 +2416,13 @@ const handleRestoreStudent = () => {
                     @click="handleCopy('final_school_name', student.final_school_name)"
                     title="Single-click to copy Final School Name"
                   >
-                    <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-400">FINAL SCHOOL NAME</span>
+                    <div class="flex items-center justify-between gap-2">
+                      <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-400">FINAL SCHOOL NAME</span>
+                      <button type="button" @click.stop="handleCopy('final_school_name', student.final_school_name)" class="w-5 h-5 rounded hover:bg-zinc-200/70 dark:hover:bg-zinc-700/70 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-all cursor-pointer active:scale-90 shrink-0" title="Copy Final School Name">
+                        <Check v-if="copiedField === 'final_school_name'" class="w-3 h-3 text-emerald-500" />
+                        <Copy v-else class="w-3 h-3" />
+                      </button>
+                    </div>
                     <span class="text-[13px] font-bold text-zinc-900 dark:text-zinc-100 uppercase tracking-tight">{{ student.final_school_name || '—' }}</span>
                   </div>
 
@@ -2427,7 +2432,13 @@ const handleRestoreStudent = () => {
                     @click="handleCopy('major', student.major)"
                     title="Single-click to copy Major"
                   >
-                    <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-400">MAJOR</span>
+                    <div class="flex items-center justify-between gap-2">
+                      <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-400">MAJOR</span>
+                      <button type="button" @click.stop="handleCopy('major', student.major)" class="w-5 h-5 rounded hover:bg-zinc-200/70 dark:hover:bg-zinc-700/70 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-all cursor-pointer active:scale-90 shrink-0" title="Copy Major">
+                        <Check v-if="copiedField === 'major'" class="w-3 h-3 text-emerald-500" />
+                        <Copy v-else class="w-3 h-3" />
+                      </button>
+                    </div>
                     <span class="text-[13px] font-bold text-zinc-900 dark:text-zinc-100 uppercase tracking-tight">{{ student.major || '—' }}</span>
                   </div>
 
@@ -2440,7 +2451,13 @@ const handleRestoreStudent = () => {
                       title="Single-click to copy GPA"
                     >
                       <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-400">GPA</span>
-                      <span class="text-xs font-bold font-mono text-zinc-900 dark:text-zinc-100">{{ student.gpa ? `${student.gpa} (${student.gpa_system || '5'})` : '—' }}</span>
+                      <span class="flex items-center gap-1">
+                        <span class="text-xs font-bold font-mono text-zinc-900 dark:text-zinc-100">{{ student.gpa ? `${student.gpa} (${student.gpa_system || '5'})` : '—' }}</span>
+                        <button type="button" @click.stop="handleCopy('gpa', student.gpa ? `${student.gpa} (${student.gpa_system || '5'})` : '')" class="w-5 h-5 rounded hover:bg-zinc-200/70 dark:hover:bg-zinc-700/70 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-all cursor-pointer active:scale-90 shrink-0" title="Copy GPA">
+                          <Check v-if="copiedField === 'gpa'" class="w-3 h-3 text-emerald-500" />
+                          <Copy v-else class="w-3 h-3" />
+                        </button>
+                      </span>
                     </div>
 
                     <div
@@ -2450,7 +2467,13 @@ const handleRestoreStudent = () => {
                       title="Single-click to copy Degree No"
                     >
                       <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-400">DEGREE NO</span>
-                      <span class="text-xs font-bold font-mono text-zinc-900 dark:text-zinc-100">{{ student.degree_no || '—' }}</span>
+                      <span class="flex items-center gap-1">
+                        <span class="text-xs font-bold font-mono text-zinc-900 dark:text-zinc-100">{{ student.degree_no || '—' }}</span>
+                        <button type="button" @click.stop="handleCopy('degree_no', student.degree_no)" class="w-5 h-5 rounded hover:bg-zinc-200/70 dark:hover:bg-zinc-700/70 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-all cursor-pointer active:scale-90 shrink-0" title="Copy Degree No">
+                          <Check v-if="copiedField === 'degree_no'" class="w-3 h-3 text-emerald-500" />
+                          <Copy v-else class="w-3 h-3" />
+                        </button>
+                      </span>
                     </div>
 
                     <div
@@ -2460,7 +2483,13 @@ const handleRestoreStudent = () => {
                       title="Single-click to copy Date of Entry"
                     >
                       <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-400">DATE OF ENTRY</span>
-                      <span class="text-xs font-bold font-mono text-zinc-900 dark:text-zinc-100">{{ student.date_of_entry || '—' }}</span>
+                      <span class="flex items-center gap-1">
+                        <span class="text-xs font-bold font-mono text-zinc-900 dark:text-zinc-100">{{ student.date_of_entry || '—' }}</span>
+                        <button type="button" @click.stop="handleCopy('date_of_entry', student.date_of_entry)" class="w-5 h-5 rounded hover:bg-zinc-200/70 dark:hover:bg-zinc-700/70 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-all cursor-pointer active:scale-90 shrink-0" title="Copy Date of Entry">
+                          <Check v-if="copiedField === 'date_of_entry'" class="w-3 h-3 text-emerald-500" />
+                          <Copy v-else class="w-3 h-3" />
+                        </button>
+                      </span>
                     </div>
 
                     <div
@@ -2470,7 +2499,13 @@ const handleRestoreStudent = () => {
                       title="Single-click to copy Date of Graduation"
                     >
                       <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-400">DATE OF GRADUATION</span>
-                      <span class="text-xs font-bold font-mono text-zinc-900 dark:text-zinc-100">{{ student.date_of_graduation || '—' }}</span>
+                      <span class="flex items-center gap-1">
+                        <span class="text-xs font-bold font-mono text-zinc-900 dark:text-zinc-100">{{ student.date_of_graduation || '—' }}</span>
+                        <button type="button" @click.stop="handleCopy('date_of_graduation', student.date_of_graduation)" class="w-5 h-5 rounded hover:bg-zinc-200/70 dark:hover:bg-zinc-700/70 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-all cursor-pointer active:scale-90 shrink-0" title="Copy Date of Graduation">
+                          <Check v-if="copiedField === 'date_of_graduation'" class="w-3 h-3 text-emerald-500" />
+                          <Copy v-else class="w-3 h-3" />
+                        </button>
+                      </span>
                     </div>
 
                     <div
@@ -2480,7 +2515,13 @@ const handleRestoreStudent = () => {
                       @click="handleCopy('school_address', student.school_address)"
                       title="Single-click to copy School Address"
                     >
-                      <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-400">SCHOOL ADDRESS</span>
+                      <div class="flex items-center justify-between gap-2">
+                        <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-400">SCHOOL ADDRESS</span>
+                        <button type="button" @click.stop="handleCopy('school_address', student.school_address)" class="w-5 h-5 rounded hover:bg-zinc-200/70 dark:hover:bg-zinc-700/70 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-all cursor-pointer active:scale-90 shrink-0" title="Copy School Address">
+                          <Check v-if="copiedField === 'school_address'" class="w-3 h-3 text-emerald-500" />
+                          <Copy v-else class="w-3 h-3" />
+                        </button>
+                      </div>
                       <span class="text-xs font-medium text-zinc-700 dark:text-zinc-300">{{ student.school_address }}</span>
                     </div>
 
@@ -2492,7 +2533,13 @@ const handleRestoreStudent = () => {
                       title="Single-click to copy School Phone"
                     >
                       <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-400">SCHOOL PHONE</span>
-                      <span class="text-xs font-bold font-mono text-zinc-900 dark:text-zinc-100">{{ formatPhoneValue(student.school_phone) }}</span>
+                      <span class="flex items-center gap-1">
+                        <span class="text-xs font-bold font-mono text-zinc-900 dark:text-zinc-100">{{ formatPhoneValue(student.school_phone) }}</span>
+                        <button type="button" @click.stop="handleCopy('school_phone', formatPhoneValue(student.school_phone))" class="w-5 h-5 rounded hover:bg-zinc-200/70 dark:hover:bg-zinc-700/70 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-all cursor-pointer active:scale-90 shrink-0" title="Copy School Phone">
+                          <Check v-if="copiedField === 'school_phone'" class="w-3 h-3 text-emerald-500" />
+                          <Copy v-else class="w-3 h-3" />
+                        </button>
+                      </span>
                     </div>
 
                     <div
@@ -2503,7 +2550,13 @@ const handleRestoreStudent = () => {
                       title="Single-click to copy School Email"
                     >
                       <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-400">SCHOOL E-MAIL</span>
-                      <span class="text-xs font-medium text-zinc-900 dark:text-zinc-100">{{ student.school_email }}</span>
+                      <span class="flex items-center gap-1">
+                        <span class="text-xs font-medium text-zinc-900 dark:text-zinc-100">{{ student.school_email }}</span>
+                        <button type="button" @click.stop="handleCopy('school_email', student.school_email)" class="w-5 h-5 rounded hover:bg-zinc-200/70 dark:hover:bg-zinc-700/70 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-all cursor-pointer active:scale-90 shrink-0" title="Copy School Email">
+                          <Check v-if="copiedField === 'school_email'" class="w-3 h-3 text-emerald-500" />
+                          <Copy v-else class="w-3 h-3" />
+                        </button>
+                      </span>
                     </div>
                   </div>
                   </div>
@@ -3003,23 +3056,16 @@ const handleRestoreStudent = () => {
                 </div>
               </div>
 
-              <!-- 2.3 Family Info Header & Cards (Collapsible Accordion) -->
+              <!-- 2.3 Family Info Header & Cards -->
               <div class="flex flex-col gap-1.5">
-                <div
-                  class="flex items-center justify-between px-1 cursor-pointer select-none"
-                  @click="isFamilyOpen = !isFamilyOpen"
-                >
+                <div class="flex items-center justify-between px-1">
                   <div class="flex items-center gap-1.5 text-zinc-500 dark:text-zinc-400 font-bold uppercase tracking-wider text-[11px]">
                     <Users class="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
                     <span>FAMILY INFO</span>
                   </div>
-                  <button type="button" class="w-6 h-6 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 flex items-center justify-center transition-all">
-                    <ChevronDown class="w-3.5 h-3.5 transition-transform duration-200" :class="isFamilyOpen ? 'rotate-180' : ''" />
-                  </button>
                 </div>
 
-                <div class="accordion-collapse" :class="{ 'is-open': isFamilyOpen }">
-                <div class="accordion-collapse-inner grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                   <!-- FATHER FULLNAME -->
                   <div
                     class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
@@ -3188,7 +3234,6 @@ const handleRestoreStudent = () => {
                       <span v-else class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
                     </div>
                   </div>
-                </div>
                 </div>
               </div>
 
