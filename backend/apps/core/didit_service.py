@@ -21,7 +21,7 @@ def _require_config():
         )
 
 
-def create_verification_session(vendor_data: str = '') -> dict:
+def create_verification_session(vendor_data: str = '', callback: str = '') -> dict:
     """
     Creates a new Didit verification session for the configured workflow.
     Returns the raw {session_id, url, session_token, ...} response.
@@ -29,12 +29,21 @@ def create_verification_session(vendor_data: str = '') -> dict:
     `vendor_data` is an opaque string Didit echoes back unchanged in the
     webhook/decision payload - used to carry our own IdentityVerification id
     so the webhook handler can find the right row without guessing.
+
+    `callback` is the URL Didit's hosted flow redirects the browser to once
+    the visitor finishes (Didit appends ?verificationSessionId=&status=).
+    Without it, the hosted flow ends on a static Didit "you're verified"
+    page with no way back to our app - the visitor has to notice they need
+    to close the tab themselves, which many don't.
     """
     _require_config()
+    payload = {'workflow_id': settings.DIDIT_WORKFLOW_ID, 'vendor_data': vendor_data}
+    if callback:
+        payload['callback'] = callback
     resp = requests.post(
         f'{settings.DIDIT_BASE_URL}/v3/session/',
         headers={'x-api-key': settings.DIDIT_API_KEY, 'Content-Type': 'application/json'},
-        json={'workflow_id': settings.DIDIT_WORKFLOW_ID, 'vendor_data': vendor_data},
+        json=payload,
         timeout=15,
     )
     resp.raise_for_status()

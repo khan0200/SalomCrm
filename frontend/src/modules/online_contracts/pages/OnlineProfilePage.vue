@@ -422,7 +422,7 @@ function handleResubmit(contract: OnlineContractSummary) {
 
       <!-- 2. MY CONTRACTS SECTION -->
       <section class="space-y-4">
-        <div class="flex items-center justify-between gap-4">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
           <div>
             <h2 class="text-base font-semibold tracking-tight text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
               <span>Mening shartnomalarim</span>
@@ -439,7 +439,7 @@ function handleResubmit(contract: OnlineContractSummary) {
             <button
               type="button"
               @click="loadData(false)"
-              class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white hover:bg-zinc-50 dark:bg-zinc-900 dark:hover:bg-zinc-850 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white text-xs font-medium transition-colors cursor-pointer shadow-2xs"
+              class="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white hover:bg-zinc-50 dark:bg-zinc-900 dark:hover:bg-zinc-850 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white text-xs font-medium transition-colors cursor-pointer shadow-2xs shrink-0"
               title="Ro'yxatni yangilash"
             >
               <RotateCw class="w-3.5 h-3.5" :class="{ 'animate-spin': isRefreshing }" />
@@ -449,7 +449,7 @@ function handleResubmit(contract: OnlineContractSummary) {
             <!-- New contract button - routes through identity verification first if not done yet -->
             <router-link
               :to="{ name: newContractRouteName, params: { tenantname: tenantSlug } }"
-              class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:hover:bg-white dark:text-zinc-950 text-xs font-medium transition-all shadow-xs active:scale-98"
+              class="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1 px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:hover:bg-white dark:text-zinc-950 text-xs font-medium transition-all shadow-xs active:scale-98"
             >
               <Plus class="w-3.5 h-3.5" />
               <span>Yangi shartnoma</span>

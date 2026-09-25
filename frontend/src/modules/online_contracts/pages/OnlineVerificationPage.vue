@@ -36,6 +36,18 @@ const extracted = ref({ full_name: '', document_number: '', date_of_birth: '' })
 const isConfirming = ref(false)
 const confirmError = ref('')
 
+// Didit's hosted flow runs in a separate tab (window.open). When it finishes,
+// Didit redirects THAT tab to our own callback URL (?verificationSessionId=&
+// status=) instead of leaving it dead-ended on its own "you're verified"
+// screen. Landing here with that query param means this load IS the popup
+// tab returning from Didit, not a normal visit - close it immediately so
+// the visitor ends up back on the original tab, which is already polling
+// and will advance itself once the webhook lands.
+const isDiditCallbackTab = !!new URLSearchParams(window.location.search).get('verificationSessionId')
+if (isDiditCallbackTab) {
+  window.close()
+}
+
 function goNext() {
   const pendingTariffId = sessionStorage.getItem('selected_tariff_id')
   if (pendingTariffId) {

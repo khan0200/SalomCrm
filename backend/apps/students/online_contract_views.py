@@ -541,8 +541,13 @@ class IdentityVerificationStartView(APIView):
             status=IdentityVerificationStatus.IN_PROGRESS,
         )
 
+        tenant_slug = getattr(user.tenant, 'slug', '') if user.tenant_id else ''
+        callback_url = request.build_absolute_uri(f'/contracts/online/{tenant_slug}/verification') if tenant_slug else ''
+
         try:
-            session = didit_service.create_verification_session(vendor_data=str(verification.id))
+            session = didit_service.create_verification_session(
+                vendor_data=str(verification.id), callback=callback_url
+            )
         except didit_service.DiditNotConfigured as e:
             verification.delete()
             return Response({'detail': str(e)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
