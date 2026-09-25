@@ -2,8 +2,6 @@
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
-  BookUser,
-  CreditCard,
   ScanFace,
   ArrowRight,
   ArrowLeft,
@@ -28,7 +26,6 @@ const tenantSlug = computed(() => (route.params.tenantname as string) || '')
 const isLoadingTenant = ref(true)
 const tenantInfo = ref<TenantInfoResponse | null>(null)
 
-const documentType = ref<'PASSPORT' | 'ID_CARD'>('PASSPORT')
 const status = ref<IdentityVerificationStatus>('NOT_STARTED')
 const sessionUrl = ref('')
 const isStarting = ref(false)
@@ -82,7 +79,10 @@ async function handleStart() {
   errorMessage.value = ''
   isStarting.value = true
   try {
-    const res = await onlineContractsApi.startVerification(documentType.value)
+    // Didit's own hosted flow asks the visitor to pick passport vs ID card
+    // itself - asking again here first would just be a duplicate step, so
+    // this is a fixed placeholder, not a real user choice.
+    const res = await onlineContractsApi.startVerification('PASSPORT')
     status.value = res.status
     sessionUrl.value = res.url
     window.open(res.url, '_blank', 'noopener')
@@ -188,33 +188,9 @@ onBeforeUnmount(() => stopPolling())
             <span>{{ errorMessage }}</span>
           </div>
 
-          <label class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-2">
-            Hujjat turini tanlang
-          </label>
-          <div class="grid grid-cols-2 gap-2.5 mb-6">
-            <button
-              type="button"
-              @click="documentType = 'PASSPORT'"
-              class="p-3 rounded-lg border-2 text-left transition-all cursor-pointer"
-              :class="documentType === 'PASSPORT'
-                ? 'border-zinc-900 dark:border-zinc-100 bg-zinc-50 dark:bg-zinc-800/60'
-                : 'border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700'"
-            >
-              <BookUser class="w-4 h-4 mb-1.5" :class="documentType === 'PASSPORT' ? 'text-zinc-900 dark:text-zinc-100' : 'text-zinc-400'" />
-              <div class="text-xs font-semibold text-zinc-900 dark:text-zinc-100">Xalqaro pasport</div>
-            </button>
-            <button
-              type="button"
-              @click="documentType = 'ID_CARD'"
-              class="p-3 rounded-lg border-2 text-left transition-all cursor-pointer"
-              :class="documentType === 'ID_CARD'
-                ? 'border-zinc-900 dark:border-zinc-100 bg-zinc-50 dark:bg-zinc-800/60'
-                : 'border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700'"
-            >
-              <CreditCard class="w-4 h-4 mb-1.5" :class="documentType === 'ID_CARD' ? 'text-zinc-900 dark:text-zinc-100' : 'text-zinc-400'" />
-              <div class="text-xs font-semibold text-zinc-900 dark:text-zinc-100">ID karta</div>
-            </button>
-          </div>
+          <p class="text-[11px] text-zinc-500 dark:text-zinc-400 mb-4">
+            Tugmani bosgach yangi oyna ochiladi - u yerda hujjat turini (pasport yoki ID karta) tanlab, skanerlaysiz.
+          </p>
 
           <button
             type="button"
@@ -237,16 +213,27 @@ onBeforeUnmount(() => stopPolling())
               Tekshiruv oynasida davom eting
             </p>
             <p class="text-[11px] text-zinc-500 dark:text-zinc-400 max-w-xs leading-relaxed mb-5">
-              Yangi ochilgan oynada hujjatingizni skanerlab, selfie oling. Yakunlaganingizdan so'ng bu sahifa avtomatik yangilanadi.
+              Yangi ochilgan oynada hujjatingizni skanerlab, selfie oling. "Tasdiqlandingiz!" degan xabarni ko'rgach,
+              o'sha oynani yoping va <strong>shu sahifaga qayting</strong> - avtomatik davom etadi.
             </p>
-            <button
-              type="button"
-              @click="handleReopen"
-              class="inline-flex items-center gap-1.5 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white underline transition-colors cursor-pointer"
-            >
-              <ExternalLink class="w-3.5 h-3.5" />
-              <span>Oynani qayta ochish</span>
-            </button>
+            <div class="flex items-center gap-3">
+              <button
+                type="button"
+                @click="handleReopen"
+                class="inline-flex items-center gap-1.5 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white underline transition-colors cursor-pointer"
+              >
+                <ExternalLink class="w-3.5 h-3.5" />
+                <span>Oynani qayta ochish</span>
+              </button>
+              <button
+                type="button"
+                @click="refreshStatus"
+                class="inline-flex items-center gap-1.5 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white underline transition-colors cursor-pointer"
+              >
+                <RotateCw class="w-3.5 h-3.5" />
+                <span>Hozir tekshirish</span>
+              </button>
+            </div>
           </div>
         </template>
 

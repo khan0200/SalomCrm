@@ -442,6 +442,31 @@ class StudentProfileView(APIView):
         return Response({'detail': 'Profile updated successfully.'}, status=status.HTTP_200_OK)
 
 
+def _apply_didit_decision(verification: 'IdentityVerification', decision: dict, didit_status: str) -> None:
+    """
+    Shared by the webhook handler and the status-polling fallback below -
+    applies a fetched/pushed Didit decision to an IdentityVerification row
+    and saves it. `didit_status` is the top-level session status, already
+    upper-cased (e.g. "APPROVED", "DECLINED").
+    """
+    verification.raw_decision = decision
+    if didit_status == 'APPROVED':
+        extracted = didit_service.extract_fields_from_decision(decision)
+        verification.extracted_full_name = extracted['full_name']
+        verification.extracted_document_number = extracted['document_number']
+        verification.extracted_date_of_birth = extracted['date_of_birth']
+        verification.face_match_result = extracted['face_match_result']
+        verification.liveness_result = extracted['liveness_result']
+        verification.status = IdentityVerificationStatus.PENDING_REVIEW
+    elif didit_status == 'DECLINED':
+        verification.status = IdentityVerificationStatus.DECLINED
+    elif didit_status in ('EXPIRED', 'ABANDONED', 'KYC EXPIRED', 'KYC_EXPIRED'):
+        verification.status = IdentityVerificationStatus.ABANDONED
+    else:
+        verification.status = IdentityVerificationStatus.IN_PROGRESS
+    verification.save()
+
+
 class IdentityVerificationStartView(APIView):
     """
     Public-portal endpoint: POST /api/contracts/online/verification/start/
@@ -518,6 +543,22 @@ class IdentityVerificationStatusView(APIView):
         if not verification:
             return Response({'status': IdentityVerificationStatus.NOT_STARTED})
 
+        # Fallback for when the webhook hasn't arrived (or won't - e.g. the
+        # destination was misconfigured): pull the decision directly so a
+        # student isn't stuck IN_PROGRESS forever just because the push
+        # notification never made it. Cheap enough to do on every poll -
+        # only fires while genuinely still IN_PROGRESS.
+        if verification.status == IdentityVerificationStatus.IN_PROGRESS and verification.session_id:
+            try:
+                decision = didit_service.get_session_decision(verification.session_id)
+                didit_status = (decision.get('status') or '').upper()
+                _apply_didit_decision(verification, decision, didit_status)
+            except Exception:
+                logger.warning(
+                    'Status-poll fallback: could not fetch Didit decision for session_id=%s',
+                    verification.session_id, exc_info=True
+                )
+
         data = {
             'status': verification.status,
             'document_type': verification.document_type,
@@ -593,9 +634,15 @@ class IdentityVerificationWebhookView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def post(self, request):
-        signature = request.headers.get('X-Signature', '')
-        timestamp = request.headers.get('X-Timestamp', '')
-        if not didit_service.verify_webhook_signature(request.data, signature, timestamp):
+        if not didit_service.verify_webhook(request.data, request.headers):
+            # Logged at warning (not just rejected silently) so a real
+            # signature-scheme mismatch is diagnosable from server logs
+            # without needing Didit's own delivery-log UI.
+            logger.warning(
+                'Didit webhook signature verification failed. headers=%s body=%s',
+                {k: v for k, v in request.headers.items() if k.lower().startswith('x-')},
+                dict(request.data) if hasattr(request.data, 'keys') else request.data,
+            )
             return Response({'detail': 'Invalid signature.'}, status=status.HTTP_401_UNAUTHORIZED)
 
         session_id = request.data.get('session_id')
@@ -627,25 +674,8 @@ class IdentityVerificationWebhookView(APIView):
                 logger.exception('Failed to fetch Didit decision for session_id=%s', session_id)
                 return Response({'detail': 'Could not fetch decision.'}, status=status.HTTP_502_BAD_GATEWAY)
 
-        verification.raw_decision = decision
         didit_status = (request.data.get('status') or (decision or {}).get('status') or '').upper()
-
-        if didit_status == 'APPROVED':
-            extracted = didit_service.extract_fields_from_decision(decision)
-            verification.extracted_full_name = extracted['full_name']
-            verification.extracted_document_number = extracted['document_number']
-            verification.extracted_date_of_birth = extracted['date_of_birth']
-            verification.face_match_result = extracted['face_match_result']
-            verification.liveness_result = extracted['liveness_result']
-            verification.status = IdentityVerificationStatus.PENDING_REVIEW
-        elif didit_status == 'DECLINED':
-            verification.status = IdentityVerificationStatus.DECLINED
-        elif didit_status in ('EXPIRED', 'ABANDONED', 'KYC EXPIRED', 'KYC_EXPIRED'):
-            verification.status = IdentityVerificationStatus.ABANDONED
-        else:
-            verification.status = IdentityVerificationStatus.IN_PROGRESS
-
-        verification.save()
+        _apply_didit_decision(verification, decision, didit_status)
         return Response({'detail': 'ok'}, status=status.HTTP_200_OK)
 
 

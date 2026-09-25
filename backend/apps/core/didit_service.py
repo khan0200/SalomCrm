@@ -68,39 +68,78 @@ def _canonicalize(value):
     return value
 
 
-def verify_webhook_signature(body_dict: dict, signature: str, timestamp: str) -> bool:
+def _hmac_hex(secret: str, message: str) -> str:
+    return hmac.new(secret.encode(), message.encode('utf-8'), hashlib.sha256).hexdigest()
+
+
+def verify_webhook(body_dict: dict, headers) -> bool:
     """
     Verifies an inbound webhook actually came from Didit. Without this,
     anyone who finds our webhook URL could POST a fake "Approved" decision
     for any session_id.
 
-    Algorithm (per Didit's own docs): HMAC-SHA256, over
-    "{timestamp}:{canonical_json_of_body}" where the canonical JSON has
-    sorted keys, compact separators, and whole-number floats collapsed to
-    ints - keyed by DIDIT_WEBHOOK_SECRET. A request whose timestamp is more
-    than 5 minutes old is rejected even with a valid signature, to block
-    replay of a captured payload.
+    Didit's own docs describe two signing schemes and were unverifiable
+    against a live payload before this went live (no test webhook available
+    ahead of time) - a first production attempt (6/6 deliveries) failed
+    verification, so this now tries every documented combination rather
+    than a single hard-coded interpretation:
+      - timestamp from the X-Timestamp header, or from the body's own
+        "timestamp" field, if the header is absent
+      - the primary scheme: HMAC-SHA256("{timestamp}:{canonical_json}"),
+        canonical JSON = sorted keys, compact separators, whole-number
+        floats collapsed to ints
+      - the documented fallback: HMAC-SHA256 of
+        "{timestamp}:{session_id}:{status}:{webhook_type}" only
+    Accepting whichever combination matches is still fully secure - every
+    path requires DIDIT_WEBHOOK_SECRET, so a forged request can't satisfy
+    any of them without it.
 
-    Returns False (never raises) when the secret isn't configured yet, or
-    either header is missing/invalid - callers must treat that as "cannot
-    verify", not "verified".
+    `headers` is anything supporting .get(name), e.g. a Django
+    HttpHeaders/request.headers object.
+
+    Returns False (never raises) when the secret isn't configured, no
+    signature header is present at all, or every combination is stale/
+    mismatched - callers must treat that as "cannot verify", not
+    "verified".
     """
-    if not settings.DIDIT_WEBHOOK_SECRET or not signature or not timestamp:
+    secret = settings.DIDIT_WEBHOOK_SECRET
+    signature = headers.get('X-Signature') or headers.get('X-Signature-Simple')
+    if not secret or not signature:
         return False
-    try:
-        if abs(time.time() - int(timestamp)) > 300:
-            return False
-    except (TypeError, ValueError):
+
+    header_ts = headers.get('X-Timestamp')
+    body_ts = body_dict.get('timestamp') if isinstance(body_dict, dict) else None
+    candidate_timestamps = [t for t in (header_ts, str(body_ts) if body_ts is not None else None) if t]
+    if not candidate_timestamps:
+        return False
+
+    fresh_timestamps = []
+    for ts in candidate_timestamps:
+        try:
+            if abs(time.time() - int(ts)) <= 300:
+                fresh_timestamps.append(ts)
+        except (TypeError, ValueError):
+            continue
+    if not fresh_timestamps:
         return False
 
     canonical = json.dumps(
         _canonicalize(body_dict), sort_keys=True, ensure_ascii=False, separators=(',', ':')
     )
-    message = f"{timestamp}:{canonical}"
-    expected = hmac.new(
-        settings.DIDIT_WEBHOOK_SECRET.encode(), message.encode('utf-8'), hashlib.sha256
-    ).hexdigest()
-    return hmac.compare_digest(expected, signature)
+    simple_message_parts = (
+        str(body_dict.get('session_id', '')),
+        str(body_dict.get('status', '')),
+        str(body_dict.get('webhook_type', '')),
+    )
+
+    for ts in fresh_timestamps:
+        if hmac.compare_digest(_hmac_hex(secret, f"{ts}:{canonical}"), signature):
+            return True
+        simple_message = f"{ts}:{':'.join(simple_message_parts)}"
+        if hmac.compare_digest(_hmac_hex(secret, simple_message), signature):
+            return True
+
+    return False
 
 
 def _unwrap(item: dict, singular_key: str) -> dict:
