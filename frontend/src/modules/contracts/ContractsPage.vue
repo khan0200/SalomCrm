@@ -37,6 +37,7 @@ import {
   Archive,
   ArchiveRestore,
   Building2,
+  BadgeCheck,
 } from 'lucide-vue-next'
 import { downloadContractAsPdf } from './utils/contractPdf'
 import { vReveal } from '@/directives/reveal'
@@ -1225,8 +1226,13 @@ async function handleUnarchive(contract: Contract) {
 
                       <!-- Column 3: Student & Passport (Expands naturally to fill available space) -->
                       <td class="py-3 px-4 align-middle">
-                        <div v-if="contract.student_name" class="font-medium text-zinc-900 dark:text-zinc-100 text-xs leading-snug">
+                        <div v-if="contract.student_name" class="inline-flex items-center gap-1 font-medium text-zinc-900 dark:text-zinc-100 text-xs leading-snug">
                           {{ contract.student_name }}
+                          <BadgeCheck
+                            v-if="contract.is_identity_verified"
+                            class="w-3.5 h-3.5 shrink-0 fill-blue-500 text-white dark:fill-blue-400 dark:text-zinc-900"
+                            title="Shaxsi tasdiqlangan"
+                          />
                         </div>
                         <div v-else class="text-zinc-400 italic text-[11px]">Unassigned</div>
                         <div class="text-[11px] text-zinc-400 flex items-center gap-1.5 mt-0.5 font-mono">

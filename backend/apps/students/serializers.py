@@ -398,6 +398,7 @@ class ContractListSerializer(serializers.ModelSerializer):
     updated_by_branch_name = serializers.SerializerMethodField()
     email = serializers.SerializerMethodField()
     guardian_contract_text = serializers.SerializerMethodField()
+    is_identity_verified = serializers.SerializerMethodField()
 
     class Meta:
         model = Contract
@@ -415,9 +416,18 @@ class ContractListSerializer(serializers.ModelSerializer):
             'guardian_relation', 'guardian_phone', 'guardian_address',
             'guardian_signature_data', 'guardian_contract_text',
             'created_at', 'updated_at', 'signed_at', 'created_by_name',
-            'updated_by_name', 'updated_by_branch_name'
+            'updated_by_name', 'updated_by_branch_name', 'is_identity_verified'
         )
         read_only_fields = ('id', 'version', 'created_at', 'updated_at')
+
+    def get_is_identity_verified(self, obj):
+        # KYC status lives on the portal account's StudentProfile, not on the
+        # Contract itself - a contract whose student later deletes their
+        # portal account (student_account -> NULL, see DeleteProfileView)
+        # simply stops showing the badge rather than erroring.
+        account = obj.student_account
+        profile = getattr(account, 'student_profile', None) if account else None
+        return bool(profile and profile.is_identity_verified)
 
     def get_student_id(self, obj):
         return obj.student_id_assigned or (obj.student.id if obj.student else None)

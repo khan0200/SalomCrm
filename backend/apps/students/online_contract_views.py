@@ -360,6 +360,44 @@ class StudentSignInView(APIView):
         }, status=status.HTTP_200_OK)
 
 
+class DeleteProfileView(APIView):
+    """
+    Public-portal endpoint: POST /api/contracts/online/profile/delete/
+    Permanently deletes the student's own login account. StudentProfile and
+    IdentityVerification cascade-delete with it (portal-account-specific
+    data), but any Contract they submitted does NOT - Contract.student_account
+    uses SET_NULL specifically so closing one's own portal account can never
+    make the agency's copy of a signed contract disappear; it just becomes
+    an unlinked historical record from the account's side.
+
+    Requires re-typing the account's own full name and password, matching
+    the confirm-by-typing-name pattern already used for cancelling a
+    contract on this same page - a plain "Delete" button is too easy to
+    hit by accident for something this irreversible.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        user = request.user
+        if getattr(user, 'role', None) != UserRole.STUDENT:
+            return Response({'detail': 'This endpoint is for student accounts only.'}, status=status.HTTP_403_FORBIDDEN)
+
+        full_name = (request.data.get('full_name') or '').strip()
+        password = (request.data.get('password') or '').strip()
+
+        if not full_name or not password:
+            return Response({'detail': "To'liq ism va parolni kiriting."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if full_name.upper() != (user.full_name or '').strip().upper():
+            return Response({'detail': "Kiritilgan ism familiya mos kelmadi."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not user.check_password(password):
+            return Response({'detail': "Parol noto'g'ri."}, status=status.HTTP_400_BAD_REQUEST)
+
+        user.delete()
+        return Response({'detail': "Profilingiz muvaffaqiyatli o'chirildi."}, status=status.HTTP_200_OK)
+
+
 class StudentProfileView(APIView):
     """
     Authenticated endpoint: GET & PATCH /api/contracts/online/profile/

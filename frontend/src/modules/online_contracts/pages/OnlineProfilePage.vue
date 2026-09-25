@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
 import {
   User,
   FileText,
@@ -19,6 +20,7 @@ import {
   Trash2,
   XCircle,
   Scale,
+  BadgeCheck,
 } from 'lucide-vue-next'
 import {
   onlineContractsApi,
@@ -34,6 +36,7 @@ import FullContractViewerModal from '../components/FullContractViewerModal.vue'
 
 const route = useRoute()
 const router = useRouter()
+const authStore = useAuthStore()
 
 const tenantSlug = computed(() => (route.params.tenantname as string) || '')
 
@@ -58,6 +61,45 @@ const cancelConfirmationInput = ref('')
 const cancelReason = ref('')
 const isCancelling = ref(false)
 const cancelError = ref('')
+
+const isDeleteProfileModalOpen = ref(false)
+const deleteFullNameInput = ref('')
+const deletePasswordInput = ref('')
+const isDeletingProfile = ref(false)
+const deleteProfileError = ref('')
+
+const isDeleteConfirmationMatching = computed(() => {
+  const expected = (profileData.value?.user.full_name || '').trim()
+  if (!expected) return false
+  return deleteFullNameInput.value.trim().toUpperCase() === expected.toUpperCase()
+})
+
+function openDeleteProfileModal() {
+  deleteFullNameInput.value = ''
+  deletePasswordInput.value = ''
+  deleteProfileError.value = ''
+  isDeleteProfileModalOpen.value = true
+}
+
+async function handleConfirmDeleteProfile() {
+  if (!isDeleteConfirmationMatching.value || !deletePasswordInput.value.trim()) return
+  isDeletingProfile.value = true
+  deleteProfileError.value = ''
+  try {
+    await onlineContractsApi.deleteProfile({
+      full_name: deleteFullNameInput.value.trim(),
+      password: deletePasswordInput.value,
+    })
+    isDeleteProfileModalOpen.value = false
+    authStore.logout()
+    router.push({ name: 'online-sign-in', params: { tenantname: tenantSlug.value } })
+  } catch (err: any) {
+    console.error('Failed to delete profile:', err)
+    deleteProfileError.value = err?.response?.data?.detail || "Profilni o'chirishda xatolik yuz berdi."
+  } finally {
+    isDeletingProfile.value = false
+  }
+}
 
 const expectedContractName = computed(() => {
   return (selectedContractForCancel.value?.tariff_name || selectedContractForCancel.value?.title || '').trim()
@@ -300,8 +342,13 @@ function handleResubmit(contract: OnlineContractSummary) {
         <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
           <div class="p-3.5 bg-zinc-50/70 dark:bg-zinc-850/50 rounded-lg border border-zinc-300 dark:border-zinc-800">
             <span class="text-xs font-bold uppercase tracking-wide text-black dark:text-white block mb-1">To'liq ism-sharif (F.I.O)</span>
-            <span class="text-xs font-bold text-zinc-900 dark:text-zinc-100">
+            <span class="inline-flex items-center gap-1 text-xs font-bold text-zinc-900 dark:text-zinc-100">
               {{ (profileData?.user.full_name || "Ko'rsatilmagan").toUpperCase() }}
+              <BadgeCheck
+                v-if="profileData?.is_identity_verified"
+                class="w-3.5 h-3.5 shrink-0 fill-blue-500 text-white dark:fill-blue-400 dark:text-zinc-900"
+                title="Shaxsi tasdiqlangan"
+              />
             </span>
           </div>
 
@@ -339,6 +386,17 @@ function handleResubmit(contract: OnlineContractSummary) {
               {{ profileData?.profile.office || "Belgilanmagan" }}
             </span>
           </div>
+        </div>
+
+        <div class="mt-6 pt-5 border-t border-zinc-100 dark:border-zinc-850 flex justify-end">
+          <button
+            type="button"
+            @click="openDeleteProfileModal"
+            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-red-200 dark:border-red-900/50 text-red-600 dark:text-red-400 text-xs font-semibold hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors shadow-2xs"
+          >
+            <Trash2 class="w-3.5 h-3.5" />
+            <span>Profilni o'chirish</span>
+          </button>
         </div>
       </section>
 
@@ -815,6 +873,98 @@ function handleResubmit(contract: OnlineContractSummary) {
             >
               <Loader2 v-if="isCancelling" class="w-3.5 h-3.5 animate-spin" />
               <span>Ha, bekor qilish</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- Delete Profile Confirmation Modal -->
+    <Teleport to="body">
+      <div
+        v-if="isDeleteProfileModalOpen"
+        class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs"
+        @click.self="isDeleteProfileModalOpen = false"
+      >
+        <div class="relative w-full max-w-md bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-2xl shadow-2xl p-6 space-y-4 animate-in fade-in zoom-in-95 duration-200">
+          <div class="flex items-start gap-3">
+            <div class="w-10 h-10 rounded-xl bg-red-50 dark:bg-red-950/60 border border-red-500/20 text-red-600 dark:text-red-400 flex items-center justify-center shrink-0">
+              <Trash2 class="w-5 h-5" />
+            </div>
+            <div>
+              <h3 class="text-base font-bold text-black dark:text-white tracking-tight">
+                Profilni o'chirish
+              </h3>
+              <p class="text-xs text-zinc-600 dark:text-zinc-400 mt-1 leading-relaxed font-medium">
+                Bu amal hisobingizni butunlay o'chiradi va uni qaytarib bo'lmaydi. Imzolangan shartnomalaringiz agentlik arxivida saqlanib qoladi, lekin ular endi ushbu hisobga bog'liq bo'lmaydi.
+              </p>
+            </div>
+          </div>
+
+          <!-- Mandatory Full Name Confirmation Input -->
+          <div class="p-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-850/80 border border-zinc-200 dark:border-zinc-800 space-y-2">
+            <label class="block text-xs font-bold text-black dark:text-white leading-relaxed">
+              Tasdiqlash uchun to'liq ism-sharifingizni kiriting:
+            </label>
+            <div class="flex items-center gap-2">
+              <span class="text-xs text-zinc-900 dark:text-zinc-100 font-mono font-bold select-all bg-white dark:bg-zinc-900 px-2.5 py-1 rounded-md border border-zinc-300 dark:border-zinc-700 shadow-2xs">
+                {{ (profileData?.user.full_name || '').toUpperCase() }}
+              </span>
+            </div>
+
+            <input
+              v-model="deleteFullNameInput"
+              type="text"
+              placeholder="To'liq ism-sharifingizni yozing"
+              class="w-full px-3 py-2 text-xs font-bold rounded-lg border bg-white dark:bg-zinc-900 text-black dark:text-white placeholder:text-zinc-400 focus:outline-hidden transition-colors shadow-2xs"
+              :class="isDeleteConfirmationMatching && deleteFullNameInput.trim() ? 'border-emerald-500 ring-1 ring-emerald-500/30' : 'border-zinc-300 dark:border-zinc-700 focus:border-red-500 focus:ring-1 focus:ring-red-500/30'"
+            />
+
+            <p v-if="deleteFullNameInput && !isDeleteConfirmationMatching" class="text-[11px] text-red-600 dark:text-red-400 font-medium">
+              Kiritilgan ism hisobingiz ismi bilan bir xil bo'lishi kerak.
+            </p>
+            <p v-else-if="isDeleteConfirmationMatching && deleteFullNameInput.trim()" class="text-[11px] text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1">
+              ✓ Ism to'g'ri kiritildi
+            </p>
+          </div>
+
+          <!-- Password Input -->
+          <div>
+            <label class="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5">
+              Parolingiz
+            </label>
+            <input
+              v-model="deletePasswordInput"
+              type="password"
+              placeholder="Hisobingiz paroli"
+              class="w-full px-3 py-2 text-xs font-medium rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-black dark:text-white placeholder:text-zinc-400 focus:outline-hidden focus:border-zinc-500 transition-colors"
+              @keydown.enter="isDeleteConfirmationMatching && deletePasswordInput.trim() ? handleConfirmDeleteProfile() : null"
+            />
+          </div>
+
+          <div v-if="deleteProfileError" class="p-2.5 rounded-lg bg-red-50 text-red-700 border border-red-200 text-xs font-semibold">
+            {{ deleteProfileError }}
+          </div>
+
+          <!-- Actions -->
+          <div class="pt-2 flex items-center justify-end gap-2 border-t border-zinc-200 dark:border-zinc-800">
+            <button
+              type="button"
+              @click="isDeleteProfileModalOpen = false"
+              :disabled="isDeletingProfile"
+              class="px-4 py-2 text-xs font-bold text-zinc-700 dark:text-zinc-300 hover:text-black dark:hover:text-white rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+            >
+              Yo'q, qolsin
+            </button>
+
+            <button
+              type="button"
+              @click="handleConfirmDeleteProfile"
+              :disabled="!isDeleteConfirmationMatching || !deletePasswordInput.trim() || isDeletingProfile"
+              class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold text-xs shadow-xs transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <Loader2 v-if="isDeletingProfile" class="w-3.5 h-3.5 animate-spin" />
+              <span>Ha, profilni o'chirish</span>
             </button>
           </div>
         </div>

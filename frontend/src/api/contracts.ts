@@ -55,6 +55,7 @@ export interface Contract {
   created_by_name?: string | null
   updated_by_name?: string | null
   updated_by_branch_name?: string | null
+  is_identity_verified?: boolean
 }
 
 export interface ContractCreatePayload {

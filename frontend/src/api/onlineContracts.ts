@@ -289,6 +289,13 @@ export const onlineContractsApi = {
     return data
   },
 
+  // 6c. Permanently delete the student's own login account. Submitted
+  // contracts are unaffected - see DeleteProfileView docstring.
+  async deleteProfile(payload: { full_name: string; password: string }): Promise<{ detail: string }> {
+    const { data } = await apiClient.post('/contracts/online/profile/delete/', payload)
+    return data
+  },
+
   // 7. Submit & Sign Contract
   async submitContract(payload: SubmitContractPayload): Promise<{
     detail: string
