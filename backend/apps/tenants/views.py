@@ -2,6 +2,7 @@ from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from apps.core.permissions import IsPlatformSuperAdmin, IsTenantHeadManager, IsTenantManager, IsTenantUser
+from apps.authentication.models import UserRole
 from .models import Tenant, Branch
 from .serializers import TenantSerializer, TenantCreateWithAdminSerializer, BranchSerializer
 
@@ -24,7 +25,7 @@ class TenantViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        if user.is_superuser or getattr(user, 'role', '') == 'SUPER_ADMIN':
+        if user.is_superuser or getattr(user, 'role', '') == UserRole.SUPER_ADMIN:
             return Tenant.objects.all().order_by('name')
         return Tenant.objects.filter(id=user.tenant_id)
 
@@ -52,7 +53,7 @@ class TenantViewSet(viewsets.ModelViewSet):
         User = get_user_model()
         tenant = self.get_object()
         admins = User.objects.filter(
-            tenant=tenant, role='HEAD_MANAGER'
+            tenant=tenant, role=UserRole.HEAD_MANAGER
         ).order_by('date_joined')
         return Response([
             {
@@ -134,15 +135,23 @@ class TenantViewSet(viewsets.ModelViewSet):
 class BranchViewSet(viewsets.ModelViewSet):
     """Branch / Office ViewSet for tenant-specific locations."""
     serializer_class = BranchSerializer
-    permission_classes = [IsTenantUser]
     pagination_class = None
+
+    def get_permissions(self):
+        # Any tenant user may view branches (e.g. to file a student under an
+        # office), but managing them - per the documented permission matrix -
+        # is Manager+ only. The class-level IsTenantUser previously let STAFF
+        # create/update/delete branches directly via the API.
+        if self.action in ('create', 'update', 'partial_update', 'destroy'):
+            return [IsTenantManager()]
+        return [IsTenantUser()]
 
     def get_queryset(self):
         user = self.request.user
         # Honour the tenant a Super Admin has switched into (X-Tenant-ID via
         # TenantMiddleware), not just an explicit ?tenant_id= parameter.
         tenant = getattr(self.request, 'tenant', None) or getattr(user, 'tenant', None)
-        if user.is_superuser or getattr(user, 'role', '') == 'SUPER_ADMIN':
+        if user.is_superuser or getattr(user, 'role', '') == UserRole.SUPER_ADMIN:
             tenant_id = self.request.query_params.get('tenant_id')
             if tenant_id:
                 return Branch.objects.filter(tenant_id=tenant_id).order_by('name')
@@ -157,7 +166,7 @@ class BranchViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         user = self.request.user
         tenant = getattr(self.request, 'tenant', None) or getattr(user, 'tenant', None)
-        if not tenant and (user.is_superuser or getattr(user, 'role', '') == 'SUPER_ADMIN'):
+        if not tenant and (user.is_superuser or getattr(user, 'role', '') == UserRole.SUPER_ADMIN):
             tenant_id = self.request.data.get('tenant_id') or self.request.query_params.get('tenant_id')
             if tenant_id:
                 from .models import Tenant

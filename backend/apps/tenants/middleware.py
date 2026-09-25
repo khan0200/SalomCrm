@@ -1,4 +1,5 @@
 from django.utils.functional import SimpleLazyObject
+from apps.authentication.models import UserRole
 
 
 def resolve_tenant(request):
@@ -15,7 +16,7 @@ def resolve_tenant(request):
 
     is_super = (
         getattr(user, 'is_superuser', False)
-        or getattr(user, 'role', '') == 'SUPER_ADMIN'
+        or getattr(user, 'role', '') == UserRole.SUPER_ADMIN
     )
 
     if is_super:

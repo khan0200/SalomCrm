@@ -21,6 +21,8 @@ from rest_framework.request import Request
 from django.db import IntegrityError
 from django.db.models import Q
 from apps.core.permissions import IsTenantUser, IsTenantHeadManager, IsTenantManager, IsTenantManagerOrReadOnly
+from apps.core.access import branch_scope_filter
+from apps.authentication.models import UserRole
 from .models import (
     Student, Folder, TariffOption, EducationLevelOption,
     StudentGroupOption, LeadSourceOption, CoordinatorOption,
@@ -102,7 +104,7 @@ class StudentViewSet(viewsets.ModelViewSet):
         params = getattr(req, 'query_params', getattr(req, 'GET', {}))
         tenant = getattr(req, 'tenant', None) or getattr(user, 'tenant', None)
 
-        is_super = getattr(user, 'is_superuser', False) or getattr(user, 'role', '') == 'SUPER_ADMIN'
+        is_super = getattr(user, 'is_superuser', False) or getattr(user, 'role', '') == UserRole.SUPER_ADMIN
 
         if is_super:
             tenant_param = params.get('tenant_id')
@@ -114,6 +116,11 @@ class StudentViewSet(viewsets.ModelViewSet):
                 qs = Student.objects.all()
         else:
             qs = Student.objects.filter(tenant=tenant)
+
+        # STAFF/MANAGER accounts set to BRANCH_ONLY only ever see their own
+        # branch's students; everyone else (HEAD_MANAGER, SUPER_ADMIN, or an
+        # ALL-scope STAFF/MANAGER) is unaffected - see apps.core.access.
+        qs = qs.filter(branch_scope_filter(user))
 
         # For detail actions (retrieve, update, set_color, set_folders, etc.), return base queryset
         if self.action != 'list':
@@ -638,11 +645,12 @@ class StudentOptionsViewSet(viewsets.ViewSet):
         universities = list(UniversityOption.objects.filter(tenant=tenant).values_list('name', flat=True).order_by('name')) if tenant else []
         folders_qs = Folder.objects.filter(tenant=tenant).order_by('name') if tenant else Folder.objects.all().order_by('name')
 
-        all_count = Student.objects.filter(tenant=tenant, is_deleted=False).count() if tenant else Student.objects.filter(is_deleted=False).count()
-        except_count = Student.objects.filter(tenant=tenant, is_deleted=False).filter(Q(folder_ids=[]) | Q(folder_ids__isnull=True)).count() if tenant else Student.objects.filter(is_deleted=False).filter(Q(folder_ids=[]) | Q(folder_ids__isnull=True)).count()
-        deleted_count = Student.objects.filter(tenant=tenant, is_deleted=True, is_permanently_deleted=False).count() if tenant else Student.objects.filter(is_deleted=True, is_permanently_deleted=False).count()
-        permanently_deleted_count = Student.objects.filter(tenant=tenant, is_permanently_deleted=True).count() if tenant else Student.objects.filter(is_permanently_deleted=True).count()
-        hidden_count = Student.objects.filter(tenant=tenant, is_deleted=False, status_hidden=True).count() if tenant else Student.objects.filter(is_deleted=False, status_hidden=True).count()
+        scope = branch_scope_filter(user)
+        all_count = Student.objects.filter(tenant=tenant, is_deleted=False).filter(scope).count() if tenant else Student.objects.filter(is_deleted=False).filter(scope).count()
+        except_count = Student.objects.filter(tenant=tenant, is_deleted=False).filter(scope).filter(Q(folder_ids=[]) | Q(folder_ids__isnull=True)).count() if tenant else Student.objects.filter(is_deleted=False).filter(scope).filter(Q(folder_ids=[]) | Q(folder_ids__isnull=True)).count()
+        deleted_count = Student.objects.filter(tenant=tenant, is_deleted=True, is_permanently_deleted=False).filter(scope).count() if tenant else Student.objects.filter(is_deleted=True, is_permanently_deleted=False).filter(scope).count()
+        permanently_deleted_count = Student.objects.filter(tenant=tenant, is_permanently_deleted=True).filter(scope).count() if tenant else Student.objects.filter(is_permanently_deleted=True).filter(scope).count()
+        hidden_count = Student.objects.filter(tenant=tenant, is_deleted=False, status_hidden=True).filter(scope).count() if tenant else Student.objects.filter(is_deleted=False, status_hidden=True).filter(scope).count()
 
         folder_counts = {
             'all': all_count,
@@ -653,7 +661,7 @@ class StudentOptionsViewSet(viewsets.ViewSet):
             'hidden': hidden_count,
         }
         for f in folders_qs:
-            f_qs = Student.objects.filter(is_deleted=False, folder_ids__contains=[f.id])
+            f_qs = Student.objects.filter(is_deleted=False, folder_ids__contains=[f.id]).filter(scope)
             if tenant:
                 f_qs = f_qs.filter(tenant=tenant)
             folder_counts[str(f.id)] = f_qs.count()
@@ -705,7 +713,7 @@ class StudentExportView(APIView):
         user = request.user
         tenant = getattr(request, 'tenant', None) or getattr(user, 'tenant', None)
         params = getattr(request, 'query_params', getattr(request, 'GET', {}))
-        is_super = getattr(user, 'is_superuser', False) or getattr(user, 'role', '') == 'SUPER_ADMIN'
+        is_super = getattr(user, 'is_superuser', False) or getattr(user, 'role', '') == UserRole.SUPER_ADMIN
 
         if is_super:
             tenant_param = params.get('tenant_id')
@@ -717,6 +725,8 @@ class StudentExportView(APIView):
                 qs = Student.objects.all()
         else:
             qs = Student.objects.filter(tenant=tenant)
+
+        qs = qs.filter(branch_scope_filter(user))
 
         # Folder / Archive scope
         folder = params.get('folder', 'all')
@@ -2144,6 +2154,12 @@ class ContractViewSet(viewsets.ModelViewSet):
             return Contract.objects.none()
 
         qs = Contract.objects.filter(tenant=tenant)
+
+        # Contract.office is a point-in-time snapshot taken at creation, not
+        # a live join through student__office - draft contracts can outlive
+        # or predate their student_id/FK link, so this is the only reliable
+        # way to know which branch a contract belongs to.
+        qs = qs.filter(branch_scope_filter(user))
 
         # Soft delete handling
         include_deleted = str(self.request.query_params.get('include_deleted', 'false')).lower() == 'true'

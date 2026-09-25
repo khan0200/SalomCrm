@@ -3,7 +3,7 @@ from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.exceptions import AuthenticationFailed
 from django.contrib.auth import get_user_model
 from apps.tenants.models import Tenant, Branch
-from .models import UserRole
+from .models import UserRole, DataScope
 
 User = get_user_model()
 
@@ -68,7 +68,7 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = (
             'id', 'email', 'full_name', 'role', 'tenant', 'tenant_name',
-            'branch', 'branch_name', 'avatar_url', 'phone',
+            'branch', 'branch_name', 'data_scope', 'avatar_url', 'phone',
             'telegram_id', 'telegram_username',
             'is_active', 'is_staff', 'date_joined'
         )
@@ -93,12 +93,77 @@ class UserCreateUpdateSerializer(serializers.ModelSerializer):
         model = User
         fields = (
             'id', 'email', 'password', 'full_name', 'role', 'tenant',
-            'branch', 'avatar_url', 'phone',
+            'branch', 'data_scope', 'avatar_url', 'phone',
             'telegram_id', 'telegram_username', 'is_active'
         )
         # The view sets the tenant from the request context; accepting it from
         # the client would let a caller place a user in another tenant.
         read_only_fields = ('tenant',)
+
+    def get_fields(self):
+        # Narrow the `branch` choices to the target tenant's own branches.
+        # Without this, the auto-generated PrimaryKeyRelatedField accepts any
+        # Branch UUID platform-wide, so a Head Manager could assign a staff
+        # member to another agency's office by ID. On update the tenant is
+        # pinned to the existing user's (perform_update never lets it move);
+        # on create it's whichever tenant the request will create into (see
+        # UserViewSet._target_tenant) - the same two cases the view itself
+        # already distinguishes.
+        fields = super().get_fields()
+        if self.instance is not None:
+            target_tenant = self.instance.tenant
+        else:
+            request = self.context.get('request')
+            requester = getattr(request, 'user', None) if request else None
+            target_tenant = (getattr(request, 'tenant', None) or getattr(requester, 'tenant', None)) if request else None
+        if target_tenant is not None:
+            fields['branch'].queryset = Branch.objects.filter(tenant=target_tenant)
+        return fields
+
+    def validate_role(self, value):
+        # This serializer only backs UserViewSet's create/update, which
+        # get_permissions() already restricts to Head Managers (or a real
+        # platform Super Admin). Without this check, a Head Manager could
+        # send role=SUPER_ADMIN directly - bypassing the AddStaffModal
+        # dropdown, which only offers roles up to their own - and grant
+        # platform-wide power to a user whose tenant stays pinned to their
+        # own agency. STUDENT is excluded too: that role is only ever
+        # created by the online-contract sign-up flow, never this endpoint.
+        request = self.context.get('request')
+        requester = getattr(request, 'user', None) if request else None
+        is_platform_super_admin = bool(
+            requester and (requester.is_superuser or requester.role == UserRole.SUPER_ADMIN)
+        )
+        if value in (UserRole.SUPER_ADMIN, UserRole.STUDENT) and not is_platform_super_admin:
+            raise serializers.ValidationError(
+                'Only a Platform Super Admin can assign this role.'
+            )
+        return value
+
+    def validate(self, attrs):
+        unset = object()
+        role = attrs.get('role', getattr(self.instance, 'role', None))
+
+        if role == UserRole.SUPER_ADMIN:
+            # Platform-wide by definition (tenant=None) - "own branch" is a
+            # meaningless concept for this role, so never let a stored
+            # BRANCH_ONLY value linger from before a promotion.
+            attrs['data_scope'] = DataScope.ALL
+        else:
+            # A tenant can have several HEAD_MANAGER accounts (per-branch
+            # heads alongside the agency's actual owner), so - unlike role -
+            # data_scope is a per-person setting even for HEAD_MANAGER/MANAGER.
+            scope = attrs.get('data_scope', getattr(self.instance, 'data_scope', DataScope.ALL))
+            if scope == DataScope.BRANCH_ONLY:
+                branch = attrs.get('branch', unset)
+                if branch is unset:
+                    branch = getattr(self.instance, 'branch', None)
+                if branch is None:
+                    raise serializers.ValidationError({
+                        'data_scope': "Filialga cheklash uchun avval xodimga filial biriktiring."
+                    })
+
+        return attrs
 
     def create(self, validated_data):
         password = validated_data.pop('password', None)

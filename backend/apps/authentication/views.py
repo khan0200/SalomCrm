@@ -2,10 +2,11 @@ from rest_framework import viewsets, permissions, status
 from rest_framework.exceptions import ValidationError, PermissionDenied
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from rest_framework.throttling import UserRateThrottle
 from rest_framework_simplejwt.views import TokenObtainPairView
 from django.contrib.auth import get_user_model
 from django.db.models import Q
-from apps.core.permissions import IsPlatformSuperAdmin, IsTenantHeadManager, IsTenantUser
+from apps.core.permissions import IsTenantHeadManager
 from .serializers import (
     CustomTokenObtainPairSerializer, UserSerializer,
     UserCreateUpdateSerializer, ChangePasswordSerializer
@@ -141,45 +142,52 @@ class MeView(APIView):
         return Response(serializer.data)
 
 
+class FinancePasswordThrottle(UserRateThrottle):
+    scope = 'finance_password_verify'
+
+
 class VerifyFinancePasswordView(APIView):
     """
     Verifies that the provided password belongs to an authorized Head Manager or Super Admin
-    of the current tenant (or platform Super Admin).
-    Enforces strict tenant isolation.
+    of the caller's own tenant (or a platform Super Admin) - used to let a Staff user get
+    step-up authorization from a Manager standing next to them, without switching accounts.
+
+    Requires the caller to already hold a valid session: without that, tenant could not be
+    resolved and every tenant's Head Manager/Super Admin password was checked against a single
+    unauthenticated guess, turning this into a platform-wide brute-force target.
     """
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated]
+    throttle_classes = [FinancePasswordThrottle]
 
     def post(self, request):
         password = (request.data.get('password') or '').strip()
         if not password:
             return Response({'detail': 'Password is required'}, status=status.HTTP_400_BAD_REQUEST)
 
-        user = getattr(request, 'user', None)
-        tenant = getattr(request, 'tenant', None) or (getattr(user, 'tenant', None) if user and user.is_authenticated else None)
+        user = request.user
+        tenant = getattr(request, 'tenant', None) or user.tenant
 
-        # 1. If user is authenticated in request, check their password if they belong to this tenant or are Super Admin
-        if user and user.is_authenticated:
-            if (user.is_superuser or getattr(user, 'role', '') in ['SUPER_ADMIN', 'HEAD_MANAGER', 'MANAGER']):
-                if user.check_password(password):
-                    return Response({'valid': True, 'manager_name': user.full_name, 'role': getattr(user, 'role', '')})
+        # 1. The caller's own password, if they already hold sufficient rank.
+        if user.is_superuser or user.role in (UserRole.SUPER_ADMIN, UserRole.HEAD_MANAGER, UserRole.MANAGER):
+            if user.check_password(password):
+                return Response({'valid': True, 'manager_name': user.full_name, 'role': user.role})
 
-        # 2. Check active Head Managers of THIS TENANT or Platform Super Admins
-        head_managers = User.objects.filter(is_active=True)
+        # 2. A Head Manager/Manager of the caller's OWN tenant, or a platform Super
+        # Admin. Only a Super Admin with no tenant switched in reaches the `else`
+        # branch, so this never widens into "any tenant's Head Manager".
+        candidates = User.objects.filter(is_active=True)
         if tenant:
-            head_managers = head_managers.filter(
-                Q(tenant=tenant, role__in=['HEAD_MANAGER', 'MANAGER']) |
-                Q(role='SUPER_ADMIN') |
+            candidates = candidates.filter(
+                Q(tenant=tenant, role__in=[UserRole.HEAD_MANAGER, UserRole.MANAGER]) |
+                Q(role=UserRole.SUPER_ADMIN) |
                 Q(is_superuser=True)
             )
         else:
-            head_managers = head_managers.filter(
-                Q(role__in=['HEAD_MANAGER', 'SUPER_ADMIN']) |
-                Q(is_superuser=True)
-            )
+            candidates = candidates.filter(Q(role=UserRole.SUPER_ADMIN) | Q(is_superuser=True))
 
-        for hm in head_managers:
-            if hm.check_password(password):
-                return Response({'valid': True, 'manager_name': hm.full_name, 'role': hm.role})
+        for candidate in candidates:
+            if candidate.check_password(password):
+                return Response({'valid': True, 'manager_name': candidate.full_name, 'role': candidate.role})
 
         return Response({'detail': 'Incorrect Head Manager password.'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -193,11 +201,12 @@ class UserViewSet(viewsets.ModelViewSet):
     serializer_class = UserSerializer
 
     def get_permissions(self):
-        # Mutating another user (or any role change) is a Head Manager action.
-        # Without this, a STAFF user could PATCH their own role to HEAD_MANAGER.
-        if self.action in ('create', 'destroy', 'update', 'partial_update'):
-            return [IsTenantHeadManager()]
-        return [IsTenantUser()]
+        # This endpoint backs the internal Staff page only, which is itself
+        # gated headManagerOnly on the frontend - list/retrieve used to fall
+        # through to IsTenantUser, letting any STAFF account enumerate every
+        # colleague's email/phone/telegram id via a direct API call. Every
+        # action (view included) is a Head Manager (or Super Admin) action.
+        return [IsTenantHeadManager()]
 
     def get_serializer_class(self):
         if self.action in ('create', 'update', 'partial_update'):
@@ -219,7 +228,7 @@ class UserViewSet(viewsets.ModelViewSet):
         #   leftover from account creation), that must never make them look
         #   like that tenant's employee.
         base = User.objects.exclude(role__in=[UserRole.STUDENT, UserRole.SUPER_ADMIN])
-        if user.is_superuser or getattr(user, 'role', '') == 'SUPER_ADMIN':
+        if user.is_superuser or getattr(user, 'role', '') == UserRole.SUPER_ADMIN:
             tenant_id = self.request.query_params.get('tenant_id')
             if tenant_id:
                 return base.filter(tenant_id=tenant_id)
@@ -260,8 +269,8 @@ class UserViewSet(viewsets.ModelViewSet):
         # agency out of staff management), nor a platform super admin.
         if instance.pk == user.pk:
             raise ValidationError('You cannot delete your own account.')
-        if instance.role == 'SUPER_ADMIN' and not (
-            user.is_superuser or getattr(user, 'role', '') == 'SUPER_ADMIN'
+        if instance.role == UserRole.SUPER_ADMIN and not (
+            user.is_superuser or getattr(user, 'role', '') == UserRole.SUPER_ADMIN
         ):
             raise PermissionDenied('You cannot delete a platform super admin.')
         instance.delete()

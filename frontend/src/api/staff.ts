@@ -1,5 +1,5 @@
 import apiClient from './client'
-import type { UserProfile, UserRole } from '@/types'
+import type { UserProfile, UserRole, DataScope } from '@/types'
 
 export interface StaffCreatePayload {
   full_name: string
@@ -7,6 +7,7 @@ export interface StaffCreatePayload {
   role: UserRole
   password?: string
   branch?: string | number | null
+  data_scope?: DataScope
 }
 
 export const staffApi = {

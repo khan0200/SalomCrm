@@ -434,6 +434,13 @@ const colorMap: Record<string, { bg: string; text: string; border: string; icon:
                     {{ (member as any).branch_name }}
                   </span>
                   <span v-else class="text-zinc-400 dark:text-zinc-600 italic">Not assigned</span>
+                  <span
+                    v-if="(member as any).data_scope === 'BRANCH_ONLY'"
+                    title="Can only see this branch's students, payments, and contracts"
+                    class="mt-1 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-400 border border-amber-200 dark:border-amber-800"
+                  >
+                    Only this branch
+                  </span>
                 </td>
                 <td class="px-4 py-3">
                   <span

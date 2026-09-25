@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from django.db import transaction
 from django.contrib.auth import get_user_model
+from apps.authentication.models import UserRole
 from .models import Tenant, Branch
 
 User = get_user_model()
@@ -78,7 +79,7 @@ class TenantCreateWithAdminSerializer(serializers.ModelSerializer):
             email=admin_email,
             password=admin_password,
             full_name=admin_full_name,
-            role='HEAD_MANAGER',
+            role=UserRole.HEAD_MANAGER,
             tenant=tenant,
             is_staff=True
         )

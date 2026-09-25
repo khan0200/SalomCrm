@@ -2,7 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import BaseModal from '@/components/common/BaseModal.vue'
 import { AlertCircle, UserPlus, Loader2 } from 'lucide-vue-next'
-import type { UserRole, UserProfile } from '@/types'
+import type { UserRole, UserProfile, DataScope } from '@/types'
 import { useOffices } from '@/composables/useOffices'
 
 const props = defineProps<{
@@ -13,7 +13,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'close'): void
-  (e: 'submit', data: { full_name: string; email: string; role: UserRole; password: string; branch: string | null }): void
+  (e: 'submit', data: { full_name: string; email: string; role: UserRole; password: string; branch: string | null; data_scope: DataScope }): void
 }>()
 
 const { officesRegistry, fetchOffices } = useOffices()
@@ -24,6 +24,7 @@ const blankForm = () => ({
   role: 'STAFF' as UserRole,
   password: '',
   branch: '' as string,
+  data_scope: 'ALL' as DataScope,
 })
 
 const form = ref(blankForm())
@@ -53,6 +54,7 @@ watch(() => props.isOpen, (open) => {
         // UserProfile type declares - that shape only matches the login
         // response. Guard with a plain truthy/String() cast either way.
         branch: (props.member as any).branch ? String((props.member as any).branch) : '',
+        data_scope: ((props.member as any).data_scope as DataScope) || 'ALL',
       }
     } else {
       form.value = blankForm()
@@ -80,12 +82,17 @@ const handleSubmit = () => {
     error.value = 'Password must be at least 6 characters.'
     return
   }
+  if (form.value.data_scope === 'BRANCH_ONLY' && !form.value.branch) {
+    error.value = 'Select a branch before restricting access to it.'
+    return
+  }
 
   const payload: Record<string, unknown> = {
     full_name: form.value.full_name.trim(),
     email: form.value.email.trim().toLowerCase(),
     role: form.value.role,
     branch: form.value.branch || null,
+    data_scope: form.value.data_scope,
   }
   if (form.value.password) {
     payload.password = form.value.password
@@ -160,6 +167,22 @@ const handleSubmit = () => {
         </select>
         <p class="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1">
           Which office this team member works out of.
+        </p>
+      </div>
+
+      <div>
+        <label class="block font-bold text-zinc-700 dark:text-zinc-300 mb-1">Access to Data</label>
+        <select
+          v-model="form.data_scope"
+          class="w-full px-3 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 font-semibold focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none cursor-pointer"
+        >
+          <option value="ALL">All data (every branch)</option>
+          <option value="BRANCH_ONLY">Only their branch's data</option>
+        </select>
+        <p class="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1">
+          {{ form.data_scope === 'BRANCH_ONLY'
+            ? "Restricted to students, payments, and contracts from the branch selected above - regardless of role."
+            : 'Can see students, payments, and contracts from every branch in the agency.' }}
         </p>
       </div>
 

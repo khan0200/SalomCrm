@@ -201,6 +201,9 @@ REST_FRAMEWORK = {
         # The code space is ~1.1x10^12 combinations, so this is just a sane
         # ceiling against scripted enumeration, not the primary defense.
         'contract_verify': '30/min',
+        # Per-user cap on Finance Password step-up attempts, so a logged-in
+        # STAFF account can't be used to brute-force a Manager's password.
+        'finance_password_verify': '5/min',
     },
 }
 

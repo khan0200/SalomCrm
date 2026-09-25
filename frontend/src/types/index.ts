@@ -1,4 +1,5 @@
 export type UserRole = 'SUPER_ADMIN' | 'HEAD_MANAGER' | 'MANAGER' | 'STAFF' | 'STUDENT'
+export type DataScope = 'ALL' | 'BRANCH_ONLY'
 
 export interface Tenant {
   id: string
@@ -40,6 +41,7 @@ export interface UserProfile {
   is_superuser: boolean
   tenant?: Tenant | null
   branch?: Branch | null
+  data_scope?: DataScope
 }
 
 export type StudentLevel = 'COLLEGE' | 'BACHELOR' | 'MASTERS' | 'MASTER NO CERTIFICATE' | 'LANGUAGE COURSE'

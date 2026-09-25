@@ -4,6 +4,8 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.db.models import Q
 from apps.core.permissions import IsTenantUser, IsTenantManager, IsTenantManagerOrReadOnly
+from apps.core.access import branch_scope_filter
+from apps.authentication.models import UserRole
 from apps.students.models import Student
 from apps.students.views import alphanumeric_key
 from .serializers import (
@@ -23,10 +25,12 @@ class StatusBoardViewSet(viewsets.ModelViewSet):
         user = self.request.user
         tenant = getattr(self.request, 'tenant', None) or getattr(user, 'tenant', None)
 
-        if user.is_superuser or getattr(user, 'role', '') == 'SUPER_ADMIN':
+        if user.is_superuser or getattr(user, 'role', '') == UserRole.SUPER_ADMIN:
             qs = Student.objects.filter(tenant=tenant) if tenant else Student.objects.all()
         else:
             qs = Student.objects.filter(tenant=user.tenant)
+
+        qs = qs.filter(branch_scope_filter(user))
 
         # 1. Base non-deleted
         qs = qs.filter(is_deleted=False)

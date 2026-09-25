@@ -11,6 +11,11 @@ class UserRole(models.TextChoices):
     STUDENT = 'STUDENT', 'Online Student'
 
 
+class DataScope(models.TextChoices):
+    ALL = 'ALL', 'All Tenant Data'
+    BRANCH_ONLY = 'BRANCH_ONLY', 'Own Branch Only'
+
+
 class CustomUserManager(BaseUserManager):
     """Manager for custom user model using email as unique identifier."""
     def create_user(self, email, password=None, **extra_fields):
@@ -60,6 +65,17 @@ class User(AbstractBaseUser, PermissionsMixin):
         null=True,
         blank=True,
         related_name='users'
+    )
+    # Whether this user sees every student/payment/contract in the tenant, or
+    # only the ones belonging to their own `branch`. Only meaningful for
+    # STAFF/MANAGER - HEAD_MANAGER and SUPER_ADMIN always see everything
+    # regardless of this value (enforced in apps.core.access, not here, so a
+    # stale/mis-set value on a promoted user can never accidentally restrict
+    # them).
+    data_scope = models.CharField(
+        max_length=16,
+        choices=DataScope.choices,
+        default=DataScope.ALL,
     )
     avatar_url = models.URLField(max_length=500, blank=True, null=True)
     phone = models.CharField(max_length=50, blank=True, null=True)

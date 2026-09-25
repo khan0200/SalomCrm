@@ -4,6 +4,7 @@ from django.http import HttpResponse
 from django.db.models import Q
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.views import APIView
 from rest_framework.response import Response
 import openpyxl
@@ -11,6 +12,8 @@ from openpyxl.styles import Font, PatternFill, Alignment
 from openpyxl.utils import get_column_letter
 
 from apps.core.permissions import IsTenantUser, IsTenantManager
+from apps.core.access import branch_scope_filter
+from apps.authentication.models import UserRole
 from apps.students.models import Student
 from .models import Payment, PaymentMethodTemplate, PaymentReceiverTemplate, PaymentNotePill
 from .serializers import (
@@ -32,7 +35,7 @@ class PaymentViewSet(viewsets.ModelViewSet):
         user = self.request.user
         tenant = getattr(self.request, 'tenant', None) or getattr(user, 'tenant', None)
 
-        if user.is_superuser or getattr(user, 'role', '') == 'SUPER_ADMIN':
+        if user.is_superuser or getattr(user, 'role', '') == UserRole.SUPER_ADMIN:
             tenant_param = self.request.query_params.get('tenant_id')
             if tenant_param:
                 qs = Payment.objects.filter(tenant_id=tenant_param)
@@ -42,6 +45,8 @@ class PaymentViewSet(viewsets.ModelViewSet):
                 qs = Payment.objects.all()
         else:
             qs = Payment.objects.filter(tenant=user.tenant)
+
+        qs = qs.filter(branch_scope_filter(user, office_field='student__office'))
 
         # Filters
         student_id = self.request.query_params.get('student_id')
@@ -83,6 +88,27 @@ class PaymentViewSet(viewsets.ModelViewSet):
 
         return qs.select_related('student', 'created_by').order_by('-created_at')
 
+    def _resolve_scoped_student(self, request, tenant, student_id):
+        """
+        Look up a student by id/payment_id for record_payment(), same as
+        before, but a BRANCH_ONLY user naming a real student outside their
+        own branch must be rejected rather than silently recording an
+        unlinked payment - get_queryset() already hides that student from
+        their Payments list, so letting the write side reach them anyway
+        would be a straightforward way around the whole restriction.
+        """
+        if not student_id:
+            return None
+        user = request.user
+        sid = student_id.strip().upper()
+        student_qs = Student.objects.filter(Q(id=sid) | Q(payment_id=sid))
+        if tenant and not (user.is_superuser or getattr(user, 'role', '') == UserRole.SUPER_ADMIN):
+            student_qs = student_qs.filter(tenant=tenant)
+        student = student_qs.filter(branch_scope_filter(user)).first()
+        if student is None and student_qs.exists():
+            raise PermissionDenied("Bu talaba sizning filialingizga tegishli emas.")
+        return student
+
     def create(self, request, *args, **kwargs):
         serializer = PaymentCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -91,13 +117,7 @@ class PaymentViewSet(viewsets.ModelViewSet):
         tenant = getattr(request, 'tenant', None) or getattr(user, 'tenant', None)
 
         student_id = serializer.validated_data.get('student_id')
-        student = None
-        if student_id:
-            sid = student_id.strip().upper()
-            student_qs = Student.objects.filter(Q(id=sid) | Q(payment_id=sid))
-            if tenant and not (user.is_superuser or getattr(user, 'role', '') == 'SUPER_ADMIN'):
-                student_qs = student_qs.filter(tenant=tenant)
-            student = student_qs.first()
+        student = self._resolve_scoped_student(request, tenant, student_id)
 
         payment = record_payment(
             tenant=tenant,
@@ -130,13 +150,7 @@ class PaymentViewSet(viewsets.ModelViewSet):
         tenant = getattr(request, 'tenant', None) or getattr(user, 'tenant', None)
 
         student_id = serializer.validated_data.get('student_id')
-        student = None
-        if student_id:
-            sid = student_id.strip().upper()
-            student_qs = Student.objects.filter(Q(id=sid) | Q(payment_id=sid))
-            if tenant and not (user.is_superuser or getattr(user, 'role', '') == 'SUPER_ADMIN'):
-                student_qs = student_qs.filter(tenant=tenant)
-            student = student_qs.first()
+        student = self._resolve_scoped_student(request, tenant, student_id)
 
         payment = record_payment(
             tenant=tenant,
@@ -204,10 +218,12 @@ class PaymentOverviewViewSet(viewsets.ReadOnlyModelViewSet):
         user = self.request.user
         tenant = getattr(self.request, 'tenant', None) or getattr(user, 'tenant', None)
 
-        if user.is_superuser or getattr(user, 'role', '') == 'SUPER_ADMIN':
+        if user.is_superuser or getattr(user, 'role', '') == UserRole.SUPER_ADMIN:
             qs = Student.objects.filter(tenant=tenant) if tenant else Student.objects.all()
         else:
             qs = Student.objects.filter(tenant=user.tenant)
+
+        qs = qs.filter(branch_scope_filter(user))
 
         # Status filter (active vs archive vs all)
         status_filter = self.request.query_params.get('status')
@@ -272,7 +288,9 @@ class PaymentExportView(APIView):
         user = request.user
         tenant = getattr(request, 'tenant', None) or getattr(user, 'tenant', None)
 
-        qs = Payment.objects.filter(tenant=tenant).select_related('student', 'created_by').order_by('-created_at')
+        qs = Payment.objects.filter(tenant=tenant).filter(
+            branch_scope_filter(user, office_field='student__office')
+        ).select_related('student', 'created_by').order_by('-created_at')
 
         # Create workbook
         wb = openpyxl.Workbook()

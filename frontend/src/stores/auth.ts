@@ -22,9 +22,14 @@ export const useAuthStore = defineStore('auth', () => {
   const isSuperAdmin = computed(() => !!user.value?.is_superuser || user.value?.role === 'SUPER_ADMIN')
   const isHeadManager = computed(() => isSuperAdmin.value || user.value?.role === 'HEAD_MANAGER')
   const isManager = computed(() => isHeadManager.value || user.value?.role === 'MANAGER')
-  const isStaff = computed(() => isAuthenticated.value && !isManager.value)
 
-  // Role-based permissions
+  // Role-based permissions. canEdit/canDelete are intentionally identical
+  // today - the backend has no separate "delete" permission tier beyond
+  // Manager+, so splitting these would be a distinction without a
+  // difference. Keep both names (consumed independently across ~15
+  // components) so a future edit-vs-delete split doesn't require touching
+  // every call site, but don't invent extra logic here until that split
+  // actually exists server-side.
   const canEdit = computed(() => isManager.value)
   const canDelete = computed(() => isManager.value)
   const canAccessPayments = computed(() => isManager.value)
@@ -146,7 +151,6 @@ export const useAuthStore = defineStore('auth', () => {
     isSuperAdmin,
     isHeadManager,
     isManager,
-    isStaff,
     canEdit,
     canDelete,
     canAccessPayments,
