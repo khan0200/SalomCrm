@@ -28,13 +28,25 @@ def branch_scope_filter(user, office_field: str = 'office') -> Q:
     queried - 'office' when querying Student directly, 'student__office' for
     models with an FK to Student (Payment, Contract, ...).
 
-    A branch-restricted user with no branch assigned matches nothing rather
-    than falling back to "see everything" - silently widening access on a
-    misconfigured account would defeat the whole point of the setting.
+    A record with no office set yet (blank/NULL - or, via the FK path, no
+    linked student at all) belongs to no one's branch - it's unclaimed
+    shared-pool data, not "someone else's branch", so it stays visible to
+    every BRANCH_ONLY user rather than vanishing until an ALL-scope manager
+    happens to assign it an office. Only a record tagged to a *different*
+    branch is actually excluded.
+
+    A branch-restricted user with no branch of their own assigned matches
+    nothing - that's a misconfigured account state the serializer already
+    refuses to create, so this is just a conservative fallback, never the
+    normal path.
     """
     if not is_branch_restricted(user):
         return Q()
     branch_name = getattr(getattr(user, 'branch', None), 'name', None)
     if not branch_name:
         return Q(pk__in=[])
-    return Q(**{office_field: branch_name})
+    return (
+        Q(**{office_field: branch_name}) |
+        Q(**{f'{office_field}__isnull': True}) |
+        Q(**{office_field: ''})
+    )
