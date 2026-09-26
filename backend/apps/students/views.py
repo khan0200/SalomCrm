@@ -2167,38 +2167,49 @@ class ContractViewSet(viewsets.ModelViewSet):
         if not include_deleted:
             qs = qs.filter(is_deleted=False)
 
-        # Archive filter: archiving is orthogonal to status - any contract,
-        # regardless of status, can be archived, and once archived it must
-        # disappear from every other filter (All/Pending/Verified/Cancelled).
-        # `include_archived=true` bypasses the default exclusion entirely -
-        # used only by the tab-counts fetch, which needs every contract
-        # (archived or not) to compute all counts, including the Archive tab.
-        status_filter = self.request.query_params.get('status', '').strip()
-        include_archived = str(self.request.query_params.get('include_archived', 'false')).lower() == 'true'
+        # Archive/status/search filters below are LIST-only query-param
+        # filters. Detail routes (retrieve/update/destroy and custom actions
+        # like reject/archive/unarchive/assign_student_id) look a contract up
+        # by id via self.get_object(), which filters through this same
+        # get_queryset() - but those requests carry no query params, so the
+        # default `is_archived=False` exclusion silently 404'd any archived
+        # contract out of every detail action, including unarchive() itself
+        # (it could never find the very contract it exists to un-archive).
+        # Scoping this block to the list action lets detail routes always
+        # find a contract by id regardless of its archive/status state.
+        if self.action == 'list':
+            # Archive filter: archiving is orthogonal to status - any contract,
+            # regardless of status, can be archived, and once archived it must
+            # disappear from every other filter (All/Pending/Verified/Cancelled).
+            # `include_archived=true` bypasses the default exclusion entirely -
+            # used only by the tab-counts fetch, which needs every contract
+            # (archived or not) to compute all counts, including the Archive tab.
+            status_filter = self.request.query_params.get('status', '').strip()
+            include_archived = str(self.request.query_params.get('include_archived', 'false')).lower() == 'true'
 
-        if status_filter == 'archive':
-            qs = qs.filter(is_archived=True)
-        else:
-            if not include_archived:
-                qs = qs.filter(is_archived=False)
-            if status_filter:
-                qs = qs.filter(status=status_filter)
+            if status_filter == 'archive':
+                qs = qs.filter(is_archived=True)
+            else:
+                if not include_archived:
+                    qs = qs.filter(is_archived=False)
+                if status_filter:
+                    qs = qs.filter(status=status_filter)
 
-        # Student filter
-        student_id = self.request.query_params.get('student_id', '').strip()
-        if student_id:
-            qs = qs.filter(student_id=student_id)
+            # Student filter
+            student_id = self.request.query_params.get('student_id', '').strip()
+            if student_id:
+                qs = qs.filter(student_id=student_id)
 
-        # Search filter
-        search = self.request.query_params.get('search', '').strip()
-        if search:
-            qs = qs.filter(
-                Q(contract_number__icontains=search) |
-                Q(title__icontains=search) |
-                Q(template_name__icontains=search) |
-                Q(student__full_name__icontains=search) |
-                Q(student__passport__icontains=search)
-            )
+            # Search filter
+            search = self.request.query_params.get('search', '').strip()
+            if search:
+                qs = qs.filter(
+                    Q(contract_number__icontains=search) |
+                    Q(title__icontains=search) |
+                    Q(template_name__icontains=search) |
+                    Q(student__full_name__icontains=search) |
+                    Q(student__passport__icontains=search)
+                )
 
         return qs.select_related('student', 'created_by', 'updated_by', 'updated_by__branch').order_by('-created_at')
 
