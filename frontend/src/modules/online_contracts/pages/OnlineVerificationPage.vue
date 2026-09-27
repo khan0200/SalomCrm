@@ -44,8 +44,14 @@ const confirmError = ref('')
 // the visitor ends up back on the original tab, which is already polling
 // and will advance itself once the webhook lands.
 const isDiditCallbackTab = !!new URLSearchParams(window.location.search).get('verificationSessionId')
+// window.close() only works on a tab the browser can verify was opened by
+// script (window.open without 'noopener'); if some browser still refuses,
+// this stays visible instead of leaving the visitor on a blank/frozen tab
+// with no explanation.
+const showManualCloseMessage = ref(false)
 if (isDiditCallbackTab) {
   window.close()
+  setTimeout(() => { showManualCloseMessage.value = true }, 600)
 }
 
 function goNext() {
@@ -97,7 +103,13 @@ async function handleStart() {
     const res = await onlineContractsApi.startVerification('PASSPORT')
     status.value = res.status
     sessionUrl.value = res.url
-    window.open(res.url, '_blank', 'noopener')
+    // No 'noopener' here on purpose: severing window.opener makes browsers
+    // treat this tab as if it wasn't script-opened, which silently blocks
+    // window.close() from working once Didit's callback lands back on our
+    // own verification page - the tab would just sit there stuck. Didit is
+    // a trusted, deliberately-integrated verification vendor, not arbitrary
+    // third-party content, so the usual reverse-tabnabbing risk is minimal.
+    window.open(res.url, '_blank')
     startPolling()
   } catch (err: any) {
     errorMessage.value = err?.response?.data?.detail
@@ -109,7 +121,7 @@ async function handleStart() {
 
 function handleReopen() {
   if (sessionUrl.value) {
-    window.open(sessionUrl.value, '_blank', 'noopener')
+    window.open(sessionUrl.value, '_blank')
   }
 }
 
@@ -138,6 +150,10 @@ async function handleConfirm() {
 }
 
 onMounted(async () => {
+  // This tab's only job is to close itself and hand control back to the
+  // original tab (see isDiditCallbackTab above) - no need to load anything.
+  if (isDiditCallbackTab) return
+
   try {
     tenantInfo.value = await onlineContractsApi.getTenantInfo(tenantSlug.value)
   } finally {
@@ -151,7 +167,16 @@ onBeforeUnmount(() => stopPolling())
 </script>
 
 <template>
-  <OnlineContractLayout :tenant-info="tenantInfo" :is-loading="isLoadingTenant">
+  <!-- Orphan callback tab: only shown if window.close() was refused -->
+  <div v-if="isDiditCallbackTab" class="min-h-screen flex items-center justify-center p-6">
+    <div v-if="showManualCloseMessage" class="text-center max-w-xs">
+      <CheckCircle2 class="w-8 h-8 text-emerald-500 mx-auto mb-3" />
+      <p class="text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Tasdiqlandi!</p>
+      <p class="text-xs text-zinc-500 dark:text-zinc-400">Ushbu oynani yopib, avvalgi oynaga qayting - u avtomatik davom etadi.</p>
+    </div>
+  </div>
+
+  <OnlineContractLayout v-else :tenant-info="tenantInfo" :is-loading="isLoadingTenant">
     <div class="max-w-lg mx-auto py-6">
       <!-- Back link -->
       <router-link
