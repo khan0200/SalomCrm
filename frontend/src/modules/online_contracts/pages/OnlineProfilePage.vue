@@ -91,8 +91,10 @@ async function handleConfirmDeleteProfile() {
       password: deletePasswordInput.value,
     })
     isDeleteProfileModalOpen.value = false
-    authStore.logout()
-    router.push({ name: 'online-sign-in', params: { tenantname: tenantSlug.value } })
+    // logout() does a full window.location navigation, which would win a
+    // race against a separate router.push() - pass the sign-in page
+    // directly so a deleted account doesn't end up on staff-only /login.
+    authStore.logout(`/contracts/online/${tenantSlug.value}/sign-in`)
   } catch (err: any) {
     console.error('Failed to delete profile:', err)
     deleteProfileError.value = err?.response?.data?.detail || "Profilni o'chirishda xatolik yuz berdi."

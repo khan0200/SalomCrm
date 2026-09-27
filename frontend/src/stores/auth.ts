@@ -92,7 +92,10 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  const logout = () => {
+  // `redirectTo` defaults to the staff login page - the student portal
+  // passes its own tenant landing page instead, since a student has no
+  // reason to ever land on the staff-only /login screen.
+  const logout = (redirectTo: string = '/login') => {
     user.value = null
     token.value = null
     activeTenantId.value = null
@@ -102,7 +105,7 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.removeItem('user_profile')
     localStorage.removeItem('active_tenant_id')
     localStorage.removeItem('active_tenant_name')
-    window.location.href = '/login'
+    window.location.href = redirectTo
   }
 
   const setActiveTenant = (tenantId: string | null, tenantName?: string | null) => {

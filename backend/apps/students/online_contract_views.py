@@ -322,11 +322,18 @@ class StudentSignInView(APIView):
         if not user or not user.check_password(password):
             return Response({'detail': 'Incorrect email or password.'}, status=status.HTTP_400_BAD_REQUEST)
 
+        # This is the public student portal - staff/manager/owner accounts
+        # authenticate here too (same email+password check above), but must
+        # never be let in: there was no role check at all, so any staff
+        # member's own login credentials worked on this student-only page.
+        if user.role != UserRole.STUDENT:
+            return Response({'detail': 'Incorrect email or password.'}, status=status.HTTP_400_BAD_REQUEST)
+
         if not user.is_active:
             return Response({'detail': 'Your account is currently disabled.'}, status=status.HTTP_403_FORBIDDEN)
 
         # Verify tenant match for students
-        if user.role == UserRole.STUDENT and tenant and user.tenant != tenant:
+        if tenant and user.tenant != tenant:
             return Response({'detail': f'This account belongs to another consulting company.'}, status=status.HTTP_403_FORBIDDEN)
 
         profile = StudentProfile.objects.filter(user=user).first()

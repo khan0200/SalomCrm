@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { FileSignature, User, LogOut, ShieldCheck } from 'lucide-vue-next'
+import { FileSignature, User, LogOut, ShieldCheck, AlertCircle } from 'lucide-vue-next'
 import type { TenantInfoResponse } from '@/api/onlineContracts'
 
 const props = defineProps<{
@@ -18,9 +18,18 @@ const tenantSlug = computed(() => (route.params.tenantname as string) || props.t
 const isStudentAuthenticated = computed(() => authStore.isAuthenticated && authStore.user?.role === 'STUDENT')
 const studentFullName = computed(() => authStore.user?.full_name || authStore.user?.email || 'Talaba')
 
+const isLogoutModalOpen = ref(false)
+
 function handleSignOut() {
-  authStore.logout()
-  router.push({ name: 'online-landing', params: { tenantname: tenantSlug.value } })
+  isLogoutModalOpen.value = true
+}
+
+function confirmSignOut() {
+  // `window.location.href` (inside logout()) does a full page navigation,
+  // which would race and win over a separate router.push() call - pass the
+  // student's own tenant landing page directly instead of the staff /login
+  // default, so a student never ends up on the staff-only sign-in screen.
+  authStore.logout(`/contracts/online/${tenantSlug.value}`)
 }
 
 /**
@@ -201,5 +210,44 @@ function handleNavClick(sectionId: string, e: MouseEvent) {
         </div>
       </div>
     </footer>
+
+    <!-- Sign-out confirmation -->
+    <Teleport to="body">
+      <div
+        v-if="isLogoutModalOpen"
+        class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs"
+        @click.self="isLogoutModalOpen = false"
+      >
+        <div class="relative w-full max-w-sm bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-2xl shadow-2xl p-6 space-y-4 animate-in fade-in zoom-in-95 duration-200">
+          <div class="flex items-start gap-3">
+            <div class="w-10 h-10 rounded-xl bg-red-50 dark:bg-red-950/60 border border-red-500/20 text-red-600 dark:text-red-400 flex items-center justify-center shrink-0">
+              <AlertCircle class="w-5 h-5" />
+            </div>
+            <div>
+              <h3 class="text-base font-bold text-black dark:text-white tracking-tight">Chiqishni tasdiqlang</h3>
+              <p class="text-xs text-zinc-600 dark:text-zinc-400 mt-1">Profilingizdan chiqmoqchimisiz?</p>
+            </div>
+          </div>
+
+          <div class="flex items-center justify-end gap-2 pt-2">
+            <button
+              type="button"
+              @click="isLogoutModalOpen = false"
+              class="px-4 py-2 text-xs font-bold text-zinc-700 dark:text-zinc-300 hover:text-black dark:hover:text-white rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+            >
+              Yo'q, qolaman
+            </button>
+            <button
+              type="button"
+              @click="confirmSignOut"
+              class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold text-xs shadow-xs transition-all cursor-pointer"
+            >
+              <LogOut class="w-3.5 h-3.5" />
+              <span>Ha, chiqish</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
