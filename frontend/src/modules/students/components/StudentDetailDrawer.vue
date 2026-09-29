@@ -447,12 +447,9 @@ const handleCopy = (fieldKey: string, text?: string | null) => {
   }, 1600)
 }
 
-const getCertCopyText = (cert?: string | null, score?: string | null, testDate?: string | null, validDate?: string | null) => {
+const getCertScoreCopyText = (cert?: string | null, score?: string | null) => {
   if (!cert || cert === 'NO CERTIFICATE') return ''
-  let text = `${cert} (SCORE: ${score || '—'})`
-  if (testDate) text += ` (TEST DATE: ${testDate})`
-  if (validDate) text += ` (VALID DATE: ${validDate})`
-  return text
+  return score ? `${cert} ${score}` : cert
 }
 
 // Inline Edit Handlers
@@ -2700,10 +2697,7 @@ const handleRestoreStudent = () => {
 
                   <!-- LANGUAGE CERTIFICATE 1 (Split Badge Box) -->
                   <div
-                    class="sm:col-span-2 relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
-                    :class="[copiedField === 'cert1' && 'animate-copy-press']"
-                    @click="handleCopy('cert1', getCertCopyText(student.language_certificate, student.certificate_score, student.certificate_test_date, student.certificate_valid_date))"
-                    title="Single-click to copy Language Certificate 1"
+                    class="sm:col-span-2 relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 group/card"
                   >
                     <div class="flex items-center justify-between">
                       <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 flex items-center gap-1.5">
@@ -2711,16 +2705,6 @@ const handleRestoreStudent = () => {
                         <span>LANGUAGE CERTIFICATE 1</span>
                       </span>
                       <div class="flex items-center gap-1">
-                        <button
-                          v-if="student.language_certificate && student.language_certificate !== 'NO CERTIFICATE'"
-                          type="button"
-                          @click.stop="handleCopy('cert1', getCertCopyText(student.language_certificate, student.certificate_score, student.certificate_test_date, student.certificate_valid_date))"
-                          class="w-6 h-6 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-all cursor-pointer active:scale-90"
-                          title="Copy Certificate 1"
-                        >
-                          <Check v-if="copiedField === 'cert1'" class="w-3.5 h-3.5 text-emerald-500" />
-                          <Copy v-else class="w-3.5 h-3.5" />
-                        </button>
                         <button type="button" @click.stop="openCertModal(1)" class="w-6 h-6 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-all cursor-pointer active:scale-90" title="Edit Certificate 1">
                           <Pencil class="w-3.5 h-3.5" />
                         </button>
@@ -2738,18 +2722,43 @@ const handleRestoreStudent = () => {
 
                     <div class="mt-0.5">
                       <div v-if="student.language_certificate && student.language_certificate !== 'NO CERTIFICATE'" class="flex flex-col gap-1">
-                        <div class="inline-flex items-center text-xs font-bold rounded-full overflow-hidden shadow-2xs select-none self-start">
+                        <div
+                          class="inline-flex items-center text-xs font-bold rounded-full overflow-hidden shadow-2xs select-none self-start cursor-pointer"
+                          :class="[copiedField === 'cert1_score' && 'animate-copy-press']"
+                          @click="handleCopy('cert1_score', getCertScoreCopyText(student.language_certificate, student.certificate_score))"
+                          title="Single-click to copy Language & Score"
+                        >
                           <span class="bg-[#de350b] text-white px-2.5 py-0.5 uppercase tracking-wide text-[11px]">{{ student.language_certificate }}</span>
-                          <span class="bg-[#0052cc] text-white px-2.5 py-0.5 text-[11px]">SCORE: {{ student.certificate_score || '—' }}</span>
+                          <span class="bg-[#0052cc] text-white px-2.5 py-0.5 text-[11px] flex items-center gap-1">
+                            SCORE: {{ student.certificate_score || '—' }}
+                            <Check v-if="copiedField === 'cert1_score'" class="w-3 h-3" />
+                            <Copy v-else class="w-3 h-3 opacity-70" />
+                          </span>
                         </div>
                         <div v-if="student.certificate_test_date || student.certificate_valid_date" class="flex flex-wrap items-center gap-x-3.5 gap-y-0.5 text-[11px] pt-0.5">
-                          <div v-if="student.certificate_test_date" class="flex items-center gap-1">
+                          <div
+                            v-if="student.certificate_test_date"
+                            class="flex items-center gap-1 cursor-pointer"
+                            :class="[copiedField === 'cert1_test_date' && 'animate-copy-press']"
+                            @click="handleCopy('cert1_test_date', student.certificate_test_date)"
+                            title="Single-click to copy Test Date"
+                          >
                             <span class="text-[9.5px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">TEST DATE:</span>
                             <span class="font-mono font-bold text-zinc-800 dark:text-zinc-200">{{ student.certificate_test_date }}</span>
+                            <Check v-if="copiedField === 'cert1_test_date'" class="w-3 h-3 text-emerald-500" />
+                            <Copy v-else class="w-3 h-3 text-zinc-400" />
                           </div>
-                          <div v-if="student.certificate_valid_date" class="flex items-center gap-1">
+                          <div
+                            v-if="student.certificate_valid_date"
+                            class="flex items-center gap-1 cursor-pointer"
+                            :class="[copiedField === 'cert1_valid_date' && 'animate-copy-press']"
+                            @click="handleCopy('cert1_valid_date', student.certificate_valid_date)"
+                            title="Single-click to copy Valid Date"
+                          >
                             <span class="text-[9.5px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">VALID DATE:</span>
                             <span class="font-mono font-bold text-zinc-800 dark:text-zinc-200">{{ student.certificate_valid_date }}</span>
+                            <Check v-if="copiedField === 'cert1_valid_date'" class="w-3 h-3 text-emerald-500" />
+                            <Copy v-else class="w-3 h-3 text-zinc-400" />
                           </div>
                         </div>
                       </div>
@@ -2760,10 +2769,7 @@ const handleRestoreStudent = () => {
                   <!-- LANGUAGE CERTIFICATE 2 (Optional) -->
                   <div
                     v-if="showCert2"
-                    class="sm:col-span-2 relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
-                    :class="[copiedField === 'cert2' && 'animate-copy-press']"
-                    @click="handleCopy('cert2', getCertCopyText(student.language_certificate_2, student.certificate_score_2, student.certificate_2_test_date, student.certificate_2_valid_date))"
-                    title="Single-click to copy Language Certificate 2"
+                    class="sm:col-span-2 relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 group/card"
                   >
                     <div class="flex items-center justify-between">
                       <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 flex items-center gap-1.5">
@@ -2771,16 +2777,6 @@ const handleRestoreStudent = () => {
                         <span>LANGUAGE CERTIFICATE 2</span>
                       </span>
                       <div class="flex items-center gap-1">
-                        <button
-                          v-if="student.language_certificate_2 && student.language_certificate_2 !== 'NO CERTIFICATE'"
-                          type="button"
-                          @click.stop="handleCopy('cert2', getCertCopyText(student.language_certificate_2, student.certificate_score_2, student.certificate_2_test_date, student.certificate_2_valid_date))"
-                          class="w-6 h-6 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-all cursor-pointer active:scale-90"
-                          title="Copy Certificate 2"
-                        >
-                          <Check v-if="copiedField === 'cert2'" class="w-3.5 h-3.5 text-emerald-500" />
-                          <Copy v-else class="w-3.5 h-3.5" />
-                        </button>
                         <button type="button" @click.stop="openCertModal(2)" class="w-6 h-6 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-all cursor-pointer active:scale-90" title="Edit Certificate 2">
                           <Pencil class="w-3.5 h-3.5" />
                         </button>
@@ -2801,18 +2797,43 @@ const handleRestoreStudent = () => {
 
                     <div class="mt-0.5">
                       <div v-if="student.language_certificate_2 && student.language_certificate_2 !== 'NO CERTIFICATE'" class="flex flex-col gap-1">
-                        <div class="inline-flex items-center text-xs font-bold rounded-full overflow-hidden shadow-2xs select-none self-start">
+                        <div
+                          class="inline-flex items-center text-xs font-bold rounded-full overflow-hidden shadow-2xs select-none self-start cursor-pointer"
+                          :class="[copiedField === 'cert2_score' && 'animate-copy-press']"
+                          @click="handleCopy('cert2_score', getCertScoreCopyText(student.language_certificate_2, student.certificate_score_2))"
+                          title="Single-click to copy Language & Score"
+                        >
                           <span class="bg-[#00b8d9] text-white px-2.5 py-0.5 uppercase tracking-wide text-[11px]">{{ student.language_certificate_2 }}</span>
-                          <span class="bg-[#0052cc] text-white px-2.5 py-0.5 text-[11px]">SCORE: {{ student.certificate_score_2 || '—' }}</span>
+                          <span class="bg-[#0052cc] text-white px-2.5 py-0.5 text-[11px] flex items-center gap-1">
+                            SCORE: {{ student.certificate_score_2 || '—' }}
+                            <Check v-if="copiedField === 'cert2_score'" class="w-3 h-3" />
+                            <Copy v-else class="w-3 h-3 opacity-70" />
+                          </span>
                         </div>
                         <div v-if="student.certificate_2_test_date || student.certificate_2_valid_date" class="flex flex-wrap items-center gap-x-3.5 gap-y-0.5 text-[11px] pt-0.5">
-                          <div v-if="student.certificate_2_test_date" class="flex items-center gap-1">
+                          <div
+                            v-if="student.certificate_2_test_date"
+                            class="flex items-center gap-1 cursor-pointer"
+                            :class="[copiedField === 'cert2_test_date' && 'animate-copy-press']"
+                            @click="handleCopy('cert2_test_date', student.certificate_2_test_date)"
+                            title="Single-click to copy Test Date"
+                          >
                             <span class="text-[9.5px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">TEST DATE:</span>
                             <span class="font-mono font-bold text-zinc-800 dark:text-zinc-200">{{ student.certificate_2_test_date }}</span>
+                            <Check v-if="copiedField === 'cert2_test_date'" class="w-3 h-3 text-emerald-500" />
+                            <Copy v-else class="w-3 h-3 text-zinc-400" />
                           </div>
-                          <div v-if="student.certificate_2_valid_date" class="flex items-center gap-1">
+                          <div
+                            v-if="student.certificate_2_valid_date"
+                            class="flex items-center gap-1 cursor-pointer"
+                            :class="[copiedField === 'cert2_valid_date' && 'animate-copy-press']"
+                            @click="handleCopy('cert2_valid_date', student.certificate_2_valid_date)"
+                            title="Single-click to copy Valid Date"
+                          >
                             <span class="text-[9.5px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">VALID DATE:</span>
                             <span class="font-mono font-bold text-zinc-800 dark:text-zinc-200">{{ student.certificate_2_valid_date }}</span>
+                            <Check v-if="copiedField === 'cert2_valid_date'" class="w-3 h-3 text-emerald-500" />
+                            <Copy v-else class="w-3 h-3 text-zinc-400" />
                           </div>
                         </div>
                       </div>
@@ -2823,10 +2844,7 @@ const handleRestoreStudent = () => {
                   <!-- LANGUAGE CERTIFICATE 3 (Optional) -->
                   <div
                     v-if="showCert3"
-                    class="sm:col-span-2 relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
-                    :class="[copiedField === 'cert3' && 'animate-copy-press']"
-                    @click="handleCopy('cert3', getCertCopyText(student.language_certificate_3, student.certificate_score_3, student.certificate_3_test_date, student.certificate_3_valid_date))"
-                    title="Single-click to copy Language Certificate 3"
+                    class="sm:col-span-2 relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 group/card"
                   >
                     <div class="flex items-center justify-between">
                       <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 flex items-center gap-1.5">
@@ -2834,16 +2852,6 @@ const handleRestoreStudent = () => {
                         <span>LANGUAGE CERTIFICATE 3</span>
                       </span>
                       <div class="flex items-center gap-1">
-                        <button
-                          v-if="student.language_certificate_3 && student.language_certificate_3 !== 'NO CERTIFICATE'"
-                          type="button"
-                          @click.stop="handleCopy('cert3', getCertCopyText(student.language_certificate_3, student.certificate_score_3, student.certificate_3_test_date, student.certificate_3_valid_date))"
-                          class="w-6 h-6 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-all cursor-pointer active:scale-90"
-                          title="Copy Certificate 3"
-                        >
-                          <Check v-if="copiedField === 'cert3'" class="w-3.5 h-3.5 text-emerald-500" />
-                          <Copy v-else class="w-3.5 h-3.5" />
-                        </button>
                         <button type="button" @click.stop="openCertModal(3)" class="w-6 h-6 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-all cursor-pointer active:scale-90" title="Edit Certificate 3">
                           <Pencil class="w-3.5 h-3.5" />
                         </button>
@@ -2855,18 +2863,43 @@ const handleRestoreStudent = () => {
 
                     <div class="mt-0.5">
                       <div v-if="student.language_certificate_3 && student.language_certificate_3 !== 'NO CERTIFICATE'" class="flex flex-col gap-1">
-                        <div class="inline-flex items-center text-xs font-bold rounded-full overflow-hidden shadow-2xs select-none self-start">
+                        <div
+                          class="inline-flex items-center text-xs font-bold rounded-full overflow-hidden shadow-2xs select-none self-start cursor-pointer"
+                          :class="[copiedField === 'cert3_score' && 'animate-copy-press']"
+                          @click="handleCopy('cert3_score', getCertScoreCopyText(student.language_certificate_3, student.certificate_score_3))"
+                          title="Single-click to copy Language & Score"
+                        >
                           <span class="bg-[#ff5630] text-white px-2.5 py-0.5 uppercase tracking-wide text-[11px]">{{ student.language_certificate_3 }}</span>
-                          <span class="bg-[#0052cc] text-white px-2.5 py-0.5 text-[11px]">SCORE: {{ student.certificate_score_3 || '—' }}</span>
+                          <span class="bg-[#0052cc] text-white px-2.5 py-0.5 text-[11px] flex items-center gap-1">
+                            SCORE: {{ student.certificate_score_3 || '—' }}
+                            <Check v-if="copiedField === 'cert3_score'" class="w-3 h-3" />
+                            <Copy v-else class="w-3 h-3 opacity-70" />
+                          </span>
                         </div>
                         <div v-if="student.certificate_3_test_date || student.certificate_3_valid_date" class="flex flex-wrap items-center gap-x-3.5 gap-y-0.5 text-[11px] pt-0.5">
-                          <div v-if="student.certificate_3_test_date" class="flex items-center gap-1">
+                          <div
+                            v-if="student.certificate_3_test_date"
+                            class="flex items-center gap-1 cursor-pointer"
+                            :class="[copiedField === 'cert3_test_date' && 'animate-copy-press']"
+                            @click="handleCopy('cert3_test_date', student.certificate_3_test_date)"
+                            title="Single-click to copy Test Date"
+                          >
                             <span class="text-[9.5px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">TEST DATE:</span>
                             <span class="font-mono font-bold text-zinc-800 dark:text-zinc-200">{{ student.certificate_3_test_date }}</span>
+                            <Check v-if="copiedField === 'cert3_test_date'" class="w-3 h-3 text-emerald-500" />
+                            <Copy v-else class="w-3 h-3 text-zinc-400" />
                           </div>
-                          <div v-if="student.certificate_3_valid_date" class="flex items-center gap-1">
+                          <div
+                            v-if="student.certificate_3_valid_date"
+                            class="flex items-center gap-1 cursor-pointer"
+                            :class="[copiedField === 'cert3_valid_date' && 'animate-copy-press']"
+                            @click="handleCopy('cert3_valid_date', student.certificate_3_valid_date)"
+                            title="Single-click to copy Valid Date"
+                          >
                             <span class="text-[9.5px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">VALID DATE:</span>
                             <span class="font-mono font-bold text-zinc-800 dark:text-zinc-200">{{ student.certificate_3_valid_date }}</span>
+                            <Check v-if="copiedField === 'cert3_valid_date'" class="w-3 h-3 text-emerald-500" />
+                            <Copy v-else class="w-3 h-3 text-zinc-400" />
                           </div>
                         </div>
                       </div>
@@ -3252,10 +3285,7 @@ const handleRestoreStudent = () => {
                 <div class="flex flex-col gap-1.5">
                   <!-- 3.1 OFFICE CARD (iOS Gradient Widget) -->
                   <div
-                    class="relative bg-gradient-to-br from-[#1d70f2] to-[#1456c2] text-white rounded-[13px] px-2.5 py-2 shadow-sm shadow-blue-500/15 border border-white/15 flex flex-col justify-between cursor-pointer hover:brightness-105 transition-all duration-150 group/card"
-                    :class="[copiedField === 'office' && 'animate-copy-press']"
-                    @click="handleCopy('office', student.office)"
-                    title="Single-click to copy Office"
+                    class="relative bg-gradient-to-br from-[#1d70f2] to-[#1456c2] text-white rounded-[13px] px-2.5 py-2 shadow-sm shadow-blue-500/15 border border-white/15 flex flex-col justify-between transition-all duration-150 group/card"
                   >
                     <div class="flex items-center justify-between">
                       <span class="text-[9.5px] uppercase font-bold tracking-wider text-blue-100 flex items-center gap-1.5">
@@ -3263,10 +3293,6 @@ const handleRestoreStudent = () => {
                         <span>OFFICE</span>
                       </span>
                       <div class="flex items-center gap-1">
-                        <button type="button" @click.stop="handleCopy('office', student.office)" class="w-5 h-5 rounded hover:bg-white/20 text-white/80 hover:text-white flex items-center justify-center transition-all cursor-pointer active:scale-90" title="Copy Office">
-                          <Check v-if="copiedField === 'office'" class="w-3 h-3 text-white" />
-                          <Copy v-else class="w-3 h-3" />
-                        </button>
                         <button type="button" @click.stop="startInlineEdit('office', student.office)" class="w-5 h-5 rounded hover:bg-white/20 text-white/80 hover:text-white flex items-center justify-center transition-all cursor-pointer active:scale-90" title="Edit Office">
                           <Pencil class="w-3 h-3" />
                         </button>
@@ -3280,23 +3306,16 @@ const handleRestoreStudent = () => {
                   <!-- 3.2 BALANCE CARD (iOS Gradient Widget) -->
                   <div
                     v-if="authStore.canAccessPayments"
-                    class="relative rounded-[13px] px-2.5 py-2 text-white flex flex-col justify-between shadow-sm border border-white/15 cursor-pointer hover:brightness-105 transition-all duration-150 group/card"
+                    class="relative rounded-[13px] px-2.5 py-2 text-white flex flex-col justify-between shadow-sm border border-white/15 transition-all duration-150 group/card"
                     :class="[
-                      computedBalance < 0 ? 'bg-gradient-to-br from-[#e11d48] to-[#be123c] shadow-rose-500/20' : 'bg-gradient-to-br from-[#059669] to-[#047857] shadow-emerald-500/20',
-                      copiedField === 'balance' && 'animate-copy-press'
+                      computedBalance < 0 ? 'bg-gradient-to-br from-[#e11d48] to-[#be123c] shadow-rose-500/20' : 'bg-gradient-to-br from-[#059669] to-[#047857] shadow-emerald-500/20'
                     ]"
-                    @click="handleCopy('balance', String(computedBalance))"
-                    title="Single-click to copy Balance"
                   >
                     <div class="flex items-center justify-between">
                       <span class="text-[9.5px] uppercase font-bold tracking-wider text-white/90 flex items-center gap-1.5">
                         <Landmark class="w-3.5 h-3.5" />
                         <span>BALANCE</span>
                       </span>
-                      <button type="button" @click.stop="handleCopy('balance', String(computedBalance))" class="w-5 h-5 rounded hover:bg-white/20 text-white/80 hover:text-white flex items-center justify-center transition-all cursor-pointer active:scale-90" title="Copy Balance">
-                        <Check v-if="copiedField === 'balance'" class="w-3 h-3 text-white" />
-                        <Copy v-else class="w-3 h-3" />
-                      </button>
                     </div>
                     <div v-if="isPaymentsLoading && !studentPaymentsData" class="h-5 w-28 bg-white/30 rounded-md animate-pulse mt-0.5" />
                     <div v-else class="mt-0.5 flex items-baseline gap-1.5 flex-wrap">
@@ -3308,20 +3327,13 @@ const handleRestoreStudent = () => {
                   <!-- 3.3 PAYMENTS DONE CARD (iOS Gradient Widget) -->
                   <div
                     v-if="authStore.canAccessPayments"
-                    class="relative bg-gradient-to-br from-[#10b981] to-[#059669] rounded-[13px] px-2.5 py-2 text-white flex flex-col justify-between shadow-sm shadow-emerald-500/20 border border-white/15 cursor-pointer hover:brightness-105 transition-all duration-150 group/card"
-                    :class="[copiedField === 'payments_done' && 'animate-copy-press']"
-                    @click="handleCopy('payments_done', String(computedPaymentsDone))"
-                    title="Single-click to copy Payments Done"
+                    class="relative bg-gradient-to-br from-[#10b981] to-[#059669] rounded-[13px] px-2.5 py-2 text-white flex flex-col justify-between shadow-sm shadow-emerald-500/20 border border-white/15 transition-all duration-150 group/card"
                   >
                     <div class="flex items-center justify-between">
                       <span class="text-[9.5px] uppercase font-bold tracking-wider text-emerald-100 flex items-center gap-1.5">
                         <CheckSquare class="w-3.5 h-3.5" />
                         <span>PAYMENTS DONE</span>
                       </span>
-                      <button type="button" @click.stop="handleCopy('payments_done', String(computedPaymentsDone))" class="w-5 h-5 rounded hover:bg-white/20 text-emerald-200 hover:text-white flex items-center justify-center transition-all cursor-pointer active:scale-90" title="Copy Payments Done">
-                        <Check v-if="copiedField === 'payments_done'" class="w-3 h-3 text-white" />
-                        <Copy v-else class="w-3 h-3" />
-                      </button>
                     </div>
                     <div v-if="isPaymentsLoading && !studentPaymentsData" class="h-5 w-28 bg-white/30 rounded-md animate-pulse mt-0.5" />
                     <div v-else class="mt-0.5 flex items-baseline gap-1.5 flex-wrap">
@@ -3333,20 +3345,13 @@ const handleRestoreStudent = () => {
                   <!-- 3.4 DISCOUNT CARD (iOS Gradient Widget) -->
                   <div
                     v-if="authStore.canAccessPayments"
-                    class="relative bg-gradient-to-br from-[#f97316] to-[#ea580c] rounded-[13px] px-2.5 py-2 text-white flex flex-col justify-between shadow-sm shadow-orange-500/20 border border-white/15 cursor-pointer hover:brightness-105 transition-all duration-150 group/card"
-                    :class="[copiedField === 'discount' && 'animate-copy-press']"
-                    @click="handleCopy('discount', String(computedDiscount))"
-                    title="Single-click to copy Discount"
+                    class="relative bg-gradient-to-br from-[#f97316] to-[#ea580c] rounded-[13px] px-2.5 py-2 text-white flex flex-col justify-between shadow-sm shadow-orange-500/20 border border-white/15 transition-all duration-150 group/card"
                   >
                     <div class="flex items-center justify-between">
                       <span class="text-[9.5px] uppercase font-bold tracking-wider text-orange-100 flex items-center gap-1.5">
                         <Tag class="w-3.5 h-3.5" />
                         <span>DISCOUNT</span>
                       </span>
-                      <button type="button" @click.stop="handleCopy('discount', String(computedDiscount))" class="w-5 h-5 rounded hover:bg-white/20 text-orange-200 hover:text-white flex items-center justify-center transition-all cursor-pointer active:scale-90" title="Copy Discount">
-                        <Check v-if="copiedField === 'discount'" class="w-3 h-3 text-white" />
-                        <Copy v-else class="w-3 h-3" />
-                      </button>
                     </div>
                     <div v-if="isPaymentsLoading && !studentPaymentsData" class="h-5 w-24 bg-white/30 rounded-md animate-pulse mt-0.5" />
                     <div v-else class="mt-0.5 flex items-baseline gap-1.5 flex-wrap">
@@ -3358,20 +3363,13 @@ const handleRestoreStudent = () => {
                   <!-- 3.5 WITHDRAWN CARD (iOS Gradient Widget) -->
                   <div
                     v-if="authStore.canAccessPayments && computedWithdrawals > 0"
-                    class="relative bg-gradient-to-br from-[#e11d48] to-[#be123c] rounded-[13px] px-2.5 py-2 text-white flex flex-col justify-between shadow-sm shadow-rose-500/20 border border-white/15 cursor-pointer hover:brightness-105 transition-all duration-150 group/card"
-                    :class="[copiedField === 'withdrawn' && 'animate-copy-press']"
-                    @click="handleCopy('withdrawn', String(computedWithdrawals))"
-                    title="Single-click to copy Withdrawn"
+                    class="relative bg-gradient-to-br from-[#e11d48] to-[#be123c] rounded-[13px] px-2.5 py-2 text-white flex flex-col justify-between shadow-sm shadow-rose-500/20 border border-white/15 transition-all duration-150 group/card"
                   >
                     <div class="flex items-center justify-between">
                       <span class="text-[9.5px] uppercase font-bold tracking-wider text-rose-100 flex items-center gap-1.5">
                         <ArrowDownCircle class="w-3.5 h-3.5" />
                         <span>WITHDRAWN</span>
                       </span>
-                      <button type="button" @click.stop="handleCopy('withdrawn', String(computedWithdrawals))" class="w-5 h-5 rounded hover:bg-white/20 text-rose-200 hover:text-white flex items-center justify-center transition-all cursor-pointer active:scale-90" title="Copy Withdrawn">
-                        <Check v-if="copiedField === 'withdrawn'" class="w-3 h-3 text-white" />
-                        <Copy v-else class="w-3 h-3" />
-                      </button>
                     </div>
                     <div class="mt-0.5 text-[14.5px] font-extrabold tracking-tight font-mono leading-tight">
                       {{ formatCurrency(computedWithdrawals) }}
@@ -3407,10 +3405,7 @@ const handleRestoreStudent = () => {
 
                   <!-- 3.7 GROUP -->
                   <div
-                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[12px] px-2.5 py-[5.5px] shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
-                    :class="[copiedField === 'student_group' && 'animate-copy-press']"
-                    @click="handleCopy('student_group', student.student_group)"
-                    title="Single-click to copy Group"
+                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[12px] px-2.5 py-[5.5px] shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 group/card"
                   >
                     <div class="flex items-center justify-between">
                       <span class="text-[9.5px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 flex items-center gap-1.5">
@@ -3418,10 +3413,6 @@ const handleRestoreStudent = () => {
                         <span>GROUP</span>
                       </span>
                       <div class="flex items-center gap-1">
-                        <button type="button" @click.stop="handleCopy('student_group', student.student_group)" class="w-5 h-5 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-all cursor-pointer active:scale-90" title="Copy Group">
-                          <Check v-if="copiedField === 'student_group'" class="w-3 h-3 text-emerald-500" />
-                          <Copy v-else class="w-3 h-3" />
-                        </button>
                         <button type="button" @click.stop="startInlineEdit('student_group', student.student_group)" class="w-5 h-5 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-all cursor-pointer active:scale-90" title="Edit Group">
                           <Pencil class="w-3 h-3" />
                         </button>
@@ -3437,10 +3428,7 @@ const handleRestoreStudent = () => {
 
                   <!-- 3.8 LEAD BY -->
                   <div
-                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[12px] px-2.5 py-[5.5px] shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
-                    :class="[copiedField === 'lead_by' && 'animate-copy-press']"
-                    @click="handleCopy('lead_by', student.lead_by)"
-                    title="Single-click to copy Lead Source"
+                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[12px] px-2.5 py-[5.5px] shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 group/card"
                   >
                     <div class="flex items-center justify-between">
                       <span class="text-[9.5px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 flex items-center gap-1.5">
@@ -3448,10 +3436,6 @@ const handleRestoreStudent = () => {
                         <span>LEAD BY</span>
                       </span>
                       <div class="flex items-center gap-1">
-                        <button type="button" @click.stop="handleCopy('lead_by', student.lead_by)" class="w-5 h-5 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-all cursor-pointer active:scale-90" title="Copy Lead By">
-                          <Check v-if="copiedField === 'lead_by'" class="w-3 h-3 text-emerald-500" />
-                          <Copy v-else class="w-3 h-3" />
-                        </button>
                         <button type="button" @click.stop="startInlineEdit('lead_by', student.lead_by)" class="w-5 h-5 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-all cursor-pointer active:scale-90" title="Edit Lead By">
                           <Pencil class="w-3 h-3" />
                         </button>
@@ -3500,10 +3484,7 @@ const handleRestoreStudent = () => {
 
                   <!-- 3.10 KORDINATOR -->
                   <div
-                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[12px] px-2.5 py-[5.5px] shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
-                    :class="[copiedField === 'coordinator' && 'animate-copy-press']"
-                    @click="handleCopy('coordinator', student.coordinator)"
-                    title="Single-click to copy Coordinator"
+                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[12px] px-2.5 py-[5.5px] shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 group/card"
                   >
                     <div class="flex items-center justify-between">
                       <span class="text-[9.5px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 flex items-center gap-1.5">
@@ -3511,10 +3492,6 @@ const handleRestoreStudent = () => {
                         <span>KORDINATOR</span>
                       </span>
                       <div class="flex items-center gap-1">
-                        <button type="button" @click.stop="handleCopy('coordinator', student.coordinator)" class="w-5 h-5 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-all cursor-pointer active:scale-90" title="Copy Coordinator">
-                          <Check v-if="copiedField === 'coordinator'" class="w-3 h-3 text-emerald-500" />
-                          <Copy v-else class="w-3 h-3" />
-                        </button>
                         <button type="button" @click.stop="startInlineEdit('coordinator', student.coordinator)" class="w-5 h-5 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-all cursor-pointer active:scale-90" title="Edit Coordinator">
                           <Pencil class="w-3 h-3" />
                         </button>

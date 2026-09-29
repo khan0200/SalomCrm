@@ -264,6 +264,10 @@ export const settingsApi = {
     const res = await apiClient.post('/schools/upsert/', data)
     return res.data
   },
+  normalizeSchoolName: async (name: string): Promise<{ name: string }> => {
+    const res = await apiClient.post('/schools/normalize-preview/', { name })
+    return res.data
+  },
 
   // Majors Directory (Multi-Branch Database Sync)
   getMajors: async (): Promise<GeneralOption[]> => {

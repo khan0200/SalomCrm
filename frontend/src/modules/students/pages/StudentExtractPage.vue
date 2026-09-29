@@ -208,6 +208,8 @@ const FIELD_MAPPING: Record<string, keyof Student> = {
   'GPA': 'gpa',
   'GRADE POINT AVERAGE': 'gpa',
   'AVERAGE GRADE': 'gpa',
+  'GPA_SYSTEM': 'gpa_system',
+  'GPA SYSTEM': 'gpa_system',
   'DEGREE NO': 'degree_no',
   'DEGREE_NO': 'degree_no',
   'DEGREE NUMBER': 'degree_no',
@@ -592,6 +594,22 @@ const triggerExtraction = async () => {
       }
     }
     extractedFieldsList.value = fieldsArr
+
+    // Normalize the extracted school name into the CRM's house style right
+    // away, so the preview the user reviews already shows the clean name
+    // instead of raw OCR text (normalization used to only apply once the
+    // field was saved, via the school directory upsert).
+    const schoolField = fieldsArr.find(f => FIELD_MAPPING[f.key.toUpperCase().replace(/\s+/g, '_')] === 'final_school_name' || FIELD_MAPPING[f.key] === 'final_school_name')
+    if (schoolField && schoolField.value.trim()) {
+      try {
+        const { name: normalizedName } = await settingsApi.normalizeSchoolName(schoolField.value.trim())
+        if (normalizedName && normalizedName.trim()) {
+          schoolField.value = normalizedName.trim()
+        }
+      } catch (e) {
+        console.error('School name normalization preview failed:', e)
+      }
+    }
   } catch (err: any) {
     console.error('Extraction failed:', err)
     extractError.value = err.response?.data?.error || 'Failed to extract document information.'

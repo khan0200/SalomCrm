@@ -948,6 +948,30 @@ class SchoolDirectoryViewSet(viewsets.ModelViewSet):
     serializer_class = SchoolDirectorySerializer
     queryset = SchoolDirectory.objects.all().order_by('name')
 
+    @action(detail=False, methods=['post'], url_path='normalize-preview')
+    def normalize_preview(self, request: Request):
+        """
+        Read-only: normalizes a school name into the CRM house style without
+        writing anything to the directory. Used to clean up AI-OCR-extracted
+        school names in the extraction preview, before the user reviews/saves
+        them (the DB-writing `upsert` action only runs once they actually save).
+        """
+        name = str(request.data.get('name', '')).strip()
+        if not name:
+            return Response({'name': ''}, status=status.HTTP_200_OK)
+
+        if SchoolDirectory.objects.filter(name=name).exists():
+            return Response({'name': name}, status=status.HTTP_200_OK)
+
+        from .ai_command_service import normalize_school_name
+        existing_names = list(SchoolDirectory.objects.values_list('name', flat=True))
+        try:
+            normalized = normalize_school_name(name, existing_names) or name
+        except Exception:
+            logger.exception("School name normalization preview failed; using raw input")
+            normalized = name
+        return Response({'name': normalized}, status=status.HTTP_200_OK)
+
     @action(detail=False, methods=['post'], url_path='upsert')
     def upsert(self, request: Request):
         name = str(request.data.get('name', '')).strip()
