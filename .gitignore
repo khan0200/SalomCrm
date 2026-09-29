@@ -4,6 +4,8 @@ venv/
 env/
 .env
 *.env
+*firebase*.json
+imzopechat/
 
 # Python
 __pycache__/

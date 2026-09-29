@@ -135,6 +135,20 @@ class StudentCreateUpdateSerializer(serializers.ModelSerializer):
             return normalize_date_to_iso(value)
         return value
 
+    def validate_final_school_name(self, value):
+        value = (value or '').strip()
+        if not value:
+            return value
+        from .models import SchoolDirectory
+        if SchoolDirectory.objects.filter(name=value).exists():
+            return value
+        from .ai_command_service import normalize_school_name
+        try:
+            existing_names = list(SchoolDirectory.objects.values_list('name', flat=True))
+            return normalize_school_name(value, existing_names) or value
+        except Exception:
+            return value
+
     def create(self, validated_data):
         # pick_needed is a manual checklist (PICK_NEEDED_LIST on the frontend);
         # it is no longer auto-computed here. It previously used its own label

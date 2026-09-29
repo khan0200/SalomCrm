@@ -450,3 +450,205 @@ def fallback_rule_based_parser(
         "action": "other",
         "message": f"Received instruction: {text}"
     }
+
+
+# --- School name normalization (Educational Background modal) ---
+
+# Uzbek/Russian words that indicate a numbered general-education school and
+# should collapse to the "GENERAL SECONDARY SCHOOL №N" family.
+_SCHOOL_WORD_HINTS = ('MAKTAB', 'MAKTABI', 'SCHOOL', 'ШКОЛА', 'МАКТАБ')
+
+# Words that indicate the input names an actual institution type. If NONE of
+# these (or their Cyrillic equivalents) appear anywhere in the input, the AI
+# has no basis to invent an institution — this guards against hallucination
+# on bare place names / stray words (e.g. "asaka", "12", "bilmadim").
+_INSTITUTION_TYPE_HINTS = (
+    'MAKTAB', 'ШКОЛА', 'SCHOOL', 'SKUL', 'SCOOL', 'SKOOL',
+    'LITSEY', 'LITSEI', 'LYCEUM', 'ЛИЦЕЙ',
+    'KOLLEJ', 'COLLEGE', 'КОЛЛЕДЖ', 'КОЛЛЕЖ',
+    'TEXNIKUM', 'TECHNICUM', 'ТЕХНИКУМ',
+    'POLITEXNIKUM', 'POLYTECHNICUM', 'ПОЛИТЕХНИКУМ',
+    'UNIVERSITET', 'UNIVERSITY', 'УНИВЕРСИТЕТ',
+    'INSTITUT', 'INSTITUTE', 'ИНСТИТУТ',
+    'AKADEMI', 'ACADEMY', 'АКАДЕМИ',
+    'GIMNAZIYA', 'GYMNASIUM', 'ГИМНАЗИЯ',
+)
+
+
+def _has_institution_type_hint(text: str) -> bool:
+    upper = text.upper()
+    return any(hint in upper for hint in _INSTITUTION_TYPE_HINTS)
+
+
+def _pretokenize_school_name(name: str) -> str:
+    """
+    Cleans up punctuation noise BEFORE the name reaches the AI, so the model
+    always sees clean word boundaries instead of guessing across stray
+    separators like '/', ',', '_', or doubled dashes.
+    """
+    import re as _re
+
+    n = name.strip()
+    # Collapse doubled/tripled dashes to a single dash: "3--maktab" -> "3-maktab"
+    n = _re.sub(r'-{2,}', '-', n)
+    # Treat '/', '_', and ',' between a number and a word as the same
+    # separator as a dash or space, e.g. "3/maktab" / "3,maktab" / "3_maktab" -> "3-maktab"
+    n = _re.sub(r'(\d)\s*[/_,]\s*', r'\1-', n)
+    n = _re.sub(r'[/_,]\s*(\d)', r'-\1', n)
+    # Collapse any remaining run of whitespace
+    n = _re.sub(r'\s+', ' ', n).strip()
+    return n
+
+
+def normalize_school_name(raw_name: str, official_schools: Optional[List[str]] = None) -> str:
+    """
+    Normalizes a manually-typed school name (English, Uzbek, or mixed) into the
+    CRM's house style, e.g.:
+      "3RD vocational school"        -> "VOCATIONAL SCHOOL №3"
+      "N3 General secondary school"  -> "GENERAL SECONDARY SCHOOL №3"
+      "qorgontepa tumani 3-maktab"   -> "QORGONTEPA DISTRICT GENERAL SECONDARY SCHOOL №3"
+
+    Falls back to a simple uppercase/whitespace cleanup (no translation) if no
+    OpenAI key is configured or the API call fails, so the field is never
+    blocked on AI availability.
+
+    Guards against hallucination: if the input contains no recognizable
+    institution-type word at all (e.g. a bare place name like "asaka", a bare
+    number like "12", or filler text like "bilmadim"), the AI is never asked
+    to invent one — the input is returned unchanged (just uppercased) for a
+    human to fill in properly.
+    """
+    name = _pretokenize_school_name(raw_name or '')
+    if not name:
+        return name
+
+    # Hallucination guard: no institution-type word present anywhere in the
+    # input and it isn't just a pass-through directory match -> don't let the
+    # AI fabricate an institution out of a bare word/number.
+    if not _has_institution_type_hint(name):
+        return name.upper()
+
+    schools = official_schools or []
+    api_key = os.environ.get("OPENAI_API_KEY") or getattr(settings, "OPENAI_API_KEY", "")
+
+    if not api_key:
+        return _fallback_normalize_school_name(name)
+
+    schools_sample = schools[:150]
+
+    system_instruction = (
+        "You clean up school/university/college names typed by CRM staff in Uzbekistan into one "
+        "consistent house style used by this CRM's school directory.\n\n"
+        "Rules:\n"
+        "1. Translate any Uzbek or Russian words into English using this exact dictionary — apply it "
+        "regardless of spacing, hyphenation, or case in the input (e.g. 'kasb hunar kolleji', "
+        "'kasb-hunar kolleji', and 'kasb-hunar kolleji' all mean the same thing):\n"
+        "   - 'tumani'/'tuman' -> 'DISTRICT'\n"
+        "   - 'shahar'/'shahri'/'shahridagi' -> 'CITY'\n"
+        "   - 'viloyati' -> 'REGION'\n"
+        "   - 'maktab'/'maktabi' / Russian 'школа' -> 'SCHOOL'\n"
+        "   - 'umumiy o'rta ta'lim maktabi' / \"o'rta maktab\" -> 'GENERAL SECONDARY SCHOOL'\n"
+        "   - 'kasb-hunar kolleji', 'kasb hunar kolleji' (with or without a hyphen/space), bare 'kollej', "
+        "'texnika kolleji', 'professional kollej' -> 'VOCATIONAL COLLEGE'. A medical college "
+        "('tibbiyot kolleji') -> 'MEDICAL COLLEGE', not 'VOCATIONAL COLLEGE'.\n"
+        "   - 'litsey'/'litseyi' (with or without a hyphen/space), Russian 'лицей' -> 'LYCEUM'. "
+        "'akademik litsey'/'akademik litseyi' -> 'ACADEMIC LYCEUM'.\n"
+        "   - 'texnikum' -> 'TECHNICUM'\n"
+        "   - 'politexnikum' -> 'POLYTECHNICUM'\n"
+        "   - 'universitet' -> 'UNIVERSITY', 'institut' -> 'INSTITUTE', 'akademiya' -> 'ACADEMY'\n"
+        "CRITICAL: 'TECHNICUM' and 'POLYTECHNICUM' are DIFFERENT institution types in Uzbekistan — never "
+        "substitute one for the other. Uzbek 'texnikum' always maps to 'TECHNICUM', NOT 'POLYTECHNICUM'; "
+        "only translate to 'POLYTECHNICUM' if the input literally says 'politexnikum' or 'polytechnicum'. "
+        "Likewise 'LYCEUM' and 'VOCATIONAL COLLEGE' are different institution types from 'SCHOOL' and from "
+        "each other — never substitute between them; only translate the Uzbek/Russian word that was actually "
+        "typed.\n"
+        "2. Output ALL UPPERCASE.\n"
+        "3. Any school number (ordinal like '3rd', 'N3', a leading/trailing digit, or a Cyrillic/Latin "
+        "numeral) MUST be rewritten as '№N' placed at the END of the institution-type phrase, never as a "
+        "prefix and never spelled out as an ordinal. Example: '3RD VOCATIONAL SCHOOL' -> 'VOCATIONAL SCHOOL №3'. "
+        "'N3 GENERAL SECONDARY SCHOOL' -> 'GENERAL SECONDARY SCHOOL №3'. '12-GENERAL SECONDARY SCHOOL' -> "
+        "'GENERAL SECONDARY SCHOOL №12'.\n"
+        "4. If a district/region name is present, keep it, formatted as '<DISTRICT NAME> DISTRICT' before the "
+        "institution type, e.g. 'qorgontepa tumani 3-maktab' -> 'QORGONTEPA DISTRICT GENERAL SECONDARY SCHOOL №3'.\n"
+        "5. Do not invent a school number if none was given.\n"
+        "5b. If the input just says 'general school' / 'umumiy maktab' without specifying 'secondary' or "
+        "'education', default it to 'GENERAL SECONDARY SCHOOL' (the more common of the two house-style "
+        "variants). Only use 'GENERAL EDUCATION SCHOOL' when the input explicitly says 'education' (not "
+        "'secondary').\n"
+        "6. If the typed name already closely matches one of the official schools listed below (allowing for "
+        "typos, punctuation, or spacing differences), return that OFFICIAL name exactly instead of your own "
+        "reformatting. IMPORTANT: this only applies to spelling/spacing/punctuation variants of the SAME "
+        "institution type and number — e.g. 'general sekondari school-14' matches 'GENERAL SECONDARY SCHOOL №14'. "
+        "NEVER match across different institution types (TECHNICUM, POLYTECHNICUM, COLLEGE, LYCEUM, SCHOOL are all "
+        "distinct) or different numbers — a district commonly has several separate technicums/polytechnicums/"
+        "colleges numbered №1, №2, №3 etc, and each is a different real institution. If the exact type+number "
+        "combination is not in the list, output your own reformatting instead of borrowing a similar-looking name "
+        "from the list.\n"
+        "7. If the input is a university/institute/academy name (not a numbered school), just clean up spelling, "
+        "spacing and casing — do not force a '№' number onto it.\n"
+        "8. CRITICAL — NEVER INVENT AN INSTITUTION: only translate/reformat words that are actually present in "
+        "the input. Never add a district, region, or institution-type word that the input did not mention or "
+        "clearly imply (e.g. a bare city/district name like 'Asaka' with nothing else is NOT enough basis to "
+        "invent a full institution name — do not guess which school, college, or technicum the user meant). If "
+        "the input is too incomplete or ambiguous to normalize confidently, return it unchanged (just cleaned "
+        "up for spacing/casing) rather than fabricating details.\n\n"
+        f"Official school directory (sample):\n{json.dumps(schools_sample)}\n\n"
+        "Respond ONLY with valid JSON: {\"normalized_name\": \"...\"}"
+    )
+
+    try:
+        resp = requests.post(
+            "https://api.openai.com/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "model": "gpt-4o",
+                "messages": [
+                    {"role": "system", "content": system_instruction},
+                    {"role": "user", "content": name}
+                ],
+                "response_format": {"type": "json_object"},
+                "temperature": 0,
+                "max_tokens": 200
+            },
+            timeout=10
+        )
+
+        if resp.status_code == 200:
+            content = resp.json()["choices"][0]["message"]["content"]
+            parsed = json.loads(content)
+            normalized = str(parsed.get("normalized_name", "")).strip()
+            return normalized if normalized else _fallback_normalize_school_name(name)
+
+        logger.error(f"OpenAI error {resp.status_code} in normalize_school_name: {resp.text}")
+        return _fallback_normalize_school_name(name)
+
+    except Exception as e:
+        logger.error(f"OpenAI call failed in normalize_school_name: {e}")
+        return _fallback_normalize_school_name(name)
+
+
+def _fallback_normalize_school_name(name: str) -> str:
+    """Rule-based cleanup used when AI normalization is unavailable (no translation)."""
+    import re as _re
+
+    n = _re.sub(r'\s+', ' ', name).strip()
+
+    # "NO"/"NO."/"NO1" + number -> "№N"
+    n2 = _re.sub(r'\bNO\.?\s*(\d+)\b', lambda m: '№' + m.group(1), n, flags=_re.IGNORECASE)
+    if n2 != n:
+        return n2.upper()
+
+    # Ordinal prefix, e.g. "3RD VOCATIONAL SCHOOL", "1-ST GENERAL SECONDARY SCHOOL"
+    m = _re.match(r'^(\d+)-?(?:ST|ND|RD|TH)\s+(.+)$', n, _re.IGNORECASE)
+    if m:
+        return ('%s №%s' % (m.group(2).strip(), m.group(1))).upper()
+
+    # Bare leading number + type, e.g. "12-GENERAL SECONDARY SCHOOL", "N3 GENERAL SECONDARY SCHOOL"
+    m = _re.match(r'^N?(\d+)[\s-]+(.+)$', n, _re.IGNORECASE)
+    if m:
+        return ('%s №%s' % (m.group(2).strip(), m.group(1))).upper()
+
+    return n.upper()

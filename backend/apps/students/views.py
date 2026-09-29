@@ -951,6 +951,16 @@ class SchoolDirectoryViewSet(viewsets.ModelViewSet):
         phone = request.data.get('phone', None)
         email = request.data.get('email', None)
 
+        # Skip AI normalization when the typed name already matches an existing
+        # directory entry exactly (the common case: user picked a suggestion).
+        if not SchoolDirectory.objects.filter(name=name).exists():
+            from .ai_command_service import normalize_school_name
+            existing_names = list(SchoolDirectory.objects.values_list('name', flat=True))
+            try:
+                name = normalize_school_name(name, existing_names) or name
+            except Exception:
+                logger.exception("School name normalization failed; using raw input")
+
         school, created = SchoolDirectory.objects.update_or_create(
             name=name,
             defaults={
