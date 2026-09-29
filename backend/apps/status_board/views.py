@@ -33,7 +33,7 @@ class StatusBoardViewSet(viewsets.ModelViewSet):
         qs = qs.filter(branch_scope_filter(user))
 
         # 1. Base non-deleted
-        qs = qs.filter(is_deleted=False)
+        qs = qs.filter(is_deleted=False, is_permanently_deleted=False)
 
         # 2. Status hidden handling
         show_hidden = self.request.query_params.get('show_hidden', 'false').lower() == 'true'

@@ -270,6 +270,11 @@ const tagOptions = computed<string[]>(() => {
 const filteredStudents = computed(() => {
   const q = searchQuery.value.trim().toLowerCase()
   const filtered = allStudents.value.filter(s => {
+    // Exclude permanently deleted students unless explicitly chosen in status filter
+    if (s.is_permanently_deleted && !selectedStatuses.value.includes('permanently_deleted')) {
+      return false
+    }
+
     // Search query
     if (q) {
       const sId = (s.id || '').toLowerCase()

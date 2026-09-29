@@ -164,6 +164,10 @@ const folderCounts = computed(() => {
   })
 
   allStudents.value.forEach(s => {
+    if (s.is_permanently_deleted) {
+      return
+    }
+
     if (s.is_deleted) {
       counts.deleted = (counts.deleted || 0) + 1
       return
@@ -193,6 +197,7 @@ const folderCounts = computed(() => {
 const recentPutDates = computed(() => {
   const counts: Record<string, number> = {}
   allStudents.value.forEach(s => {
+    if (s.is_permanently_deleted) return
     const d = s.kdb_put_date
     if (d && d !== 'NO KDB' && d !== 'KDB DONE') {
       counts[d] = (counts[d] || 0) + 1
@@ -204,6 +209,7 @@ const recentPutDates = computed(() => {
 const recentTakeDates = computed(() => {
   const counts: Record<string, number> = {}
   allStudents.value.forEach(s => {
+    if (s.is_permanently_deleted) return
     const d = s.kdb_take_date
     if (d && d !== 'NO KDB' && d !== 'KDB DONE') {
       counts[d] = (counts[d] || 0) + 1
@@ -262,6 +268,9 @@ const calculateTakeDays = (takeDateStr?: string | null) => {
 const filteredStudents = computed(() => {
   let list = allStudents.value
   const q = searchQuery.value.trim().toLowerCase()
+
+  // Always exclude permanently deleted students on Status Board
+  list = list.filter(s => !s.is_permanently_deleted)
 
   // 1. Folder filter
   if (activeFolder.value === 'deleted') {

@@ -135,6 +135,9 @@ const handleApplyFilters = (filters: {
 
 // ── Filtering ───────────────────────────────────────────────────────────────
 const filteredStudents = computed(() => students.value.filter(student => {
+  // Never show permanently deleted students in Documents
+  if (student.is_permanently_deleted) return false
+
   // 1. Deleted Students
   const showDeleted = dashboardStore.selectedLevels.includes('DELETED')
   if (showDeleted) {

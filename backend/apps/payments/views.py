@@ -228,14 +228,14 @@ class PaymentOverviewViewSet(viewsets.ReadOnlyModelViewSet):
         # Status filter (active vs archive vs all)
         status_filter = self.request.query_params.get('status')
         if status_filter == 'Archive':
-            qs = qs.filter(is_deleted=True)
+            qs = qs.filter(is_deleted=True, is_permanently_deleted=False)
         elif status_filter == 'Active':
-            qs = qs.filter(is_deleted=False)
+            qs = qs.filter(is_deleted=False, is_permanently_deleted=False)
 
         # Search
         search = self.request.query_params.get('search', '').strip()
         if search:
-            qs = qs.filter(
+            qs = qs.filter(is_permanently_deleted=False).filter(
                 Q(id__icontains=search) |
                 Q(full_name__icontains=search) |
                 Q(phone1__icontains=search)

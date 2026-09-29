@@ -272,16 +272,18 @@ const folderScopedStudents = computed(() => {
   } else if (activeFolder.value === 'deleted' || activeFolder.value === 'archive') {
     list = list.filter(s => s.is_deleted && !s.is_permanently_deleted)
   } else if (activeFolder.value === 'hidden') {
-    list = list.filter(s => !s.is_deleted && s.status_hidden)
+    list = list.filter(s => !s.is_deleted && !s.is_permanently_deleted && s.status_hidden)
   } else if (activeFolder.value === 'except') {
-    list = list.filter(s => !s.is_deleted && (!s.folder_ids || s.folder_ids.length === 0))
+    list = list.filter(s => !s.is_deleted && !s.is_permanently_deleted && (!s.folder_ids || s.folder_ids.length === 0))
   } else if (activeFolder.value !== 'all') {
     const targetFolderId = String(activeFolder.value)
-    list = list.filter(s => !s.is_deleted && (s.folder_ids || []).map(String).includes(targetFolderId))
+    list = list.filter(s => !s.is_deleted && !s.is_permanently_deleted && (s.folder_ids || []).map(String).includes(targetFolderId))
   } else {
-    // In 'all' folder: if searching, include archived students; otherwise show active students
+    // In 'all' folder: if searching, include recoverable archived students, but NEVER permanently deleted students; otherwise show active students
     if (!q) {
-      list = list.filter(s => !s.is_deleted)
+      list = list.filter(s => !s.is_deleted && !s.is_permanently_deleted)
+    } else {
+      list = list.filter(s => !s.is_permanently_deleted)
     }
   }
 

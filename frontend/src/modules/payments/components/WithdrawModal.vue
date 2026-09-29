@@ -87,9 +87,10 @@ const selectedStudent = computed(() => {
 })
 
 const studentOptions = computed(() => {
-  if (!studentSearch.value) return props.students.slice(0, 30)
+  const activeStudents = props.students.filter(s => !s.is_permanently_deleted)
+  if (!studentSearch.value) return activeStudents.slice(0, 30)
   const q = studentSearch.value.toLowerCase()
-  return props.students.filter(s =>
+  return activeStudents.filter(s =>
     (s.id || '').toLowerCase().includes(q) ||
     (s.full_name || '').toLowerCase().includes(q)
   ).slice(0, 30)

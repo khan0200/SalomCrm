@@ -132,11 +132,11 @@ const leadOptions = computed<string[]>(() => {
   return Array.from(set).sort()
 })
 
-// Only Active students (!s.is_deleted) who do not already belong to this target folder
+// Only Active students (!s.is_deleted && !s.is_permanently_deleted) who do not already belong to this target folder
 const pickableStudents = computed(() => {
   const targetFolderId = String(props.folderId)
   return props.allStudents.filter(s => {
-    if (s.is_deleted) return false
+    if (s.is_deleted || s.is_permanently_deleted) return false
     const currentFolderIds = (s.folder_ids || []).map(String)
     return !currentFolderIds.includes(targetFolderId)
   })

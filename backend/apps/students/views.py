@@ -137,18 +137,22 @@ class StudentViewSet(viewsets.ModelViewSet):
         elif folder == 'deleted' or folder == 'archive':
             qs = qs.filter(is_deleted=True, is_permanently_deleted=False)
         elif folder == 'hidden':
-            qs = qs.filter(is_deleted=False, status_hidden=True)
+            qs = qs.filter(is_deleted=False, is_permanently_deleted=False, status_hidden=True)
         elif folder == 'except':
-            qs = qs.filter(is_deleted=False).filter(Q(folder_ids=[]) | Q(folder_ids__isnull=True))
+            qs = qs.filter(is_deleted=False, is_permanently_deleted=False).filter(Q(folder_ids=[]) | Q(folder_ids__isnull=True))
         elif folder != 'all':
             try:
                 folder_uuid = uuid.UUID(str(folder).strip())
-                qs = qs.filter(is_deleted=False, folder_ids__contains=[folder_uuid])
+                qs = qs.filter(is_deleted=False, is_permanently_deleted=False, folder_ids__contains=[folder_uuid])
             except (ValueError, TypeError):
                 qs = qs.none()
         else:
             if not include_archive and not search_query:
-                qs = qs.filter(is_deleted=False)
+                qs = qs.filter(is_deleted=False, is_permanently_deleted=False)
+            elif not include_archive and search_query:
+                qs = qs.filter(is_deleted=False, is_permanently_deleted=False)
+            elif search_query:
+                qs = qs.filter(is_permanently_deleted=False)
 
         # ── 2. Search Filter ──────────────────────────────────────────────
         search_mode = params.get('search_mode', 'all')
@@ -738,18 +742,22 @@ class StudentExportView(APIView):
         elif folder == 'deleted' or folder == 'archive':
             qs = qs.filter(is_deleted=True, is_permanently_deleted=False)
         elif folder == 'hidden':
-            qs = qs.filter(is_deleted=False, status_hidden=True)
+            qs = qs.filter(is_deleted=False, is_permanently_deleted=False, status_hidden=True)
         elif folder == 'except':
-            qs = qs.filter(is_deleted=False).filter(Q(folder_ids=[]) | Q(folder_ids__isnull=True))
+            qs = qs.filter(is_deleted=False, is_permanently_deleted=False).filter(Q(folder_ids=[]) | Q(folder_ids__isnull=True))
         elif folder != 'all':
             try:
                 folder_uuid = uuid.UUID(str(folder).strip())
-                qs = qs.filter(is_deleted=False, folder_ids__contains=[folder_uuid])
+                qs = qs.filter(is_deleted=False, is_permanently_deleted=False, folder_ids__contains=[folder_uuid])
             except (ValueError, TypeError):
                 qs = qs.none()
         else:
-            if not include_archive:
-                qs = qs.filter(is_deleted=False)
+            if not include_archive and not search_query:
+                qs = qs.filter(is_deleted=False, is_permanently_deleted=False)
+            elif not include_archive and search_query:
+                qs = qs.filter(is_deleted=False, is_permanently_deleted=False)
+            elif search_query:
+                qs = qs.filter(is_permanently_deleted=False)
 
         # Search filter
         search_query = str(params.get('search', '')).strip()
@@ -1311,7 +1319,7 @@ class VisaStudentQuickSearchView(APIView):
             return Response([])
 
         tenant = getattr(request, 'tenant', None) or getattr(request.user, 'tenant', None)
-        qs = Student.objects.filter(is_deleted=False)
+        qs = Student.objects.filter(is_deleted=False, is_permanently_deleted=False)
         if tenant:
             qs = qs.filter(tenant=tenant)
 
@@ -1353,7 +1361,7 @@ class VisaStudentLookupView(APIView):
             return Response({'found': False})
 
         tenant = getattr(request, 'tenant', None) or getattr(request.user, 'tenant', None)
-        qs = Student.objects.filter(is_deleted=False)
+        qs = Student.objects.filter(is_deleted=False, is_permanently_deleted=False)
         if tenant:
             qs = qs.filter(tenant=tenant)
 

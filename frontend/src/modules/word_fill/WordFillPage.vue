@@ -173,7 +173,7 @@ const { data: allStudentsData, isLoading: isLoadingStudents } = useQuery({
 })
 
 const allStudents = computed<Student[]>(
-  () => (allStudentsData.value?.results || []).filter(s => !s.is_deleted)
+  () => (allStudentsData.value?.results || []).filter(s => !s.is_deleted && !s.is_permanently_deleted)
 )
 
 // Dynamic Option Sources (from Config + Master Students)

@@ -291,6 +291,7 @@ const toggleAllGroups = () => {
 const filteredStudents = computed(() => {
   return allStudents.value.filter(s => {
     if (studentSearch.value) {
+      if (s.is_permanently_deleted) return false
       const q = studentSearch.value.toLowerCase()
       const matches = (s.id || '').toLowerCase().includes(q) || (s.full_name || '').toLowerCase().includes(q)
       if (!matches) return false
