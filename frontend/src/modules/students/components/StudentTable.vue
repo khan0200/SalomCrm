@@ -1,13 +1,19 @@
 <script setup lang="ts">
 import type { Student } from '@/types'
 import StudentRow from './StudentRow.vue'
-import { ChevronDown, ChevronUp, Users, Loader2 } from 'lucide-vue-next'
+import { ChevronDown, ChevronUp, Users, Loader2, Sparkles } from 'lucide-vue-next'
+import { useAuthStore } from '@/stores/auth'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   students: Student[]
   isLoading: boolean
   sortOrder: 'asc' | 'desc'
-}>()
+  isNewTenant?: boolean
+}>(), {
+  isNewTenant: false,
+})
+
+const authStore = useAuthStore()
 
 const emit = defineEmits<{
   (e: 'toggle-sort'): void
@@ -48,6 +54,24 @@ const emit = defineEmits<{
             <td colspan="6" class="p-12 text-center text-zinc-400">
               <Loader2 class="w-6 h-6 animate-spin mx-auto text-blue-600 mb-2" />
               <span class="text-xs font-medium">Loading roster data...</span>
+            </td>
+          </tr>
+
+          <tr v-else-if="isNewTenant">
+            <td colspan="6" class="p-12 text-center text-zinc-400">
+              <Sparkles class="w-8 h-8 mx-auto text-blue-400 dark:text-blue-500 mb-2" />
+              <p class="font-bold text-sm text-zinc-700 dark:text-zinc-300">Hali talabalar qo'shilmagan</p>
+              <p class="text-xs text-zinc-400 mt-1 max-w-sm mx-auto">
+                Bu yerda hozircha bo'sh — CRM bilan tanishish uchun avval sozlamalarni ko'rib chiqing.
+              </p>
+              <RouterLink
+                v-if="authStore.canAccessSettings"
+                to="/settings?tab=info"
+                class="inline-flex items-center gap-1.5 mt-3 px-3.5 py-1.5 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-500/20 transition-all"
+              >
+                <Sparkles class="w-3.5 h-3.5" />
+                <span>Boshlash bo'limini ko'rish</span>
+              </RouterLink>
             </td>
           </tr>
 

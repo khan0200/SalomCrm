@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
 import {
   Tag,
   GraduationCap,
@@ -44,7 +45,14 @@ import {
   UserCheck,
   StickyNote,
   Banknote,
-  Plus
+  Plus,
+  Info,
+  FileSignature,
+  KanbanSquare,
+  FileStack,
+  ShieldCheck,
+  FileSpreadsheet,
+  UsersRound
 } from 'lucide-vue-next'
 import { settingsApi, type TariffOption, type GeneralOption, type UniversityStatusOption, type CustomTag } from '@/api/settings'
 import { useCustomTags } from '@/composables/useCustomTags'
@@ -144,6 +152,17 @@ const resolveOfficeIcon = (iconKey?: string) => {
 
 // ── Tab Configurations (1-to-1 UniApp2) ──────────────────────────────
 const TABS_CONFIG = {
+  info: {
+    id: 'info',
+    label: "Boshlash / Info",
+    subLabel: "Yordam va qo'llanma",
+    description: "CRM imkoniyatlari va birinchi qadamlar bo'yicha qisqacha yo'riqnoma.",
+    icon: Info,
+    colorClass: 'text-zinc-500 bg-zinc-50 dark:bg-zinc-950/20 border-zinc-100 dark:border-zinc-900/30',
+    activeColorClass: 'bg-zinc-500/10 text-zinc-500 dark:bg-zinc-500/20',
+    btnBgClass: 'bg-zinc-600 hover:bg-zinc-700 text-white',
+    addText: '',
+  },
   tariff: {
     id: 'tariff',
     label: 'Tariff Options',
@@ -269,7 +288,80 @@ const TABS_CONFIG = {
 
 type TabType = keyof typeof TABS_CONFIG
 
-const activeTab = ref<TabType>('tariff')
+// ── Info Tab: Onboarding Journey Content ───────────────────────────────
+// The order mirrors the real lifecycle of a student record through the
+// CRM, not the sidebar/settings menu order — a brand-new tenant reads
+// this top-to-bottom, once, like a short book about the product.
+const JOURNEY_STEPS = [
+  {
+    key: 'students',
+    n: '01',
+    label: "Talaba qo'shish — qo'lda emas, hujjatdan",
+    icon: UsersRound,
+    detail: "Yangi talabani qo'shganda maydonlarni birma-bir yozish shart emas. Profildagi \"Fill by Document\" orqali pasport, diplom yoki til sertifikati (IELTS, TOPIK, SAT) rasmini yuklaysiz — sun'iy intellekt ism, sana, GPA kabi 20+ maydonni o'zi o'qib chiqadi, siz esa saqlashdan oldin faqat tekshirib chiqasiz.",
+    example: "Masalan: pasport rasmini tashlaysiz → 3 soniyada ism, tug'ilgan sana va pasport raqami avtomatik to'ladi.",
+  },
+  {
+    key: 'contracts',
+    n: '02',
+    label: 'Shartnoma va onlayn imzo',
+    icon: FileSignature,
+    detail: "Talaba tanlagan tarif asosida shartnoma yaratiladi. Tizim tasdiqlash kodi bilan shaxsiy havola beradi — talaba shu havola orqali o'zi kirib, shartnomani ekranda o'qib, telefonidan imzolaydi. Ofisga kelib, qog'ozga imzo chekish shart emas.",
+    example: "Masalan: talaba havolani telefonida ochib imzolaydi → shartnoma holati avtomatik \"Verified\"ga o'tadi.",
+  },
+  {
+    key: 'payments',
+    n: '03',
+    label: "To'lov va balans",
+    icon: Wallet,
+    detail: "\"Add Payment\" orqali summa, to'lov usuli va qabul qiluvchi kiritiladi. Har bir talaba uchun balans (to'lovlar − tarif − chegirma) tizim tomonidan avtomatik hisoblanadi — qarzdorlarni qidirib yurish shart emas, filtr orqali bir zumda ko'rinadi.",
+    example: "Masalan: 13,000,000 so'mlik tarifdan 8,000,000 to'langan bo'lsa, tizim \"5,000,000 qarz\" deb o'zi ko'rsatadi.",
+  },
+  {
+    key: 'visacheck',
+    n: '04',
+    label: 'Viza holatini tekshirish',
+    icon: ShieldCheck,
+    detail: "Pasport raqami, ism va tug'ilgan sana asosida bitta yoki butun guruh uchun viza statusi real vaqtda so'raladi. Holat o'zgarsa (masalan kutilayotgandan tasdiqlanganga) bildirishnoma chiqadi, tasdiqlangan talaba uchun sertifikat PDF qilib yuklab olinadi.",
+    example: "Masalan: 30 nafar talabani bir vaqtda tekshirib, kim tasdiqlanganini ro'yxat holida ko'rasiz.",
+  },
+  {
+    key: 'status',
+    n: '05',
+    label: 'Jarayonni nazorat qilish',
+    icon: KanbanSquare,
+    detail: "Status Board — talabaning qaysi bosqichda (Invoice, CoA, Embassy va h.k.) turganini bir jadvalda ko'rsatadigan boshqaruv paneli. Har bir katakchani bossangiz, o'sha yerning o'zida sana yoki holatni o'zgartirasiz. Bosqich nomlari Settings → University Statuses orqali o'zingizga moslab sozlanadi.",
+    example: "Masalan: KDB sanasini kiritsangiz, tizim 31 kundan keyingi olib ketish sanasini o'zi hisoblab beradi.",
+  },
+  {
+    key: 'documents',
+    n: '06',
+    label: 'Hujjatlar nazorati',
+    icon: FileStack,
+    detail: "Talabaning qaysi hujjati hali topshirilmaganini ko'rsatadigan jadval. Ba'zi belgilar (masalan telefon, manzil) tegishli maydon talaba profilida to'ldirilgach avtomatik o'chadi — hech kim qo'lda o'chirmaydi, shu bilan ma'lumot to'liqligi kafolatlanadi.",
+    example: "Masalan: pasport nusxasi yuklanmagan bo'lsa, qizil belgi ko'rinadi va yodingizga soladi.",
+  },
+  {
+    key: 'app_form',
+    n: '07',
+    label: 'Ariza va blankalarni to\'ldirish',
+    icon: FileSpreadsheet,
+    detail: "Universitet yoki elchixona talab qiladigan tayyor Excel/Word blankangizni yuklaysiz — tizim ustunlarni (hatto koreyscha sarlavhalarni ham) tanib, tanlagan talabalaringiz ma'lumotini avtomatik joylashtiradi. Bitta jadvalga ko'p talaba yoki har biriga alohida hujjat — ikkalasi ham mumkin.",
+    example: "Masalan: 여권번호 (pasport raqami) ustunini tizim o'zi tanib, mos ma'lumotni joylaydi.",
+  },
+  {
+    key: 'staff',
+    n: '08',
+    label: 'Jamoani boshqarish',
+    icon: Users,
+    detail: "Xodim qo'shib, unga rol beriladi: Head Manager (to'liq huquq), Manager (xodimlar bo'limidan tashqari hammasi) yoki Staff (faqat ko'rish va shartnoma yaratish). Har bir xodimga \"faqat o'z filiali\" yoki \"barcha ma'lumotlar\"ni ko'rish doirasini belgilash mumkin.",
+    example: "Masalan: filialga biriktirilgan xodim faqat o'z filiali talabalarini ko'radi, boshqa filiallarni ko'rmaydi.",
+  },
+]
+
+const route = useRoute()
+const initialTab = (route.query.tab as string) in TABS_CONFIG ? (route.query.tab as TabType) : 'info'
+const activeTab = ref<TabType>(initialTab)
 const searchQuery = ref('')
 const loading = ref(false)
 
@@ -806,7 +898,7 @@ const activeConfig = computed(() => TABS_CONFIG[activeTab.value])
         <p class="text-xs text-zinc-500 font-medium mt-0.5">Configure tariffs, academic levels, cohorts, lead sources, and payment methods</p>
       </div>
 
-      <div class="flex items-center gap-3 w-full sm:w-auto">
+      <div v-if="activeTab !== 'info'" class="flex items-center gap-3 w-full sm:w-auto">
         <!-- Search -->
         <div class="relative flex-1 sm:w-64">
           <Search class="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -868,6 +960,7 @@ const activeConfig = computed(() => TABS_CONFIG[activeTab.value])
             </div>
           </div>
           <span
+            v-if="tab.id !== 'info'"
             class="px-1.5 py-0.2 rounded-full text-[9.5px] font-bold font-mono ml-2 shrink-0"
             :class="activeTab === tab.id ? 'bg-blue-600 text-white shadow-xs' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500'"
           >
@@ -893,7 +986,37 @@ const activeConfig = computed(() => TABS_CONFIG[activeTab.value])
           </div>
         </div>
 
-        <div v-if="loading" class="flex-1 flex items-center justify-center py-16">
+        <!-- 0. Info / Getting Started — read once, top to bottom, like a
+             short manual: every module in the order a student record
+             actually moves through the CRM. No cards-in-cards, no
+             collapse/expand — everything is on the page at once. -->
+        <div v-if="activeTab === 'info'" class="max-w-2xl">
+          <p class="text-[12.5px] text-zinc-500 leading-relaxed mb-6">
+            SalomCRM bitta talabani birinchi murojaatidan viza olib, hujjatlarini yopishigacha kuzatib boradi.
+            Quyida shu yo'lning har bir bosqichi va nima uchun kerakligi tartib bilan tushuntirilgan.
+          </p>
+
+          <ol class="relative border-l border-zinc-200 dark:border-zinc-700 pl-6 space-y-6">
+            <li v-for="step in JOURNEY_STEPS" :key="step.key" class="relative">
+              <div class="absolute -left-[31px] top-0.5 w-6 h-6 rounded-full bg-white dark:bg-[#111315] border-2 border-blue-500 flex items-center justify-center">
+                <component :is="step.icon" class="w-3 h-3 text-blue-500" />
+              </div>
+              <div class="flex items-baseline gap-2">
+                <span class="text-[10px] font-mono font-bold text-zinc-400">{{ step.n }}</span>
+                <h4 class="text-[13.5px] font-extrabold text-zinc-900 dark:text-zinc-100">{{ step.label }}</h4>
+              </div>
+              <p class="text-[12px] text-zinc-600 dark:text-zinc-400 leading-relaxed mt-1">{{ step.detail }}</p>
+              <p class="text-[11.5px] text-zinc-400 dark:text-zinc-500 italic leading-relaxed mt-1">{{ step.example }}</p>
+            </li>
+          </ol>
+
+          <p class="text-[12px] text-zinc-500 leading-relaxed mt-7 pt-5 border-t border-zinc-100 dark:border-zinc-800">
+            Bu sahifaning o'zida esa (chapdagi ro'yxat orqali) tariflar, xodimlar, universitetlar, to'lov usullari va
+            boshqa barcha ro'yxatlarni o'zingizga moslab sozlaysiz.
+          </p>
+        </div>
+
+        <div v-else-if="loading" class="flex-1 flex items-center justify-center py-16">
           <Loader2 class="w-8 h-8 text-blue-600 animate-spin" />
         </div>
 

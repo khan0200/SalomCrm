@@ -238,6 +238,11 @@ const { data: allStudentsData, isLoading, refetch } = useQuery({
 
 const allStudents = computed<Student[]>(() => allStudentsData.value?.results || [])
 
+// True only when the tenant has never added a single student yet (not when
+// filters/search simply return no matches) — used to point brand-new tenants
+// at the Settings "Boshlash / Info" tab instead of the generic empty state.
+const isNewTenant = computed(() => !isLoading.value && allStudents.value.length === 0)
+
 // Dynamic real-time folder counts calculated from in-memory master roster
 const dynamicFolderCounts = computed(() => {
   const list = allStudents.value
@@ -1006,6 +1011,7 @@ dashboardStore.onExportExcel = handleExportExcel
       :students="students"
       :is-loading="isLoading"
       :sort-order="sortOrder"
+      :is-new-tenant="isNewTenant"
       @toggle-sort="toggleSort"
       @open-detail="openDetail"
       @open-actions="openActions"
