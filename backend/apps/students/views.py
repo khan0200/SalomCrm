@@ -1836,9 +1836,11 @@ def _serialize_students_for_fill(request, student_ids):
             # Parents
             "father_name": s.father_name,
             "father_phone": s.father_phone,
+            "father_workplace": s.father_workplace,
             "father_job": s.father_job,
             "mother_name": s.mother_name,
             "mother_phone": s.mother_phone,
+            "mother_workplace": s.mother_workplace,
             "mother_job": s.mother_job,
             # Education & School
             "educational_background": s.educational_background,

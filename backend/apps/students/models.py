@@ -88,7 +88,8 @@ class Student(TenantAwareModel):
     father_job = models.CharField(max_length=255, blank=True, null=True)  # Lavozim
     mother_name = models.CharField(max_length=255, blank=True, null=True)
     mother_phone = models.CharField(max_length=50, blank=True, null=True)
-    mother_job = models.CharField(max_length=255, blank=True, null=True)
+    mother_workplace = models.CharField(max_length=255, blank=True, null=True)  # Ish joyi
+    mother_job = models.CharField(max_length=255, blank=True, null=True)  # Lavozim
     email = models.EmailField(max_length=255, blank=True, null=True)
     address = models.TextField(blank=True, null=True)
 

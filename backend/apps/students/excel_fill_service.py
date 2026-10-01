@@ -210,10 +210,12 @@ CRM_FIELDS = [
     # Parents
     {"key": "father_name", "label": "Otasining ismi (Father's Name / 부 성명)", "category": "parents"},
     {"key": "father_phone", "label": "Otasining telefoni (Father's Phone / 부 연락처)", "category": "parents"},
-    {"key": "father_job", "label": "Otasining ish joyi (Father's Job / 부 직업)", "category": "parents"},
+    {"key": "father_workplace", "label": "Otasining ish joyi (Father's Workplace / 부 직장)", "category": "parents"},
+    {"key": "father_job", "label": "Otasining kasbi (Father's Job / 부 직업)", "category": "parents"},
     {"key": "mother_name", "label": "Onasining ismi (Mother's Name / 모 성명)", "category": "parents"},
     {"key": "mother_phone", "label": "Onasining telefoni (Mother's Phone / 모 연락처)", "category": "parents"},
-    {"key": "mother_job", "label": "Onasining ish joyi (Mother's Job / 모 직업)", "category": "parents"},
+    {"key": "mother_workplace", "label": "Onasining ish joyi (Mother's Workplace / 모 직장)", "category": "parents"},
+    {"key": "mother_job", "label": "Onasining kasbi (Mother's Job / 모 직업)", "category": "parents"},
 
     # Education (Educational Background)
     {"key": "educational_background", "label": "Ta'lim darajasi (Educational Background / 최종학력 / 학력사항)", "category": "education"},
@@ -285,12 +287,13 @@ SEMANTIC_PATTERNS = [
     
     # Parents specific FIRST (ensures father/mother phones and names don't get captured as student's)
     (r"(father['’]?s\s*name|father\s*name|father\s*fullname|부\s*성명|부\s*이름|부친\s*성명|부친\s*이름|아버지\s*성명|아버지\s*이름|otasining\s*ismi|фио\s*отца)", "father_name"),
-    (r"(father['’]?s\s*(number|phone|mobile|tel|cell)|father\s*(mobile|phone|no|tel|cell)|부\s*(연락처|전화번호|휴대전화|휴대폰|핸드폰)|부친\s*(연락처|전화|휴대폰)|아버지\s*(연락처|전화번호|휴대폰)|otasining\s*(telefoni|raqami)|телефон\s*отца)", "father_phone"),
-    (r"(father['’]?s\s*(job|occupation|work)|father\s*(job|occupation)|부\s*직업|부친\s*직업|아버지\s*직업|otasining\s*(kasbi|ish\s*joyi)|место\s*работы\s*отца)", "father_job"),
+    (r"(father['’]?s\s*(workplace|work\s*place)|부\s*(직장|근무처)|부친\s*(직장|근무처)|아버지\s*(직장|근무처)|otasining\s*ish\s*joyi|место\s*работы\s*отца)", "father_workplace"),
+    (r"(father['’]?s\s*(job|occupation|work|position)|father\s*(job|occupation|work|position)|부\s*(직업|직위|직책)|부친\s*(직업|직위)|아버지\s*(직업|직위)|otasining\s*(kasbi|lavozimi)|должность\s*отца|профессия\s*отца)", "father_job"),
     
     (r"(mother['’]?s\s*name|mother\s*name|mother\s*fullname|모\s*성명|모\s*이름|모친\s*성명|모친\s*이름|어머니\s*성명|어머니\s*이름|onasining\s*ismi|фио\s*матери)", "mother_name"),
     (r"(mother['’]?s\s*(number|phone|mobile|tel|cell)|mother\s*(mobile|phone|no|tel|cell)|모\s*(연락처|전화번호|휴대전화|휴대폰|핸드폰)|모친\s*(연락처|전화|휴대폰)|어머니\s*(연락처|전화번호|휴대폰)|onasining\s*(telefoni|raqami)|телефон\s*матери)", "mother_phone"),
-    (r"(mother['’]?s\s*(job|occupation|work)|mother\s*(job|occupation)|모\s*직업|모친\s*직업|어머니\s*직업|onasining\s*(kasbi|ish\s*joyi)|место\s*работы\s*матери)", "mother_job"),
+    (r"(mother['’]?s\s*(workplace|work\s*place)|모\s*(직장|근무처)|모친\s*(직장|근무처)|어머니\s*(직장|근무처)|onasining\s*ish\s*joyi|место\s*работы\s*матери)", "mother_workplace"),
+    (r"(mother['’]?s\s*(job|occupation|work|position)|mother\s*(job|occupation|work|position)|모\s*(직업|직위|직책)|모친\s*(직업|직위)|어머니\s*(직업|직위)|onasining\s*(kasbi|lavozimi)|должность\s*матери|профессия\s*матери)", "mother_job"),
 
     # Dates of entry, graduation, expected graduation
     (r"(date\s*of\s*entry|entry\s*date|data\s*of\s*entry|admission\s*date|entrance\s*date|enrol+ment\s*date|입학\s*일자?|입학\s*년\s*월\s*일|입학년월일|kirish\s*sana(si)?|o'qishga\s*kirgan\s*sana|дата\s*поступления)", "date_of_entry"),

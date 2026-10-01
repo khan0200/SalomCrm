@@ -75,6 +75,7 @@ export interface Student {
   father_job?: string | null
   mother_name?: string | null
   mother_phone?: string | null
+  mother_workplace?: string | null
   mother_job?: string | null
   email?: string | null
   address?: string | null
