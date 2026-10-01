@@ -4,6 +4,7 @@ import type { Student } from '@/types'
 import { ROW_COLOR_MAP } from '@/types'
 import { Copy, Check, MoreVertical } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
+import { formatPhoneValue } from '@/utils/phone'
 
 const props = defineProps<{
   student: Student
@@ -30,8 +31,8 @@ const copyName = () => {
 const copyPhone = () => {
   const lines = [
     `${props.student.id}  ${props.student.full_name}`,
-    props.student.phone1,
-    props.student.phone2
+    formatPhoneValue(props.student.phone1),
+    formatPhoneValue(props.student.phone2)
   ].filter(Boolean)
   navigator.clipboard.writeText(lines.join('\n'))
   isPhoneCopied.value = true
@@ -251,8 +252,8 @@ const universities = computed(() => {
     >
       <div class="flex items-center justify-start gap-2">
         <div class="leading-tight space-y-0.5">
-          <div>{{ student.phone1 || '—' }}</div>
-          <div v-if="student.phone2" :class="hasRowColor ? 'text-zinc-800 dark:text-zinc-200 font-medium' : 'text-zinc-500 dark:text-zinc-400'">{{ student.phone2 }}</div>
+          <div>{{ formatPhoneValue(student.phone1) || '—' }}</div>
+          <div v-if="student.phone2" :class="hasRowColor ? 'text-zinc-800 dark:text-zinc-200 font-medium' : 'text-zinc-500 dark:text-zinc-400'">{{ formatPhoneValue(student.phone2) }}</div>
         </div>
 
         <div class="group/copyphone relative inline-flex items-center justify-center">

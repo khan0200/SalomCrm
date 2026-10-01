@@ -138,21 +138,8 @@ const driveUrlInput = ref('')
 const isPermanentConfirmOpen = ref(false)
 
 // Phone & Passport Formatters
+import { formatPhoneValue } from '@/utils/phone'
 const phoneFields = new Set(['phone1', 'phone2', 'father_phone', 'mother_phone', 'school_phone'])
-
-const formatPhoneValue = (value?: string | null) => {
-  if (!value) return ''
-  // Strip a leading 998 country code before taking the first 9 digits -
-  // without this, a value stored WITH +998 (e.g. from the online contract
-  // flow) had its own "998" prefix eaten into the 9-digit window, silently
-  // truncating the real last 3 digits of the number.
-  const digits = value.replace(/\D/g, '').replace(/^998/, '').slice(0, 9)
-  const first = digits.slice(0, 2)
-  const second = digits.slice(2, 5)
-  const third = digits.slice(5, 7)
-  const fourth = digits.slice(7, 9)
-  return [first, second, third, fourth].filter(Boolean).join('-')
-}
 
 const formatSchoolPhone = (value?: string | null): string => {
   if (!value) return ''

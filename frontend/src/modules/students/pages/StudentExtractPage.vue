@@ -28,6 +28,7 @@ import { studentsApi } from '@/api/students'
 import { settingsApi } from '@/api/settings'
 import { useUiStore } from '@/stores/ui'
 import { BUILTIN_SCHOOL_DIRECTORY } from '@/data/schoolsData'
+import { formatPhoneValue } from '@/utils/phone'
 import type { Student } from '@/types'
 
 const route = useRoute()
@@ -639,16 +640,7 @@ const handleSaveAllFields = async () => {
     } else if (dbField === 'passport') {
       finalValue = finalValue.replace(/\s/g, '').toUpperCase()
     } else if (dbField === 'phone1' || dbField === 'phone2') {
-      const digits = finalValue.replace(/\D/g, '')
-      let cleanDigits = digits
-      if (cleanDigits.startsWith('998') && cleanDigits.length === 12) {
-        cleanDigits = cleanDigits.slice(3)
-      } else if (cleanDigits.length > 9) {
-        cleanDigits = cleanDigits.slice(-9)
-      }
-      if (cleanDigits.length === 9) {
-        finalValue = `${cleanDigits.slice(0, 2)}-${cleanDigits.slice(2, 5)}-${cleanDigits.slice(5, 7)}-${cleanDigits.slice(7, 9)}`
-      }
+      finalValue = formatPhoneValue(finalValue) || finalValue
     } else if (['birthday', 'passport_issue_date', 'passport_expire_date', 'date_of_entry', 'date_of_graduation'].includes(dbField as string)) {
       finalValue = normalizeDate(finalValue)
     } else if (['full_name', 'address', 'final_school_name', 'major', 'father_name', 'mother_name'].includes(dbField as string)) {
@@ -933,16 +925,7 @@ const handleSaveFieldToProfile = async (fieldKey: string, value: string) => {
   } else if (dbField === 'passport') {
     finalValue = finalValue.replace(/\s/g, '').toUpperCase()
   } else if (dbField === 'phone1' || dbField === 'phone2') {
-    const digits = finalValue.replace(/\D/g, '')
-    let cleanDigits = digits
-    if (cleanDigits.startsWith('998') && cleanDigits.length === 12) {
-      cleanDigits = cleanDigits.slice(3)
-    } else if (cleanDigits.length > 9) {
-      cleanDigits = cleanDigits.slice(-9)
-    }
-    if (cleanDigits.length === 9) {
-      finalValue = `${cleanDigits.slice(0, 2)}-${cleanDigits.slice(2, 5)}-${cleanDigits.slice(5, 7)}-${cleanDigits.slice(7, 9)}`
-    }
+    finalValue = formatPhoneValue(finalValue) || finalValue
   } else if (['birthday', 'passport_issue_date', 'passport_expire_date', 'date_of_entry', 'date_of_graduation'].includes(dbField as string)) {
     finalValue = normalizeDate(finalValue)
   } else if (['full_name', 'address', 'final_school_name', 'major', 'father_name', 'mother_name'].includes(dbField as string)) {

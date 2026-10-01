@@ -16,6 +16,7 @@ import {
 } from 'lucide-vue-next'
 import type { Student, Folder } from '@/types'
 import { useAlphanumericSort } from '@/composables/useAlphanumericSort'
+import { formatPhoneValue } from '@/utils/phone'
 
 const props = defineProps<{
   isOpen: boolean
@@ -828,7 +829,7 @@ onUnmounted(() => {
 
                 <!-- Phone -->
                 <span v-if="s.phone1" class="text-zinc-400 font-mono">
-                  {{ s.phone1 }}
+                  {{ formatPhoneValue(s.phone1) }}
                 </span>
               </div>
 

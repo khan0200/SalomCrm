@@ -37,6 +37,7 @@ import WordPlaceholderCatalog from './components/WordPlaceholderCatalog.vue'
 import { studentsApi } from '@/api/students'
 import type { Student } from '@/types'
 import { ROW_COLOR_MAP } from '@/types'
+import { formatPhoneValue } from '@/utils/phone'
 
 // ─── Step State ─────────────────────────────────────────────────────────────
 const currentStep = ref<1 | 2 | 3 | 4>(1)
@@ -1310,7 +1311,7 @@ const resetWizard = () => {
                     </td>
                     <td class="p-3 font-mono text-zinc-800 dark:text-zinc-200 align-top">{{ student.passport || '-' }}</td>
                     <td class="p-3 text-zinc-600 dark:text-zinc-400 align-top">{{ student.birthday || '-' }}</td>
-                    <td class="p-3 text-zinc-600 dark:text-zinc-400 font-mono align-top">{{ student.phone1 || '-' }}</td>
+                    <td class="p-3 text-zinc-600 dark:text-zinc-400 font-mono align-top">{{ formatPhoneValue(student.phone1) || '-' }}</td>
                   </tr>
                 </tbody>
               </table>

@@ -130,19 +130,7 @@ watch(guardianRelationOption, (val) => {
 // Re-derives the whole formatted string from whatever digits are currently
 // in the field on every keystroke, so pasting, mid-string edits, and
 // backspacing all self-correct instead of drifting out of the dash pattern.
-function formatUzPhone(raw: string): string {
-  const digits = raw.replace(/\D/g, '').replace(/^998/, '').slice(0, 9)
-  let local = ''
-  for (let i = 0; i < digits.length; i++) {
-    if (i === 2 || i === 5 || i === 7) local += '-'
-    local += digits[i]
-  }
-  return local
-}
-
-function isCompleteUzPhone(val: string): boolean {
-  return val.replace(/\D/g, '').replace(/^998/, '').length === 9
-}
+import { formatUzPhoneInput as formatUzPhone, isCompleteUzPhone } from '@/utils/phone'
 
 // Display-only: the stored value is always bare local digits (see
 // formatUzPhone above); "+998" is added back wherever a phone number is
