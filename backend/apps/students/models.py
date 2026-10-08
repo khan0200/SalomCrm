@@ -241,8 +241,15 @@ class Student(TenantAwareModel):
 
         # Set payment_id exactly once at creation — NEVER overwrite after that.
         # This keeps payments correctly anchored even when Student.id is renamed.
+        # A permanently-deleted or renamed-away student can leave its old
+        # "P<id>" anchor occupying the row, so when that candidate is already
+        # taken we keep doubling the "P" prefix (PPG49, PPPG49, ...) until we
+        # land on a free one instead of raising a 500 on save.
         if not self.payment_id and self.id:
-            self.payment_id = f"P{self.id.strip().upper()}"
+            candidate = f"P{self.id.strip().upper()}"
+            while Student.objects.filter(payment_id=candidate).exclude(pk=self.pk).exists():
+                candidate = f"P{candidate}"
+            self.payment_id = candidate
 
         # Auto-extract Google Drive Folder ID from URL if not explicitly provided
         if self.google_drive_url and not self.google_drive_folder_id:

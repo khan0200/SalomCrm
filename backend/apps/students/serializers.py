@@ -169,6 +169,23 @@ class StudentCreateUpdateSerializer(serializers.ModelSerializer):
             except Exception as e:
                 logger.error(f"Auto-translation on student create failed: {e}")
 
+        # A permanently-deleted student row stays in the DB (data retention —
+        # see services.permanent_delete_student) still holding its old id as
+        # PK. Re-issuing that same id to a brand-new student is intentionally
+        # allowed (active/archived ids must never be reused, but permanently
+        # deleted ones may be), so free the id by hard-deleting the stale row
+        # instead of hitting a PK IntegrityError on create.
+        new_id = str(validated_data.get('id') or '').strip().upper()
+        if new_id:
+            existing = Student.objects.filter(id=new_id).first()
+            if existing:
+                if existing.is_permanently_deleted:
+                    existing.delete()
+                else:
+                    raise serializers.ValidationError({
+                        'id': f"'{new_id}' ID band — bu talaba allaqachon mavjud ({existing.full_name})."
+                    })
+
         student = Student.objects.create(**validated_data)
 
         # A tariff assigned at creation must immediately set balance to
