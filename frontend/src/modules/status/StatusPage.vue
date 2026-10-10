@@ -11,7 +11,7 @@ import { useCustomTags } from '@/composables/useCustomTags'
 import { useDocumentHelpers } from '@/composables/useDocumentHelpers'
 import {
   Search, Plus, Filter, ChevronLeft, ChevronRight,
-  Folder as FolderIcon, X, Tag, Layers, Users, BookOpen
+  Folder as FolderIcon, Tag, Layers, Users, BookOpen
 } from 'lucide-vue-next'
 
 import StatusTable from './components/StatusTable.vue'
@@ -26,6 +26,7 @@ import AddStudentsToFolderModal from '@/modules/students/components/AddStudentsT
 import { useUniversityStatuses } from '@/composables/useUniversityStatuses'
 import { calculateStudentWorkflowStage, WORKFLOW_STAGES } from './utils/statusWorkflow'
 import QuickPillFilters from '@/components/QuickPillFilters.vue'
+import ActiveFilterChips from '@/components/ActiveFilterChips.vue'
 
 const queryClient = useQueryClient()
 const uiStore = useUiStore()
@@ -467,16 +468,50 @@ const handleToggleSort = (field: 'id' | 'left') => {
   }
 }
 
-const handleUpdateInvoice = async (studentId: string, status: string | null, university: string | null = null) => {
-  updateStudentOptimistically(studentId, { invoice: status, invoice_university: university })
-  try {
-    await statusApi.quickUpdate(studentId, { invoice: status })
-    if (university !== undefined) {
-      await studentsApi.updateStudent(studentId, { invoice_university: university } as any)
+// Shared optimistic-update-with-rollback: applies `patch` immediately, runs
+// `apiCall`, and on failure reverts every touched field back to its prior
+// value plus shows an error toast - so a failed request never leaves the
+// Kanban board silently showing a status the backend never saved. Every
+// quick-update handler below goes through this instead of hand-rolling its
+// own try/catch, so they can't drift into inconsistent error behavior.
+const quickUpdateWithRollback = async (
+  studentId: string,
+  patch: Partial<Student>,
+  apiCall: () => Promise<unknown>,
+  errorMessage: string,
+) => {
+  const student = allStudents.value.find(s => s.id === studentId)
+  const previousValues: Record<string, unknown> = {}
+  if (student) {
+    for (const key of Object.keys(patch) as (keyof Student)[]) {
+      previousValues[key] = student[key]
     }
-  } catch (err: any) {
-    console.error('Invoice update failed:', err)
   }
+
+  updateStudentOptimistically(studentId, patch)
+  try {
+    await apiCall()
+  } catch (err) {
+    console.error(errorMessage, err)
+    if (student) {
+      updateStudentOptimistically(studentId, previousValues as Partial<Student>)
+    }
+    uiStore.addToast({ type: 'error', title: 'Update Failed', message: errorMessage })
+  }
+}
+
+const handleUpdateInvoice = async (studentId: string, status: string | null, university: string | null = null) => {
+  await quickUpdateWithRollback(
+    studentId,
+    { invoice: status, invoice_university: university },
+    async () => {
+      await statusApi.quickUpdate(studentId, { invoice: status })
+      if (university !== undefined) {
+        await studentsApi.updateStudent(studentId, { invoice_university: university } as any)
+      }
+    },
+    'Could not update invoice status. Please try again.',
+  )
 }
 
 // Which of a student's university slots are currently Accepted - used to
@@ -539,29 +574,22 @@ const handleUpdateUniversityField = async (studentId: string, slot: 1 | 2, name:
 }
 
 const handleUpdateUniversityStatus = async (studentId: string, slot: 1 | 2, status: string) => {
-  const student = allStudents.value.find(s => s.id === studentId)
-  if (!student) return
-
   const field = `university_${slot}_status` as const
-  const previousValue = student[field]
-
-  updateStudentOptimistically(studentId, { [field]: status } as Partial<Student>)
-  try {
-    await statusApi.quickUpdate(studentId, { [field]: status } as any)
-  } catch (err) {
-    console.error('University status update failed:', err)
-    updateStudentOptimistically(studentId, { [field]: previousValue } as Partial<Student>)
-    uiStore.addToast({ type: 'error', title: 'Update Failed', message: `Could not update ${student.full_name}'s university status. Please try again.` })
-  }
+  await quickUpdateWithRollback(
+    studentId,
+    { [field]: status } as Partial<Student>,
+    () => statusApi.quickUpdate(studentId, { [field]: status } as any),
+    'Could not update university status. Please try again.',
+  )
 }
 
 const handleUpdateCoa = async (studentId: string, status: string | null) => {
-  updateStudentOptimistically(studentId, { coa: status })
-  try {
-    await statusApi.quickUpdate(studentId, { coa: status })
-  } catch (err) {
-    console.error('CoA update failed:', err)
-  }
+  await quickUpdateWithRollback(
+    studentId,
+    { coa: status },
+    () => statusApi.quickUpdate(studentId, { coa: status }),
+    'Could not update CoA status. Please try again.',
+  )
 }
 
 const handleUpdateKdbPut = async (studentId: string, val: string) => {
@@ -595,15 +623,17 @@ const handleUpdateKdbPut = async (studentId: string, val: string) => {
     updatedFolders.push(kdbFolder.value.id)
   }
 
-  updateStudentOptimistically(studentId, { kdb_put_date: dateVal, kdb_take_date: calculatedTakeDate, folder_ids: updatedFolders })
-  try {
-    await statusApi.quickUpdate(studentId, { kdb_put_date: dateVal, kdb_take_date: calculatedTakeDate })
-    if (updatedFolders.length !== currentFolders.length) {
-      await studentsApi.setFolders(studentId, updatedFolders)
-    }
-  } catch (err) {
-    console.error('KDB Put update failed:', err)
-  }
+  await quickUpdateWithRollback(
+    studentId,
+    { kdb_put_date: dateVal, kdb_take_date: calculatedTakeDate, folder_ids: updatedFolders },
+    async () => {
+      await statusApi.quickUpdate(studentId, { kdb_put_date: dateVal, kdb_take_date: calculatedTakeDate })
+      if (updatedFolders.length !== currentFolders.length) {
+        await studentsApi.setFolders(studentId, updatedFolders)
+      }
+    },
+    'Could not update KDB put date. Please try again.',
+  )
 }
 
 const handleUpdateKdbTake = async (studentId: string, val: string) => {
@@ -624,15 +654,17 @@ const handleUpdateKdbTake = async (studentId: string, val: string) => {
     updatedFolders.push(kdbFolder.value.id)
   }
 
-  updateStudentOptimistically(studentId, { kdb_take_date: dateVal, folder_ids: updatedFolders })
-  try {
-    await statusApi.quickUpdate(studentId, { kdb_take_date: dateVal })
-    if (updatedFolders.length !== currentFolders.length) {
-      await studentsApi.setFolders(studentId, updatedFolders)
-    }
-  } catch (err) {
-    console.error('KDB Take update failed:', err)
-  }
+  await quickUpdateWithRollback(
+    studentId,
+    { kdb_take_date: dateVal, folder_ids: updatedFolders },
+    async () => {
+      await statusApi.quickUpdate(studentId, { kdb_take_date: dateVal })
+      if (updatedFolders.length !== currentFolders.length) {
+        await studentsApi.setFolders(studentId, updatedFolders)
+      }
+    },
+    'Could not update KDB take date. Please try again.',
+  )
 }
 
 const handleSaveCustomDate = async ({ studentId, type, date }: { studentId: string; type: 'PUT' | 'TAKE'; date: string }) => {
@@ -644,39 +676,39 @@ const handleSaveCustomDate = async ({ studentId, type, date }: { studentId: stri
 }
 
 const handleUpdateEmbassy = async (studentId: string, status: string | null) => {
-  updateStudentOptimistically(studentId, { embassy: status })
-  try {
-    await statusApi.quickUpdate(studentId, { embassy: status })
-  } catch (err) {
-    console.error('Embassy status update failed:', err)
-  }
+  await quickUpdateWithRollback(
+    studentId,
+    { embassy: status },
+    () => statusApi.quickUpdate(studentId, { embassy: status }),
+    'Could not update visa status. Please try again.',
+  )
 }
 
 const handleUpdateStatusHidden = async (studentId: string, isHidden: boolean) => {
-  updateStudentOptimistically(studentId, { status_hidden: isHidden })
-  try {
-    await statusApi.quickUpdate(studentId, { status_hidden: isHidden })
-  } catch (err) {
-    console.error('Status hidden update failed:', err)
-  }
+  await quickUpdateWithRollback(
+    studentId,
+    { status_hidden: isHidden },
+    () => statusApi.quickUpdate(studentId, { status_hidden: isHidden }),
+    'Could not update hidden status. Please try again.',
+  )
 }
 
 const handleUpdateStatusRowColor = async (studentId: string, color: string | null) => {
-  updateStudentOptimistically(studentId, { status_row_color: color })
-  try {
-    await studentsApi.setColor(studentId, { status_row_color: color })
-  } catch (err) {
-    console.error('Status row color update failed:', err)
-  }
+  await quickUpdateWithRollback(
+    studentId,
+    { status_row_color: color },
+    () => studentsApi.setColor(studentId, { status_row_color: color }),
+    'Could not update row color. Please try again.',
+  )
 }
 
 const handleSetFolders = async (studentId: string, folderIds: string[]) => {
-  updateStudentOptimistically(studentId, { folder_ids: folderIds })
-  try {
-    await studentsApi.setFolders(studentId, folderIds)
-  } catch (err) {
-    console.error('Set folders failed:', err)
-  }
+  await quickUpdateWithRollback(
+    studentId,
+    { folder_ids: folderIds },
+    () => studentsApi.setFolders(studentId, folderIds),
+    'Could not update folders. Please try again.',
+  )
 }
 
 const handleToggleTag = async (studentId: string, tagName: string) => {
@@ -686,39 +718,39 @@ const handleToggleTag = async (studentId: string, tagName: string) => {
   const newTags = currentTags.includes(tagName)
     ? currentTags.filter(t => t !== tagName)
     : [...currentTags, tagName]
-  updateStudentOptimistically(studentId, { task_tags: newTags })
-  try {
-    await studentsApi.toggleTag(studentId, tagName)
-  } catch (err) {
-    console.error('Toggle tag failed:', err)
-  }
+  await quickUpdateWithRollback(
+    studentId,
+    { task_tags: newTags },
+    () => studentsApi.toggleTag(studentId, tagName),
+    'Could not update tag. Please try again.',
+  )
 }
 
 const handleClearAllActions = async (studentId: string) => {
-  updateStudentOptimistically(studentId, { row_color: null, status_row_color: null, task_tags: [] })
-  try {
-    await studentsApi.updateStudent(studentId, { row_color: null, status_row_color: null, task_tags: [] } as any)
-  } catch (err) {
-    console.error('Clear all failed:', err)
-  }
+  await quickUpdateWithRollback(
+    studentId,
+    { row_color: null, status_row_color: null, task_tags: [] },
+    () => studentsApi.updateStudent(studentId, { row_color: null, status_row_color: null, task_tags: [] } as any),
+    'Could not clear actions. Please try again.',
+  )
 }
 
 const handleArchive = async (studentId: string) => {
-  updateStudentOptimistically(studentId, { is_deleted: true })
-  try {
-    await studentsApi.archiveStudent(studentId)
-  } catch (err) {
-    console.error('Archive failed:', err)
-  }
+  await quickUpdateWithRollback(
+    studentId,
+    { is_deleted: true },
+    () => studentsApi.archiveStudent(studentId),
+    'Could not archive student. Please try again.',
+  )
 }
 
 const handleRestore = async (studentId: string) => {
-  updateStudentOptimistically(studentId, { is_deleted: false })
-  try {
-    await studentsApi.restoreStudent(studentId)
-  } catch (err) {
-    console.error('Restore failed:', err)
-  }
+  await quickUpdateWithRollback(
+    studentId,
+    { is_deleted: false },
+    () => studentsApi.restoreStudent(studentId),
+    'Could not restore student. Please try again.',
+  )
 }
 
 const handlePermanentDelete = async (studentId: string) => {
@@ -733,34 +765,36 @@ const handlePermanentDelete = async (studentId: string) => {
     await studentsApi.permanentDeleteStudent(studentId)
   } catch (err) {
     console.error('Permanent delete failed:', err)
+    uiStore.addToast({ type: 'error', title: 'Delete Failed', message: 'Could not permanently delete student. Please try again.' })
+    queryClient.invalidateQueries({ queryKey: ['all-students-master'] })
   }
 }
 
 const handleUpdateEmbassyFatherDocs = async (studentId: string, docs: string[]) => {
-  updateStudentOptimistically(studentId, { embassy_father_docs: docs })
-  try {
-    await statusApi.updateEmbassyDrawer(studentId, { embassy_father_docs: docs })
-  } catch (err) {
-    console.error('Father docs update failed:', err)
-  }
+  await quickUpdateWithRollback(
+    studentId,
+    { embassy_father_docs: docs },
+    () => statusApi.updateEmbassyDrawer(studentId, { embassy_father_docs: docs }),
+    "Could not update father's documents. Please try again.",
+  )
 }
 
 const handleUpdateEmbassyMotherDocs = async (studentId: string, docs: string[]) => {
-  updateStudentOptimistically(studentId, { embassy_mother_docs: docs })
-  try {
-    await statusApi.updateEmbassyDrawer(studentId, { embassy_mother_docs: docs })
-  } catch (err) {
-    console.error('Mother docs update failed:', err)
-  }
+  await quickUpdateWithRollback(
+    studentId,
+    { embassy_mother_docs: docs },
+    () => statusApi.updateEmbassyDrawer(studentId, { embassy_mother_docs: docs }),
+    "Could not update mother's documents. Please try again.",
+  )
 }
 
 const handleUpdateEmbassySponsorNotes = async (studentId: string, notes: string) => {
-  updateStudentOptimistically(studentId, { embassy_sponsor_notes: notes })
-  try {
-    await statusApi.updateEmbassyDrawer(studentId, { embassy_sponsor_notes: notes || null })
-  } catch (err) {
-    console.error('Sponsor notes update failed:', err)
-  }
+  await quickUpdateWithRollback(
+    studentId,
+    { embassy_sponsor_notes: notes },
+    () => statusApi.updateEmbassyDrawer(studentId, { embassy_sponsor_notes: notes || null }),
+    'Could not update sponsor notes. Please try again.',
+  )
 }
 
 // Click on Row / Embassy
@@ -814,10 +848,6 @@ const handleApplyFilters = (filters: any) => {
   selectedLeads.value = filters.leads
   selectedMissingDocs.value = filters.missingDocs || []
   isFilterPanelOpen.value = false
-}
-
-const resetAllFilters = () => {
-  dashboardStore.resetAllFilters()
 }
 
 const isFolderAddModalOpen = ref(false)
@@ -899,97 +929,7 @@ const handleSaveFolderAdd = async (selectedIds: string[]) => {
     />
 
     <!-- Active Filter Chips (if any selected) -->
-    <div v-if="dashboardStore.activeFiltersCount > 0" class="flex flex-wrap items-center gap-1 px-1 select-none text-[10px] -mt-2 -mb-1">
-      <span class="font-bold text-zinc-500 mr-1">Active Filters:</span>
-
-      <span
-        v-for="t in selectedTariffs"
-        :key="`t-${t}`"
-        class="inline-flex items-center gap-1 px-1.5 py-0 bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 rounded-full font-medium"
-      >
-        <span>Tariff: {{ t === 'NO_TARIFF' ? 'No Tariff' : t }}</span>
-        <X class="w-2.5 h-2.5 cursor-pointer hover:text-red-500" @click="selectedTariffs = selectedTariffs.filter(x => x !== t)" />
-      </span>
-
-      <span
-        v-for="l in selectedLevels"
-        :key="`l-${l}`"
-        class="inline-flex items-center gap-1 px-1.5 py-0 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 rounded-full font-medium"
-      >
-        <span>Level: {{ l === 'NO_LEVEL' ? 'No Level' : l }}</span>
-        <X class="w-2.5 h-2.5 cursor-pointer hover:text-red-500" @click="selectedLevels = selectedLevels.filter(x => x !== l)" />
-      </span>
-
-      <span
-        v-for="g in selectedGroups"
-        :key="`g-${g}`"
-        class="inline-flex items-center gap-1 px-1.5 py-0 bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 rounded-full font-medium"
-      >
-        <span>Group: {{ g === 'NO_GROUP' ? 'No Group' : g }}</span>
-        <X class="w-2.5 h-2.5 cursor-pointer hover:text-red-500" @click="selectedGroups = selectedGroups.filter(x => x !== g)" />
-      </span>
-
-      <span
-        v-for="b in selectedBranches"
-        :key="`b-${b}`"
-        class="inline-flex items-center gap-1 px-1.5 py-0 bg-teal-50 dark:bg-teal-950/40 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-800 rounded-full font-medium"
-      >
-        <span>Branch: {{ b === 'NO_BRANCH' ? 'No Branch' : b }}</span>
-        <X class="w-2.5 h-2.5 cursor-pointer hover:text-red-500" @click="selectedBranches = selectedBranches.filter(x => x !== b)" />
-      </span>
-
-      <span
-        v-for="c in selectedCerts"
-        :key="`c-${c}`"
-        class="inline-flex items-center gap-1 px-1.5 py-0 bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 rounded-full font-medium"
-      >
-        <span>Cert: {{ c }}</span>
-        <X class="w-2.5 h-2.5 cursor-pointer hover:text-red-500" @click="selectedCerts = selectedCerts.filter(x => x !== c)" />
-      </span>
-
-      <span
-        v-for="s in selectedScores"
-        :key="`s-${s}`"
-        class="inline-flex items-center gap-1 px-1.5 py-0 bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 rounded-full font-medium"
-      >
-        <span>Score: {{ s }}</span>
-        <X class="w-2.5 h-2.5 cursor-pointer hover:text-red-500" @click="selectedScores = selectedScores.filter(x => x !== s)" />
-      </span>
-
-      <span
-        v-for="m in selectedMissingDocs"
-        :key="`m-${m}`"
-        class="inline-flex items-center gap-1 px-1.5 py-0 bg-orange-50 dark:bg-orange-950/40 text-orange-700 dark:text-orange-300 border border-orange-200 dark:border-orange-800 rounded-full font-medium"
-      >
-        <span>Missing: {{ m }}</span>
-        <X class="w-2.5 h-2.5 cursor-pointer hover:text-red-500" @click="selectedMissingDocs = selectedMissingDocs.filter(x => x !== m)" />
-      </span>
-
-      <span
-        v-for="tg in selectedTags"
-        :key="`tg-${tg}`"
-        class="inline-flex items-center gap-1 px-1.5 py-0 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 rounded-full font-medium"
-      >
-        <span>Tag: {{ tg }}</span>
-        <X class="w-2.5 h-2.5 cursor-pointer hover:text-red-500" @click="selectedTags = selectedTags.filter(x => x !== tg)" />
-      </span>
-
-      <span
-        v-for="lb in selectedLeads"
-        :key="`lb-${lb}`"
-        class="inline-flex items-center gap-1 px-1.5 py-0 bg-teal-50 dark:bg-teal-950/40 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-800 rounded-full font-medium"
-      >
-        <span>Lead: {{ lb === 'NO_LEADBY' ? 'No Lead by' : lb }}</span>
-        <X class="w-2.5 h-2.5 cursor-pointer hover:text-red-500" @click="selectedLeads = selectedLeads.filter(x => x !== lb)" />
-      </span>
-
-      <button
-        @click="resetAllFilters"
-        class="text-[10px] font-bold text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors ml-1 cursor-pointer"
-      >
-        Clear All
-      </button>
-    </div>
+    <ActiveFilterChips />
 
     <!-- Telegram-Style Folders Selector matching Uniapp2 -->
     <div className="mb-2 flex items-center overflow-x-auto scrollbar-none gap-3 md:gap-4 select-none shrink-0 border-b border-zinc-200 dark:border-zinc-800 pb-2 px-1">

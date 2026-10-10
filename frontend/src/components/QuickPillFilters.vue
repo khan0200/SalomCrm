@@ -4,7 +4,44 @@ import { useQuery } from '@tanstack/vue-query'
 import { studentsApi } from '@/api/students'
 import { useStudentDashboardStore } from '@/stores/studentDashboard'
 
+// Every current call site renders exactly one instance per page, all
+// sharing the same dashboardStore filters by design (Documents/Status/
+// Students are meant to show the same global group+level selection). The
+// `scope` prop exists so a future screen that needs two instances on
+// screen at once (e.g. a split-view comparing two groups) can give each
+// one its own isolated state via a plain ref, instead of both silently
+// fighting over the same global filter - without it, nothing about this
+// component's API would let that ever be done safely.
+const props = withDefaults(defineProps<{
+  scope?: { selectedGroups: string[]; selectedLevels: string[] }
+}>(), {
+  scope: undefined,
+})
+
+const emit = defineEmits<{
+  (e: 'update:scope', value: { selectedGroups: string[]; selectedLevels: string[] }): void
+}>()
+
 const dashboardStore = useStudentDashboardStore()
+
+const selectedGroups = computed<string[]>(() => props.scope ? props.scope.selectedGroups : dashboardStore.selectedGroups)
+const selectedLevels = computed<string[]>(() => props.scope ? props.scope.selectedLevels : dashboardStore.selectedLevels)
+
+const setSelectedGroups = (value: string[]) => {
+  if (props.scope) {
+    emit('update:scope', { ...props.scope, selectedGroups: value })
+  } else {
+    dashboardStore.selectedGroups = value
+  }
+}
+
+const setSelectedLevels = (value: string[]) => {
+  if (props.scope) {
+    emit('update:scope', { ...props.scope, selectedLevels: value })
+  } else {
+    dashboardStore.selectedLevels = value
+  }
+}
 
 const { data: optionsData } = useQuery({
   queryKey: ['student-options'],
@@ -16,25 +53,25 @@ const groups = computed<string[]>(() => optionsData.value?.groups || [])
 const levels = computed<string[]>(() => optionsData.value?.levels || [])
 
 const toggleGroup = (group: string) => {
-  const current = [...dashboardStore.selectedGroups]
+  const current = [...selectedGroups.value]
   const idx = current.indexOf(group)
   if (idx > -1) {
     current.splice(idx, 1)
   } else {
     current.push(group)
   }
-  dashboardStore.selectedGroups = current
+  setSelectedGroups(current)
 }
 
 const toggleLevel = (level: string) => {
-  const current = [...dashboardStore.selectedLevels]
+  const current = [...selectedLevels.value]
   const idx = current.indexOf(level)
   if (idx > -1) {
     current.splice(idx, 1)
   } else {
     current.push(level)
   }
-  dashboardStore.selectedLevels = current
+  setSelectedLevels(current)
 }
 </script>
 
@@ -47,9 +84,9 @@ const toggleLevel = (level: string) => {
         :key="'g-'+g"
         @click="toggleGroup(g)"
         :title="g"
-        class="shrink-0 px-2 max-w-[110px] truncate rounded-full text-[9px] font-bold uppercase transition-colors border select-none cursor-pointer tracking-wide"
-        :class="dashboardStore.selectedGroups.includes(g) 
-          ? 'bg-blue-100 dark:bg-blue-900/40 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300 shadow-xs' 
+        class="shrink-0 px-2 py-0.5 max-w-[110px] truncate rounded-full text-[9px] font-bold uppercase transition-colors border select-none cursor-pointer tracking-wide leading-normal"
+        :class="selectedGroups.includes(g)
+          ? 'bg-blue-100 dark:bg-blue-900/40 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300 shadow-xs'
           : 'bg-white dark:bg-[#111315] border-zinc-200 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-900'"
       >
         {{ g }}
@@ -64,9 +101,9 @@ const toggleLevel = (level: string) => {
         :key="'l-'+l"
         @click="toggleLevel(l)"
         :title="l"
-        class="shrink-0 px-2 max-w-[110px] truncate rounded-full text-[9px] font-bold uppercase transition-colors border select-none cursor-pointer tracking-wide"
-        :class="dashboardStore.selectedLevels.includes(l) 
-          ? 'bg-purple-100 dark:bg-purple-900/40 border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300 shadow-xs' 
+        class="shrink-0 px-2 py-0.5 max-w-[110px] truncate rounded-full text-[9px] font-bold uppercase transition-colors border select-none cursor-pointer tracking-wide leading-normal"
+        :class="selectedLevels.includes(l)
+          ? 'bg-purple-100 dark:bg-purple-900/40 border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300 shadow-xs'
           : 'bg-white dark:bg-[#111315] border-zinc-200 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-900'"
       >
         {{ l }}

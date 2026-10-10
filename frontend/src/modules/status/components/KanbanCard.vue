@@ -109,12 +109,33 @@ const getInvoiceBadgeClass = (status: string | null | undefined) => {
   return 'bg-zinc-400 dark:bg-zinc-500 text-white font-semibold border-transparent'
 }
 
+// Full-text equivalents of the badge classes above, used as `title` so the
+// truncated <select> still exposes its full selected value on hover - the
+// invoice/COA/visa selects don't have this already, unlike the university
+// name/status selects elsewhere in this file which all do.
+const COA_LABELS: Record<string, string> = {
+  'NOT TAKEN': 'Not Taken', TAKEN: 'Taken', MISTAKE: 'Mistake', CANCELLED: 'Cancelled',
+}
+const getCoaTitle = (status: string | null | undefined) => COA_LABELS[status || 'NOT TAKEN'] || 'Not Taken'
+
+const invoiceTitle = computed(() => {
+  const val = props.student.invoice || 'NOT TAKEN'
+  if (val === 'PAID') return props.student.invoice_university ? `Paid: ${props.student.invoice_university}` : 'Paid'
+  const labels: Record<string, string> = { 'NOT TAKEN': 'Not Taken', TAKEN: 'Taken', CANCELLED: 'Cancelled' }
+  return labels[val] || 'Not Taken'
+})
+
 // ── VISA column: 3-state outcome selector, legacy CANCELLED = Rejected ──
 const isVisaActive = (status: 'APPLIED' | 'APPROVED' | 'REJECTED') => {
   const current = props.student.embassy
   if (status === 'REJECTED') return current === 'REJECTED' || current === 'CANCELLED'
   return current === status
 }
+
+// Title for the COA-column "Visa" <select> (Applied / Not Yet toggle) - a
+// full-text fallback for its truncated badge styling, same reasoning as
+// invoiceTitle/getCoaTitle above.
+const visaCoaSelectTitle = computed(() => isVisaActive('APPLIED') ? 'Applied' : 'Not Yet')
 
 const visaCardClass = computed(() => {
   if (isVisaActive('APPROVED')) {
@@ -205,7 +226,7 @@ const confirmRevertToCoa = () => {
             class="flex-1 min-w-0 px-1.5 py-0.5 text-[9px] font-semibold rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 focus:outline-none truncate"
             :class="authStore.canEdit ? 'cursor-pointer' : 'cursor-default opacity-90'"
           >
-            <option value="" class="bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200">University {{ slot }}...</option>
+            <option value="" class="bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200">University {{ slot }}</option>
             <option v-for="uni in universityOptions" :key="uni" :value="uni" class="bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200">{{ uni }}</option>
           </select>
           <select
@@ -233,7 +254,7 @@ const confirmRevertToCoa = () => {
             class="flex-1 min-w-0 px-1.5 py-0.5 text-[9px] font-semibold rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 focus:outline-none truncate"
             :class="authStore.canEdit ? 'cursor-pointer' : 'cursor-default opacity-90'"
           >
-            <option value="" class="bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200">University {{ slot }}...</option>
+            <option value="" class="bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200">University {{ slot }}</option>
             <option v-for="uni in universityOptions" :key="uni" :value="uni" class="bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200">{{ uni }}</option>
           </select>
           <span v-else class="flex-1 min-w-0 text-[9px] font-semibold text-zinc-700 dark:text-zinc-300 truncate" :title="uniName(slot)">
@@ -268,7 +289,7 @@ const confirmRevertToCoa = () => {
             class="flex-1 min-w-0 px-1.5 py-0.5 text-[9px] font-semibold rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 focus:outline-none truncate"
             :class="authStore.canEdit ? 'cursor-pointer' : 'cursor-default opacity-90'"
           >
-            <option value="" class="bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200">University {{ slot }}...</option>
+            <option value="" class="bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200">University {{ slot }}</option>
             <option v-for="uni in universityOptions" :key="uni" :value="uni" class="bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200">{{ uni }}</option>
           </select>
           <span v-else class="flex-1 min-w-0 text-[9px] font-semibold text-zinc-700 dark:text-zinc-300 truncate" :title="uniName(slot)">
@@ -290,6 +311,7 @@ const confirmRevertToCoa = () => {
             :key="`invoice-select-${student.id}-${student.invoice}-${invoiceSelectResetKey}`"
             :value="student.invoice || 'NOT TAKEN'"
             :disabled="!authStore.canEdit"
+            :title="invoiceTitle"
             @change="emit('update-invoice-status', student.invoice || 'NOT TAKEN', ($event.target as HTMLSelectElement).value)"
             class="flex-1 min-w-0 px-2 py-0.5 rounded-full text-[8.5px] font-bold uppercase tracking-wider border focus:outline-none shadow-2xs truncate"
             :class="[getInvoiceBadgeClass(student.invoice), authStore.canEdit ? 'cursor-pointer' : 'cursor-default opacity-90']"
@@ -305,6 +327,7 @@ const confirmRevertToCoa = () => {
           <select
             :value="student.coa || 'NOT TAKEN'"
             :disabled="!authStore.canEdit"
+            :title="getCoaTitle(student.coa)"
             @change="emit('update-coa-status', ($event.target as HTMLSelectElement).value)"
             class="flex-1 min-w-0 px-2 py-0.5 rounded-full text-[8.5px] font-bold uppercase tracking-wider border focus:outline-none shadow-2xs truncate"
             :class="[getCoaBadgeClass(student.coa), authStore.canEdit ? 'cursor-pointer' : 'cursor-default opacity-90']"
@@ -330,6 +353,7 @@ const confirmRevertToCoa = () => {
           <select
             :value="student.coa || 'NOT TAKEN'"
             :disabled="!authStore.canEdit"
+            :title="getCoaTitle(student.coa)"
             @change="emit('update-coa-status', ($event.target as HTMLSelectElement).value)"
             class="flex-1 min-w-0 px-2 py-0.5 rounded-full text-[8.5px] font-bold uppercase tracking-wider border focus:outline-none shadow-2xs truncate"
             :class="[getCoaBadgeClass(student.coa), authStore.canEdit ? 'cursor-pointer' : 'cursor-default opacity-90']"
@@ -345,6 +369,7 @@ const confirmRevertToCoa = () => {
           <select
             :value="isVisaActive('APPLIED') ? 'APPLIED' : 'NOT_YET'"
             :disabled="!authStore.canEdit"
+            :title="visaCoaSelectTitle"
             @change="emit('update-visa-status', ($event.target as HTMLSelectElement).value === 'APPLIED' ? 'APPLIED' : null)"
             class="flex-1 min-w-0 px-2 py-0.5 rounded-full text-[8.5px] font-bold uppercase tracking-wider border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-300 focus:outline-none shadow-2xs truncate"
             :class="authStore.canEdit ? 'cursor-pointer' : 'cursor-default opacity-90'"

@@ -151,6 +151,15 @@ button, input, select, textarea, optgroup {
 }
 
 .kanban-card-leave-active {
+  /* Taken out of flow during its own leave transition so the FLIP move
+     above can measure siblings' final position without this card still
+     occupying a flex slot - contained to the card-list width via the
+     relative parent on .flex.flex-col.gap-1.5 in KanbanColumn.vue, so it
+     doesn't escape to the document (the bug `position: absolute` alone
+     caused before this `left`/`right` pair was added). */
+  position: absolute;
+  left: 0;
+  right: 0;
   transition: opacity 0.18s ease-in, transform 0.18s ease-in;
 }
 

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import type { Student } from '@/types'
-import type { WorkflowStage } from '../utils/statusWorkflow'
+import { WORKFLOW_STAGES, type WorkflowStage } from '../utils/statusWorkflow'
 import { Users, ChevronsLeftRight, ChevronsRightLeft } from 'lucide-vue-next'
 import KanbanCard from './KanbanCard.vue'
 
@@ -34,17 +34,34 @@ const STAGE_ACCENT: Record<WorkflowStage, string> = {
   visa: 'text-emerald-600 dark:text-emerald-400',
 }
 
-const BASE_WIDTH = 260
-const EXPANDED_WIDTH = 340
+// Each column takes an equal share of the board's width - derived from the
+// actual stage count so adding/removing a stage doesn't silently throw the
+// widths off (the previous hardcoded `20%` only happened to be correct
+// because there were exactly 5 stages). The subtracted gap compensates for
+// KanbanBoard's `gap-3` (0.75rem) between columns: with N columns there are
+// N-1 gaps to divide out of N columns, i.e. (N-1)/N * 0.75rem per column.
+const BOARD_GAP_REM = 0.75
+const COLUMN_WIDTH_PERCENT = 100 / WORKFLOW_STAGES.length
+const COLUMN_GAP_REM = (BOARD_GAP_REM * (WORKFLOW_STAGES.length - 1)) / WORKFLOW_STAGES.length
+const EXPANDED_SCALE = 1.3
 
 const expanded = ref(false)
 const toggleExpand = () => { expanded.value = !expanded.value }
 </script>
 
 <template>
+  <!-- min-w-0 is the actual fix for long card text pushing the column wider
+       than its calc() width: flex items default to `min-width: auto`, which
+       sizes them to fit their content's intrinsic width regardless of the
+       explicit `width` style below. Without it, a long unbreakable string
+       in a card (e.g. a long university name) would still force this
+       column past its budget even though the <select>/<span> elements
+       inside KanbanCard.vue have their own `truncate` class - `truncate`
+       only clips an element's own rendered box, it doesn't change how the
+       browser computes that box's preferred size in a flex container. -->
   <div
     class="flex flex-col min-w-0 max-h-[calc(100vh-220px)] bg-zinc-50/70 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 rounded-2xl overflow-hidden select-none shrink-0"
-    :style="{ width: expanded ? 'calc((20% - 0.6rem) * 1.3)' : 'calc(20% - 0.6rem)', transition: 'width 0.22s cubic-bezier(0.4,0,0.2,1)' }"
+    :style="{ width: expanded ? `calc((${COLUMN_WIDTH_PERCENT}% - ${COLUMN_GAP_REM}rem) * ${EXPANDED_SCALE})` : `calc(${COLUMN_WIDTH_PERCENT}% - ${COLUMN_GAP_REM}rem)`, transition: 'width 0.22s cubic-bezier(0.4,0,0.2,1)' }"
   >
     <!-- Column header -->
     <div class="flex items-center justify-between px-3.5 py-3 border-b border-zinc-200 dark:border-zinc-800 shrink-0 bg-white/60 dark:bg-zinc-850/60">
@@ -79,7 +96,7 @@ const toggleExpand = () => { expanded.value = !expanded.value }
         <p class="text-[11px] text-zinc-400 dark:text-zinc-500 font-medium">No students</p>
       </div>
 
-      <TransitionGroup v-else name="kanban-card" tag="div" class="flex flex-col gap-1.5">
+      <TransitionGroup v-else name="kanban-card" tag="div" class="relative flex flex-col gap-1.5">
         <KanbanCard
           v-for="student in students"
           :key="student.id"
