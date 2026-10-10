@@ -44,7 +44,7 @@ const toggleExpand = () => { expanded.value = !expanded.value }
 <template>
   <div
     class="flex flex-col min-w-0 max-h-[calc(100vh-220px)] bg-zinc-50/70 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 rounded-2xl overflow-hidden select-none"
-    :style="{ flex: `1 0 ${expanded ? EXPANDED_WIDTH : BASE_WIDTH}px`, transition: 'flex-basis 0.22s cubic-bezier(0.4,0,0.2,1)' }"
+    :style="{ flex: `1 1 ${expanded ? EXPANDED_WIDTH : BASE_WIDTH}px`, transition: 'flex-basis 0.22s cubic-bezier(0.4,0,0.2,1)' }"
   >
     <!-- Column header -->
     <div class="flex items-center justify-between px-3.5 py-3 border-b border-zinc-200 dark:border-zinc-800 shrink-0 bg-white/60 dark:bg-zinc-850/60">
