@@ -36,7 +36,7 @@ const studentsByStage = computed(() => {
 
 <template>
   <div class="overflow-x-auto scrollbar-thin">
-    <div class="flex gap-3 pb-2">
+    <div class="inline-flex gap-3 pb-2 min-w-full">
       <KanbanColumn
         v-for="stage in WORKFLOW_STAGES"
         :key="stage.key"

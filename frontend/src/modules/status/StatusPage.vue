@@ -877,6 +877,25 @@ const handleSaveFolderAdd = async (selectedIds: string[]) => {
 
 <template>
   <div class="space-y-3 select-none">
+    <!-- Shared Filter Drawer -->
+    <StudentFilters
+      :is-open="isFilterPanelOpen"
+      :options="optionsData || { tariffs: [], levels: [], groups: [], leads: [], folders: [], offices: [] }"
+      :students="allStudents"
+      :selected-tariffs="selectedTariffs"
+      :selected-levels="selectedLevels"
+      :selected-groups="selectedGroups"
+      :selected-branches="selectedBranches"
+      :selected-certs="selectedCerts"
+      :selected-scores="selectedScores"
+      :selected-tags="selectedTags"
+      :selected-leads="selectedLeads"
+      :selected-missing-docs="selectedMissingDocs"
+      :matching-count="filteredStudents.length"
+      @close="isFilterPanelOpen = false"
+      @apply="handleApplyFilters"
+    />
+
     <!-- Active Filter Chips matching Uniapp2 -->
     <div
       v-if="dashboardStore.activeFiltersCount > 0"
@@ -1261,24 +1280,6 @@ const handleSaveFolderAdd = async (selectedIds: string[]) => {
       @select="handleSelectInvoiceUni"
     />
 
-    <!-- Shared Filter Drawer -->
-    <StudentFilters
-      :is-open="isFilterPanelOpen"
-      :options="optionsData || { tariffs: [], levels: [], groups: [], leads: [], folders: [], offices: [] }"
-      :students="allStudents"
-      :selected-tariffs="selectedTariffs"
-      :selected-levels="selectedLevels"
-      :selected-groups="selectedGroups"
-      :selected-branches="selectedBranches"
-      :selected-certs="selectedCerts"
-      :selected-scores="selectedScores"
-      :selected-tags="selectedTags"
-      :selected-leads="selectedLeads"
-      :selected-missing-docs="selectedMissingDocs"
-      :matching-count="filteredStudents.length"
-      @close="isFilterPanelOpen = false"
-      @apply="handleApplyFilters"
-    />
 
     <!-- Export to Excel Modal -->
     <ExportExcelModal
