@@ -145,7 +145,7 @@ const confirmRevertToCoa = () => {
 
 <template>
   <div
-    class="group rounded-xl border border-dashed p-2.5 shadow-md hover:shadow-lg transition-all cursor-pointer"
+    class="group rounded-xl border-2 border-dashed p-2.5 shadow-md hover:shadow-lg transition-all cursor-pointer"
     :class="stageKey === 'visa' ? visaCardClass : 'border-zinc-200/80 dark:border-zinc-700/80 bg-white dark:bg-zinc-900'"
     @click="handleCardClick"
     @contextmenu="handleContextMenu"
