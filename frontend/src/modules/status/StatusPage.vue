@@ -25,6 +25,7 @@ import StudentActionsModal from '@/modules/students/components/StudentActionsMod
 import AddStudentsToFolderModal from '@/modules/students/components/AddStudentsToFolderModal.vue'
 import { useUniversityStatuses } from '@/composables/useUniversityStatuses'
 import { calculateStudentWorkflowStage, WORKFLOW_STAGES } from './utils/statusWorkflow'
+import QuickPillFilters from '@/components/QuickPillFilters.vue'
 
 const queryClient = useQueryClient()
 const uiStore = useUiStore()
@@ -1144,6 +1145,7 @@ const handleSaveFolderAdd = async (selectedIds: string[]) => {
           Showing all students in {{ activeFolder === 'all' ? 'All' : activeFolder === 'deleted' ? 'Archive' : activeFolder === 'hidden' ? 'Hidden' : activeFolder === 'except' ? 'Except' : (foldersOptions.find(f => f.id === activeFolder)?.name || 'Folder') }}
         </span>
       </div>
+      <QuickPillFilters />
       <div class="flex items-center gap-3">
         <!-- Add to Folder button -->
         <button

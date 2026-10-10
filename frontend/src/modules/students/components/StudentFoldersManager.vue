@@ -4,6 +4,7 @@ import type { Folder } from '@/types'
 import { Plus, X } from 'lucide-vue-next'
 import BaseModal from '@/components/common/BaseModal.vue'
 import { useAuthStore } from '@/stores/auth'
+import QuickPillFilters from '@/components/QuickPillFilters.vue'
 
 const props = defineProps<{
   folders: Folder[]
@@ -194,6 +195,7 @@ const activeFolderName = computed(() => {
       <div class="italic">
         Showing all students in <span class="font-medium text-zinc-600 dark:text-zinc-300">{{ activeFolderName }}</span>
       </div>
+      <QuickPillFilters />
       <div class="flex items-center gap-3">
         <!-- Add to Folder button -->
         <button

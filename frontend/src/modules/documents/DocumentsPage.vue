@@ -11,6 +11,7 @@ import { useDocumentHelpers, syncMissingDocuments, isFieldFilled, CERT_SLOTS } f
 import { useAuthStore } from '@/stores/auth'
 import DocumentsModal from './components/DocumentsModal.vue'
 import StudentFilters from '@/modules/students/components/StudentFilters.vue'
+import QuickPillFilters from '@/components/QuickPillFilters.vue'
 
 const queryClient = useQueryClient()
 const dashboardStore = useStudentDashboardStore()
@@ -629,15 +630,16 @@ const DOC_BADGE_BASE = 'h-8 w-8 shrink-0 rounded-full inline-flex items-center j
     </div>
 
     <!-- Summary line -->
-    <div class="flex items-center justify-between px-1">
-      <span class="text-xs font-bold text-zinc-500 dark:text-zinc-400">
+    <div class="flex items-center justify-between px-1 min-h-[28px]">
+      <span class="text-xs font-bold text-zinc-500 dark:text-zinc-400 shrink-0">
         Showing {{ pagedStudents.length }} of {{ sortedStudents.length }} students
       </span>
+      <QuickPillFilters />
       <a
         href="https://drive.google.com"
         target="_blank"
         rel="noopener noreferrer"
-        class="text-xs font-bold text-[#007aff] hover:underline"
+        class="text-xs font-bold text-[#007aff] hover:underline shrink-0"
       >
         Access to Drive
       </a>
