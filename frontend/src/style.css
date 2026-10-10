@@ -152,8 +152,6 @@ button, input, select, textarea, optgroup {
 
 .kanban-card-leave-active {
   transition: opacity 0.18s ease-in, transform 0.18s ease-in;
-  position: absolute;
-  width: 100%;
 }
 
 .kanban-card-enter-from {
