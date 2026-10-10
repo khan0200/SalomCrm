@@ -300,16 +300,15 @@ const folderScopedStudents = computed(() => {
       list = list.filter(s => {
         const idMatch = (s.id || '').toLowerCase().includes(q)
         const nameMatch = (s.full_name || '').toLowerCase().includes(q)
-        const koreanNameMatch = (s.korean_name || '').toLowerCase().includes(q)
         const passportMatch = (s.passport || '').toLowerCase().includes(q)
         const phone1Match = (s.phone1 || '').toLowerCase().includes(q)
         const phone2Match = (s.phone2 || '').toLowerCase().includes(q)
-        const telegramMatch = (s.telegram_username || '').toLowerCase().includes(q)
-        const fatherMatch = (s.father_name || '').toLowerCase().includes(q)
-        const motherMatch = (s.mother_name || '').toLowerCase().includes(q)
-        const uniMatch = (s.university_1 || '').toLowerCase().includes(q)
-        return idMatch || nameMatch || koreanNameMatch || passportMatch || phone1Match || phone2Match || telegramMatch || fatherMatch || motherMatch || uniMatch
-
+        const uni1Match = (s.university_1 || '').toLowerCase().includes(q)
+        const uni2Match = (s.university_2 || '').toLowerCase().includes(q)
+        const uni3Match = (s.university_3 || '').toLowerCase().includes(q)
+        const uni4Match = (s.university_4 || '').toLowerCase().includes(q)
+        const uni5Match = (s.university_5 || '').toLowerCase().includes(q)
+        return idMatch || nameMatch || passportMatch || phone1Match || phone2Match || uni1Match || uni2Match || uni3Match || uni4Match || uni5Match
       })
     }
   }

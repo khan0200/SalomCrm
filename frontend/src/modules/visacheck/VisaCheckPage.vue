@@ -232,15 +232,11 @@ const matchingSearchAndType = computed(() => {
     const idClean = idStr.replace(/[^a-z0-9]/gi, '')
     const pass = (s.passport || '').toLowerCase()
     const passClean = pass.replace(/[^a-z0-9]/gi, '')
-    const appNo = (s.application_no || '').toLowerCase()
-    const appNoClean = appNo.replace(/[^a-z0-9]/gi, '')
 
     if (mode === 'id') {
       return (
         idStr.includes(rawQ) ||
         (qClean.length > 0 && idClean.includes(qClean)) ||
-        appNo.includes(rawQ) ||
-        (qClean.length > 0 && appNoClean.includes(qClean)) ||
         pass.includes(rawQ) ||
         (qClean.length > 0 && passClean.includes(qClean))
       )
@@ -248,9 +244,6 @@ const matchingSearchAndType = computed(() => {
 
     const name = (s.full_name || '').toLowerCase()
     const univ = (s.university || '').toLowerCase()
-    const tariff = (s.tariff || '').toLowerCase()
-    const bday = (s.birthday || '').toLowerCase()
-    const bdayClean = bday.replace(/[^a-z0-9]/gi, '')
 
     return (
       name.includes(rawQ) ||
@@ -258,12 +251,7 @@ const matchingSearchAndType = computed(() => {
       (qClean.length > 0 && passClean.includes(qClean)) ||
       idStr.includes(rawQ) ||
       (qClean.length > 0 && idClean.includes(qClean)) ||
-      univ.includes(rawQ) ||
-      tariff.includes(rawQ) ||
-      appNo.includes(rawQ) ||
-      (qClean.length > 0 && appNoClean.includes(qClean)) ||
-      bday.includes(rawQ) ||
-      (qClean.length > 0 && bdayClean.includes(qClean))
+      univ.includes(rawQ)
     )
   })
 })

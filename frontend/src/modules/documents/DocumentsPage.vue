@@ -247,18 +247,14 @@ const filteredStudents = computed(() => students.value.filter(student => {
       matchesSearch = Boolean(
         (student.id && student.id.toLowerCase().includes(cleanSearch)) ||
         (student.full_name && student.full_name.toLowerCase().includes(cleanSearch)) ||
-        (student.korean_name && student.korean_name.toLowerCase().includes(cleanSearch)) ||
         (student.passport && student.passport.toLowerCase().includes(cleanSearch)) ||
         (student.phone1 && student.phone1.toLowerCase().includes(cleanSearch)) ||
         (student.phone2 && student.phone2.toLowerCase().includes(cleanSearch)) ||
-        (student.father_phone && student.father_phone.toLowerCase().includes(cleanSearch)) ||
-        (student.mother_phone && student.mother_phone.toLowerCase().includes(cleanSearch)) ||
         (student.university_1 && student.university_1.toLowerCase().includes(cleanSearch)) ||
         (student.university_2 && student.university_2.toLowerCase().includes(cleanSearch)) ||
         (student.university_3 && student.university_3.toLowerCase().includes(cleanSearch)) ||
         (student.university_4 && student.university_4.toLowerCase().includes(cleanSearch)) ||
-        (student.university_5 && student.university_5.toLowerCase().includes(cleanSearch)) ||
-        (student.final_school_name && student.final_school_name.toLowerCase().includes(cleanSearch))
+        (student.university_5 && student.university_5.toLowerCase().includes(cleanSearch))
       )
     }
     if (!matchesSearch) return false

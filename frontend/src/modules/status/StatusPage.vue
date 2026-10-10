@@ -302,7 +302,7 @@ const filteredStudents = computed(() => {
       const nameMatch = (s.full_name || '').toLowerCase().includes(q)
       const passportMatch = (s.passport || '').toLowerCase().includes(q)
       const phoneMatch = (s.phone1 || '').includes(q) || (s.phone2 || '').includes(q)
-      const uniMatch = [s.university_1, s.university_2, s.university_3, s.university_4, s.university_5, s.invoice_university]
+      const uniMatch = [s.university_1, s.university_2, s.university_3, s.university_4, s.university_5]
         .filter(Boolean)
         .some(u => (u as string).toLowerCase().includes(q))
       return idMatch || nameMatch || passportMatch || phoneMatch || uniMatch
