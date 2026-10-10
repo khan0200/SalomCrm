@@ -182,6 +182,12 @@ class Student(TenantAwareModel):
     embassy_sponsor_notes = models.TextField(blank=True, null=True)
     status_row_color = models.CharField(max_length=50, blank=True, null=True)
 
+    # Computed Kanban pipeline stage for the Status Board, derived from
+    # university/invoice/coa/embassy fields on every save via a pre_save
+    # signal (see apps/students/signals.py + apps/students/services.py:
+    # compute_workflow_stage). Never set directly by API consumers.
+    workflow_stage = models.CharField(max_length=20, default='student', blank=True)
+
     # 8. System & Management Metadata
     office = models.CharField(max_length=100, blank=True, null=True, db_index=True)
     student_group = models.CharField(max_length=100, blank=True, null=True, db_index=True)
@@ -227,6 +233,7 @@ class Student(TenantAwareModel):
             models.Index(fields=['tenant', 'status_hidden']),
             models.Index(fields=['tenant', 'tariff']),
             models.Index(fields=['tenant', 'balance']),
+            models.Index(fields=['tenant', 'workflow_stage']),
         ]
 
     def __str__(self):
@@ -323,6 +330,25 @@ class Student(TenantAwareModel):
             update_fields = set(kwargs['update_fields'])
             update_fields.update(uni_fields)
             kwargs['update_fields'] = list(update_fields)
+
+        # Status Board Kanban stage, recomputed on every save from the
+        # (now-compacted) university/invoice/coa/embassy fields above. Must
+        # run here rather than via a pre_save signal: Model.save() freezes
+        # update_fields into an immutable frozenset before pre_save is sent,
+        # so a signal receiver can no longer append 'workflow_stage' to a
+        # partial update_fields list (e.g. services.archive_student's
+        # update_fields=['is_deleted', 'updated_at']) by then - it would be
+        # silently dropped from the actual SQL UPDATE. Doing it inline here,
+        # before super().save(), lets us extend kwargs['update_fields']
+        # exactly like the university-compaction block above already does.
+        from .services import compute_workflow_stage
+        new_stage = compute_workflow_stage(self)
+        if self.workflow_stage != new_stage:
+            self.workflow_stage = new_stage
+            if kwargs.get('update_fields') is not None:
+                update_fields = set(kwargs['update_fields'])
+                update_fields.add('workflow_stage')
+                kwargs['update_fields'] = list(update_fields)
 
         super().save(*args, **kwargs)
 
@@ -424,6 +450,14 @@ class UniversityOption(models.Model):
     class Meta:
         db_table = 'universities'
         ordering = ['name']
+
+    def save(self, *args, **kwargs):
+        # Enforce uppercase so every tenant's university list stays in one
+        # consistent format (e.g. "SEOUL NATIONAL UNIVERSITY (GWANAK, SEOUL)")
+        # regardless of how a name was typed when added.
+        if self.name:
+            self.name = ' '.join(self.name.strip().split()).upper()
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return self.name

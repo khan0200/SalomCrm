@@ -115,6 +115,7 @@ class StudentCreateUpdateSerializer(serializers.ModelSerializer):
             'balance', 'discount', 'tenant', 'created_by',
             'created_at', 'updated_at',
             'payment_id',  # Immutable — set once on create, never via API
+            'workflow_stage',  # Computed exclusively in Student.save(); never set via API
         )
 
     def validate_birthday(self, value):

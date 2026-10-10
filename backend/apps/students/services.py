@@ -139,6 +139,55 @@ def permanent_delete_student(student, user=None):
 GUARDIAN_TARIFF_NAME = "Kafillik shartnomasi (18 yoshga to'lmaganlar uchun)"
 
 
+# Kanban pipeline stage for the Status Board, evaluated top-down -
+# VISA > COA > INVOICE > APPLY > STUDENT, first match wins. KEEP IN SYNC
+# (manually - Python has no shared import with the frontend) with:
+#   - frontend/src/modules/status/utils/statusWorkflow.ts: calculateStudentWorkflowStage
+#   - backend/apps/students/migrations/0024_backfill_workflow_stage.py (frozen snapshot)
+# Covered by backend/apps/students/tests/test_workflow_stage.py - update that
+# test alongside any change here or in the TS version to catch drift.
+WORKFLOW_VISA_VALUES = {'APPLIED', 'APPROVED', 'REJECTED', 'CANCELLED'}
+
+
+def compute_workflow_stage(student) -> str:
+    """
+    Pure function: derives the Status Board Kanban column from a Student's
+    current university/invoice/coa/embassy fields. Every input shape has a
+    defined result (default 'student') - there is no invalid combination,
+    so garbage/legacy values simply fall through to the earliest stage
+    rather than raising. Legacy embassy='CANCELLED' rows are treated as
+    REJECTED-equivalent for the VISA stage, matching the frontend and the
+    EmbassyDocumentsDrawer's visa selector UI.
+    """
+    visa_status = (student.embassy or '').strip().upper()
+    if visa_status in WORKFLOW_VISA_VALUES:
+        return 'visa'
+
+    coa_val = (student.coa or '').strip().upper()
+    if coa_val and coa_val != 'NOT TAKEN':
+        return 'coa'
+
+    uni_statuses = [
+        student.university_1_status, student.university_2_status,
+        student.university_3_status, student.university_4_status,
+        student.university_5_status,
+    ]
+    is_any_uni_accepted = any((s or '').strip().upper() == 'ACCEPTED' for s in uni_statuses)
+    invoice_val = (student.invoice or '').strip().upper()
+    has_active_invoice = bool(invoice_val and invoice_val != 'NOT TAKEN')
+    if is_any_uni_accepted or has_active_invoice:
+        return 'invoice'
+
+    is_any_uni_applied = any(
+        (s or '').strip().upper() == 'APPLIED'
+        for s in (student.university_1_status, student.university_2_status)
+    )
+    if is_any_uni_applied:
+        return 'apply'
+
+    return 'student'
+
+
 def get_guardian_contract_text(tenant) -> str:
     """
     The guardian appendix's `contract_text` is looked up live (not frozen at

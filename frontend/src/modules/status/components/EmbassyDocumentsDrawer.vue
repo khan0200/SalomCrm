@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, watch, onMounted, onUnmounted } from 'vue'
 import type { Student } from '@/types'
 import {
-  X, Plus, CheckCircle2, Check, ChevronDown, ChevronUp
+  X, Plus, CheckCircle2, Check, ChevronDown, ChevronUp, Send, XCircle
 } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
 
@@ -57,6 +57,20 @@ watch(() => props.isOpen, (open) => {
   }
 })
 
+const handleGlobalKeydown = (e: KeyboardEvent) => {
+  if (e.key === 'Escape' && props.isOpen) {
+    emit('close')
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('keydown', handleGlobalKeydown)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleGlobalKeydown)
+})
+
 const handleToggleHidden = () => {
   if (!props.student || !authStore.canEdit) return
   emit('update-status-hidden', !props.student.status_hidden)
@@ -99,10 +113,23 @@ const handleSaveSponsorNotes = () => {
   emit('update-sponsor-notes', sponsorNotes.value.trim())
 }
 
-const handleToggleVisa = (targetStatus: 'APPROVED' | 'CANCELLED') => {
+// Legacy rows saved before the Kanban redesign only ever used
+// APPROVED/CANCELLED. CANCELLED is displayed and toggled as REJECTED here -
+// clicking any button always writes the new canonical value going forward,
+// so old CANCELLED rows self-correct the next time a manager touches them.
+// Must agree with calculateStudentWorkflowStage (statusWorkflow.ts) and the
+// backend's compute_workflow_stage (apps/students/services.py).
+const isVisaActive = (status: 'APPLIED' | 'APPROVED' | 'REJECTED') => {
+  if (!props.student) return false
+  if (status === 'REJECTED') {
+    return props.student.embassy === 'REJECTED' || props.student.embassy === 'CANCELLED'
+  }
+  return props.student.embassy === status
+}
+
+const handleSetVisaStatus = (targetStatus: 'APPLIED' | 'APPROVED' | 'REJECTED') => {
   if (!props.student || !authStore.canEdit) return
-  const current = props.student.embassy
-  emit('update-visa-status', current === targetStatus ? null : targetStatus)
+  emit('update-visa-status', isVisaActive(targetStatus) ? null : targetStatus)
 }
 </script>
 
@@ -409,10 +436,23 @@ const handleToggleVisa = (targetStatus: 'APPROVED' | 'CANCELLED') => {
           <div class="flex gap-3 mt-4">
             <button
               type="button"
-              @click="handleToggleVisa('APPROVED')"
+              @click="handleSetVisaStatus('APPLIED')"
               class="flex-1 py-3 px-4 rounded-xl font-bold text-sm transition-all cursor-pointer border flex items-center justify-center gap-2"
               :class="[
-                student.embassy === 'APPROVED'
+                isVisaActive('APPLIED')
+                  ? 'bg-blue-600 border-transparent text-white shadow-md hover:bg-blue-700'
+                  : 'bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-200 hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-blue-950/20 dark:hover:text-blue-400'
+              ]"
+            >
+              <Send class="h-4.5 w-4.5" />
+              <span>APPLIED</span>
+            </button>
+            <button
+              type="button"
+              @click="handleSetVisaStatus('APPROVED')"
+              class="flex-1 py-3 px-4 rounded-xl font-bold text-sm transition-all cursor-pointer border flex items-center justify-center gap-2"
+              :class="[
+                isVisaActive('APPROVED')
                   ? 'bg-emerald-600 border-transparent text-white shadow-md hover:bg-emerald-700'
                   : 'bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-200 hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-950/20 dark:hover:text-emerald-400'
               ]"
@@ -422,16 +462,16 @@ const handleToggleVisa = (targetStatus: 'APPROVED' | 'CANCELLED') => {
             </button>
             <button
               type="button"
-              @click="handleToggleVisa('CANCELLED')"
+              @click="handleSetVisaStatus('REJECTED')"
               class="flex-1 py-3 px-4 rounded-xl font-bold text-sm transition-all cursor-pointer border flex items-center justify-center gap-2"
               :class="[
-                student.embassy === 'CANCELLED'
+                isVisaActive('REJECTED')
                   ? 'bg-rose-600 border-transparent text-white shadow-md hover:bg-rose-700'
                   : 'bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-200 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/20 dark:hover:text-rose-400'
               ]"
             >
-              <X class="h-4.5 w-4.5" />
-              <span>CANCELLED</span>
+              <XCircle class="h-4.5 w-4.5" />
+              <span>REJECTED</span>
             </button>
           </div>
         </div>

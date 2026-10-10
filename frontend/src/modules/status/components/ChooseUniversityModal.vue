@@ -57,11 +57,6 @@ const handleSelect = (uniName: string) => {
         </button>
       </div>
 
-      <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-4">
-        Choose which of the student's chosen universities issued this invoice
-        <span v-if="studentName" class="font-bold text-zinc-700 dark:text-zinc-300"> ({{ studentName }})</span>:
-      </p>
-
       <!-- Student's Chosen Universities List (1 to 5) -->
       <div v-if="universitiesList.length > 0" class="flex flex-col gap-2.5 my-1">
         <button

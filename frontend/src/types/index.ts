@@ -150,6 +150,7 @@ export interface Student {
   invoice_university?: string | null
   coa?: string | null
   embassy?: string | null
+  workflow_stage?: 'student' | 'apply' | 'invoice' | 'coa' | 'visa' | string | null
   embassy_documents?: string[]
   status_hidden?: boolean
   kdb_put_date?: string | null

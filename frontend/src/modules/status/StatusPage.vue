@@ -3,6 +3,7 @@ import { ref, computed, watch } from 'vue'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
 import { studentsApi } from '@/api/students'
 import { statusApi } from '@/api/status'
+import { settingsApi } from '@/api/settings'
 import type { Student, Folder, StudentLevel, PaginatedResponse } from '@/types'
 import { useUiStore } from '@/stores/ui'
 import { useStudentDashboardStore } from '@/stores/studentDashboard'
@@ -14,6 +15,7 @@ import {
 } from 'lucide-vue-next'
 
 import StatusTable from './components/StatusTable.vue'
+import KanbanBoard from './components/KanbanBoard.vue'
 import EmbassyDocumentsDrawer from './components/EmbassyDocumentsDrawer.vue'
 import KdbDatePickerModal from './components/KdbDatePickerModal.vue'
 import ChooseUniversityModal from './components/ChooseUniversityModal.vue'
@@ -21,12 +23,16 @@ import StudentFilters from '@/modules/students/components/StudentFilters.vue'
 import ExportExcelModal from '@/modules/students/components/ExportExcelModal.vue'
 import StudentActionsModal from '@/modules/students/components/StudentActionsModal.vue'
 import AddStudentsToFolderModal from '@/modules/students/components/AddStudentsToFolderModal.vue'
+import { useUniversityStatuses } from '@/composables/useUniversityStatuses'
+import { calculateStudentWorkflowStage, WORKFLOW_STAGES } from './utils/statusWorkflow'
 
 const queryClient = useQueryClient()
 const uiStore = useUiStore()
 const dashboardStore = useStudentDashboardStore()
 const { getTagIcon, fetchTags } = useCustomTags()
 fetchTags()
+const { fetchStatuses: fetchUniversityStatuses } = useUniversityStatuses()
+fetchUniversityStatuses()
 const { getEffectiveMissingDocs } = useDocumentHelpers()
 
 // Active Folder state
@@ -100,6 +106,8 @@ const isEmbassyDrawerOpen = ref(false)
 const isChooseUniModalOpen = ref(false)
 const activeInvoiceStudentId = ref<string | null>(null)
 const invoicePendingStatus = ref<string | null>(null)
+// Increment this to force the invoice <select> to re-render (resets native browser state) when cancelled
+const invoiceSelectResetKey = ref(0)
 
 // KDB Date Picker Modal
 const isKdbDateModalOpen = ref(false)
@@ -139,6 +147,15 @@ const { data: optionsData } = useQuery({
 })
 
 const universityOptions = computed<string[]>(() => optionsData.value?.universities?.map((u: any) => u.name || u) || [])
+
+// Same University Status list configured in Settings, so the Kanban
+// board's dropdowns match Settings exactly instead of a hardcoded list.
+const { data: universityStatusData } = useQuery({
+  queryKey: ['university-statuses'],
+  queryFn: () => settingsApi.getUniversityStatuses(),
+  staleTime: 1000 * 60 * 10,
+})
+const universityStatusOptions = computed<string[]>(() => (universityStatusData.value || []).map(s => s.name))
 
 // ── Folders & KDB Detection ───────────────────────────────────────────────────
 const kdbFolder = computed(() => {
@@ -402,7 +419,22 @@ watch([searchQuery, activeFolder, selectedTariffs, selectedLevels, selectedGroup
 })
 
 // ── Optimistic Update Engine ──────────────────────────────────────────────────
+// Fields that feed calculateStudentWorkflowStage - only recompute/toast the
+// Kanban column move notification when one of these actually changed, so
+// unrelated optimistic updates (color, tags, folders, etc.) stay silent.
+const WORKFLOW_STAGE_FIELDS = new Set([
+  'embassy', 'coa', 'invoice',
+  'university_1_status', 'university_2_status', 'university_3_status',
+  'university_4_status', 'university_5_status',
+])
+
+const WORKFLOW_STAGE_LABEL = Object.fromEntries(WORKFLOW_STAGES.map(s => [s.key, s.label]))
+
 const updateStudentOptimistically = (studentId: string, patch: Partial<Student>) => {
+  const touchesWorkflowFields = Object.keys(patch).some(k => WORKFLOW_STAGE_FIELDS.has(k))
+  const studentBefore = touchesWorkflowFields ? allStudents.value.find(s => s.id === studentId) : undefined
+  const stageBefore = studentBefore ? calculateStudentWorkflowStage(studentBefore) : null
+
   queryClient.setQueryData(['all-students-master'], (old: any) => {
     if (!old || !old.results) return old
     return {
@@ -410,6 +442,18 @@ const updateStudentOptimistically = (studentId: string, patch: Partial<Student>)
       results: old.results.map((s: Student) => s.id === studentId ? { ...s, ...patch } : s)
     }
   })
+
+  if (studentBefore && stageBefore) {
+    const stageAfter = calculateStudentWorkflowStage({ ...studentBefore, ...patch })
+    if (stageAfter !== stageBefore) {
+      uiStore.addToast({
+        type: 'info',
+        title: `${studentId} ${studentBefore.full_name}`,
+        message: `${WORKFLOW_STAGE_LABEL[stageBefore]} » ${WORKFLOW_STAGE_LABEL[stageAfter]}`,
+        duration: 3000,
+      })
+    }
+  }
 }
 
 // ── Inline Actions Handlers ───────────────────────────────────────────────────
@@ -434,18 +478,41 @@ const handleUpdateInvoice = async (studentId: string, status: string | null, uni
   }
 }
 
-const handleInvoiceChange = (studentId: string, currentStatus: string | null, newStatus: string) => {
-  const isFirstAssign = (!currentStatus || currentStatus === 'NOT TAKEN') && newStatus !== 'NOT TAKEN'
-
-  if (isFirstAssign) {
-    activeInvoiceStudentId.value = studentId
-    invoicePendingStatus.value = newStatus
-    isChooseUniModalOpen.value = true
-  } else {
-    const student = allStudents.value.find(s => s.id === studentId)
-    const uniToKeep = newStatus === 'NOT TAKEN' ? null : (student?.invoice_university || null)
-    handleUpdateInvoice(studentId, newStatus, uniToKeep)
+// Which of a student's university slots are currently Accepted - used to
+// decide whether a PAID invoice needs the payer university disambiguated.
+const getAcceptedUniversities = (student: Student): { slot: number; name: string }[] => {
+  const list: { slot: number; name: string }[] = []
+  for (let i = 1; i <= 5; i++) {
+    const status = (student as any)[`university_${i}_status`]
+    if (typeof status === 'string' && status.trim().toUpperCase() === 'ACCEPTED') {
+      const name = (student as any)[`university_${i}`]
+      list.push({ slot: i, name: name && name.trim() ? name.trim() : `University ${i}` })
+    }
   }
+  return list
+}
+
+const handleInvoiceChange = (studentId: string, currentStatus: string | null, newStatus: string) => {
+  const student = allStudents.value.find(s => s.id === studentId)
+
+  // Only PAID needs to know which university was actually paid - other
+  // statuses (Taken, Cancelled) don't carry that ambiguity.
+  if (newStatus === 'PAID' && student) {
+    const accepted = getAcceptedUniversities(student)
+    if (accepted.length > 1) {
+      activeInvoiceStudentId.value = studentId
+      invoicePendingStatus.value = newStatus
+      isChooseUniModalOpen.value = true
+      return
+    }
+    // Exactly one Accepted university - no need to ask, use it directly.
+    const uniToKeep = accepted.length === 1 ? accepted[0].name : (student.invoice_university || null)
+    handleUpdateInvoice(studentId, newStatus, uniToKeep)
+    return
+  }
+
+  const uniToKeep = newStatus === 'NOT TAKEN' ? null : (student?.invoice_university || null)
+  handleUpdateInvoice(studentId, newStatus, uniToKeep)
 }
 
 const handleSelectInvoiceUni = (uni: string) => {
@@ -455,6 +522,36 @@ const handleSelectInvoiceUni = (uni: string) => {
   isChooseUniModalOpen.value = false
   activeInvoiceStudentId.value = null
   invoicePendingStatus.value = null
+}
+
+// ── Kanban: university name/status handlers ──────────────────────────────
+const handleUpdateUniversityField = async (studentId: string, slot: 1 | 2, name: string) => {
+  const field = `university_${slot}` as const
+  updateStudentOptimistically(studentId, { [field]: name } as Partial<Student>)
+  try {
+    await studentsApi.updateStudent(studentId, { [field]: name } as any)
+  } catch (err) {
+    console.error('University name update failed:', err)
+    uiStore.addToast({ type: 'error', title: 'Update Failed', message: 'Could not update university selection. Please try again.' })
+    queryClient.invalidateQueries({ queryKey: ['all-students-master'] })
+  }
+}
+
+const handleUpdateUniversityStatus = async (studentId: string, slot: 1 | 2, status: string) => {
+  const student = allStudents.value.find(s => s.id === studentId)
+  if (!student) return
+
+  const field = `university_${slot}_status` as const
+  const previousValue = student[field]
+
+  updateStudentOptimistically(studentId, { [field]: status } as Partial<Student>)
+  try {
+    await statusApi.quickUpdate(studentId, { [field]: status } as any)
+  } catch (err) {
+    console.error('University status update failed:', err)
+    updateStudentOptimistically(studentId, { [field]: previousValue } as Partial<Student>)
+    uiStore.addToast({ type: 'error', title: 'Update Failed', message: `Could not update ${student.full_name}'s university status. Please try again.` })
+  }
 }
 
 const handleUpdateCoa = async (studentId: string, status: string | null) => {
@@ -1044,11 +1141,12 @@ const handleSaveFolderAdd = async (selectedIds: string[]) => {
       </div>
     </div>
 
-    <!-- Main Status Data Table matching Uniapp2 -->
+    <!-- KDB folder: existing specialized table, completely unchanged -->
     <StatusTable
+      v-if="isKdbFolderActive"
       :students="paginatedStudents"
       :is-loading="isLoading"
-      :is-kdb-mode="isKdbFolderActive"
+      :is-kdb-mode="true"
       :sort-by="sortBy"
       :sort-order="sortOrder"
       :recent-put-dates="recentPutDates"
@@ -1063,9 +1161,27 @@ const handleSaveFolderAdd = async (selectedIds: string[]) => {
       @open-embassy="handleOpenEmbassy"
     />
 
-    <!-- Pagination Footer -->
+    <!-- All other folders: 5-column automated Kanban pipeline -->
+    <KanbanBoard
+      v-else
+      :students="filteredStudents"
+      :university-options="universityOptions"
+      :university-status-options="universityStatusOptions"
+      :invoice-select-reset-key="invoiceSelectResetKey"
+      @click-card="handleClickRow"
+      @open-actions="handleOpenActions"
+      @open-embassy="handleOpenEmbassy"
+      @update-university="handleUpdateUniversityField"
+      @update-university-status="handleUpdateUniversityStatus"
+      @update-invoice-status="handleInvoiceChange"
+      @update-coa-status="handleUpdateCoa"
+      @update-visa-status="handleUpdateEmbassy"
+      @revert-to-coa="studentId => handleUpdateEmbassy(studentId, null)"
+    />
+
+    <!-- Pagination Footer (KDB table mode only - Kanban always shows its full filtered set) -->
     <div
-      v-if="totalPages > 1"
+      v-if="isKdbFolderActive && totalPages > 1"
       class="flex items-center justify-between px-4 py-3 bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-500 select-none shadow-xs mt-2"
     >
       <div>
@@ -1141,7 +1257,7 @@ const handleSaveFolderAdd = async (selectedIds: string[]) => {
       :student-name="allStudents.find(s => s.id === activeInvoiceStudentId)?.full_name"
       :pending-status="invoicePendingStatus"
       :assigned-universities="activeInvoiceStudentAssignedUnis"
-      @close="isChooseUniModalOpen = false; activeInvoiceStudentId = null; invoicePendingStatus = null"
+      @close="isChooseUniModalOpen = false; activeInvoiceStudentId = null; invoicePendingStatus = null; invoiceSelectResetKey++"
       @select="handleSelectInvoiceUni"
     />
 

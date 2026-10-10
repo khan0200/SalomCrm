@@ -16,7 +16,6 @@ import {
 } from 'lucide-vue-next'
 import type { Student, Folder } from '@/types'
 import { useAlphanumericSort } from '@/composables/useAlphanumericSort'
-import { formatPhoneValue } from '@/utils/phone'
 
 const props = defineProps<{
   isOpen: boolean
@@ -92,6 +91,17 @@ const toggleDropdown = (key: DropdownKey) => {
   const wasOpen = target.value
   closeAllDropdowns()
   target.value = !wasOpen
+}
+
+// Any click landing outside the filter grid (the dropdown triggers + their
+// popovers) closes whichever dropdown is open - covers clicks anywhere else
+// in the modal (student list, header, footer), not just the backdrop.
+const filterGridRef = ref<HTMLElement | null>(null)
+const handleGlobalClick = (e: MouseEvent) => {
+  if (!filterGridRef.value) return
+  if (!filterGridRef.value.contains(e.target as Node)) {
+    closeAllDropdowns()
+  }
 }
 
 const toggleInList = (list: string[], value: string) => {
@@ -317,16 +327,6 @@ const handleSave = () => {
   emit('save', selectedIds.value)
 }
 
-const getOtherFolderNames = (s: Student) => {
-  if (!s.folder_ids || s.folder_ids.length === 0) return []
-  return s.folder_ids
-    .map(fId => {
-      const found = props.folders.find(f => String(f.id) === String(fId))
-      return found?.name || ''
-    })
-    .filter(name => Boolean(name) && name.toUpperCase() !== 'KDB' && name !== props.folderName)
-}
-
 const getLevelBadgeClass = (lvl?: string | null) => {
   if (!lvl) return 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 border-zinc-200 dark:border-zinc-700'
   const u = lvl.toUpperCase()
@@ -358,10 +358,16 @@ const handleGlobalKeydown = (e: KeyboardEvent) => {
 
 onMounted(() => {
   window.addEventListener('keydown', handleGlobalKeydown)
+  // Capture phase: the filter box's own @click.stop (used to keep clicks
+  // inside it from bubbling up to the modal panel's closeAllDropdowns)
+  // would otherwise also block this listener, since it runs in the bubble
+  // phase on the same window target.
+  window.addEventListener('click', handleGlobalClick, true)
 })
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleGlobalKeydown)
+  window.removeEventListener('click', handleGlobalClick, true)
 })
 </script>
 
@@ -450,7 +456,7 @@ onUnmounted(() => {
         </div>
 
         <!-- 2. Filter Grid (7 Dropdowns matching Download Excel Modal) -->
-        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-2">
+        <div ref="filterGridRef" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-2">
           <!-- Folder Filter -->
           <div class="relative">
             <button
@@ -747,7 +753,7 @@ onUnmounted(() => {
       </div>
 
       <!-- ── Scrollable Student List ────────────────────────────── -->
-      <div class="flex-1 overflow-y-auto p-6 scrollbar-thin">
+      <div class="flex-1 overflow-y-auto scrollbar-thin">
         <div
           v-if="filteredStudents.length === 0"
           class="py-16 text-center text-xs text-zinc-400 italic flex flex-col items-center justify-center"
@@ -757,96 +763,96 @@ onUnmounted(() => {
           <p class="mt-1 text-xs text-zinc-400">Try clearing active filters or adjusting your search keyword.</p>
         </div>
 
-        <!-- Student Items Grid (Clean Responsive 2-column or 1-column layout) -->
-        <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-          <div
-            v-for="s in filteredStudents"
-            :key="s.id"
-            @click="toggleStudent(s.id)"
-            class="group flex items-start gap-3.5 p-3.5 rounded-xl border text-left cursor-pointer transition-all select-none"
-            :class="[
-              selectedIds.includes(s.id)
-                ? 'border-blue-500 bg-blue-50/60 dark:bg-blue-950/40 shadow-xs ring-1 ring-blue-500/50'
-                : 'border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#15171a] hover:border-zinc-300 dark:hover:border-zinc-700 hover:bg-zinc-50/80 dark:hover:bg-zinc-850/60'
-            ]"
-          >
-            <!-- Checkbox -->
-            <div
-              class="w-5 h-5 min-w-[20px] rounded-lg border-2 flex items-center justify-center shrink-0 mt-0.5 transition-all"
-              :class="[
-                selectedIds.includes(s.id)
-                  ? 'border-blue-600 bg-blue-600 shadow-xs text-white'
-                  : 'border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 group-hover:border-blue-400'
-              ]"
-            >
-              <Check v-if="selectedIds.includes(s.id)" class="w-3.5 h-3.5 stroke-[3]" />
-            </div>
-
-            <!-- Student Info -->
-            <div class="flex-1 min-w-0">
-              <div class="flex items-center justify-between gap-2">
-                <div class="flex items-center gap-2 min-w-0">
-                  <span class="text-xs font-bold text-zinc-900 dark:text-zinc-100 uppercase tracking-wide truncate">
-                    {{ s.full_name }}
-                  </span>
-                  <span v-if="s.korean_name" class="text-[11px] font-medium text-zinc-400 truncate">
-                    ({{ s.korean_name }})
-                  </span>
+        <!-- Table layout (ID, Full Name, Level, Tariff, Language Certificate, Group) -->
+        <table v-else class="w-full text-left border-collapse">
+          <thead class="sticky top-0 z-10">
+            <tr class="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/90 dark:bg-zinc-850/90 text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 select-none">
+              <th class="pl-4 pr-1.5 py-2.5 w-10">
+                <div
+                  class="w-5 h-5 rounded-lg border-2 flex items-center justify-center shrink-0 transition-all cursor-pointer"
+                  :class="[
+                    isAllFilteredSelected
+                      ? 'border-blue-600 bg-blue-600 shadow-xs text-white'
+                      : 'border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800'
+                  ]"
+                  @click.stop="toggleSelectAll"
+                >
+                  <Check v-if="isAllFilteredSelected" class="w-3.5 h-3.5 stroke-[3]" />
                 </div>
-
-                <!-- ID Pill -->
-                <span class="text-[10.5px] text-zinc-500 dark:text-zinc-400 font-mono font-bold bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded border border-zinc-200 dark:border-zinc-700 shrink-0">
+              </th>
+              <th class="pl-1.5 pr-2 py-2.5 w-16">ID</th>
+              <th class="pl-0 pr-2 py-2.5">Full Name</th>
+              <th class="px-2 py-2.5 w-28">Level</th>
+              <th class="px-2 py-2.5 w-32">Tariff</th>
+              <th class="px-2 py-2.5 w-32">Language Certificate</th>
+              <th class="px-2 py-2.5 w-28">Group</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-zinc-100 dark:divide-zinc-850">
+            <tr
+              v-for="s in filteredStudents"
+              :key="s.id"
+              @click="toggleStudent(s.id)"
+              class="cursor-pointer transition-colors text-xs select-none"
+              :class="selectedIds.includes(s.id) ? 'bg-blue-50/70 dark:bg-blue-950/30' : 'hover:bg-zinc-50 dark:hover:bg-zinc-850/60'"
+            >
+              <td class="pl-4 pr-1.5 py-2.5">
+                <div
+                  class="w-5 h-5 rounded-lg border-2 flex items-center justify-center shrink-0 transition-all"
+                  :class="[
+                    selectedIds.includes(s.id)
+                      ? 'border-blue-600 bg-blue-600 shadow-xs text-white'
+                      : 'border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800'
+                  ]"
+                >
+                  <Check v-if="selectedIds.includes(s.id)" class="w-3.5 h-3.5 stroke-[3]" />
+                </div>
+              </td>
+              <td class="pl-1.5 pr-2 py-2.5">
+                <span class="text-[10.5px] text-zinc-500 dark:text-zinc-400 font-mono font-bold bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded border border-zinc-200 dark:border-zinc-700">
                   {{ s.id }}
                 </span>
-              </div>
-
-              <!-- Metadata Row: Level, Tariff, Group, Phone -->
-              <div class="flex items-center gap-1.5 mt-2 flex-wrap text-[10.5px]">
-                <!-- Level Badge -->
+              </td>
+              <td class="pl-0 pr-2 py-2.5">
+                <span class="font-bold uppercase tracking-wide text-zinc-900 dark:text-zinc-100">{{ s.full_name }}</span>
+              </td>
+              <td class="px-2 py-2.5 whitespace-nowrap">
                 <span
                   v-if="s.level"
-                  class="font-bold px-1.5 py-0.5 rounded border uppercase"
+                  class="font-bold px-1.5 py-0.5 rounded border uppercase text-[10.5px]"
                   :class="getLevelBadgeClass(s.level)"
                 >
                   {{ s.level }}
                 </span>
-
-                <!-- Tariff Badge -->
+                <span v-else class="text-zinc-400">—</span>
+              </td>
+              <td class="px-2 py-2.5 whitespace-nowrap">
                 <span
                   v-if="s.tariff"
-                  class="font-bold px-1.5 py-0.5 rounded border bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/60 uppercase"
+                  class="font-bold px-1.5 py-0.5 rounded border bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/60 uppercase text-[10.5px]"
                 >
                   {{ s.tariff }}
                 </span>
-
-                <!-- Group Badge -->
+                <span v-else class="text-zinc-400">—</span>
+              </td>
+              <td class="px-2 py-2.5 whitespace-nowrap">
                 <span
-                  v-if="s.student_group"
-                  class="font-semibold text-zinc-600 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 px-1.5 py-0.5 rounded"
+                  v-if="s.language_certificate && s.language_certificate !== 'NO CERTIFICATE'"
+                  class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10.5px] font-bold"
+                  :class="s.language_certificate === 'TOPIK' ? 'bg-rose-500 text-white' : 'bg-blue-600 text-white'"
                 >
-                  {{ s.student_group }}
+                  <span>{{ s.language_certificate }}</span>
+                  <span v-if="s.certificate_score" class="opacity-90 font-mono">({{ s.certificate_score }})</span>
                 </span>
-
-                <!-- Phone -->
-                <span v-if="s.phone1" class="text-zinc-400 font-mono">
-                  {{ formatPhoneValue(s.phone1) }}
-                </span>
-              </div>
-
-              <!-- Other Existing Folders Badges -->
-              <div v-if="getOtherFolderNames(s).length > 0" class="flex items-center gap-1 mt-2 flex-wrap">
-                <span class="text-[10px] text-zinc-400 font-medium">Folders:</span>
-                <span
-                  v-for="name in getOtherFolderNames(s)"
-                  :key="name"
-                  class="text-[10px] font-semibold text-zinc-600 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-md px-1.5 py-0.5 uppercase"
-                >
-                  {{ name }}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
+                <span v-else class="text-zinc-400">—</span>
+              </td>
+              <td class="px-2 py-2.5 whitespace-nowrap">
+                <span v-if="s.student_group" class="font-semibold text-zinc-600 dark:text-zinc-400">{{ s.student_group }}</span>
+                <span v-else class="text-zinc-400">—</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
 
       <!-- ── Footer ─────────────────────────────────────────────── -->

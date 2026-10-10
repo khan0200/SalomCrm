@@ -34,6 +34,9 @@ export const statusApi = {
     embassy?: string | null
     status_hidden?: boolean
     status_row_color?: string | null
+    university_1_status?: string | null
+    university_2_status?: string | null
+    invoice_university?: string | null
   }): Promise<Student> => {
     const response = await apiClient.patch(`/status/${id}/quick_update/`, data)
     return response.data

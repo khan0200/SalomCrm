@@ -31,11 +31,16 @@ class StatusStudentListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Student
         fields = (
-            'id', 'full_name', 'level', 'invoice', 'invoice_university',
-            'coa', 'embassy', 'embassy_documents', 'status_hidden',
+            'id', 'full_name', 'level', 'language_certificate', 'invoice', 'invoice_university',
+            'coa', 'embassy', 'workflow_stage', 'embassy_documents', 'status_hidden',
             'kdb_put_date', 'kdb_take_date', 'days_left', 'urgency',
             'embassy_father_docs', 'embassy_mother_docs', 'embassy_sponsor_notes',
-            'status_row_color', 'folder_ids', 'created_at'
+            'status_row_color', 'folder_ids', 'created_at',
+            'university_1', 'university_1_status', 'university_1_major',
+            'university_2', 'university_2_status', 'university_2_major',
+            'university_3', 'university_3_status', 'university_3_major',
+            'university_4', 'university_4_status', 'university_4_major',
+            'university_5', 'university_5_status', 'university_5_major',
         )
 
     def get_days_left(self, obj):
@@ -55,14 +60,20 @@ class StatusStudentListSerializer(serializers.ModelSerializer):
 
 
 class StatusQuickUpdateSerializer(serializers.Serializer):
-    """Serializer for rapid inline table updates on Status page."""
+    """Serializer for rapid inline table/Kanban updates on Status page."""
     invoice = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    invoice_university = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     coa = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     kdb_put_date = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     kdb_take_date = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     embassy = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     status_hidden = serializers.BooleanField(required=False)
     status_row_color = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    # Kanban "Student"/"Apply" column controls - status only; the university
+    # name/major slot still goes through studentsApi.updateStudent() exactly
+    # like invoice_university already does.
+    university_1_status = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    university_2_status = serializers.CharField(required=False, allow_null=True, allow_blank=True)
 
 
 class EmbassyDrawerUpdateSerializer(serializers.Serializer):

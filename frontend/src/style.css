@@ -126,6 +126,46 @@ button, input, select, textarea, optgroup {
   animation: pageIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
+/* Small inline confirm bars (e.g. a button splitting into Yes/No) - grows
+   open from the top instead of popping in at full size instantly. */
+@keyframes confirmGrowIn {
+  from { opacity: 0; transform: scaleY(0.6) translateY(-3px); }
+  to { opacity: 1; transform: scaleY(1) translateY(0); }
+}
+
+.animate-confirm-in {
+  transform-origin: top;
+  animation: confirmGrowIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Kanban card list (Status page): when a card moves to another column, the
+   cards left behind in its old column smoothly slide up to close the gap,
+   and the card appearing in its new column fades/scales in - instead of
+   both lists just snapping to their new layout instantly. */
+.kanban-card-move {
+  transition: transform 0.32s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.kanban-card-enter-active {
+  transition: opacity 0.22s cubic-bezier(0.16, 1, 0.3, 1), transform 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.kanban-card-leave-active {
+  transition: opacity 0.18s ease-in, transform 0.18s ease-in;
+  position: absolute;
+  width: 100%;
+}
+
+.kanban-card-enter-from {
+  opacity: 0;
+  transform: scale(0.94) translateY(-6px);
+}
+
+.kanban-card-leave-to {
+  opacity: 0;
+  transform: scale(0.96);
+}
+
 /* Drawer animations matching UniApp2 */
 @keyframes slide-in-right {
   from {
