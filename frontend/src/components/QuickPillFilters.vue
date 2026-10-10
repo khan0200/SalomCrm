@@ -46,7 +46,8 @@ const toggleLevel = (level: string) => {
         v-for="g in groups"
         :key="'g-'+g"
         @click="toggleGroup(g)"
-        class="shrink-0 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase transition-colors border select-none cursor-pointer tracking-wider"
+        :title="g"
+        class="shrink-0 px-2 max-w-[110px] truncate rounded-full text-[9px] font-bold uppercase transition-colors border select-none cursor-pointer tracking-wide"
         :class="dashboardStore.selectedGroups.includes(g) 
           ? 'bg-blue-100 dark:bg-blue-900/40 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300 shadow-xs' 
           : 'bg-white dark:bg-[#111315] border-zinc-200 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-900'"
@@ -62,7 +63,8 @@ const toggleLevel = (level: string) => {
         v-for="l in levels"
         :key="'l-'+l"
         @click="toggleLevel(l)"
-        class="shrink-0 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase transition-colors border select-none cursor-pointer tracking-wider"
+        :title="l"
+        class="shrink-0 px-2 max-w-[110px] truncate rounded-full text-[9px] font-bold uppercase transition-colors border select-none cursor-pointer tracking-wide"
         :class="dashboardStore.selectedLevels.includes(l) 
           ? 'bg-purple-100 dark:bg-purple-900/40 border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300 shadow-xs' 
           : 'bg-white dark:bg-[#111315] border-zinc-200 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-900'"
