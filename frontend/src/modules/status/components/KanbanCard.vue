@@ -133,6 +133,19 @@ const handleSetVisaStatus = (status: 'APPLIED' | 'APPROVED' | 'REJECTED') => {
   emit('update-visa-status', isVisaActive(status) ? null : status)
 }
 
+const stageCardClass = computed(() => {
+  if (props.stageKey === 'visa') return visaCardClass.value
+  
+  const baseBg = 'bg-white dark:bg-zinc-900'
+  switch (props.stageKey) {
+    case 'student': return `border-zinc-400 dark:border-zinc-500 ${baseBg}`
+    case 'apply': return `border-blue-500 dark:border-blue-400 ${baseBg}`
+    case 'invoice': return `border-violet-500 dark:border-violet-400 ${baseBg}`
+    case 'coa': return `border-amber-500 dark:border-amber-400 ${baseBg}`
+    default: return `border-zinc-200/80 dark:border-zinc-700/80 ${baseBg}`
+  }
+})
+
 // "Back to COA" asks for inline confirmation first - the button splits into
 // Yes/No instead of acting immediately, since reverting from VISA loses the
 // visa outcome.
@@ -146,7 +159,7 @@ const confirmRevertToCoa = () => {
 <template>
   <div
     class="group rounded-xl border-2 border-dashed p-2.5 shadow-md hover:shadow-lg transition-all cursor-pointer"
-    :class="stageKey === 'visa' ? visaCardClass : 'border-zinc-200/80 dark:border-zinc-700/80 bg-white dark:bg-zinc-900'"
+    :class="stageCardClass"
     @click="handleCardClick"
     @contextmenu="handleContextMenu"
   >
