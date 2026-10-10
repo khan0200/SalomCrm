@@ -278,7 +278,7 @@ const confirmRevertToCoa = () => {
             :value="student.invoice || 'NOT TAKEN'"
             :disabled="!authStore.canEdit"
             @change="emit('update-invoice-status', student.invoice || 'NOT TAKEN', ($event.target as HTMLSelectElement).value)"
-            class="flex-1 min-w-0 px-2 py-0.5 rounded-full text-[8.5px] font-bold uppercase tracking-wider border focus:outline-none shadow-2xs"
+            class="flex-1 min-w-0 px-2 py-0.5 rounded-full text-[8.5px] font-bold uppercase tracking-wider border focus:outline-none shadow-2xs truncate"
             :class="[getInvoiceBadgeClass(student.invoice), authStore.canEdit ? 'cursor-pointer' : 'cursor-default opacity-90']"
           >
             <option value="NOT TAKEN" class="bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200">Not Taken</option>
@@ -293,7 +293,7 @@ const confirmRevertToCoa = () => {
             :value="student.coa || 'NOT TAKEN'"
             :disabled="!authStore.canEdit"
             @change="emit('update-coa-status', ($event.target as HTMLSelectElement).value)"
-            class="flex-1 min-w-0 px-2 py-0.5 rounded-full text-[8.5px] font-bold uppercase tracking-wider border focus:outline-none shadow-2xs"
+            class="flex-1 min-w-0 px-2 py-0.5 rounded-full text-[8.5px] font-bold uppercase tracking-wider border focus:outline-none shadow-2xs truncate"
             :class="[getCoaBadgeClass(student.coa), authStore.canEdit ? 'cursor-pointer' : 'cursor-default opacity-90']"
           >
             <option value="NOT TAKEN" class="bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200">Not Taken</option>
@@ -318,7 +318,7 @@ const confirmRevertToCoa = () => {
             :value="student.coa || 'NOT TAKEN'"
             :disabled="!authStore.canEdit"
             @change="emit('update-coa-status', ($event.target as HTMLSelectElement).value)"
-            class="flex-1 min-w-0 px-2 py-0.5 rounded-full text-[8.5px] font-bold uppercase tracking-wider border focus:outline-none shadow-2xs"
+            class="flex-1 min-w-0 px-2 py-0.5 rounded-full text-[8.5px] font-bold uppercase tracking-wider border focus:outline-none shadow-2xs truncate"
             :class="[getCoaBadgeClass(student.coa), authStore.canEdit ? 'cursor-pointer' : 'cursor-default opacity-90']"
           >
             <option value="NOT TAKEN" class="bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200">Not Taken</option>
@@ -333,7 +333,7 @@ const confirmRevertToCoa = () => {
             :value="isVisaActive('APPLIED') ? 'APPLIED' : 'NOT_YET'"
             :disabled="!authStore.canEdit"
             @change="emit('update-visa-status', ($event.target as HTMLSelectElement).value === 'APPLIED' ? 'APPLIED' : null)"
-            class="flex-1 min-w-0 px-2 py-0.5 rounded-full text-[8.5px] font-bold uppercase tracking-wider border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-300 focus:outline-none shadow-2xs"
+            class="flex-1 min-w-0 px-2 py-0.5 rounded-full text-[8.5px] font-bold uppercase tracking-wider border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-300 focus:outline-none shadow-2xs truncate"
             :class="authStore.canEdit ? 'cursor-pointer' : 'cursor-default opacity-90'"
           >
             <option value="NOT_YET" class="bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200">Not Yet</option>
