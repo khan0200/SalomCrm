@@ -812,6 +812,7 @@ const handleApplyFilters = (filters: any) => {
   selectedTags.value = filters.tags
   selectedLeads.value = filters.leads
   selectedMissingDocs.value = filters.missingDocs || []
+  isFilterPanelOpen.value = false
 }
 
 const resetAllFilters = () => {
