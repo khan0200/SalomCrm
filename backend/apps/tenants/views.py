@@ -148,8 +148,6 @@ class BranchViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        # Honour the tenant a Super Admin has switched into (X-Tenant-ID via
-        # TenantMiddleware), not just an explicit ?tenant_id= parameter.
         tenant = getattr(self.request, 'tenant', None) or getattr(user, 'tenant', None)
         if user.is_superuser or getattr(user, 'role', '') == UserRole.SUPER_ADMIN:
             tenant_id = self.request.query_params.get('tenant_id')
@@ -157,26 +155,23 @@ class BranchViewSet(viewsets.ModelViewSet):
                 return Branch.objects.filter(tenant_id=tenant_id).order_by('name')
             if tenant:
                 return Branch.objects.filter(tenant=tenant).order_by('name')
-            return Branch.objects.all().order_by('name')
+            return Branch.objects.none()
         if not tenant:
-            from .models import Tenant
-            tenant = Tenant.objects.first()
+            return Branch.objects.none()
         return Branch.objects.filter(tenant=tenant).order_by('name')
 
     def perform_create(self, serializer):
+        from rest_framework.exceptions import ValidationError
         user = self.request.user
         tenant = getattr(self.request, 'tenant', None) or getattr(user, 'tenant', None)
         if not tenant and (user.is_superuser or getattr(user, 'role', '') == UserRole.SUPER_ADMIN):
             tenant_id = self.request.data.get('tenant_id') or self.request.query_params.get('tenant_id')
             if tenant_id:
                 from .models import Tenant
-                tenant = Tenant.objects.filter(id=tenant_id).first()
-            if not tenant:
-                from .models import Tenant
-                tenant = Tenant.objects.first()
-        elif not tenant:
-            from .models import Tenant
-            tenant = Tenant.objects.first()
+                from django.db.models import Q
+                tenant = Tenant.objects.filter(Q(id=tenant_id) | Q(slug=tenant_id)).first()
+        if not tenant:
+            raise ValidationError({'tenant': 'Tenant is required to create a branch.'})
         serializer.save(tenant=tenant)
 
     def perform_update(self, serializer):

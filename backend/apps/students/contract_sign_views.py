@@ -491,6 +491,29 @@ def _link_or_create_crm_student(contract: Contract) -> None:
     if not contract.contract_number or contract.contract_number == contract.student_id_assigned:
         contract.contract_number = student_id
 
+    # Record official discount in payment system so it affects balance, payments table, and student details drawer
+    if contract.discount and contract.discount > 0:
+        if crm_student.discount != contract.discount:
+            crm_student.discount = contract.discount
+            crm_student.save(update_fields=['discount'])
+        from apps.payments.services import record_payment
+        contract_ref = f"CONTRACT_{contract.id}"
+        already_recorded = crm_student.payments.filter(
+            is_discount=True,
+            notes__contains=contract_ref
+        ).exists()
+        if not already_recorded:
+            record_payment(
+                tenant=contract.tenant,
+                student=crm_student,
+                amount=contract.discount,
+                method='Discount',
+                received_by='Contract Signing',
+                notes=f"Shartnoma bo'yicha chegirma (#{student_id}, ref: {contract_ref})",
+                is_discount=True,
+                user=contract.created_by,
+            )
+
 
 class ContractSignSubmitView(APIView):
     """

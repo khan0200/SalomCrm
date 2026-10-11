@@ -1173,7 +1173,7 @@ async function handleUnarchive(contract: Contract) {
                 </p>
                 <button
                   type="button"
-                  @click="uiStore.isShareContractLinkModalOpen = true"
+                  @click="uiStore.isCreateContractModalOpen = true"
                   class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-black text-white dark:bg-zinc-100 dark:hover:bg-white dark:text-zinc-950 text-xs font-medium cursor-pointer shadow-2xs transition-all active:scale-[0.98]"
                 >
                   <Plus class="w-3.5 h-3.5" />

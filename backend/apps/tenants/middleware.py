@@ -23,7 +23,10 @@ def resolve_tenant(request):
         header = request.headers.get('X-Tenant-ID') or request.GET.get('tenant_id')
         if header:
             from apps.tenants.models import Tenant
-            return Tenant.objects.filter(id=header, is_active=True).first()
+            from django.db.models import Q
+            tenant = Tenant.objects.filter(Q(id=header) | Q(slug=header), is_active=True).first()
+            if tenant:
+                return tenant
 
     return getattr(user, 'tenant', None)
 

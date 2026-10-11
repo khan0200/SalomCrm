@@ -66,12 +66,10 @@ export const useUiStore = defineStore('ui', () => {
     toasts.value = toasts.value.filter(t => t.id !== id)
   }
 
+  // Shared so both AppHeader's "+ New Contract" button and the Contracts
+  // page's empty-state button open the same staff pre-fill dialog
+  // (ContractCreateDialog.vue) without duplicating state.
   const isCreateContractModalOpen = ref<boolean>(false)
-
-  // Shared with AppHeader's "+ New Contract" button (which owns the actual
-  // QR + copy-link modal) so other pages (e.g. the Contracts empty state)
-  // can open the same modal without duplicating its state/markup.
-  const isShareContractLinkModalOpen = ref<boolean>(false)
 
   return {
     isDark,
@@ -82,6 +80,5 @@ export const useUiStore = defineStore('ui', () => {
     addToast,
     removeToast,
     isCreateContractModalOpen,
-    isShareContractLinkModalOpen,
   }
 })

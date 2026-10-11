@@ -626,6 +626,16 @@ class ContractCreateUpdateSerializer(serializers.ModelSerializer):
         )
         read_only_fields = ('id', 'version')
 
+    def to_internal_value(self, data):
+        data = data.copy() if hasattr(data, 'copy') else dict(data)
+        if 'discount' in data and data['discount'] is not None:
+            raw = str(data['discount']).replace(' ', '').replace(',', '.')
+            if not raw or raw == 'null':
+                data['discount'] = None
+            else:
+                data['discount'] = raw
+        return super().to_internal_value(data)
+
     def validate_student(self, value):
         # `student` has no tenant-scoped queryset (DRF defaults a bare FK
         # field to Student.objects.all()), so without this check a direct
@@ -639,5 +649,6 @@ class ContractCreateUpdateSerializer(serializers.ModelSerializer):
         if tenant and value.tenant_id != tenant.id:
             raise serializers.ValidationError("Bu talaba boshqa tenant'ga tegishli.")
         return value
+
 
 

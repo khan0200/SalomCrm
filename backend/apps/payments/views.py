@@ -355,20 +355,17 @@ class BasePaymentOptionViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
         tenant = getattr(self.request, 'tenant', None) or getattr(user, 'tenant', None)
-        if not tenant:
-            from apps.tenants.models import Tenant
-            tenant = Tenant.objects.first()
         if not tenant or self.model_class is None:
             return self.model_class.objects.none() if self.model_class else Payment.objects.none()
 
         return self.model_class.objects.filter(tenant=tenant).order_by('id')
 
     def perform_create(self, serializer):
+        from rest_framework.exceptions import ValidationError
         user = self.request.user
         tenant = getattr(self.request, 'tenant', None) or getattr(user, 'tenant', None)
         if not tenant:
-            from apps.tenants.models import Tenant
-            tenant = Tenant.objects.first()
+            raise ValidationError({'tenant': 'Tenant is required.'})
         serializer.save(tenant=tenant)
 
 

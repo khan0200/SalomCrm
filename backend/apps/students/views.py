@@ -550,18 +550,20 @@ class FolderViewSet(viewsets.ModelViewSet):
         user = req.user
         tenant = getattr(req, 'tenant', None) or getattr(user, 'tenant', None)
         if not tenant:
-            from apps.tenants.models import Tenant
-            tenant = Tenant.objects.first()
+            return Folder.objects.none()
         if tenant:
             if not Folder.objects.filter(tenant=tenant, name__iexact='KDB').exists():
                 Folder.objects.create(tenant=tenant, name='KDB')
             return Folder.objects.filter(tenant=tenant).order_by('name')
-        return Folder.objects.all().order_by('name')
+        return Folder.objects.none()
 
     def perform_create(self, serializer):
+        from rest_framework.exceptions import ValidationError
         req: Any = self.request
         user = req.user
         tenant = getattr(req, 'tenant', None) or getattr(user, 'tenant', None)
+        if not tenant:
+            raise ValidationError({'tenant': 'Tenant is required to create a folder.'})
         serializer.save(tenant=tenant)
 
     def destroy(self, request, *args, **kwargs):
@@ -648,14 +650,14 @@ class StudentOptionsViewSet(viewsets.ViewSet):
         leads = list(LeadSourceOption.objects.filter(tenant=tenant).values_list('name', flat=True)) if tenant else []
         coordinators = list(CoordinatorOption.objects.filter(tenant=tenant).values_list('name', flat=True)) if tenant else []
         universities = list(UniversityOption.objects.filter(tenant=tenant).values_list('name', flat=True).order_by('name')) if tenant else []
-        folders_qs = Folder.objects.filter(tenant=tenant).order_by('name') if tenant else Folder.objects.all().order_by('name')
+        folders_qs = Folder.objects.filter(tenant=tenant).order_by('name') if tenant else Folder.objects.none()
 
         scope = branch_scope_filter(user)
-        all_count = Student.objects.filter(tenant=tenant, is_deleted=False).filter(scope).count() if tenant else Student.objects.filter(is_deleted=False).filter(scope).count()
-        except_count = Student.objects.filter(tenant=tenant, is_deleted=False).filter(scope).filter(Q(folder_ids=[]) | Q(folder_ids__isnull=True)).count() if tenant else Student.objects.filter(is_deleted=False).filter(scope).filter(Q(folder_ids=[]) | Q(folder_ids__isnull=True)).count()
-        deleted_count = Student.objects.filter(tenant=tenant, is_deleted=True, is_permanently_deleted=False).filter(scope).count() if tenant else Student.objects.filter(is_deleted=True, is_permanently_deleted=False).filter(scope).count()
-        permanently_deleted_count = Student.objects.filter(tenant=tenant, is_permanently_deleted=True).filter(scope).count() if tenant else Student.objects.filter(is_permanently_deleted=True).filter(scope).count()
-        hidden_count = Student.objects.filter(tenant=tenant, is_deleted=False, status_hidden=True).filter(scope).count() if tenant else Student.objects.filter(is_deleted=False, status_hidden=True).filter(scope).count()
+        all_count = Student.objects.filter(tenant=tenant, is_deleted=False).filter(scope).count() if tenant else 0
+        except_count = Student.objects.filter(tenant=tenant, is_deleted=False).filter(scope).filter(Q(folder_ids=[]) | Q(folder_ids__isnull=True)).count() if tenant else 0
+        deleted_count = Student.objects.filter(tenant=tenant, is_deleted=True, is_permanently_deleted=False).filter(scope).count() if tenant else 0
+        permanently_deleted_count = Student.objects.filter(tenant=tenant, is_permanently_deleted=True).filter(scope).count() if tenant else 0
+        hidden_count = Student.objects.filter(tenant=tenant, is_deleted=False, status_hidden=True).filter(scope).count() if tenant else 0
 
         folder_counts = {
             'all': all_count,
@@ -680,7 +682,7 @@ class StudentOptionsViewSet(viewsets.ViewSet):
             for f in folders_qs
         ]
 
-        tags_qs = TagOption.objects.filter(tenant=tenant).order_by('name') if tenant else TagOption.objects.all().order_by('name')
+        tags_qs = TagOption.objects.filter(tenant=tenant).order_by('name') if tenant else TagOption.objects.none()
         tags = [
             {
                 'id': str(t.id),
@@ -691,7 +693,7 @@ class StudentOptionsViewSet(viewsets.ViewSet):
         ]
 
         from apps.tenants.models import Branch
-        offices_qs = Branch.objects.filter(tenant=tenant).values_list('name', flat=True).order_by('name') if tenant else Branch.objects.values_list('name', flat=True).distinct().order_by('name')
+        offices_qs = Branch.objects.filter(tenant=tenant).values_list('name', flat=True).order_by('name') if tenant else Branch.objects.none()
         offices = list(offices_qs)
 
         return Response({
@@ -870,20 +872,17 @@ class BaseOptionViewSet(viewsets.ModelViewSet):
         req: Any = self.request
         user = req.user
         tenant = getattr(req, 'tenant', None) or getattr(user, 'tenant', None)
-        if not tenant:
-            from apps.tenants.models import Tenant
-            tenant = Tenant.objects.first()
         if not tenant or self.model_class is None:
             return self.model_class.objects.none() if self.model_class else Student.objects.none()
         return self.model_class.objects.filter(tenant=tenant).order_by('name')
 
     def perform_create(self, serializer):
+        from rest_framework.exceptions import ValidationError
         req: Any = self.request
         user = req.user
         tenant = getattr(req, 'tenant', None) or getattr(user, 'tenant', None)
         if not tenant:
-            from apps.tenants.models import Tenant
-            tenant = Tenant.objects.first()
+            raise ValidationError({'tenant': 'Tenant is required.'})
         serializer.save(tenant=tenant)
 
 
@@ -892,12 +891,12 @@ class TariffOptionViewSet(BaseOptionViewSet):
     serializer_class = TariffOptionSerializer
 
     def perform_create(self, serializer):
+        from rest_framework.exceptions import ValidationError
         req: Any = self.request
         user = req.user
         tenant = getattr(req, 'tenant', None) or getattr(user, 'tenant', None)
         if not tenant:
-            from apps.tenants.models import Tenant
-            tenant = Tenant.objects.first()
+            raise ValidationError({'tenant': 'Tenant is required.'})
         # New tariffs start inactive (hidden from the online-signing portal)
         # until staff writes the contract text and flips them on - see
         # TariffOption.is_active.
@@ -2143,14 +2142,10 @@ class AICommandInterpretView(APIView):
         tenant = getattr(request, 'tenant', None) or getattr(request.user, 'tenant', None)
         if tenant:
             official_unis = list(UniversityOption.objects.filter(tenant=tenant).values_list('name', flat=True).order_by('name'))
-        else:
-            official_unis = list(UniversityOption.objects.values_list('name', flat=True).order_by('name'))
-
-        # Load available folders for this tenant
-        if tenant:
             folders_qs = Folder.objects.filter(tenant=tenant).order_by('name')
         else:
-            folders_qs = Folder.objects.all().order_by('name')
+            official_unis = []
+            folders_qs = Folder.objects.none()
         available_folders = [{"id": str(f.id), "name": f.name} for f in folders_qs]
 
         from .ai_command_service import interpret_ai_command
@@ -2192,9 +2187,6 @@ class ContractViewSet(viewsets.ModelViewSet):
         req: Any = self.request
         user = req.user
         tenant = getattr(req, 'tenant', None) or getattr(user, 'tenant', None)
-        if not tenant:
-            from apps.tenants.models import Tenant
-            tenant = Tenant.objects.first()
         if not tenant:
             return Contract.objects.none()
 
@@ -2265,12 +2257,12 @@ class ContractViewSet(viewsets.ModelViewSet):
         return ContractDetailSerializer
 
     def perform_create(self, serializer):
+        from rest_framework.exceptions import ValidationError
         req: Any = self.request
         user = req.user
         tenant = getattr(req, 'tenant', None) or getattr(user, 'tenant', None)
         if not tenant:
-            from apps.tenants.models import Tenant
-            tenant = Tenant.objects.first()
+            raise ValidationError({'tenant': 'Tenant is required to create a contract.'})
 
         # Auto-generate contract number if not provided
         contract_number = serializer.validated_data.get('contract_number', '').strip()
@@ -2314,13 +2306,37 @@ class ContractViewSet(viewsets.ModelViewSet):
         extra['sign_token'] = secrets.token_urlsafe(32)
         extra['sign_token_expires_at'] = timezone.now() + timedelta(days=30)
 
-        serializer.save(
+        contract = serializer.save(
             tenant=tenant,
             created_by=user if user.is_authenticated else None,
             contract_number=contract_number,
             version=1,
             **extra,
         )
+
+        # If student is linked and an official discount is set on the contract,
+        # update student's discount and write it to payment history
+        if student and contract.discount and contract.discount > 0:
+            student.discount = contract.discount
+            student.save(update_fields=['discount'])
+            from apps.payments.services import record_payment
+            contract_ref = f"CONTRACT_{contract.id}"
+            already_recorded = student.payments.filter(
+                is_discount=True,
+                notes__contains=contract_ref
+            ).exists()
+            if not already_recorded:
+                record_payment(
+                    tenant=tenant,
+                    student=student,
+                    amount=contract.discount,
+                    method='Discount',
+                    received_by=getattr(user, 'username', 'Staff') or 'Staff',
+                    notes=f"Shartnoma bo'yicha chegirma (#{student.id}, ref: {contract_ref})",
+                    is_discount=True,
+                    user=user if user.is_authenticated else None,
+                )
+
 
     def update(self, request, *args, **kwargs):
         contract = self.get_object()
