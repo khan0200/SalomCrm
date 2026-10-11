@@ -227,6 +227,12 @@ REST_FRAMEWORK = {
         # Per-user cap on Finance Password step-up attempts, so a logged-in
         # STAFF account can't be used to brute-force a Manager's password.
         'finance_password_verify': '5/min',
+        # Staff-prefilled contract signing link (contract_sign_views.py):
+        # read-only status polling vs. write operations (identity confirm,
+        # KYC start/confirm, signature submit) get separate, tighter rates
+        # since the writes are what a brute-force attempt would target.
+        'contract_sign': '20/min',
+        'contract_sign_write': '10/min',
     },
 }
 

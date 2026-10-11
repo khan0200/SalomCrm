@@ -166,6 +166,24 @@ def _unwrap(item: dict, singular_key: str) -> dict:
     return nested if isinstance(nested, dict) else item
 
 
+def map_session_status(didit_status: str) -> str:
+    """
+    Maps Didit's raw top-level session status to this app's own
+    IdentityVerificationStatus-shaped values. Shared by both the
+    account-based flow (apps.students.online_contract_views) and the
+    token-based staff-prefilled flow (apps.students.contract_sign_views) so
+    the APPROVED/DECLINED/EXPIRED/ABANDONED interpretation rules live in
+    exactly one place.
+    """
+    if didit_status == 'APPROVED':
+        return 'PENDING_REVIEW'
+    if didit_status == 'DECLINED':
+        return 'DECLINED'
+    if didit_status in ('EXPIRED', 'ABANDONED', 'KYC EXPIRED', 'KYC_EXPIRED'):
+        return 'ABANDONED'
+    return 'IN_PROGRESS'
+
+
 def extract_fields_from_decision(decision: dict) -> dict:
     """
     Extraction of the fields shown to the student for confirmation, from a

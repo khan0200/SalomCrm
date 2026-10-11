@@ -18,24 +18,16 @@ from .views import (
     ContractViewSet
 )
 from .online_contract_views import (
-    TenantInfoView,
-    TariffContractTextView,
-    SendOtpView,
-    StudentSignUpView,
-    StudentSignInView,
-    StudentProfileView,
-    DeleteProfileView,
-    SubmitContractView,
-    VerifyContractView,
-    ResubmitContractView,
-    LogContractViewAuditView,
-    PublicContractDetailView,
-    CancelOnlineContractView,
     PublicVerifyContractView,
-    IdentityVerificationStartView,
-    IdentityVerificationStatusView,
-    IdentityVerificationConfirmView,
     IdentityVerificationWebhookView,
+)
+from .contract_sign_views import (
+    ContractSignStatusView,
+    ContractConfirmIdentityView,
+    ContractSignKycStartView,
+    ContractSignKycStatusView,
+    ContractSignKycConfirmView,
+    ContractSignSubmitView,
 )
 
 router = DefaultRouter()
@@ -76,33 +68,22 @@ urlpatterns = [
     path('students/ai-command/', AICommandInterpretView.as_view(), name='student-ai-command'),
     path('student-options/', StudentOptionsViewSet.as_view({'get': 'list'}), name='student-options'),
 
-    # Online Student Contracts API
-    path('contracts/online/tenant-info/<slug:slug>/', TenantInfoView.as_view(), name='online-contract-tenant-info'),
-    path('contracts/online/tariff-contract-text/<int:tariff_id>/', TariffContractTextView.as_view(), name='online-tariff-contract-text'),
-    path('contracts/online/send-otp/', SendOtpView.as_view(), name='online-contract-send-otp'),
-    path('contracts/online/send-otp/<slug:tenant_slug>/', SendOtpView.as_view(), name='online-contract-send-otp-slug'),
-    path('contracts/online/sign-up/', StudentSignUpView.as_view(), name='online-contract-sign-up'),
-    path('contracts/online/sign-up/<slug:tenant_slug>/', StudentSignUpView.as_view(), name='online-contract-sign-up-slug'),
-    path('contracts/online/sign-in/', StudentSignInView.as_view(), name='online-contract-sign-in'),
-    path('contracts/online/sign-in/<slug:tenant_slug>/', StudentSignInView.as_view(), name='online-contract-sign-in-slug'),
-    path('contracts/online/profile/', StudentProfileView.as_view(), name='online-contract-profile'),
-    path('contracts/online/profile/delete/', DeleteProfileView.as_view(), name='online-profile-delete'),
-    path('contracts/online/submit-contract/', SubmitContractView.as_view(), name='online-contract-submit'),
-    path('contracts/online/<uuid:contract_id>/verify-code/', VerifyContractView.as_view(), name='online-contract-verify-code'),
-    path('contracts/online/<uuid:contract_id>/resubmit/', ResubmitContractView.as_view(), name='online-contract-resubmit'),
-    path('contracts/online/<uuid:contract_id>/audit-view/', LogContractViewAuditView.as_view(), name='online-contract-audit-view'),
-    path('contracts/online/<uuid:contract_id>/detail/', PublicContractDetailView.as_view(), name='online-contract-detail'),
-    path('contracts/online/<uuid:contract_id>/cancel/', CancelOnlineContractView.as_view(), name='online-contract-cancel'),
-
-    # Identity verification (Didit KYC) - gates first-time contract creation
-    path('contracts/online/verification/start/', IdentityVerificationStartView.as_view(), name='online-verification-start'),
-    path('contracts/online/verification/status/', IdentityVerificationStatusView.as_view(), name='online-verification-status'),
-    path('contracts/online/verification/confirm/', IdentityVerificationConfirmView.as_view(), name='online-verification-confirm'),
+    # Didit identity-verification webhook (serves the staff-prefilled
+    # signing-link flow below via its "contract:<uuid>" vendor_data tag)
     path('contracts/online/verification/webhook/', IdentityVerificationWebhookView.as_view(), name='online-verification-webhook'),
 
     # Public verification: GET /api/contracts/public/<verification_code>/
     # No auth - see PublicVerifyContractView docstring.
     path('contracts/public/<str:code>/', PublicVerifyContractView.as_view(), name='online-contract-public-verify'),
+
+    # Staff-prefilled, token-based contract signing link (contract_sign_views.py).
+    # No account/login - sign_token in the URL is the sole access key.
+    path('contracts/sign/<str:token>/', ContractSignStatusView.as_view(), name='contract-sign-status'),
+    path('contracts/sign/<str:token>/confirm-identity/', ContractConfirmIdentityView.as_view(), name='contract-sign-confirm-identity'),
+    path('contracts/sign/<str:token>/kyc/start/', ContractSignKycStartView.as_view(), name='contract-sign-kyc-start'),
+    path('contracts/sign/<str:token>/kyc/status/', ContractSignKycStatusView.as_view(), name='contract-sign-kyc-status'),
+    path('contracts/sign/<str:token>/kyc/confirm/', ContractSignKycConfirmView.as_view(), name='contract-sign-kyc-confirm'),
+    path('contracts/sign/<str:token>/submit/', ContractSignSubmitView.as_view(), name='contract-sign-submit'),
 
     path('', include(router.urls)),
 ]

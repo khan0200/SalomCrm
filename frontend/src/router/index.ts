@@ -97,49 +97,6 @@ const routes = [
       }
     ]
   },
-  // ── Online Contracts System (Multi-tenant) ─────────────────────────────────
-  {
-    path: '/contracts/online/:tenantname',
-    name: 'online-landing',
-    component: () => import('@/modules/online_contracts/pages/OnlineLandingPage.vue'),
-    meta: { public: true, title: 'Onlayn Shartnomalar' }
-  },
-  {
-    path: '/contracts/online/:tenantname/sign-up',
-    name: 'online-sign-up',
-    component: () => import('@/modules/online_contracts/pages/OnlineSignUpPage.vue'),
-    meta: { public: true, title: "Ro'yxatdan o'tish" }
-  },
-  {
-    path: '/contracts/online/:tenantname/sign-in',
-    name: 'online-sign-in',
-    component: () => import('@/modules/online_contracts/pages/OnlineSignInPage.vue'),
-    meta: { public: true, title: 'Kirish' }
-  },
-  {
-    path: '/contracts/online/:tenantname/profile',
-    name: 'online-profile',
-    component: () => import('@/modules/online_contracts/pages/OnlineProfilePage.vue'),
-    meta: { studentOnly: true, title: 'Mening Shartnomalarim' }
-  },
-  {
-    path: '/contracts/online/:tenantname/verification',
-    name: 'online-verification',
-    component: () => import('@/modules/online_contracts/pages/OnlineVerificationPage.vue'),
-    meta: { studentOnly: true, title: 'Shaxsni tasdiqlash' }
-  },
-  {
-    path: '/contracts/online/:tenantname/contracts/sign',
-    name: 'online-contract-sign',
-    component: () => import('@/modules/online_contracts/pages/OnlineContractSignPage.vue'),
-    meta: { studentOnly: true, title: 'Shartnomani Imzolash' }
-  },
-  {
-    path: '/contracts/online/:tenantname/contracts/:contractId/sign',
-    name: 'online-contract-sign-direct',
-    component: () => import('@/modules/online_contracts/pages/OnlineContractSignPage.vue'),
-    meta: { studentOnly: true, title: 'Shartnomani Imzolash' }
-  },
   // Public "check authenticity" page reached via the QR code / link printed
   // on every contract page - looks the contract up by its verification
   // code, no login required.
@@ -148,6 +105,18 @@ const routes = [
     name: 'contract-public-verify',
     component: () => import('@/modules/online_contracts/pages/ContractVerifyPage.vue'),
     meta: { public: true, title: 'Shartnomani tekshirish' }
+  },
+  // Staff-prefilled signing link (contract_sign_views.py) - no account/
+  // login at all, the sign_token in the URL is the sole access key, so
+  // this uses `public: true` (not `studentOnly`, which unconditionally
+  // requires authStore.isAuthenticated) same as contract-public-verify
+  // above. Top-level and slug-free like /contracts/:code, since the token
+  // alone resolves the tenant server-side.
+  {
+    path: '/sign/:token',
+    name: 'contract-sign-link',
+    component: () => import('@/modules/online_contracts/pages/ContractSignLinkPage.vue'),
+    meta: { public: true, title: 'Shartnomani imzolash' }
   },
   {
     path: '/:pathMatch(.*)*',
@@ -162,27 +131,6 @@ const router = createRouter({
 
 router.beforeEach((to, from, next) => {
   const authStore = useAuthStore()
-
-  // Student portal guard
-  if (to.meta.studentOnly) {
-    if (!authStore.isAuthenticated) {
-      next({
-        name: 'online-sign-in',
-        params: { tenantname: to.params.tenantname || 'unibridge' },
-        query: { redirect: to.fullPath }
-      })
-      return
-    }
-    next()
-    return
-  }
-
-  // Prevent student accounts from accessing internal CRM dashboards
-  if (authStore.isAuthenticated && authStore.user?.role === 'STUDENT' && !to.path.startsWith('/contracts/online/')) {
-    const tenantSlug = authStore.user.tenant?.slug || 'unibridge'
-    next({ name: 'online-profile', params: { tenantname: tenantSlug } })
-    return
-  }
 
   if (!to.meta.public && !authStore.isAuthenticated) {
     next({ name: 'login' })

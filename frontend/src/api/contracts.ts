@@ -50,6 +50,10 @@ export interface Contract {
   rejected_at?: string | null
   rejected_by_name?: string | null
   signed_at?: string | null
+  sign_token?: string | null
+  sign_token_expires_at?: string | null
+  sign_token_used_at?: string | null
+  kyc_status?: string | null
   created_at: string
   updated_at: string
   created_by_name?: string | null
@@ -65,6 +69,29 @@ export interface ContractCreatePayload {
   template_name?: string
   content: string
   status?: string
+  // Staff pre-fill for the token-based signing link flow
+  // (ContractSignLinkPage.vue) - all optional.
+  tariff_option?: number | string | null
+  tariff_name?: string
+  tariff_price?: number | string
+  discount?: number | string
+  passport_number?: string
+  full_name?: string
+  education_level?: string
+  date_of_birth?: string
+  office?: string
+  phone1?: string
+  phone2?: string
+  // Target CRM Student ID for a brand-new student (no existing `student`
+  // row picked via autocomplete) - consumed post-signing to create the
+  // CRM Student record. Ignored by the backend when `student` is set.
+  student_id_assigned?: string
+  // Guardian (kafil) fields, staff-filled up front for minors.
+  guardian_full_name?: string
+  guardian_passport_number?: string
+  guardian_relation?: string
+  guardian_phone?: string
+  guardian_address?: string
 }
 
 export interface ContractUpdatePayload {
@@ -167,6 +194,15 @@ export const contractsApi = {
 
   async unarchiveContract(id: string): Promise<{ detail: string; is_archived: boolean }> {
     const { data } = await apiClient.post(`/contracts/${id}/unarchive/`)
+    return data
+  },
+
+  async regenerateSignLink(id: string): Promise<{
+    detail: string
+    sign_token: string
+    sign_token_expires_at: string
+  }> {
+    const { data } = await apiClient.post(`/contracts/${id}/regenerate-sign-link/`)
     return data
   },
 }

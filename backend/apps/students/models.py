@@ -666,135 +666,6 @@ class VisaStudent(TenantAwareModel):
         super().save(*args, **kwargs)
 
 
-class StudentProfile(TimeStampedModel):
-    """
-    Online Student Profile linked to an authentication User account.
-    """
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    user = models.OneToOneField(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-        related_name='student_profile'
-    )
-    tenant = models.ForeignKey(
-        'tenants.Tenant',
-        on_delete=models.CASCADE,
-        related_name='student_profiles'
-    )
-    passport_number = models.CharField(max_length=50, blank=True, null=True, db_index=True)
-    date_of_birth = models.CharField(max_length=50, blank=True, null=True)
-    phone1 = models.CharField(max_length=50, blank=True, null=True)
-    phone2 = models.CharField(max_length=50, blank=True, null=True)
-    education_level = models.CharField(max_length=100, blank=True, null=True)
-    office = models.CharField(max_length=100, blank=True, null=True)
-
-    class Meta:
-        db_table = 'crm_student_profiles'
-        verbose_name = 'Student Profile'
-        verbose_name_plural = 'Student Profiles'
-
-    def __str__(self):
-        return f"Profile of {self.user.email} ({self.passport_number or 'No Passport'})"
-
-    @property
-    def latest_identity_verification(self):
-        # Kept as a live query rather than a cached attribute - a student
-        # can retry after a decline, and callers always want the current
-        # attempt, not whatever was loaded earlier in the request.
-        return self.identity_verifications.order_by('-created_at').first()
-
-    @property
-    def is_identity_verified(self) -> bool:
-        v = self.latest_identity_verification
-        return bool(v and v.status == IdentityVerificationStatus.VERIFIED)
-
-
-class IdentityVerificationStatus(models.TextChoices):
-    NOT_STARTED = 'NOT_STARTED', 'Not Started'
-    IN_PROGRESS = 'IN_PROGRESS', 'In Progress'
-    PENDING_REVIEW = 'PENDING_REVIEW', 'Pending Student Review'
-    VERIFIED = 'VERIFIED', 'Verified'
-    DECLINED = 'DECLINED', 'Declined'
-    ABANDONED = 'ABANDONED', 'Abandoned'
-
-
-class IdentityVerification(TimeStampedModel):
-    """
-    One attempt at KYC identity verification (document scan + face match,
-    via Didit) for a student, gating their ability to create new online
-    contracts. Kept as its own history table rather than fields on
-    StudentProfile - a declined/abandoned attempt must not block a retry,
-    so "the current state" is always "the latest row", not a single mutable
-    status column that would lose the history of why an earlier try failed.
-    """
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    student_profile = models.ForeignKey(
-        'StudentProfile', on_delete=models.CASCADE, related_name='identity_verifications'
-    )
-    provider = models.CharField(max_length=20, default='didit')
-    session_id = models.CharField(max_length=100, db_index=True)
-    session_url = models.URLField(max_length=1000, blank=True, null=True)
-    document_type = models.CharField(max_length=20, blank=True, null=True)  # PASSPORT / ID_CARD
-    status = models.CharField(
-        max_length=20,
-        choices=IdentityVerificationStatus.choices,
-        default=IdentityVerificationStatus.NOT_STARTED,
-        db_index=True,
-    )
-
-    # Raw webhook/decision payload, stored as-is. Didit's exact extracted-
-    # field names weren't confirmed against a live account before this was
-    # built - keeping the full payload means a field-mapping fix never
-    # requires backfilling lost data.
-    raw_decision = models.JSONField(blank=True, null=True)
-
-    # Best-effort fields parsed out of raw_decision for the student to
-    # confirm/correct - never written into StudentProfile's real fields
-    # until the student explicitly confirms them.
-    extracted_full_name = models.CharField(max_length=255, blank=True, null=True)
-    extracted_document_number = models.CharField(max_length=50, blank=True, null=True)
-    extracted_date_of_birth = models.CharField(max_length=50, blank=True, null=True)
-
-    face_match_result = models.CharField(max_length=20, blank=True, null=True)
-    liveness_result = models.CharField(max_length=20, blank=True, null=True)
-
-    confirmed_at = models.DateTimeField(blank=True, null=True)
-
-    class Meta:
-        db_table = 'crm_identity_verifications'
-        verbose_name = 'Identity Verification'
-        verbose_name_plural = 'Identity Verifications'
-        ordering = ['-created_at']
-
-    def __str__(self):
-        return f"{self.student_profile.user.email} - {self.status}"
-
-
-class EmailVerificationCode(TimeStampedModel):
-    """
-    Stores single-use OTP codes for online student registration / verification.
-    """
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    email = models.EmailField(db_index=True)
-    tenant = models.ForeignKey(
-        'tenants.Tenant',
-        on_delete=models.CASCADE,
-        related_name='email_verification_codes'
-    )
-    code_hash = models.CharField(max_length=128)
-    expires_at = models.DateTimeField()
-    attempts = models.IntegerField(default=0)
-    is_used = models.BooleanField(default=False)
-    ip_address = models.GenericIPAddressField(null=True, blank=True)
-
-    class Meta:
-        db_table = 'crm_email_verification_codes'
-        ordering = ['-created_at']
-
-    def __str__(self):
-        return f"OTP for {self.email} (used={self.is_used})"
-
-
 class Contract(TenantAwareModel):
     """
     Multi-tenant Contract model.
@@ -915,6 +786,34 @@ class Contract(TenantAwareModel):
     signed_at = models.DateTimeField(null=True, blank=True)
     signer_ip = models.GenericIPAddressField(null=True, blank=True)
     signer_user_agent = models.TextField(blank=True, null=True)
+
+    # Staff-prefilled signing link lifecycle (no student account/login
+    # involved - the token itself is the access key, like sign_token's
+    # original intent). Reusable until the flow completes: a student
+    # closing the browser mid-flow and reopening the same link resumes
+    # instead of starting over. Rejected by every write endpoint once used.
+    sign_token_expires_at = models.DateTimeField(null=True, blank=True)
+    sign_token_used_at = models.DateTimeField(null=True, blank=True)
+    identity_confirm_attempts = models.PositiveSmallIntegerField(default=0)
+    identity_confirmed_at = models.DateTimeField(null=True, blank=True)
+
+    # Didit KYC state for the link-based flow, scoped directly to this
+    # Contract rather than the IdentityVerification/StudentProfile models -
+    # this flow has no student account to hang that table off, and keeping
+    # it isolated here means zero changes to the existing self-service
+    # flow's models. A contract in this flow has exactly one KYC attempt
+    # that matters, so no retry-history table is needed (a decline+retry
+    # just overwrites these fields).
+    kyc_status = models.CharField(max_length=20, default='NOT_STARTED', db_index=True)
+    kyc_session_id = models.CharField(max_length=100, blank=True, default='')
+    kyc_session_url = models.TextField(blank=True, default='')
+    kyc_raw_decision = models.JSONField(default=dict, blank=True)
+    kyc_extracted_full_name = models.CharField(max_length=255, blank=True, default='')
+    kyc_extracted_document_number = models.CharField(max_length=50, blank=True, default='')
+    kyc_extracted_date_of_birth = models.CharField(max_length=50, blank=True, default='')
+    kyc_face_match_result = models.CharField(max_length=50, blank=True, default='')
+    kyc_liveness_result = models.CharField(max_length=50, blank=True, default='')
+    kyc_confirmed_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         db_table = 'contracts'

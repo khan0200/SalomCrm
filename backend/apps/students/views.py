@@ -2274,16 +2274,52 @@ class ContractViewSet(viewsets.ModelViewSet):
 
         # Auto-generate contract number if not provided
         contract_number = serializer.validated_data.get('contract_number', '').strip()
-        if not contract_number:
+        auto_generated_number = not contract_number
+        if auto_generated_number:
             current_year = datetime.now().year
             count = Contract.objects.filter(tenant=tenant, created_at__year=current_year).count() + 1
             contract_number = f"SH-{current_year}-{count:04d}"
+
+        extra = {}
+        student = serializer.validated_data.get('student')
+        # If staff picked an existing CRM student (already has a real
+        # student_id, e.g. "UB120"), there's no "assign Student ID" step
+        # left to do for this contract - link it immediately so staff
+        # never has to separately run assign_student_id just to attach an
+        # ID that was already known at creation time. contract_number only
+        # follows the student ID if staff left it blank (not provided) -
+        # matching assign_student_id's own convention elsewhere, without
+        # overriding a contract_number staff explicitly typed.
+        if student is not None:
+            extra['student_id_assigned'] = student.id
+            if auto_generated_number:
+                contract_number = student.id
+        else:
+            # Brand-new student (no existing CRM row to pick): staff types
+            # a target ID by hand in the New Contract form, same convention
+            # as assign_student_id. Stored now so ContractSignSubmitView can
+            # create the actual Student row once the student finishes
+            # signing - not before, per the agreed design.
+            manual_student_id = (serializer.validated_data.get('student_id_assigned') or '').strip().upper()
+            if manual_student_id:
+                extra['student_id_assigned'] = manual_student_id
+                if auto_generated_number:
+                    contract_number = manual_student_id
+
+        # Staff-prefilled signing link: every contract gets a sign_token
+        # unconditionally (harmless if never sent to a student) - see
+        # contract_sign_views.py for the token-based flow this enables.
+        import secrets
+        from datetime import timedelta
+        extra['sign_token'] = secrets.token_urlsafe(32)
+        extra['sign_token_expires_at'] = timezone.now() + timedelta(days=30)
 
         serializer.save(
             tenant=tenant,
             created_by=user if user.is_authenticated else None,
             contract_number=contract_number,
-            version=1
+            version=1,
+            **extra,
         )
 
     def update(self, request, *args, **kwargs):
@@ -2597,6 +2633,53 @@ class ContractViewSet(viewsets.ModelViewSet):
             'contract_number': contract.contract_number,
             'verification_code': verif_code,
             'expires_at': expires_at.isoformat(),
+        }, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'], url_path='regenerate-sign-link')
+    def regenerate_sign_link(self, request, pk=None):
+        """
+        Agency Action: Rotate the staff-prefilled signing link's token with
+        a fresh 30-day expiration (e.g. the original link expired before
+        the student opened it, or was sent to the wrong contact).
+        Not manager-only - sending/resending a signing link is a routine
+        per-contract action, unlike assign_student_id/regenerate_code's
+        agency-verification responsibilities.
+        """
+        import secrets
+        from datetime import timedelta as _timedelta
+
+        contract = self.get_object()
+        if contract.sign_token_used_at:
+            return Response(
+                {'detail': 'This contract has already been signed via its link; the link cannot be regenerated.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        contract.sign_token = secrets.token_urlsafe(32)
+        contract.sign_token_expires_at = timezone.now() + _timedelta(days=30)
+        contract.identity_confirm_attempts = 0
+        contract.updated_by = request.user if request.user.is_authenticated else None
+        contract.save(update_fields=[
+            'sign_token', 'sign_token_expires_at', 'identity_confirm_attempts',
+            'updated_by', 'updated_at'
+        ])
+
+        ContractAuditEvent.objects.create(
+            contract=contract,
+            tenant=contract.tenant,
+            action='SIGN_LINK_REGENERATED',
+            actor_type='STAFF',
+            actor_id=str(request.user.id) if request.user.is_authenticated else '',
+            actor_email=request.user.email if request.user.is_authenticated else '',
+            description="Staff regenerated the contract's signing link.",
+            ip_address=request.META.get('REMOTE_ADDR'),
+            user_agent=request.META.get('HTTP_USER_AGENT', '')
+        )
+
+        return Response({
+            'detail': 'Signing link regenerated.',
+            'sign_token': contract.sign_token,
+            'sign_token_expires_at': contract.sign_token_expires_at.isoformat(),
         }, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=['post'], url_path='reject')

@@ -453,13 +453,10 @@ class ContractListSerializer(serializers.ModelSerializer):
         read_only_fields = ('id', 'version', 'created_at', 'updated_at')
 
     def get_is_identity_verified(self, obj):
-        # KYC status lives on the portal account's StudentProfile, not on the
-        # Contract itself - a contract whose student later deletes their
-        # portal account (student_account -> NULL, see DeleteProfileView)
-        # simply stops showing the badge rather than erroring.
-        account = obj.student_account
-        profile = getattr(account, 'student_profile', None) if account else None
-        return bool(profile and profile.is_identity_verified)
+        # KYC state lives directly on Contract.kyc_status (staff-prefilled
+        # signing-link flow, contract_sign_views.py) - works uniformly for
+        # every contract, no portal account/profile involved.
+        return obj.kyc_status == 'VERIFIED'
 
     def get_student_id(self, obj):
         return obj.student_id_assigned or (obj.student.id if obj.student else None)
@@ -544,7 +541,8 @@ class ContractDetailSerializer(serializers.ModelSerializer):
             'contract_hash', 'student_id_assigned', 'verification_code',
             'verification_code_expires_at', 'verification_code_generated_at',
             'verification_code_used', 'verified_at', 'rejection_reason',
-            'rejected_at', 'rejected_by_name', 'sign_token', 'signed_at', 'signer_ip', 'signer_user_agent',
+            'rejected_at', 'rejected_by_name', 'sign_token', 'sign_token_expires_at', 'sign_token_used_at',
+            'kyc_status', 'signed_at', 'signer_ip', 'signer_user_agent',
             'created_at', 'updated_at', 'created_by_name', 'updated_by_name'
         )
         read_only_fields = ('id', 'version', 'created_at', 'updated_at')
@@ -604,7 +602,27 @@ class ContractCreateUpdateSerializer(serializers.ModelSerializer):
         model = Contract
         fields = (
             'id', 'student', 'contract_number', 'title',
-            'template_name', 'content', 'status', 'version'
+            'template_name', 'content', 'status', 'version',
+            # Staff pre-fill fields for the token-based signing link flow
+            # (contract_sign_views.py) - all optional, all already existed
+            # as model columns, just not writable through this serializer
+            # before. sign_token/kyc_*/identity_confirm_* stay server-managed
+            # only (never listed here), same as verification_code already was.
+            'tariff_option', 'tariff_name', 'tariff_price', 'discount',
+            'passport_number', 'full_name', 'education_level', 'date_of_birth',
+            'office', 'phone1', 'phone2',
+            # Staff-chosen target CRM Student ID for a brand-new student
+            # (one with no existing `student` row to pick via autocomplete).
+            # Consumed post-signing by ContractSignSubmitView to create the
+            # CRM Student record - see assign_student_id's identical
+            # create-if-missing pattern in views.py.
+            'student_id_assigned',
+            # Guardian (kafil) fields for minors - staff fills these up
+            # front, same as every other field above; the student's own
+            # signing-link flow only re-confirms via declarations+signature,
+            # never retypes this data.
+            'guardian_full_name', 'guardian_passport_number', 'guardian_relation',
+            'guardian_phone', 'guardian_address',
         )
         read_only_fields = ('id', 'version')
 
