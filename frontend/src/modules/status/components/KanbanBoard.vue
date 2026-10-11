@@ -15,6 +15,7 @@ const emit = defineEmits<{
   (e: 'click-card', student: Student, event: MouseEvent): void
   (e: 'open-actions', student: Student, event: MouseEvent): void
   (e: 'open-embassy', student: Student): void
+  (e: 'open-detail', student: Student): void
   (e: 'update-university', studentId: string, slot: 1 | 2, name: string): void
   (e: 'update-university-status', studentId: string, slot: 1 | 2, status: string): void
   (e: 'update-invoice-status', studentId: string, currentStatus: string | null, newStatus: string): void
@@ -49,6 +50,7 @@ const studentsByStage = computed(() => {
         @click-card="(student, event) => emit('click-card', student, event)"
         @open-actions="(student, event) => emit('open-actions', student, event)"
         @open-embassy="(student) => emit('open-embassy', student)"
+        @open-detail="(student) => emit('open-detail', student)"
         @update-university="(studentId, slot, name) => emit('update-university', studentId, slot, name)"
         @update-university-status="(studentId, slot, status) => emit('update-university-status', studentId, slot, status)"
         @update-invoice-status="(studentId, currentStatus, newStatus) => emit('update-invoice-status', studentId, currentStatus, newStatus)"

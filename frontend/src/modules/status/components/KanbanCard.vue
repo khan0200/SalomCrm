@@ -4,7 +4,7 @@ import type { Student } from '@/types'
 import type { WorkflowStage } from '../utils/statusWorkflow'
 import { useAuthStore } from '@/stores/auth'
 import { useUniversityStatuses } from '@/composables/useUniversityStatuses'
-import { CheckCircle2, ArrowLeft } from 'lucide-vue-next'
+import { CheckCircle2, ArrowLeft, Eye } from 'lucide-vue-next'
 
 const props = defineProps<{
   student: Student
@@ -24,6 +24,7 @@ const emit = defineEmits<{
   (e: 'click', event: MouseEvent): void
   (e: 'open-actions', event: MouseEvent): void
   (e: 'open-embassy'): void
+  (e: 'open-detail'): void
   (e: 'update-university', slot: 1 | 2, name: string): void
   (e: 'update-university-status', slot: 1 | 2, status: string): void
   (e: 'update-invoice-status', currentStatus: string | null, newStatus: string): void
@@ -194,23 +195,33 @@ const confirmRevertToCoa = () => {
       </span>
     </div>
 
-    <div class="flex flex-wrap gap-1 mb-2">
-      <span
-        v-if="student.level"
-        class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[8.5px] font-bold uppercase tracking-wide shadow-2xs"
-        :class="getLevelBadgeClass(student.level)"
+    <div class="flex items-center justify-between gap-1 mb-2">
+      <div class="flex flex-wrap items-center gap-1 min-w-0">
+        <span
+          v-if="student.level"
+          class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[8.5px] font-bold uppercase tracking-wide shadow-2xs"
+          :class="getLevelBadgeClass(student.level)"
+        >
+          {{ student.level }}
+        </span>
+        <span
+          v-if="primaryCert"
+          class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[8.5px] font-bold shadow-2xs"
+          :class="primaryCert.type === 'TOPIK' ? 'bg-rose-500 text-white' : 'bg-blue-600 text-white'"
+        >
+          <span>{{ primaryCert.type }}</span>
+          <span v-if="primaryCert.score" class="opacity-90 font-mono">({{ primaryCert.score }})</span>
+        </span>
+        <span v-if="!student.level && !primaryCert" class="text-[9px] text-zinc-400 dark:text-zinc-500">—</span>
+      </div>
+      <button
+        type="button"
+        title="View student details"
+        @click.stop="emit('open-detail')"
+        class="flex items-center justify-center w-5 h-5 rounded-md text-zinc-400 dark:text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer shrink-0"
       >
-        {{ student.level }}
-      </span>
-      <span
-        v-if="primaryCert"
-        class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[8.5px] font-bold shadow-2xs"
-        :class="primaryCert.type === 'TOPIK' ? 'bg-rose-500 text-white' : 'bg-blue-600 text-white'"
-      >
-        <span>{{ primaryCert.type }}</span>
-        <span v-if="primaryCert.score" class="opacity-90 font-mono">({{ primaryCert.score }})</span>
-      </span>
-      <span v-if="!student.level && !primaryCert" class="text-[9px] text-zinc-400 dark:text-zinc-500">—</span>
+        <Eye class="w-3.5 h-3.5" />
+      </button>
     </div>
 
     <!-- Stage-specific body -->
@@ -233,7 +244,7 @@ const confirmRevertToCoa = () => {
             :value="uniStatus(slot)"
             :disabled="!authStore.canEdit || !uniName(slot)"
             @change="emit('update-university-status', slot, ($event.target as HTMLSelectElement).value)"
-            class="px-1.5 py-0.5 text-[8.5px] font-bold uppercase rounded-full border focus:outline-none shrink-0 w-[88px] truncate"
+            class="kanban-status-select py-0.5 text-[8.5px] font-bold uppercase rounded-full border focus:outline-none shrink-0 min-w-[62px] w-fit max-w-[88px] truncate"
             :class="[getStatusBadgeClass(uniStatus(slot)), authStore.canEdit ? 'cursor-pointer' : 'cursor-default opacity-90']"
           >
             <option v-for="opt in statusOptions" :key="opt" :value="opt" class="bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200">{{ opt }}</option>
@@ -264,7 +275,7 @@ const confirmRevertToCoa = () => {
             :value="uniStatus(slot)"
             :disabled="!authStore.canEdit || !uniName(slot)"
             @change="emit('update-university-status', slot, ($event.target as HTMLSelectElement).value)"
-            class="px-1.5 py-0.5 text-[8.5px] font-bold uppercase rounded-full border focus:outline-none shrink-0 w-[88px] truncate"
+            class="kanban-status-select py-0.5 text-[8.5px] font-bold uppercase rounded-full border focus:outline-none shrink-0 min-w-[62px] w-fit max-w-[88px] truncate"
             :class="[getStatusBadgeClass(uniStatus(slot)), authStore.canEdit ? 'cursor-pointer' : 'cursor-default opacity-90']"
           >
             <option v-for="opt in statusOptions" :key="opt" :value="opt" class="bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200">{{ opt }}</option>
@@ -299,7 +310,7 @@ const confirmRevertToCoa = () => {
             :value="uniStatus(slot)"
             :disabled="!authStore.canEdit || !uniName(slot)"
             @change="emit('update-university-status', slot, ($event.target as HTMLSelectElement).value)"
-            class="px-1.5 py-0.5 text-[8.5px] font-bold uppercase rounded-full border focus:outline-none shrink-0 w-[88px] truncate"
+            class="kanban-status-select py-0.5 text-[8.5px] font-bold uppercase rounded-full border focus:outline-none shrink-0 min-w-[62px] w-fit max-w-[88px] truncate"
             :class="[getStatusBadgeClass(uniStatus(slot)), authStore.canEdit ? 'cursor-pointer' : 'cursor-default opacity-90']"
           >
             <option v-for="opt in statusOptions" :key="opt" :value="opt" class="bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200">{{ opt }}</option>

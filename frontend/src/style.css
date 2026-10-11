@@ -358,6 +358,28 @@ button, input, select, textarea, optgroup {
   }
 }
 
+/* Kanban status badge-selects (Status page): native <select>s styled to
+   look like solid pill badges (e.g. "CHOSEN", "APPLIED" buttons). Without
+   appearance:none, the browser reserves its own chevron gutter in addition
+   to the custom chevron SVG below, leaving an empty gap on the right. A
+   fixed width (the original bug) then left empty space on BOTH sides once
+   the text was centered, since status labels are short and configurable
+   from Settings - w-fit on the element (KanbanCard.vue) sizes the pill to
+   its content instead, so this class only owns the chevron gutter, not the
+   box width. */
+.kanban-status-select {
+  appearance: none;
+  -webkit-appearance: none;
+  text-align: center;
+  text-align-last: center;
+  padding-left: 0.45rem;
+  padding-right: 1.05rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.3rem center;
+  background-size: 9px 9px;
+}
+
 /* ── Crisp Corner Radii Standard (Decreased Radii for buttons, modals, tables, inputs) ── */
 .rounded-3xl { border-radius: 10px !important; }
 .rounded-2xl { border-radius: 8px !important; }

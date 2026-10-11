@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
 import { studentsApi } from '@/api/students'
 import { statusApi } from '@/api/status'
@@ -23,12 +24,14 @@ import StudentFilters from '@/modules/students/components/StudentFilters.vue'
 import ExportExcelModal from '@/modules/students/components/ExportExcelModal.vue'
 import StudentActionsModal from '@/modules/students/components/StudentActionsModal.vue'
 import AddStudentsToFolderModal from '@/modules/students/components/AddStudentsToFolderModal.vue'
+import StudentDetailDrawer from '@/modules/students/components/StudentDetailDrawer.vue'
 import { useUniversityStatuses } from '@/composables/useUniversityStatuses'
 import { calculateStudentWorkflowStage, WORKFLOW_STAGES } from './utils/statusWorkflow'
 import QuickPillFilters from '@/components/QuickPillFilters.vue'
 import ActiveFilterChips from '@/components/ActiveFilterChips.vue'
 
 const queryClient = useQueryClient()
+const router = useRouter()
 const uiStore = useUiStore()
 const dashboardStore = useStudentDashboardStore()
 const { getTagIcon, fetchTags } = useCustomTags()
@@ -104,6 +107,11 @@ const selectedMissingDocs = computed({
 const activeEmbassyStudentId = ref<string | null>(null)
 const isEmbassyDrawerOpen = ref(false)
 
+// Student Detail Drawer (opened via the Eye icon on a Kanban card or the
+// Embassy drawer header)
+const selectedDetailStudentId = ref<string | null>(null)
+const isDetailDrawerOpen = ref(false)
+
 // Choose University for Invoice Modal
 const isChooseUniModalOpen = ref(false)
 const activeInvoiceStudentId = ref<string | null>(null)
@@ -149,6 +157,33 @@ const { data: optionsData } = useQuery({
 })
 
 const universityOptions = computed<string[]>(() => optionsData.value?.universities?.map((u: any) => u.name || u) || [])
+
+const detailDrawerOptions = computed(() => optionsData.value || {
+  tariffs: [], levels: [], groups: [], leads: [], coordinators: [], universities: [], folders: [], offices: []
+})
+
+// Student Detail Drawer: fetches full student detail on open, same pattern
+// as StudentsPage.vue.
+const { data: detailStudentData } = useQuery({
+  queryKey: computed(() => ['student-detail', selectedDetailStudentId.value]),
+  queryFn: () => selectedDetailStudentId.value ? studentsApi.getStudentDetail(selectedDetailStudentId.value) : null,
+  enabled: computed(() => !!selectedDetailStudentId.value),
+  staleTime: 0,
+})
+
+const selectedDetailStudent = computed<Student | null>(() => {
+  if (!selectedDetailStudentId.value) return null
+  const fromRoster = allStudents.value.find(s => s.id === selectedDetailStudentId.value)
+  if (detailStudentData.value && detailStudentData.value.id === selectedDetailStudentId.value) {
+    return { ...(fromRoster || {}), ...detailStudentData.value }
+  }
+  return fromRoster || null
+})
+
+const handleOpenDetail = (student: Student) => {
+  selectedDetailStudentId.value = student.id
+  isDetailDrawerOpen.value = true
+}
 
 // Same University Status list configured in Settings, so the Kanban
 // board's dropdowns match Settings exactly instead of a hardcoded list.
@@ -558,6 +593,20 @@ const handleSelectInvoiceUni = (uni: string) => {
   isChooseUniModalOpen.value = false
   activeInvoiceStudentId.value = null
   invoicePendingStatus.value = null
+}
+
+// Student Detail Drawer's generic "Save" - used for the broader edit form
+// (contact info, education, family, etc.) rather than the Kanban quick
+// actions above, so it goes through studentsApi directly instead of
+// statusApi.quickUpdate.
+const handleUpdateStudentDetail = async (data: Partial<Student>) => {
+  if (!selectedDetailStudentId.value) return
+  await quickUpdateWithRollback(
+    selectedDetailStudentId.value,
+    data,
+    () => studentsApi.updateStudent(selectedDetailStudentId.value as string, data as any),
+    'Could not save student details. Please try again.',
+  )
 }
 
 // ── Kanban: university name/status handlers ──────────────────────────────
@@ -1098,6 +1147,7 @@ const handleSaveFolderAdd = async (selectedIds: string[]) => {
       @click-card="handleClickRow"
       @open-actions="handleOpenActions"
       @open-embassy="handleOpenEmbassy"
+      @open-detail="handleOpenDetail"
       @update-university="handleUpdateUniversityField"
       @update-university-status="handleUpdateUniversityStatus"
       @update-invoice-status="handleInvoiceChange"
@@ -1164,6 +1214,7 @@ const handleSaveFolderAdd = async (selectedIds: string[]) => {
       @update-sponsor-notes="notes => activeEmbassyStudentId && handleUpdateEmbassySponsorNotes(activeEmbassyStudentId, notes)"
       @update-visa-status="status => activeEmbassyStudentId && handleUpdateEmbassy(activeEmbassyStudentId, status)"
       @update-status-hidden="isHidden => activeEmbassyStudentId && handleUpdateStatusHidden(activeEmbassyStudentId, isHidden)"
+      @open-detail="() => activeEmbassyStudent && handleOpenDetail(activeEmbassyStudent)"
     />
 
     <!-- KDB Date Picker Modal -->
@@ -1211,6 +1262,19 @@ const handleSaveFolderAdd = async (selectedIds: string[]) => {
       @archive="() => selectedActionStudent && handleArchive(selectedActionStudent.id)"
       @restore="() => selectedActionStudent && handleRestore(selectedActionStudent.id)"
       @permanent-delete="() => selectedActionStudent && handlePermanentDelete(selectedActionStudent.id)"
+    />
+
+    <!-- Student Detail Drawer (opened via Eye icon on a Kanban card / Embassy drawer) -->
+    <StudentDetailDrawer
+      :is-open="isDetailDrawerOpen"
+      :student="selectedDetailStudent"
+      :options="detailDrawerOptions"
+      @close="isDetailDrawerOpen = false; selectedDetailStudentId = null"
+      @update-student="handleUpdateStudentDetail"
+      @archive="() => selectedDetailStudentId && handleArchive(selectedDetailStudentId)"
+      @restore="() => selectedDetailStudentId && handleRestore(selectedDetailStudentId)"
+      @permanent-delete="() => selectedDetailStudentId && handlePermanentDelete(selectedDetailStudentId)"
+      @open-add-payment="id => { isDetailDrawerOpen = false; router.push({ path: '/payments', query: { student_id: id, open_add: 'true' } }); }"
     />
   </div>
 </template>

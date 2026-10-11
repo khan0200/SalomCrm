@@ -18,6 +18,7 @@ defineEmits<{
   (e: 'click-card', student: Student, event: MouseEvent): void
   (e: 'open-actions', student: Student, event: MouseEvent): void
   (e: 'open-embassy', student: Student): void
+  (e: 'open-detail', student: Student): void
   (e: 'update-university', studentId: string, slot: 1 | 2, name: string): void
   (e: 'update-university-status', studentId: string, slot: 1 | 2, status: string): void
   (e: 'update-invoice-status', studentId: string, currentStatus: string | null, newStatus: string): void
@@ -108,6 +109,7 @@ const toggleExpand = () => { expanded.value = !expanded.value }
           @click="(event) => $emit('click-card', student, event)"
           @open-actions="(event) => $emit('open-actions', student, event)"
           @open-embassy="$emit('open-embassy', student)"
+          @open-detail="$emit('open-detail', student)"
           @update-university="(slot, name) => $emit('update-university', student.id, slot, name)"
           @update-university-status="(slot, status) => $emit('update-university-status', student.id, slot, status)"
           @update-invoice-status="(currentStatus, newStatus) => $emit('update-invoice-status', student.id, currentStatus, newStatus)"

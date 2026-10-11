@@ -2,7 +2,7 @@
 import { ref, watch, onMounted, onUnmounted } from 'vue'
 import type { Student } from '@/types'
 import {
-  X, Plus, CheckCircle2, Check, ChevronDown, ChevronUp, Send, XCircle
+  X, Plus, CheckCircle2, Check, ChevronDown, ChevronUp, Send, XCircle, Eye
 } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
 
@@ -18,6 +18,7 @@ const emit = defineEmits<{
   (e: 'update-sponsor-notes', notes: string): void
   (e: 'update-visa-status', status: string | null): void
   (e: 'update-status-hidden', isHidden: boolean): void
+  (e: 'open-detail'): void
 }>()
 
 const authStore = useAuthStore()
@@ -158,12 +159,22 @@ const handleSetVisaStatus = (targetStatus: 'APPLIED' | 'APPROVED' | 'REJECTED') 
             </span>
           </div>
         </div>
-        <button
-          @click="emit('close')"
-          class="rounded-lg p-1.5 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
-        >
-          <X class="h-5 w-5" />
-        </button>
+        <div class="flex items-center gap-1">
+          <button
+            type="button"
+            title="View student details"
+            @click="emit('open-detail')"
+            class="rounded-lg p-1.5 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+          >
+            <Eye class="h-5 w-5" />
+          </button>
+          <button
+            @click="emit('close')"
+            class="rounded-lg p-1.5 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+          >
+            <X class="h-5 w-5" />
+          </button>
+        </div>
       </div>
 
       <!-- Body -->
