@@ -47,10 +47,15 @@ const getLevelBadgeClass = (level?: string | null) => {
   }
 }
 
-const primaryCert = computed(() => {
-  const type = props.student.language_certificate
-  if (!type || type === 'NO CERTIFICATE') return null
-  return { type, score: props.student.certificate_score }
+// All configured certificates (not just the first), same pattern as
+// StudentRow.vue's `certs` - a student can hold up to 3.
+const certs = computed(() => {
+  const list = [
+    { type: props.student.language_certificate, score: props.student.certificate_score },
+    { type: props.student.language_certificate_2, score: props.student.certificate_score_2 },
+    { type: props.student.language_certificate_3, score: props.student.certificate_score_3 },
+  ]
+  return list.filter(c => c.type && c.type !== 'NO CERTIFICATE')
 })
 
 const handleCardClick = (e: MouseEvent) => {
@@ -205,14 +210,15 @@ const confirmRevertToCoa = () => {
           {{ student.level }}
         </span>
         <span
-          v-if="primaryCert"
+          v-for="(cert, idx) in certs"
+          :key="`${cert.type}-${idx}`"
           class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[8.5px] font-bold shadow-2xs"
-          :class="primaryCert.type === 'TOPIK' ? 'bg-rose-500 text-white' : 'bg-blue-600 text-white'"
+          :class="cert.type === 'TOPIK' ? 'bg-rose-500 text-white' : 'bg-blue-600 text-white'"
         >
-          <span>{{ primaryCert.type }}</span>
-          <span v-if="primaryCert.score" class="opacity-90 font-mono">({{ primaryCert.score }})</span>
+          <span>{{ cert.type }}</span>
+          <span v-if="cert.score" class="opacity-90 font-mono">({{ cert.score }})</span>
         </span>
-        <span v-if="!student.level && !primaryCert" class="text-[9px] text-zinc-400 dark:text-zinc-500">—</span>
+        <span v-if="!student.level && certs.length === 0" class="text-[9px] text-zinc-400 dark:text-zinc-500">—</span>
       </div>
       <button
         type="button"
