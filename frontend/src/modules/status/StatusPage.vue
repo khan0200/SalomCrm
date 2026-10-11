@@ -518,6 +518,16 @@ const updateStudentOptimistically = (studentId: string, patch: Partial<Student>)
     }
   })
 
+  // selectedDetailStudent merges ['all-students-master'] with this cache,
+  // with this one taking priority when present - without also patching it
+  // here, an open StudentDetailDrawer kept showing its stale pre-edit
+  // snapshot until the query refetched (drawer reopen or page reload),
+  // even though the roster update above and the server write had already
+  // landed.
+  queryClient.setQueryData(['student-detail', studentId], (old: Student | undefined) =>
+    old ? { ...old, ...patch } : old
+  )
+
   if (studentBefore && stageBefore) {
     const stageAfter = calculateStudentWorkflowStage({ ...studentBefore, ...patch })
     if (stageAfter !== stageBefore) {
