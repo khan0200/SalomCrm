@@ -324,6 +324,15 @@ const filteredStudents = computed(() => {
         if (c === 'NO CERTIFICATE') {
           return !s.language_certificate || s.language_certificate === 'NO CERTIFICATE'
         }
+        // "EXPECTED" is a certificate_score value, not a certificate type -
+        // the filter panel (StudentFilters.vue) offers it as a Certificate
+        // checkbox, so it must be matched against the score slots here too,
+        // same as DocumentsPage.vue already does.
+        if (c === 'EXPECTED') {
+          return s.certificate_score?.toUpperCase() === 'EXPECTED' ||
+            s.certificate_score_2?.toUpperCase() === 'EXPECTED' ||
+            s.certificate_score_3?.toUpperCase() === 'EXPECTED'
+        }
         return s.language_certificate === c || s.language_certificate_2 === c || s.language_certificate_3 === c
       })
     })

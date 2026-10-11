@@ -405,15 +405,49 @@ const filteredStudents = computed(() => {
     })
   }
 
+  // Certificate filter: checks all 3 certificate slots, not just the
+  // first, and treats "EXPECTED" as a score value (student.certificate_score)
+  // rather than a certificate type - mirrors DocumentsPage.vue's logic,
+  // which StudentsPage.vue and this page previously only checked slot 1 for
+  // (so a student whose EXPECTED/matching cert was in slot 2 or 3 never
+  // matched, even though the filter panel's own counts included them).
   if (selectedCerts.value.length > 0) {
     list = list.filter(s => {
-      if (selectedCerts.value.includes('NO CERTIFICATE') && (!s.language_certificate || s.language_certificate === 'NO CERTIFICATE')) return true
-      return s.language_certificate && selectedCerts.value.includes(s.language_certificate)
-    })
-  }
+      let matchesCert = false
+      if (selectedCerts.value.includes('NO CERTIFICATE') && (!s.language_certificate || s.language_certificate === 'NO CERTIFICATE')) {
+        matchesCert = true
+      }
+      if (selectedCerts.value.includes('EXPECTED') &&
+          (s.certificate_score?.toUpperCase() === 'EXPECTED' ||
+           s.certificate_score_2?.toUpperCase() === 'EXPECTED' ||
+           s.certificate_score_3?.toUpperCase() === 'EXPECTED')) {
+        matchesCert = true
+      }
+      const certMatches = [s.language_certificate, s.language_certificate_2, s.language_certificate_3]
+        .some(c => c && c !== 'NO CERTIFICATE' && selectedCerts.value.includes(c))
+      if (certMatches) matchesCert = true
 
-  if (selectedScores.value.length > 0) {
-    list = list.filter(s => s.certificate_score && selectedScores.value.includes(s.certificate_score))
+      // If a specific score sub-filter is also active alongside exactly one
+      // selected certificate type, narrow further to that cert+score pair.
+      if (matchesCert && selectedScores.value.length > 0 && selectedCerts.value.length === 1) {
+        const cert = selectedCerts.value[0] || ''
+        const scores = [s.certificate_score, s.certificate_score_2, s.certificate_score_3]
+        const certs = [s.language_certificate, s.language_certificate_2, s.language_certificate_3]
+        matchesCert = certs.some((c, i) => {
+          if (!c || c === 'NO CERTIFICATE') return false
+          if (c.toUpperCase() !== cert.toUpperCase()) return false
+          const score = (scores[i] || '').trim().toUpperCase()
+          return selectedScores.value.some(f => f.toUpperCase() === score)
+        })
+      }
+
+      return matchesCert
+    })
+  } else if (selectedScores.value.length > 0) {
+    list = list.filter(s =>
+      [s.certificate_score, s.certificate_score_2, s.certificate_score_3]
+        .some(score => score && selectedScores.value.includes(score))
+    )
   }
 
   if (selectedTags.value.length > 0) {
