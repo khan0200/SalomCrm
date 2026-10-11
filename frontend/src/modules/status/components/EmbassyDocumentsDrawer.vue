@@ -2,7 +2,7 @@
 import { ref, watch, onMounted, onUnmounted } from 'vue'
 import type { Student } from '@/types'
 import {
-  X, Plus, CheckCircle2, Check, ChevronDown, ChevronUp, Send, XCircle, Eye
+  X, Plus, CheckCircle2, Check, ChevronDown, ChevronUp, Send, XCircle, Eye, Copy
 } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
 
@@ -27,6 +27,15 @@ const activeAccordion = ref<'father' | 'mother' | 'sponsor' | null>(null)
 const newFatherDoc = ref('')
 const newMotherDoc = ref('')
 const sponsorNotes = ref('')
+
+// Quick copy for the header's full name, same pattern as StudentDetailDrawer.
+const isNameCopied = ref(false)
+const handleCopyName = () => {
+  if (!props.student?.full_name) return
+  navigator.clipboard.writeText(props.student.full_name.trim())
+  isNameCopied.value = true
+  setTimeout(() => { isNameCopied.value = false }, 1600)
+}
 
 const QUICK_DOCS = [
   'RASMIY ISH HAQQI',
@@ -147,19 +156,29 @@ const handleSetVisaStatus = (targetStatus: 'APPLIED' | 'APPROVED' | 'REJECTED') 
       class="relative w-full max-w-3xl h-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl z-10 flex flex-col overflow-hidden pointer-events-auto transition-transform"
     >
       <!-- Header -->
-      <div class="flex items-center justify-between px-6 py-5 border-b border-zinc-200 dark:border-zinc-800 shrink-0 bg-zinc-50/50 dark:bg-zinc-850/50 select-none">
-        <div>
+      <div class="flex items-center justify-between gap-3 px-6 py-5 border-b border-zinc-200 dark:border-zinc-800 shrink-0 bg-zinc-50/50 dark:bg-zinc-850/50 select-none">
+        <div class="min-w-0 flex-1">
           <h3 class="text-base font-bold text-zinc-900 dark:text-zinc-100">Embassy Documents</h3>
-          <div class="flex items-center gap-2 mt-1">
-            <span class="text-[11px] font-bold bg-[#007aff] text-white px-1.5 py-0.5 rounded-[4px] shadow-xs">
+          <div class="flex items-center gap-2 mt-1 min-w-0">
+            <span class="text-[11px] font-bold bg-[#007aff] text-white px-1.5 py-0.5 rounded-[4px] shadow-xs shrink-0">
               {{ student.id }}
             </span>
-            <span class="text-xs font-semibold text-zinc-600 dark:text-zinc-400 uppercase tracking-wide truncate max-w-[250px]">
+            <span class="text-xs font-semibold text-zinc-600 dark:text-zinc-400 uppercase tracking-wide truncate">
               {{ student.full_name }}
             </span>
+            <button
+              type="button"
+              title="Copy Full Name"
+              @click="handleCopyName"
+              :class="[isNameCopied && 'animate-copy-press']"
+              class="shrink-0 rounded-md p-1 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+            >
+              <Check v-if="isNameCopied" class="w-3.5 h-3.5 text-emerald-500" />
+              <Copy v-else class="w-3.5 h-3.5" />
+            </button>
           </div>
         </div>
-        <div class="flex items-center gap-1">
+        <div class="flex items-center gap-1 shrink-0">
           <button
             type="button"
             title="View student details"
