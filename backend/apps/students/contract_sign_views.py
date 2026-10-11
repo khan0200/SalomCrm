@@ -34,6 +34,21 @@ from apps.core import didit_service
 logger = logging.getLogger(__name__)
 
 
+class StudentIdConflict(Exception):
+    """
+    Raised when a staff-typed student_id_assigned (for a brand-new
+    student) turns out to already belong to a DIFFERENT tenant.
+    Student.id is a bare, agency-wide-unique primary key (not scoped per
+    tenant - see Student.Meta), so two unrelated consulting agencies
+    choosing the same short code (e.g. "UB120") is a real, if rare,
+    collision - this turns what would otherwise be an unhandled
+    IntegrityError mid-signing into an explicit, catchable error.
+    """
+    def __init__(self, student_id: str):
+        self.student_id = student_id
+        super().__init__(f"Student ID '{student_id}' is already in use by another tenant.")
+
+
 def get_client_ip(request):
     x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
     if x_forwarded_for:
@@ -422,6 +437,19 @@ def _link_or_create_crm_student(contract: Contract) -> None:
 
     crm_student = Student.objects.filter(tenant=contract.tenant, id=student_id).first()
     if not crm_student:
+        # Student.id is the bare primary key (global, not per-tenant) - see
+        # StudentCreateUpdateSerializer.create()'s identical guard. A match
+        # under a DIFFERENT tenant means this ID is already taken agency-
+        # wide; a permanently-deleted row frees its old id for reuse (data
+        # retention keeps the row, not the id), same convention as manual
+        # CRM creation.
+        global_match = Student.objects.filter(id=student_id).exclude(tenant=contract.tenant).first()
+        if global_match:
+            if global_match.is_permanently_deleted:
+                global_match.delete()
+            else:
+                raise StudentIdConflict(student_id)
+
         crm_student = Student.objects.create(
             id=student_id,
             tenant=contract.tenant,
@@ -566,7 +594,22 @@ class ContractSignSubmitView(APIView):
         contract.signer_user_agent = request.META.get('HTTP_USER_AGENT', '')
         contract.sign_token_used_at = now
 
-        _link_or_create_crm_student(contract)
+        try:
+            _link_or_create_crm_student(contract)
+        except StudentIdConflict:
+            # Staff typed an ID (student_id_assigned) that another tenant
+            # already owns - do NOT save a half-finished sign (the
+            # @transaction.atomic on this view rolls everything back), and
+            # tell the student plainly instead of a raw 500. Staff needs to
+            # go back into the contract and pick a different ID.
+            logger.warning(
+                'Student ID conflict with another tenant on contract=%s student_id_assigned=%s',
+                contract.id, contract.student_id_assigned,
+            )
+            return Response(
+                {'detail': "Tizimda xatolik yuz berdi. Konsalting agentligiga murojaat qiling (Student ID band)."},
+                status=status.HTTP_409_CONFLICT
+            )
 
         contract.save()
 

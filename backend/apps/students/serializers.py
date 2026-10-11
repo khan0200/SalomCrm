@@ -626,4 +626,18 @@ class ContractCreateUpdateSerializer(serializers.ModelSerializer):
         )
         read_only_fields = ('id', 'version')
 
+    def validate_student(self, value):
+        # `student` has no tenant-scoped queryset (DRF defaults a bare FK
+        # field to Student.objects.all()), so without this check a direct
+        # API call could link a contract to another tenant's real student
+        # row - the New Contract dialog's autocomplete only ever offers
+        # same-tenant matches, but that's a UI constraint, not a server one.
+        if value is None:
+            return value
+        request = self.context.get('request')
+        tenant = getattr(request, 'tenant', None) or getattr(getattr(request, 'user', None), 'tenant', None)
+        if tenant and value.tenant_id != tenant.id:
+            raise serializers.ValidationError("Bu talaba boshqa tenant'ga tegishli.")
+        return value
+
 
