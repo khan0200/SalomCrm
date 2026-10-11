@@ -130,10 +130,14 @@ const isActionsModalOpen = ref(false)
 const selectedActionStudent = ref<Student | null>(null)
 
 // ── Query Master Students (Shared Cache with /students) ──────────────────────────
+// No query-level staleTime override here - relies on the global default
+// (main.ts) so every page reading this same ['all-students-master'] key
+// (Students/Status/Documents/WordFill/ExcelFill) treats a cache entry's
+// freshness identically, instead of this page's 5min disagreeing with the
+// others' previous 0.
 const { data: studentsData, isLoading } = useQuery({
   queryKey: ['all-students-master'],
   queryFn: () => studentsApi.getStudents({ page: 1, page_size: 5000, folder: 'all', include_archive: true }),
-  staleTime: 1000 * 60 * 5,
 })
 
 const allStudents = computed<Student[]>(() => {

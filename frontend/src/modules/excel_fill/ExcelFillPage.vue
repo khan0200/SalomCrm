@@ -205,7 +205,9 @@ const { data: foldersData } = useQuery({
 const folders = computed(() => foldersData.value || options.value.folders || [])
 
 // ─── Fetch Students from Master CRM ─────────────────────────────────────────
-// Use shared master roster key so data is cached and instant
+// Use shared master roster key so data is cached and instant - no
+// query-level staleTime override, relies on the global default (main.ts)
+// so every page reading this key treats freshness identically.
 const { data: allStudentsData, isLoading: isLoadingStudents } = useQuery({
   queryKey: ['all-students-master'],
   queryFn: () => studentsApi.getStudents({
@@ -214,7 +216,6 @@ const { data: allStudentsData, isLoading: isLoadingStudents } = useQuery({
     folder: 'all',
     include_archive: true,
   }),
-  staleTime: 1000 * 60 * 5,
 })
 
 const allStudents = computed<Student[]>(() => {

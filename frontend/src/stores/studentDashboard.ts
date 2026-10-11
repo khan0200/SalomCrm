@@ -60,9 +60,6 @@ export const useStudentDashboardStore = defineStore('studentDashboard', () => {
     isExcelModalOpen.value = true
   }
 
-  // AI folder navigation — when set, StudentsPage switches to this folder and clears it
-  const aiRequestedFolder = ref<string | null>(null)
-
   const triggerExportExcel = () => {
     if (onExportExcel.value) {
       onExportExcel.value()
@@ -103,6 +100,5 @@ export const useStudentDashboardStore = defineStore('studentDashboard', () => {
     excelInitialSelectedIds,
     excelAutoOpenFieldPicker,
     openExportWithSelection,
-    aiRequestedFolder,
   }
 })

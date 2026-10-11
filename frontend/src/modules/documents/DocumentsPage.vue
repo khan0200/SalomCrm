@@ -80,6 +80,9 @@ const { data: optionsData } = useQuery({
   staleTime: 1000 * 60 * 10,
 })
 
+// No query-level staleTime override - relies on the global default
+// (main.ts) so every page reading this same key treats freshness
+// identically (was 5min here vs 0 on other pages before).
 const { data: allStudentsData, isLoading, isError, refetch } = useQuery({
   queryKey: ['all-students-master'],
   queryFn: () => studentsApi.getStudents({
@@ -88,7 +91,6 @@ const { data: allStudentsData, isLoading, isError, refetch } = useQuery({
     folder: 'all',
     include_archive: true,
   }),
-  staleTime: 1000 * 60 * 5,
 })
 
 const students = computed<Student[]>(() => allStudentsData.value?.results || [])

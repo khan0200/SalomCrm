@@ -11,9 +11,18 @@ const pinia = createPinia()
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
+      // Freshness-aware mount/focus refetching: with staleTime > 0, a cache
+      // entry younger than its staleTime renders immediately with no
+      // network call on mount or window focus; once it's past staleTime,
+      // the next mount/focus/reconnect triggers a background refetch.
+      // Previously `refetchOnMount: 'always'` + `staleTime: 0` forced every
+      // page navigation (Status/Students/Documents, which all load the
+      // same ~5000-row roster) to redownload it regardless of freshness -
+      // over a long-haul connection that cost was paid on every navigation.
       refetchOnWindowFocus: true,
-      refetchOnMount: 'always',
-      staleTime: 0,
+      refetchOnMount: true,
+      refetchOnReconnect: true,
+      staleTime: 5 * 60 * 1000,
       retry: 1,
     },
   },
