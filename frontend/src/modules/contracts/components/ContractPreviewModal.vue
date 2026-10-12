@@ -59,7 +59,7 @@ watch(
       return
     }
     const current = props.contract
-    if (current && current.content) {
+    if (current && current.content && current.canvas_source !== undefined) {
       detailedContract.value = current
       return
     }
@@ -142,7 +142,8 @@ function pagesFromContent(raw: string | undefined, vars: Record<string, string>)
     .replace(/^[\s\S]*?(?:1-BET\s*═{5,}|1-BET\s*={5,}|={10,}\s*1-BET\s*={10,}|═{10,}\s*1-BET\s*═{10,})/i, '')
     .replace(/(?:═{5,}\s*\d+-BET\s*═{5,}|={5,}\s*\d+-BET\s*={5,}|_{10,}\s*\d+-BET\s*_{10,})/gi, '<hr data-page-break="true" />')
 
-  cleaned = replaceVariablesInHtml(cleaned, vars)
+  const isAlreadyCanvasHtml = /class="canvas-a4-page-print"/.test(cleaned)
+  cleaned = replaceVariablesInHtml(cleaned, vars, { skipHeuristics: isAlreadyCanvasHtml })
   const parts = cleaned.split(/<hr[^>]*\/?>/i).map(p => p.trim()).filter(p => p.length > 0)
   // A staff-prefilled contract created from a canvas-contract tariff
   // (ContractCreateDialog.vue) flattens its already-fixed-size
@@ -156,7 +157,7 @@ function pagesFromContent(raw: string | undefined, vars: Record<string, string>)
   // instead of the flowing-text sizing meant for prose templates.
   return (parts.length > 0 ? parts : [cleaned]).map(html => ({
     html,
-    isCanvas: /class="canvas-a4-page-print"/.test(html),
+    isCanvas: isAlreadyCanvasHtml || /class="canvas-a4-page-print"/.test(html),
   }))
 }
 
@@ -179,7 +180,13 @@ const contractVariables = computed<Record<string, string>>(() => {
 const splitPages = computed<RenderedPage[]>(() => {
   const c = activeContract.value
   if (!c) return []
-  const mainPages = pagesFromContent(c.content, contractVariables.value)
+  // Prefer the structured, per-page canvas_source JSON when present
+  // (mirrors ContractSignLinkPage.vue and contractPdf.ts) so variables
+  // are resolved directly on the canvas model without heuristic text mangling.
+  const rawSource = (c.canvas_source && isCanvasDocumentJson(c.canvas_source))
+    ? c.canvas_source
+    : c.content
+  const mainPages = pagesFromContent(rawSource, contractVariables.value)
   // A minor's guardian consent appendix - same pages the PDF download
   // appends, so "Ko'rish" in the internal Contracts admin matches what
   // staff actually hand the student.
@@ -553,15 +560,15 @@ function formatRejectionDate(dateStr?: string | null): string {
   margin: 0.8rem 0;
 }
 
-.preview-a4-sheet table th,
-.preview-a4-sheet table td {
+.preview-a4-sheet:not(.is-canvas-sheet) table th,
+.preview-a4-sheet:not(.is-canvas-sheet) table td {
   border: 1px solid #71717a;
   padding: 6px 10px;
   vertical-align: top;
   font-size: 12px;
 }
 
-.preview-a4-sheet table th {
+.preview-a4-sheet:not(.is-canvas-sheet) table th {
   background-color: #f4f4f5;
   font-weight: 700;
 }

@@ -284,10 +284,13 @@ async function handleDownloadTariff(format: 'pdf' | 'doc' = 'pdf') {
 
 async function handleDownloadContract(contract: Contract, format: 'pdf' | 'doc' = 'pdf') {
   if (isDownloadingPdf.value) return
-  const content = contract.content_snapshot || contract.content || ''
+  const rawContent = contract.content_snapshot || contract.content || ''
+  const content = (contract.canvas_source && isCanvasDocumentJson(contract.canvas_source))
+    ? contract.canvas_source
+    : rawContent
   const title = `${contract.contract_number || 'Contract'}_${contract.student_name || contract.title}`
   if (format === 'doc') {
-    downloadContractDoc(title, content)
+    downloadContractDoc(title, rawContent)
   } else {
     isDownloadingPdf.value = true
     try {
