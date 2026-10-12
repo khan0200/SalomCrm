@@ -50,12 +50,14 @@ import { settingsApi, type TariffOption } from '@/api/settings'
 import { getContractTemplate } from './contractTemplates'
 import { formatDateIso, buildVariableValues } from './utils/contractVariables'
 import { contractsApi, type Contract } from '@/api/contracts'
+import { authApi } from '@/api/auth'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
 // TipTap + the canvas editor add ~450 KB; only load them once an editor is opened.
 const ContractDocumentEditor = defineAsyncComponent(() => import('./components/ContractDocumentEditor.vue'))
 import ContractCreateDialog from './components/ContractCreateDialog.vue'
 import ContractPreviewModal from './components/ContractPreviewModal.vue'
+import VerifyHeadManagerModal from './components/VerifyHeadManagerModal.vue'
 import BaseModal from '@/components/common/BaseModal.vue'
 
 const authStore = useAuthStore()
@@ -413,6 +415,9 @@ const isCreateDialogOpen = computed({
 const previewContract = ref<Contract | null>(null)
 const deletingContract = ref<Contract | null>(null)
 const isDeleting = ref(false)
+const isHeadManagerVerifyOpen = ref(false)
+const isVerifyingHeadManager = ref(false)
+const headManagerVerifyError = ref<string | null>(null)
 
 async function openContractPreview(contract: Contract) {
   previewContract.value = contract
@@ -777,25 +782,43 @@ async function handleDuplicate(contract: Contract) {
   }
 }
 
-async function confirmDelete() {
+// Deleting a contract is irreversible (or permanent for rejected ones), so
+// it requires Head Manager password step-up verification regardless of who
+// clicked the delete button - see VerifyHeadManagerModal and the backend's
+// matching IsTenantHeadManager restriction on ContractViewSet.destroy().
+function confirmDelete() {
   if (!deletingContract.value) return
   if (deletingContract.value.status === 'verified' || deletingContract.value.status === 'pending') {
     alert("Tasdiqlangan (Verified) yoki Kutilayotgan (Pending) holatidagi shartnomalarni o'chirib bo'lmaydi.")
     deletingContract.value = null
     return
   }
-  isDeleting.value = true
+  headManagerVerifyError.value = null
+  isHeadManagerVerifyOpen.value = true
+}
+
+async function handleHeadManagerVerifyAndDelete(password: string) {
+  if (!deletingContract.value) return
+  isVerifyingHeadManager.value = true
+  headManagerVerifyError.value = null
   try {
+    const res = await authApi.verifyHeadManagerPassword(password)
+    if (!res.valid) {
+      headManagerVerifyError.value = "Parol xato. Faqat Head Manager paroli qabul qilinadi."
+      return
+    }
+    isDeleting.value = true
     const isPermanent = deletingContract.value.status === 'rejected'
     await contractsApi.deleteContract(deletingContract.value.id, isPermanent)
+    isHeadManagerVerifyOpen.value = false
     deletingContract.value = null
     queryClient.invalidateQueries({ queryKey: ['contracts-list'] })
     queryClient.invalidateQueries({ queryKey: ['contracts-all-metrics'] })
   } catch (err: any) {
     console.error('Failed to delete contract:', err)
-    const errorMsg = err?.response?.data?.detail || "Shartnomani o'chirishda xatolik yuz berdi"
-    alert(errorMsg)
+    headManagerVerifyError.value = err?.response?.data?.detail || "Shartnomani o'chirishda xatolik yuz berdi"
   } finally {
+    isVerifyingHeadManager.value = false
     isDeleting.value = false
   }
 }
@@ -1508,6 +1531,18 @@ async function handleUnarchive(contract: Contract) {
         </div>
       </div>
     </BaseModal>
+
+    <!-- HEAD MANAGER PASSWORD STEP-UP (required before the delete above actually runs) -->
+    <VerifyHeadManagerModal
+      :is-open="isHeadManagerVerifyOpen"
+      :is-verifying="isVerifyingHeadManager || isDeleting"
+      :error-message="headManagerVerifyError"
+      title="Shartnomani o'chirish uchun tasdiq"
+      description="Shartnomani o'chirish faqat Head Manager paroli bilan tasdiqlanadi."
+      confirm-label="O'chirishni tasdiqlash"
+      @close="isHeadManagerVerifyOpen = false"
+      @submit="handleHeadManagerVerifyAndDelete"
+    />
 
     <!-- 1. ASSIGN STUDENT ID & GENERATE VERIFICATION CODE MODAL -->
     <BaseModal

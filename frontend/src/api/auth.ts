@@ -18,4 +18,8 @@ export const authApi = {
     const response = await apiClient.post('/auth/verify-finance-password/', { password })
     return response.data
   },
+  verifyHeadManagerPassword: async (password: string): Promise<{ valid: boolean; manager_name?: string; role?: string }> => {
+    const response = await apiClient.post('/auth/verify-head-manager-password/', { password })
+    return response.data
+  },
 }

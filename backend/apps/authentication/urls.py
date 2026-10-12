@@ -3,7 +3,8 @@ from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenRefreshView
 from .views import (
     CustomTokenObtainPairView, MeView, UserViewSet,
-    TelegramAuthView, TelegramLinkView, VerifyFinancePasswordView
+    TelegramAuthView, TelegramLinkView, VerifyFinancePasswordView,
+    VerifyHeadManagerPasswordView,
 )
 
 router = DefaultRouter()
@@ -16,6 +17,7 @@ urlpatterns = [
     path('auth/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('auth/me/', MeView.as_view(), name='auth_me'),
     path('auth/verify-finance-password/', VerifyFinancePasswordView.as_view(), name='verify_finance_password'),
+    path('auth/verify-head-manager-password/', VerifyHeadManagerPasswordView.as_view(), name='verify_head_manager_password'),
     path('', include(router.urls)),
 ]
 

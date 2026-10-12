@@ -2174,11 +2174,19 @@ class ContractViewSet(viewsets.ModelViewSet):
     # STAFF do everything a Manager can on live contracts. Those specific
     # actions now require Manager+.
     MANAGER_ONLY_ACTIONS = {
-        'destroy', 'archive', 'unarchive',
+        'archive', 'unarchive',
         'assign_student_id', 'regenerate_code', 'reject_contract',
     }
 
+    # Deleting a contract requires step-up Head Manager password verification
+    # (see contractsApi.deleteContract / VerifyHeadManagerModal on the
+    # frontend) - a plain Manager can no longer delete on their own account,
+    # unlike the other MANAGER_ONLY_ACTIONS above.
+    HEAD_MANAGER_ONLY_ACTIONS = {'destroy'}
+
     def get_permissions(self):
+        if self.action in self.HEAD_MANAGER_ONLY_ACTIONS:
+            return [IsTenantHeadManager()]
         if self.action in self.MANAGER_ONLY_ACTIONS:
             return [IsTenantManager()]
         return super().get_permissions()
@@ -2370,18 +2378,37 @@ class ContractViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
+        from apps.audit.services import log_audit_event
+        contract_num = contract.contract_number or str(contract.id)
+        actor = request.user if request.user.is_authenticated else None
+
         is_permanent = contract.status == 'rejected' or str(request.query_params.get('permanent', '')).lower() == 'true'
         if is_permanent:
-            contract_num = contract.contract_number or str(contract.id)
             contract.delete()
+            log_audit_event(
+                action='CONTRACT_PERMANENTLY_DELETED',
+                entity_type='Contract',
+                entity_id=contract.id,
+                tenant=contract.tenant,
+                user=actor,
+                description=f"Contract {contract_num} permanently deleted by {getattr(actor, 'full_name', 'Head Manager')}."
+            )
             return Response(
                 {'detail': f"Shartnoma ({contract_num}) bazadan butunlay o'chirildi.", 'permanent': True},
                 status=status.HTTP_200_OK
             )
 
         contract.is_deleted = True
-        contract.updated_by = request.user if request.user.is_authenticated else None
+        contract.updated_by = actor
         contract.save(update_fields=['is_deleted', 'updated_by', 'updated_at'])
+        log_audit_event(
+            action='CONTRACT_DELETED',
+            entity_type='Contract',
+            entity_id=contract.id,
+            tenant=contract.tenant,
+            user=actor,
+            description=f"Contract {contract_num} deleted by {getattr(actor, 'full_name', 'Head Manager')}."
+        )
         return Response({'detail': "Shartnoma muvaffaqiyatli o'chirildi"}, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=['post'])

@@ -192,6 +192,45 @@ class VerifyFinancePasswordView(APIView):
         return Response({'detail': 'Incorrect Head Manager password.'}, status=status.HTTP_400_BAD_REQUEST)
 
 
+class VerifyHeadManagerPasswordView(APIView):
+    """
+    Verifies that the provided password belongs to a Head Manager (or Super
+    Admin) - used as a step-up check before an irreversible action (e.g.
+    deleting a contract) that must not be approvable by a plain Manager or
+    Staff, unlike VerifyFinancePasswordView which also accepts Manager.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+    throttle_classes = [FinancePasswordThrottle]
+
+    def post(self, request):
+        password = (request.data.get('password') or '').strip()
+        if not password:
+            return Response({'detail': 'Password is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        user = request.user
+        tenant = getattr(request, 'tenant', None) or user.tenant
+
+        if user.is_superuser or user.role in (UserRole.SUPER_ADMIN, UserRole.HEAD_MANAGER):
+            if user.check_password(password):
+                return Response({'valid': True, 'manager_name': user.full_name, 'role': user.role})
+
+        candidates = User.objects.filter(is_active=True)
+        if tenant:
+            candidates = candidates.filter(
+                Q(tenant=tenant, role=UserRole.HEAD_MANAGER) |
+                Q(role=UserRole.SUPER_ADMIN) |
+                Q(is_superuser=True)
+            )
+        else:
+            candidates = candidates.filter(Q(role=UserRole.SUPER_ADMIN) | Q(is_superuser=True))
+
+        for candidate in candidates:
+            if candidate.check_password(password):
+                return Response({'valid': True, 'manager_name': candidate.full_name, 'role': candidate.role})
+
+        return Response({'detail': 'Incorrect Head Manager password.'}, status=status.HTTP_400_BAD_REQUEST)
+
+
 class UserViewSet(viewsets.ModelViewSet):
     """
     CRUD for Tenant Users with strict tenant isolation:
