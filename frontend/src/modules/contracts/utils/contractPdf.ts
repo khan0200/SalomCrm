@@ -53,6 +53,21 @@ function statusBadge(status?: string): { label: string; color: string } {
 }
 
 /**
+ * Detects whether the current device is a mobile or tablet device.
+ * Used to apply slight typography / scale adjustments (font-size, line-height,
+ * margins) so dense contracts authored on desktop PC fit reliably within A4 page
+ * boundaries on mobile browsers without overflowing or cutting off.
+ */
+export function isMobileDevice(): boolean {
+  if (typeof window === 'undefined') return false
+  const ua = navigator.userAgent || ''
+  const isMobileUa = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile/i.test(ua)
+  const hasTouch = (navigator.maxTouchPoints && navigator.maxTouchPoints > 0) || 'ontouchstart' in window
+  const isNarrowScreen = window.innerWidth <= 900 || (typeof screen !== 'undefined' && screen.width <= 900)
+  return isMobileUa || (hasTouch && isNarrowScreen)
+}
+
+/**
  * Format raw contract text to clean HTML if not already HTML
  */
 export function prepareContractHtml(
@@ -227,16 +242,23 @@ async function renderDocumentIntoPdf(
   ` : ''
 
   // CASE 1: Canva Canvas Document
+  // CASE 1: Canva Canvas Document
   if (isCanvasDocumentJson(rawOrHtml)) {
     const doc = deserializeCanvasDocument(rawOrHtml)
     if (doc && Array.isArray(doc.pages) && doc.pages.length > 0) {
       let signatureRendered = false
+      const isMobile = isMobileDevice()
+      const fontScale = isMobile ? 0.92 : 1.0
 
       const totalPages = doc.pages.length
       for (let pageIdx = 0; pageIdx < doc.pages.length; pageIdx++) {
         const isLastPage = pageIdx === doc.pages.length - 1
         const singlePageDoc = { ...doc, pages: [doc.pages[pageIdx]] }
-        let pageHtml = convertCanvasDocumentToHtml(singlePageDoc, mergedVars, { pageOffset: pageIdx, totalPages })
+        let pageHtml = convertCanvasDocumentToHtml(singlePageDoc, mergedVars, {
+          pageOffset: pageIdx,
+          totalPages,
+          fontScale,
+        })
 
         if (pageHtml.includes('alt="Talaba Imzosi"') || pageHtml.includes('alt="Imzo"')) {
           signatureRendered = true
@@ -270,9 +292,14 @@ async function renderDocumentIntoPdf(
               -webkit-text-size-adjust: 100% !important;
               text-size-adjust: 100% !important;
             }
-            .canvas-a4-page-print p { margin: 0.2em 0; }
+            .canvas-a4-page-print p { margin: ${isMobile ? '0.12em 0' : '0.2em 0'}; }
             .canvas-a4-page-print p:first-child { margin-top: 0 !important; }
             .canvas-a4-page-print p:last-child { margin-bottom: 0 !important; }
+            ${isMobile ? `
+              .canvas-a4-page-print .canvas-text-element p { margin: 0.12em 0 !important; }
+              .canvas-a4-page-print .canvas-text-element ol, .canvas-a4-page-print .canvas-text-element ul { margin: 0.2em 0 !important; }
+              .canvas-a4-page-print .canvas-text-element li { margin: 1px 0 !important; }
+            ` : ''}
           </style>
           ${pageHtml}
         `
@@ -329,6 +356,11 @@ async function renderDocumentIntoPdf(
                 .canvas-text-element p[style*="border-bottom"] {
                   padding-bottom: 2px !important;
                 }
+                ${isMobile ? `
+                  .canvas-a4-page-print .canvas-text-element p { margin: 0.12em 0 !important; }
+                  .canvas-a4-page-print .canvas-text-element ol, .canvas-a4-page-print .canvas-text-element ul { margin: 0.2em 0 !important; }
+                  .canvas-a4-page-print .canvas-text-element li { margin: 1px 0 !important; }
+                ` : ''}
               `
               clonedDoc.head.appendChild(fixStyle)
             },
@@ -356,10 +388,11 @@ async function renderDocumentIntoPdf(
   }
 
   // CASE 2: Standard HTML / Text Document
+  const isMobile = isMobileDevice()
   const bodyHtml = prepareContractHtml(rawOrHtml, mergedVars, signatureData, verificationMeta)
-  const marginTop = margins.top ?? 20
+  const marginTop = isMobile ? (margins.top ? Math.min(margins.top, 16) : 16) : (margins.top ?? 20)
   const marginRight = margins.right ?? 15
-  const marginBottom = margins.bottom ?? 20
+  const marginBottom = isMobile ? (margins.bottom ? Math.min(margins.bottom, 16) : 16) : (margins.bottom ?? 20)
   const marginLeft = margins.left ?? 25
 
   const contentWidthMm = 210 - marginLeft - marginRight
@@ -375,8 +408,8 @@ async function renderDocumentIntoPdf(
     background: #ffffff;
     color: #111827;
     font-family: 'Times New Roman', serif;
-    font-size: 13.5px;
-    line-height: 1.65;
+    font-size: ${isMobile ? '12.2px' : '13.5px'};
+    line-height: ${isMobile ? '1.48' : '1.65'};
     box-sizing: border-box;
     padding: 0;
     margin: 0;
@@ -393,75 +426,76 @@ async function renderDocumentIntoPdf(
       }
       .contract-pdf-content {
         font-family: 'Times New Roman', Times, serif !important;
-        font-size: 13.5px;
-        line-height: 1.65;
+        font-size: ${isMobile ? '12.2px' : '13.5px'} !important;
+        line-height: ${isMobile ? '1.48' : '1.65'} !important;
         color: #111827 !important;
         box-sizing: border-box;
         padding: 0;
       }
       .contract-pdf-content p {
-        margin: 5px 0;
+        margin: ${isMobile ? '3.5px 0' : '5px 0'} !important;
         text-align: justify;
       }
       .contract-pdf-content h1 {
-        font-size: 18px;
+        font-size: ${isMobile ? '16px' : '18px'} !important;
         font-weight: bold;
         text-align: center;
-        margin: 14px 0 8px;
+        margin: ${isMobile ? '10px 0 6px' : '14px 0 8px'} !important;
       }
       .contract-pdf-content h2 {
-        font-size: 16px;
+        font-size: ${isMobile ? '14.5px' : '16px'} !important;
         font-weight: bold;
-        margin: 12px 0 6px;
+        margin: ${isMobile ? '8px 0 4px' : '12px 0 6px'} !important;
       }
       .contract-pdf-content h3 {
-        font-size: 14px;
+        font-size: ${isMobile ? '13px' : '14px'} !important;
         font-weight: bold;
-        margin: 10px 0 4px;
+        margin: ${isMobile ? '6px 0 3px' : '10px 0 4px'} !important;
       }
       .contract-pdf-content ol {
         list-style-type: decimal !important;
         padding-left: 1.8em !important;
-        margin: 4px 0 !important;
+        margin: ${isMobile ? '3px 0' : '4px 0'} !important;
       }
       .contract-pdf-content ol ol {
         list-style-type: lower-alpha !important;
         padding-left: 1.6em !important;
-        margin: 2px 0 !important;
+        margin: ${isMobile ? '1.5px 0' : '2px 0'} !important;
       }
       .contract-pdf-content ol ol ol {
         list-style-type: lower-roman !important;
         padding-left: 1.6em !important;
-        margin: 2px 0 !important;
+        margin: ${isMobile ? '1.5px 0' : '2px 0'} !important;
       }
       .contract-pdf-content ul {
         list-style-type: disc !important;
         padding-left: 1.8em !important;
-        margin: 4px 0 !important;
+        margin: ${isMobile ? '3px 0' : '4px 0'} !important;
       }
       .contract-pdf-content ul ul {
         list-style-type: circle !important;
         padding-left: 1.6em !important;
-        margin: 2px 0 !important;
+        margin: ${isMobile ? '1.5px 0' : '2px 0'} !important;
       }
       .contract-pdf-content ul ul ul {
         list-style-type: square !important;
         padding-left: 1.6em !important;
-        margin: 2px 0 !important;
+        margin: ${isMobile ? '1.5px 0' : '2px 0'} !important;
       }
       .contract-pdf-content li {
-        margin: 2px 0 !important;
+        margin: ${isMobile ? '1.5px 0' : '2px 0'} !important;
+        line-height: ${isMobile ? '1.48' : 'inherit'} !important;
       }
       .contract-pdf-content table {
         width: 100% !important;
         border-collapse: collapse !important;
-        margin: 10px 0 !important;
+        margin: ${isMobile ? '6px 0' : '10px 0'} !important;
       }
       .contract-pdf-content td,
       .contract-pdf-content th {
         border: 1px solid #94a3b8 !important;
-        padding: 6px 10px !important;
-        font-size: 12px !important;
+        padding: ${isMobile ? '4px 8px' : '6px 10px'} !important;
+        font-size: ${isMobile ? '11px' : '12px'} !important;
         vertical-align: top !important;
         box-sizing: border-box;
       }
@@ -499,6 +533,15 @@ async function renderDocumentIntoPdf(
         border: none !important;
         display: block !important;
       }
+      ${isMobile ? `
+        .contract-pdf-content span[style*="background:#111"],
+        .contract-pdf-content span[style*="background: #111"],
+        .contract-pdf-content span[style*="background:#000"],
+        .contract-pdf-content span[style*="background: #000"] {
+          padding: 4px 14px !important;
+          font-size: 11.5px !important;
+        }
+      ` : ''}
     </style>
     <div class="contract-pdf-content">
       ${bodyHtml}
@@ -555,6 +598,41 @@ async function renderDocumentIntoPdf(
           .contract-pdf-content p[style*="border-bottom"] {
             padding-bottom: 2px !important;
           }
+          ${isMobile ? `
+            .contract-pdf-content, .contract-pdf-content * {
+              -webkit-text-size-adjust: 100% !important;
+              text-size-adjust: 100% !important;
+            }
+            .contract-pdf-content {
+              font-size: 12.2px !important;
+              line-height: 1.48 !important;
+            }
+            .contract-pdf-content p {
+              margin: 3.5px 0 !important;
+              line-height: 1.48 !important;
+            }
+            .contract-pdf-content li {
+              margin: 1.5px 0 !important;
+              line-height: 1.48 !important;
+            }
+            .contract-pdf-content ul, .contract-pdf-content ol {
+              margin: 3px 0 !important;
+            }
+            .contract-pdf-content table {
+              margin: 6px 0 !important;
+            }
+            .contract-pdf-content td, .contract-pdf-content th {
+              padding: 4px 8px !important;
+              font-size: 11px !important;
+            }
+            .contract-pdf-content span[style*="background:#111"],
+            .contract-pdf-content span[style*="background: #111"],
+            .contract-pdf-content span[style*="background:#000"],
+            .contract-pdf-content span[style*="background: #000"] {
+              padding: 4px 14px !important;
+              font-size: 11.5px !important;
+            }
+          ` : ''}
         `
         clonedDoc.head.appendChild(fixStyle)
       },

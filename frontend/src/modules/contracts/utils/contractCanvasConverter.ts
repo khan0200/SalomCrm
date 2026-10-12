@@ -481,9 +481,13 @@ export function convertHtmlToCanvasDocument(
 export function convertCanvasDocumentToHtml(
   doc: ContractDocumentModel,
   variableValues?: Record<string, string>,
-  pageNumbering?: { pageOffset: number; totalPages: number }
+  pageNumbering?: { pageOffset: number; totalPages: number; fontScale?: number }
 ): string {
   if (!doc || !doc.pages) return '<p></p>'
+
+  const fontScale = pageNumbering?.fontScale && pageNumbering.fontScale > 0 && pageNumbering.fontScale < 1.5
+    ? pageNumbering.fontScale
+    : 1.0
 
   const pageHtmls: string[] = []
 
@@ -600,7 +604,8 @@ export function convertCanvasDocumentToHtml(
             const align = cell.textAlign ? `text-align: ${cell.textAlign};` : ''
             const vAlign = cell.verticalAlign ? `vertical-align: ${cell.verticalAlign};` : ''
             const color = cell.color ? `color: ${cell.color};` : ''
-            const fontSize = cell.fontSize ? `font-size: ${cell.fontSize}pt;` : ''
+            const cellFontSize = cell.fontSize ? Math.round(cell.fontSize * fontScale * 10) / 10 : undefined
+            const fontSize = cellFontSize ? `font-size: ${cellFontSize}pt;` : ''
             const fontWeight = effectiveWeight ? `font-weight: ${effectiveWeight};` : ''
             const fontStyle = cell.fontStyle ? `font-style: ${cell.fontStyle};` : ''
             const textDecoration = cell.textDecoration ? `text-decoration: ${cell.textDecoration};` : ''
@@ -629,7 +634,7 @@ export function convertCanvasDocumentToHtml(
         const cb = el as any
         const st = cb.style || {}
         const checkedBox = cb.checked ? '☑' : '☐'
-        const fontSize = st.fontSize || cb.fontSize || 12
+        const fontSize = Math.round(((st.fontSize || cb.fontSize || 12) * fontScale) * 10) / 10
         const color = st.color || cb.color || '#111827'
         const fontWeight = st.fontWeight || 'normal'
         const fontStyle = st.fontStyle || 'normal'
@@ -652,16 +657,18 @@ export function convertCanvasDocumentToHtml(
             textColor = '#000000'
           }
         }
+        const effectiveFontSize = Math.round((st.fontSize || 12) * fontScale * 10) / 10
+        const effectiveLineHeight = fontScale < 1 ? Math.round((st.lineHeight || 1.5) * 0.95 * 100) / 100 : (st.lineHeight || 1.5)
         const fontStyle = `
           font-family: ${st.fontFamily || 'Times New Roman'}, Times, serif;
-          font-size: ${st.fontSize || 12}pt;
+          font-size: ${effectiveFontSize}pt;
           font-weight: ${st.fontWeight || 'normal'};
           font-style: ${st.fontStyle || 'normal'};
           text-decoration: ${st.textDecoration || 'none'};
           color: ${textColor};
           background-color: ${st.backgroundColor || 'transparent'};
           text-align: ${st.textAlign || 'left'};
-          line-height: ${st.lineHeight || 1.5};
+          line-height: ${effectiveLineHeight};
           letter-spacing: ${typeof st.letterSpacing === 'number' && st.letterSpacing !== 0 ? `${st.letterSpacing}px` : 'normal'};
           padding: ${st.padding || 0}mm;
           overflow-wrap: break-word;
@@ -682,13 +689,13 @@ export function convertCanvasDocumentToHtml(
     // signing). Before that there is nothing to link to, so it's omitted.
     const verificationUrl = variableValues?.verification_url || variableValues?.verification_link || ''
     const footerHtml = verificationUrl
-      ? `<div style="position: absolute; left: 0; right: 0; bottom: 6mm; text-align: center; font-family: 'Times New Roman', serif; font-size: 7.5pt; color: #2563eb;">${verificationUrl}</div>`
+      ? `<div style="position: absolute; left: 0; right: 0; bottom: 6mm; text-align: center; font-family: 'Times New Roman', serif; font-size: ${Math.round(7.5 * fontScale * 10) / 10}pt; color: #2563eb;">${verificationUrl}</div>`
       : ''
 
     const pageWrapper = `
       <div class="canvas-a4-page-print" style="position: relative; width: ${PAGE_WIDTH_MM}mm; height: ${PAGE_HEIGHT_MM}mm; background: #ffffff; overflow: hidden; page-break-after: ${isLastPage ? 'auto' : 'always'}; break-after: ${isLastPage ? 'auto' : 'page'};">
         <style>
-          .canvas-a4-page-print p { margin: 0.2em 0; }
+          .canvas-a4-page-print p { margin: ${fontScale < 1 ? '0.12em 0' : '0.2em 0'}; }
           .canvas-a4-page-print p:first-child { margin-top: 0 !important; }
           .canvas-a4-page-print p:last-child { margin-bottom: 0 !important; }
           .canvas-a4-page-print img { display: inline-block !important; vertical-align: baseline !important; }
