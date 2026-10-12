@@ -325,7 +325,7 @@ async function handleGuardianSubmit() {
 async function doSubmit() {
   isSubmitting.value = true
   try {
-    await onlineContractsApi.submitSignedContract(token.value, {
+    const res = await onlineContractsApi.submitSignedContract(token.value, {
       signature_data: studentSignature.value,
       declarations: {
         read_full_contract: declRead.value,
@@ -348,6 +348,13 @@ async function doSubmit() {
         },
       } : {}),
     })
+    // Submit response carries the freshly-generated verification_code - the
+    // status endpoint can no longer be refetched for it (sign_token is now
+    // used), so it's merged into the already-loaded contractInfo here for
+    // handleFinalDownload's {{qr_code}}/{{verification_link}} resolution.
+    if (contractInfo.value) {
+      contractInfo.value = { ...contractInfo.value, verification_code: res.verification_code }
+    }
     step.value = 'done'
   } catch (err: any) {
     submitError.value = err?.response?.data?.detail || "Shartnomani yuborishda xatolik yuz berdi."
@@ -377,6 +384,7 @@ async function handleFinalDownload() {
       office: c.office,
       educationLevel: c.education_level,
       signatureData: studentSignature.value || undefined,
+      verificationCode: c.verification_code || undefined,
     })
     const verificationMeta = {
       contractNumber: c.contract_number,

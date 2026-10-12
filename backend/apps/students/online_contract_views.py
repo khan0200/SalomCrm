@@ -160,6 +160,11 @@ class PublicVerifyContractView(APIView):
             'guardian_signature_data': contract.guardian_signature_data,
             'guardian_contract_text': get_guardian_contract_text(contract.tenant) if contract.is_minor else '',
             'content': contract.content,
+            # Original canvas-contract JSON (unresolved {{tokens}}, each
+            # page's own fixed 210x297mm sizing) - without it, downloadContractAsPdf
+            # falls back to content (flattened HTML with no page sizing) and
+            # produces a squashed PDF, same issue the signing-link page had.
+            'canvas_source': contract.canvas_source,
             'verification_code': contract.verification_code,
             'verified_at': contract.verified_at.isoformat() if contract.verified_at else None,
             'signed_at': contract.signed_at.isoformat() if contract.signed_at else None,

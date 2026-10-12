@@ -75,7 +75,7 @@ async function handleDownload() {
     })
     await downloadContractAsPdf(
       title,
-      data.value.content,
+      data.value.canvas_source || data.value.content,
       { top: 15, right: 15, bottom: 15, left: 15 },
       variableValues,
       data.value.signature_data,

@@ -48,6 +48,7 @@ export interface PublicContractVerifyResponse {
   guardian_signature_data?: string
   guardian_contract_text?: string
   content: string
+  canvas_source?: string
   verification_code: string
   verified_at?: string
   signed_at?: string
@@ -93,6 +94,7 @@ export interface ContractSignStatusResponse {
   // was built in the A4 canvas editor - see Contract.canvas_source on the
   // backend. Used for a correctly paginated, true-to-size preview/PDF.
   canvas_source?: string
+  verification_code?: string
   guardian_contract_text?: string
   tenant?: {
     id: string
@@ -163,7 +165,7 @@ export const onlineContractsApi = {
     return data
   },
 
-  async submitSignedContract(token: string, payload: SubmitSignedContractPayload): Promise<{ detail: string; contract_id: string; status: string }> {
+  async submitSignedContract(token: string, payload: SubmitSignedContractPayload): Promise<{ detail: string; contract_id: string; status: string; verification_code?: string }> {
     const { data } = await apiClient.post(`/contracts/sign/${encodeURIComponent(token)}/submit/`, payload)
     return data
   },
