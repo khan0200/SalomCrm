@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, nextTick } from 'vue'
+import { ref, computed, watch, nextTick, onBeforeUnmount } from 'vue'
 import { useQuery } from '@tanstack/vue-query'
 import {
   Search,
@@ -9,6 +9,16 @@ import {
   ArrowRight,
   ArrowLeft,
   ShieldAlert,
+  Contact,
+  UserRound,
+  BookOpenCheck,
+  CreditCard,
+  GraduationCap,
+  Building2,
+  Phone,
+  Wallet,
+  BadgePercent,
+  ChevronDown,
 } from 'lucide-vue-next'
 import BaseModal from '@/components/common/BaseModal.vue'
 import { studentsApi } from '@/api/students'
@@ -17,7 +27,12 @@ import { settingsApi } from '@/api/settings'
 import { formatUzPhoneInput, formatPhoneValue } from '@/utils/phone'
 import { useCurrency } from '@/composables/useCurrency'
 import { CONTRACT_TEMPLATES, getContractTemplate, type ContractTemplate } from '../contractTemplates'
-import { resolveContractVariables } from '../utils/contractVariables'
+import { resolveContractVariables, buildVariableValues } from '../utils/contractVariables'
+import {
+  isCanvasDocumentJson,
+  deserializeCanvasDocument,
+  convertCanvasDocumentToHtml,
+} from '../utils/contractCanvasConverter'
 import { useUiStore } from '@/stores/ui'
 import { useAuthStore } from '@/stores/auth'
 import type { Student } from '@/types'
@@ -115,12 +130,6 @@ const selectedTemplate = computed(() => {
   return templateList.value.find(t => t.key === selectedTemplateKey.value) || null
 })
 
-function onTariffChange() {
-  if (selectedTemplate.value) {
-    tariffPrice.value = selectedTemplate.value.priceDisplay || ''
-  }
-}
-
 // ── Student: live fullname autocomplete ─────────────────────────────────
 const fullNameQuery = ref('')
 const isNameFocused = ref(false)
@@ -144,6 +153,31 @@ function handleNameBlur() {
   setTimeout(() => { isNameFocused.value = false }, 150)
 }
 
+// Mirrors backend normalize_date_to_iso() for the common separators - CRM
+// records predate the strict 'YYYY-MM-DD' convention, so an existing
+// student's st.birthday can still arrive as DD.MM.YYYY etc.
+function normalizeDateToIso(val: string): string {
+  const s = (val || '').trim()
+  if (!s) return ''
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s
+  const m1 = s.match(/^(\d{1,2})[\s.\/-](\d{1,2})[\s.\/-](\d{4})$/)
+  if (m1) {
+    let d = parseInt(m1[1], 10)
+    let m = parseInt(m1[2], 10)
+    const y = parseInt(m1[3], 10)
+    if (m > 12 && d <= 12) { [d, m] = [m, d] }
+    return `${y.toString().padStart(4, '0')}-${m.toString().padStart(2, '0')}-${d.toString().padStart(2, '0')}`
+  }
+  const m2 = s.match(/^(\d{4})[\s.\/-](\d{1,2})[\s.\/-](\d{1,2})$/)
+  if (m2) {
+    const y = parseInt(m2[1], 10)
+    const m = parseInt(m2[2], 10)
+    const d = parseInt(m2[3], 10)
+    return `${y.toString().padStart(4, '0')}-${m.toString().padStart(2, '0')}-${d.toString().padStart(2, '0')}`
+  }
+  return ''
+}
+
 function pickExistingStudent(st: Student) {
   selectedExistingStudent.value = st
   fullNameQuery.value = st.full_name
@@ -152,7 +186,7 @@ function pickExistingStudent(st: Student) {
 
   passportNumber.value = st.passport || ''
   educationLevel.value = st.level || ''
-  dateOfBirth.value = st.birthday || ''
+  dateOfBirth.value = normalizeDateToIso(st.birthday || '')
   office.value = st.office || ''
   phone1.value = formatPhoneValue(st.phone1)
   phone2.value = formatPhoneValue(st.phone2)
@@ -165,7 +199,6 @@ function pickExistingStudent(st: Student) {
     const tpl = getContractTemplate(st.tariff)
     if (tpl) {
       selectedTemplateKey.value = tpl.key
-      tariffPrice.value = tpl.priceDisplay || ''
     } else {
       const clean = st.tariff.trim().toLowerCase()
       const match = templateList.value.find(
@@ -175,7 +208,6 @@ function pickExistingStudent(st: Student) {
       )
       if (match) {
         selectedTemplateKey.value = match.key
-        tariffPrice.value = match.priceDisplay || ''
       }
     }
   }
@@ -192,12 +224,56 @@ watch(fullNameQuery, (val) => {
 const studentIdAssigned = ref('')
 const passportNumber = ref('')
 const educationLevel = ref('')
+// Always kept as strict ISO 'YYYY-MM-DD' (or '') - the sole source of
+// truth submitted to the backend (date_of_birth) and stored on Student.
+// The 3 day/month/year dropdowns below only ever read/write through this.
 const dateOfBirth = ref('')
 const office = ref('')
 const phone1 = ref('')
 const phone2 = ref('')
-const tariffPrice = ref<string>('')
+// Read-only display, always the selected tariff's price - never
+// separately typed (see the Narx field in the template, which is
+// readonly), so this just mirrors selectedTemplate instead of being its
+// own state that could fall out of sync with it.
+const tariffPrice = computed(() => selectedTemplate.value?.priceDisplay || '')
 const discount = ref<string>('')
+
+// ── Date of birth: 3 separate day/month/year dropdowns instead of a
+// native <input type="date"> (illegible in some browsers/OSes). These are
+// the only things the template binds to; dateOfBirth itself is derived
+// and is what actually gets submitted/validated, so there's exactly one
+// path into the ISO string the backend expects.
+const dobDay = ref<number | null>(null)
+const dobMonth = ref<number | null>(null)
+const dobYear = ref<number | null>(null)
+const dobDays = Array.from({ length: 31 }, (_, i) => i + 1)
+const dobMonths = Array.from({ length: 12 }, (_, i) => i + 1)
+const dobCurrentYear = new Date().getFullYear()
+const dobYears = Array.from({ length: 90 }, (_, i) => dobCurrentYear - i)
+
+function syncDobToIso() {
+  if (dobDay.value && dobMonth.value && dobYear.value) {
+    dateOfBirth.value = `${dobYear.value}-${String(dobMonth.value).padStart(2, '0')}-${String(dobDay.value).padStart(2, '0')}`
+  } else {
+    dateOfBirth.value = ''
+  }
+}
+
+// Keeps the 3 dropdowns in sync whenever dateOfBirth changes from
+// elsewhere (existing-student autocomplete, form reset) - not just when
+// the user operates the dropdowns themselves.
+watch(dateOfBirth, (iso) => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || '')
+  if (m) {
+    dobYear.value = parseInt(m[1], 10)
+    dobMonth.value = parseInt(m[2], 10)
+    dobDay.value = parseInt(m[3], 10)
+  } else {
+    dobYear.value = null
+    dobMonth.value = null
+    dobDay.value = null
+  }
+}, { immediate: true })
 
 const isNewStudent = computed(() => !selectedExistingStudent.value)
 
@@ -222,16 +298,19 @@ const guardianPhone = ref('')
 const guardianAddress = ref('')
 
 // ── Contract metadata ─────────────────────────────────────────────────────
-const customContractNumber = ref('')
-const customTitle = ref('')
-
-watch(
-  [selectedTemplate, fullNameQuery],
-  ([tpl, name]) => {
-    const tplTitle = tpl ? tpl.title.replace(' SHARTNOMASI', '') : 'SHARTNOMA'
-    customTitle.value = name.trim() ? `${tplTitle} - ${name.trim().toUpperCase()}` : `${tplTitle} SHARTNOMASI`
-  }
-)
+// Contract Number always mirrors the Student ID (existing or staff-typed
+// for a new student) - matches assign_student_id's own convention
+// elsewhere (contract_number := student_id), so this is derived, never a
+// separately-typed value.
+const customContractNumber = computed(() => {
+  return selectedExistingStudent.value ? selectedExistingStudent.value.id : studentIdAssigned.value.trim().toUpperCase()
+})
+// Also always derived, never typed - mirrors the template + student name.
+const customTitle = computed(() => {
+  const tplTitle = selectedTemplate.value ? selectedTemplate.value.title.replace(' SHARTNOMASI', '') : 'SHARTNOMA'
+  const name = fullNameQuery.value.trim()
+  return name ? `${tplTitle} - ${name.toUpperCase()}` : `${tplTitle} SHARTNOMASI`
+})
 
 // ── Resolved preview content ──────────────────────────────────────────────
 const previewStudentShape = computed(() => ({
@@ -242,38 +321,115 @@ const previewStudentShape = computed(() => ({
   office: office.value,
   phone1: phone1.value,
   phone2: phone2.value,
-  tariff_price: tariffPrice.value || selectedTemplate.value?.priceDisplay || '',
+  tariff_price: tariffPrice.value,
   discount: discount.value ? parseAmount(discount.value) : 0,
 }))
 
-const previewHtml = computed(() => {
+// Array of per-page HTML, not one flat string - a canvas-contract document
+// (see ContractDocumentEditor.vue / contractCanvasConverter.ts) can be
+// several fixed 297mm-tall A4 pages, and flattening them into one v-html
+// blob loses the page breaks entirely (each page's "isLastPage" ends up
+// true since convertCanvasDocumentToHtml was called once per page), so
+// a 4-page contract visually collapsed into one long unbroken column.
+// Rendering each page as its own block (mirrors ContractPreviewModal.vue's
+// splitPages pattern) keeps the actual page boundaries visible.
+const previewPages = computed<string[]>(() => {
   const templateContent = selectedTemplate.value?.fullText || '<p></p>'
-  return resolveContractVariables(
-    templateContent,
-    previewStudentShape.value,
-    {
-      contractNumber: customContractNumber.value,
-      templateName: selectedTemplate.value?.key || '',
-      price: selectedTemplate.value?.priceDisplay || tariffPrice.value || '',
+  const meta = {
+    contractNumber: customContractNumber.value,
+    templateName: selectedTemplate.value?.key || '',
+    price: tariffPrice.value,
+  }
+
+  if (isCanvasDocumentJson(templateContent)) {
+    const doc = deserializeCanvasDocument(templateContent)
+    if (doc) {
+      const vars = buildVariableValues(previewStudentShape.value, meta)
+      return doc.pages.map(p => convertCanvasDocumentToHtml({ ...doc, pages: [p] }, vars))
     }
-  )
+  }
+
+  return [resolveContractVariables(templateContent, previewStudentShape.value, meta)]
 })
+
+// Flattened for submission - the backend's Contract.content is a single
+// TextField, same shape every other creation path already saves, and the
+// student signing page (contract_sign_views.ContractSignStatusView)
+// serves this value verbatim with no further token substitution, so it
+// MUST already be fully rendered (unlike ContractPreviewModal.vue, which
+// re-renders {{tokens}} from the Contract row's own columns and so could
+// safely take raw template+tokens instead - that asymmetry is why this
+// stays rendered HTML rather than switching to saving the raw template).
+// Pages are joined with the same <hr data-page-break="true" /> marker
+// ContractPreviewModal.vue/contractPdf.ts already split non-canvas
+// content on, so a canvas-contract's page boundaries survive being
+// flattened into one TextField instead of collapsing into one sheet.
+const previewHtml = computed(() => previewPages.value.join('<hr data-page-break="true" />'))
+
+// Saved alongside the flattened content above, into Contract.canvas_source -
+// the ORIGINAL canvas-contract JSON, {{tokens}} still unresolved. PDF
+// export (contractPdf.ts) needs this exact structured, per-page-sized
+// source to lay the document out correctly; content's flattened HTML
+// collapses each page's fixed 210x297mm sizing and corrupts the PDF
+// layout. Blank for non-canvas (plain HTML) tariffs - there's no
+// structured source to preserve there, `content` alone is sufficient.
+const canvasSourceToSave = computed<string>(() => {
+  const templateContent = selectedTemplate.value?.fullText || ''
+  return isCanvasDocumentJson(templateContent) ? templateContent : ''
+})
+
+// Canvas tariffs render as fixed 210x297mm A4 pages (contractCanvasConverter.ts
+// hard-codes PAGE_WIDTH_MM/PAGE_HEIGHT_MM), which overflow the New
+// Contract dialog's narrower body - without scaling, pages get clipped.
+// The browser's own mm->px conversion (96dpi => 1mm = 96/25.4px) is used
+// instead of measuring the rendered element, since that measurement
+// proved unreliable (0 or stale right after a step change, before v-html
+// content has actually painted) - this way the scale is correct on the
+// very first render, no observer race possible, and every page in a
+// multi-page contract scales identically since they all share one fixed
+// source size.
+const isCanvasPreview = computed(() => isCanvasDocumentJson(selectedTemplate.value?.fullText || ''))
+const PAGE_WIDTH_PX = 210 * (96 / 25.4)
+const PAGE_HEIGHT_PX = 297 * (96 / 25.4)
+const previewWrapperRef = ref<HTMLElement | null>(null)
+const previewWrapperWidth = ref(0)
+const previewScale = computed(() => {
+  if (!previewWrapperWidth.value) return 1
+  return Math.min(1, previewWrapperWidth.value / PAGE_WIDTH_PX)
+})
+
+let wrapperResizeObserver: ResizeObserver | null = null
+
+watch(previewWrapperRef, (el) => {
+  wrapperResizeObserver?.disconnect()
+  wrapperResizeObserver = null
+  if (el) {
+    previewWrapperWidth.value = el.clientWidth
+    wrapperResizeObserver = new ResizeObserver((entries) => {
+      const width = entries[0]?.contentRect.width
+      if (width) previewWrapperWidth.value = width
+    })
+    wrapperResizeObserver.observe(el)
+  }
+})
+
+onBeforeUnmount(() => wrapperResizeObserver?.disconnect())
 
 // ── Validation ─────────────────────────────────────────────────────────────
 const errorMessage = ref('')
 
 function validateForm(): string {
-  if (!selectedTemplateKey.value) return "Tarifni tanlang"
-  if (!fullNameQuery.value.trim()) return "Talabaning to'liq ismini kiriting"
-  if (isNewStudent.value && !studentIdAssigned.value.trim()) return "Student ID kiriting"
-  if (!passportNumber.value.trim()) return "Pasport raqamini kiriting"
-  if (!dateOfBirth.value.trim()) return "Tug'ilgan sanani kiriting"
+  if (!selectedTemplateKey.value) return "Please select a tariff"
+  if (!fullNameQuery.value.trim()) return "Enter the student's full name"
+  if (isNewStudent.value && !studentIdAssigned.value.trim()) return "Enter a Student ID"
+  if (!passportNumber.value.trim()) return "Enter the passport number"
+  if (!dateOfBirth.value.trim()) return "Enter the date of birth"
   if (isMinor.value) {
-    if (!guardianFullName.value.trim()) return "Kafil (ota-ona/vasiy) F.I.O. kiriting"
-    if (!guardianPassportNumber.value.trim()) return "Kafilning pasport raqamini kiriting"
-    if (!guardianRelation.value.trim()) return "Kafilning talabaga qarindoshligini kiriting"
-    if (!guardianPhone.value.trim()) return "Kafil telefon raqamini kiriting"
-    if (!guardianAddress.value.trim()) return "Kafil yashash manzilini kiriting"
+    if (!guardianFullName.value.trim()) return "Enter the guardian's full name"
+    if (!guardianPassportNumber.value.trim()) return "Enter the guardian's passport number"
+    if (!guardianRelation.value.trim()) return "Enter the guardian's relation to the student"
+    if (!guardianPhone.value.trim()) return "Enter the guardian's phone number"
+    if (!guardianAddress.value.trim()) return "Enter the guardian's address"
   }
   return ''
 }
@@ -316,8 +472,8 @@ async function copySignLink() {
     isCopiedSignLink.value = true
     uiStore.addToast({
       type: 'success',
-      title: 'Havola nusxalandi!',
-      message: `${url} buferga nusxalandi. Talabaga yuborishingiz mumkin.`,
+      title: 'Link copied!',
+      message: `${url} copied to clipboard. You can now send it to the student.`,
       duration: 4000
     })
     setTimeout(() => { isCopiedSignLink.value = false }, 2500)
@@ -333,13 +489,19 @@ async function handleCreate() {
   try {
     const resolvedContent = previewHtml.value
     const numericDiscount = discount.value ? parseAmount(discount.value) : 0
+    // tariffPrice is a display string (e.g. "13 000 000 UZS") - the
+    // backend's tariff_price is a plain DecimalField and 400s on anything
+    // that isn't a bare number, so strip it down the same way parseAmount
+    // already does for discount.
+    const numericTariffPrice = tariffPrice.value ? parseAmount(tariffPrice.value) : 0
 
     const payload: ContractCreatePayload = {
       student: selectedExistingStudent.value?.id || null,
       contract_number: customContractNumber.value || undefined,
-      title: customTitle.value || 'SHARTNOMA',
+      title: customTitle.value || 'CONTRACT',
       template_name: selectedTemplate.value?.key,
       content: resolvedContent,
+      canvas_source: canvasSourceToSave.value || undefined,
       status: 'draft',
       passport_number: passportNumber.value.trim().toUpperCase(),
       full_name: fullNameQuery.value.trim().toUpperCase(),
@@ -349,7 +511,7 @@ async function handleCreate() {
       phone1: phone1.value.trim() || undefined,
       phone2: phone2.value.trim() || undefined,
       tariff_name: selectedTemplate.value?.key,
-      tariff_price: tariffPrice.value || undefined,
+      tariff_price: numericTariffPrice > 0 ? String(numericTariffPrice) : undefined,
       discount: numericDiscount > 0 ? String(numericDiscount) : undefined,
     }
 
@@ -372,7 +534,7 @@ async function handleCreate() {
     emit('created', created)
   } catch (err: any) {
     console.error('Failed to create contract:', err)
-    errorMessage.value = err.response?.data?.detail || "Shartnomani saqlashda xatolik yuz berdi"
+    errorMessage.value = err.response?.data?.detail || "Something went wrong while saving the contract"
     step.value = 'form'
   } finally {
     isSubmitting.value = false
@@ -397,22 +559,14 @@ watch(
       office.value = ''
       phone1.value = ''
       phone2.value = ''
-      tariffPrice.value = ''
       discount.value = ''
       guardianFullName.value = ''
       guardianPassportNumber.value = ''
       guardianRelation.value = ''
       guardianPhone.value = ''
       guardianAddress.value = ''
-      customContractNumber.value = ''
-      customTitle.value = ''
       createdContract.value = null
       isCopiedSignLink.value = false
-      nextTick(() => {
-        const year = new Date().getFullYear()
-        const randSeq = Math.floor(1000 + Math.random() * 9000)
-        customContractNumber.value = `SH-${year}-${randSeq}`
-      })
     }
   }
 )
@@ -422,20 +576,20 @@ watch(
   <BaseModal
     :is-open="isOpen"
     title="New Contract"
-    subtitle="Talaba ma'lumotlarini kiritib onlayn imzolash havolasini yarating"
-    max-width="max-w-3xl"
+    subtitle="Enter the student's details to generate an online signing link"
+    max-width="max-w-2xl"
     @close="emit('close')"
   >
     <!-- STEP: done - show the per-contract signing link -->
-    <div v-if="step === 'done'" class="p-6 space-y-5">
+    <div v-if="step === 'done'" class="space-y-5">
       <div class="flex flex-col items-center text-center py-2">
         <div class="w-12 h-12 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mb-3">
           <Check class="w-6 h-6" />
         </div>
-        <h3 class="text-sm font-bold text-zinc-900 dark:text-zinc-100">Shartnoma yaratildi</h3>
+        <h3 class="text-sm font-bold text-zinc-900 dark:text-zinc-100">Contract created</h3>
         <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-          Quyidagi havolani talabaga yuboring - u hisob ochmasdan, faqat tug'ilgan sana va pasport raqamini
-          tasdiqlab, hujjatini tekshirtirib, imzo chekadi.
+          Send the link below to the student - no account needed, they just confirm their date of birth and
+          passport number, complete identity verification, and sign.
         </p>
       </div>
 
@@ -446,7 +600,7 @@ watch(
           </div>
           <div class="min-w-0">
             <div class="font-bold text-blue-900 dark:text-blue-200 text-[11px] uppercase tracking-wider">
-              Imzolash havolasi
+              Signing Link
             </div>
             <div class="font-mono text-xs font-semibold text-blue-700 dark:text-blue-300 truncate" :title="signLinkUrl">
               {{ signLinkUrl }}
@@ -461,7 +615,7 @@ watch(
         >
           <Check v-if="isCopiedSignLink" class="w-3.5 h-3.5 text-emerald-100" />
           <Copy v-else class="w-3.5 h-3.5" />
-          <span>{{ isCopiedSignLink ? 'Nusxalandi!' : 'Havolani nusxalash' }}</span>
+          <span>{{ isCopiedSignLink ? 'Copied!' : 'Copy Link' }}</span>
         </button>
       </div>
 
@@ -471,47 +625,68 @@ watch(
           @click="emit('close')"
           class="px-4 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
         >
-          Yopish
+          Close
         </button>
       </div>
     </div>
 
     <!-- STEP: preview - read-only render before generating the link -->
-    <div v-else-if="step === 'preview'" class="p-6 space-y-5">
+    <div v-else-if="step === 'preview'" class="space-y-4">
       <div v-if="errorMessage" class="p-3 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 rounded-xl text-xs text-rose-600 dark:text-rose-300 flex items-center gap-2">
-        <span class="font-bold">Xatolik:</span> {{ errorMessage }}
-      </div>
-
-      <div class="flex items-center justify-between">
-        <label class="block text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">
-          Shartnoma ko'rinishi (preview)
-        </label>
-        <span v-if="isMinor" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 text-[10px] font-bold">
-          <ShieldAlert class="w-3 h-3" /> 18 yoshdan kichik - kafil ma'lumotlari qo'shiladi
-        </span>
-      </div>
-
-      <div class="max-h-[50vh] overflow-y-auto rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4 text-[13px] leading-relaxed">
-        <div v-html="previewHtml" />
+        <span class="font-bold">Error:</span> {{ errorMessage }}
       </div>
 
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label class="block text-xs font-semibold text-zinc-600 dark:text-zinc-400 mb-1">Contract Number</label>
-          <input
-            v-model="customContractNumber"
-            type="text"
-            class="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs font-mono font-bold text-zinc-800 dark:text-zinc-200 focus:outline-none focus:border-blue-500"
-          />
+          <p
+            class="truncate text-xs font-mono font-bold text-zinc-700 dark:text-zinc-300"
+            title="The contract number always matches the Student ID"
+          >
+            {{ customContractNumber || '—' }}
+          </p>
         </div>
         <div>
           <label class="block text-xs font-semibold text-zinc-600 dark:text-zinc-400 mb-1">Contract Title</label>
-          <input
-            v-model="customTitle"
-            type="text"
-            class="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs font-bold text-zinc-800 dark:text-zinc-200 focus:outline-none focus:border-blue-500"
-          />
+          <p class="truncate text-xs font-bold text-zinc-700 dark:text-zinc-300" :title="customTitle">
+            {{ customTitle || '—' }}
+          </p>
         </div>
+      </div>
+
+      <div class="flex items-center justify-between">
+        <label class="block text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">
+          Contract Preview
+        </label>
+        <span v-if="isMinor" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 text-[10px] font-bold">
+          <ShieldAlert class="w-3 h-3" /> Under 18 - guardian details will be included
+        </span>
+      </div>
+
+      <div
+        ref="previewWrapperRef"
+        class="max-h-[48vh] overflow-y-auto overflow-x-hidden rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-950 p-3"
+      >
+        <!-- Canvas tariff: one scaled A4 sheet per page, stacked with a gap
+             between them so page boundaries stay visible (mirrors
+             ContractPreviewModal.vue's splitPages rendering). -->
+        <div v-if="isCanvasPreview" class="flex flex-col items-center gap-3">
+          <div
+            v-for="(pageHtml, idx) in previewPages"
+            :key="idx"
+            class="shrink-0 bg-white shadow-sm overflow-hidden"
+            :style="{ width: `${PAGE_WIDTH_PX * previewScale}px`, height: `${PAGE_HEIGHT_PX * previewScale}px` }"
+          >
+            <div
+              class="origin-top-left"
+              :style="{ width: `${PAGE_WIDTH_PX}px`, height: `${PAGE_HEIGHT_PX}px`, transform: `scale(${previewScale})` }"
+              v-html="pageHtml"
+            />
+          </div>
+        </div>
+        <!-- Plain HTML template (not an A4 canvas document) - no fixed
+             page size to scale against, just render as flowing text. -->
+        <div v-else class="bg-white p-4 text-[13px] leading-relaxed" v-html="previewHtml" />
       </div>
 
       <div class="flex items-center justify-between gap-3 pt-2">
@@ -520,7 +695,7 @@ watch(
           @click="step = 'form'"
           class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
         >
-          <ArrowLeft class="w-3.5 h-3.5" /> Orqaga
+          <ArrowLeft class="w-3.5 h-3.5" /> Back
         </button>
 
         <button
@@ -529,9 +704,9 @@ watch(
           :disabled="isSubmitting"
           class="inline-flex items-center gap-2 px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
         >
-          <span v-if="isSubmitting">Yaratilmoqda...</span>
+          <span v-if="isSubmitting">Creating...</span>
           <span v-else class="flex items-center gap-1.5">
-            <span>Imzolash havolasini yaratish</span>
+            <span>Generate Signing Link</span>
             <ArrowRight class="w-3.5 h-3.5" />
           </span>
         </button>
@@ -539,41 +714,44 @@ watch(
     </div>
 
     <!-- STEP: form - staff enters everything -->
-    <div v-else class="p-4 space-y-3">
+    <div v-else class="space-y-3">
       <div v-if="errorMessage" class="p-2.5 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 rounded-xl text-xs text-rose-600 dark:text-rose-300 flex items-center gap-2">
-        <span class="font-bold">Xatolik:</span> {{ errorMessage }}
+        <span class="font-bold">Error:</span> {{ errorMessage }}
       </div>
 
       <!-- 1. Student ID (15%) & Fullname (85%) in one row -->
       <div class="space-y-1">
         <div class="flex items-start gap-2.5">
           <!-- Student ID (15%) -->
-          <div class="w-[18%] sm:w-[15%] shrink-0">
+          <div class="w-[22%] sm:w-[17%] shrink-0">
             <label class="block text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 mb-0.5">Student ID</label>
-            <input
-              :value="selectedExistingStudent ? selectedExistingStudent.id : studentIdAssigned"
-              @input="(e: any) => { if (!selectedExistingStudent) studentIdAssigned = (e.target.value || '').toUpperCase() }"
-              :readonly="!!selectedExistingStudent"
-              type="text"
-              placeholder="UB120"
-              class="w-full px-2.5 py-1.5 bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs font-mono font-bold text-zinc-800 dark:text-zinc-200 focus:outline-none focus:border-blue-500 uppercase tracking-tight"
-              :class="{ 'opacity-70 cursor-not-allowed': !!selectedExistingStudent }"
-            />
+            <div class="relative">
+              <Contact class="w-3.5 h-3.5 text-zinc-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                :value="selectedExistingStudent ? selectedExistingStudent.id : studentIdAssigned"
+                @input="(e: any) => { if (!selectedExistingStudent) studentIdAssigned = (e.target.value || '').toUpperCase() }"
+                :readonly="!!selectedExistingStudent"
+                type="text"
+                placeholder="UB120"
+                class="w-full pl-7 pr-2 py-2.5 bg-white dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs font-mono font-bold text-zinc-800 dark:text-zinc-200 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 uppercase tracking-tight shadow-sm transition-shadow"
+                :class="{ 'opacity-70 cursor-not-allowed': !!selectedExistingStudent }"
+              />
+            </div>
           </div>
 
           <!-- Full name (85%) with live autocomplete -->
           <div class="flex-1 min-w-0">
-            <label class="block text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 mb-0.5">Talaba to'liq ismi</label>
+            <label class="block text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 mb-0.5">Student Full Name</label>
             <div class="relative">
               <Search class="w-3.5 h-3.5 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
                 v-model="fullNameQuery"
                 type="text"
-                placeholder="Ism familiyani kiriting..."
+                placeholder="Enter first and last name..."
                 autocomplete="off"
                 @focus="isNameFocused = true"
                 @blur="handleNameBlur"
-                class="w-full pl-8 pr-3 py-1.5 bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs font-semibold text-zinc-800 dark:text-zinc-200 focus:outline-none focus:border-blue-500 uppercase"
+                class="w-full pl-8 pr-3 py-2.5 bg-white dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs font-semibold text-zinc-800 dark:text-zinc-200 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 uppercase shadow-sm transition-shadow"
               />
 
               <div
@@ -585,7 +763,7 @@ watch(
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
                   </svg>
-                  Qidirilmoqda...
+                  Searching...
                 </div>
                 <button
                   v-else
@@ -616,103 +794,162 @@ watch(
         </div>
       </div>
 
-      <!-- 2. Tariff (default: select bo'lsin) -->
+      <!-- 2. Tariff (defaults to unselected) -->
       <div class="space-y-0.5">
-        <label class="block text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 mb-0.5">Tarif</label>
-        <select
-          v-model="selectedTemplateKey"
-          @change="onTariffChange"
-          class="w-full px-3 py-1.5 bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs font-semibold text-zinc-800 dark:text-zinc-200 focus:outline-none focus:border-blue-500 cursor-pointer transition-colors"
-        >
-          <option value="" disabled>Tarifni tanlang...</option>
-          <option v-for="tpl in templateList" :key="tpl.key" :value="tpl.key">
-            {{ tpl.key }} — {{ tpl.priceDisplay }}
-          </option>
-        </select>
+        <label class="block text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 mb-0.5">Tariff</label>
+        <div class="relative">
+          <BookOpenCheck class="w-3.5 h-3.5 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <select
+            v-model="selectedTemplateKey"
+            class="w-full pl-8 pr-7 py-2.5 bg-white dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs font-semibold text-zinc-800 dark:text-zinc-200 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 cursor-pointer shadow-sm transition-shadow appearance-none"
+          >
+            <option value="" disabled>Select tariff...</option>
+            <option v-for="tpl in templateList" :key="tpl.key" :value="tpl.key">
+              {{ tpl.key }} — {{ tpl.priceDisplay }}
+            </option>
+          </select>
+          <ChevronDown class="w-3.5 h-3.5 text-zinc-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+        </div>
       </div>
 
-      <!-- 3. Ma'lumotlar -->
+      <!-- 3. Details -->
       <div class="space-y-1">
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
           <div>
-            <label class="block text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 mb-0.5">Pasport</label>
-            <input
-              v-model="passportNumber"
-              type="text"
-              placeholder="AB1234567"
-              class="w-full px-3 py-1.5 bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs font-mono font-semibold text-zinc-800 dark:text-zinc-200 focus:outline-none focus:border-blue-500 uppercase"
-            />
+            <label class="block text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 mb-0.5">Passport</label>
+            <div class="relative">
+              <CreditCard class="w-3.5 h-3.5 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                v-model="passportNumber"
+                type="text"
+                placeholder="AB1234567"
+                class="w-full pl-8 pr-3 py-2.5 bg-white dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs font-mono font-semibold text-zinc-800 dark:text-zinc-200 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 uppercase shadow-sm transition-shadow"
+              />
+            </div>
           </div>
           <div>
-            <label class="block text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 mb-0.5">Tug'ilgan sana</label>
-            <input
-              v-model="dateOfBirth"
-              type="date"
-              class="w-full px-3 py-1.5 bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs font-mono text-zinc-800 dark:text-zinc-200 focus:outline-none focus:border-blue-500"
-            />
+            <label class="block text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 mb-0.5">Date of Birth</label>
+            <div class="grid grid-cols-3 gap-1.5">
+              <div class="relative">
+                <select
+                  v-model="dobYear"
+                  @change="syncDobToIso"
+                  class="w-full pl-2.5 pr-7 py-2.5 bg-white dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs font-mono text-zinc-800 dark:text-zinc-200 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 cursor-pointer shadow-sm transition-shadow appearance-none"
+                >
+                  <option :value="null" disabled>Year</option>
+                  <option v-for="y in dobYears" :key="y" :value="y">{{ y }}</option>
+                </select>
+                <ChevronDown class="w-3.5 h-3.5 text-zinc-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+              </div>
+              <div class="relative">
+                <select
+                  v-model="dobMonth"
+                  @change="syncDobToIso"
+                  class="w-full pl-2.5 pr-7 py-2.5 bg-white dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs font-mono text-zinc-800 dark:text-zinc-200 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 cursor-pointer shadow-sm transition-shadow appearance-none"
+                >
+                  <option :value="null" disabled>Month</option>
+                  <option v-for="m in dobMonths" :key="m" :value="m">{{ m }}</option>
+                </select>
+                <ChevronDown class="w-3.5 h-3.5 text-zinc-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+              </div>
+              <div class="relative">
+                <select
+                  v-model="dobDay"
+                  @change="syncDobToIso"
+                  class="w-full pl-2.5 pr-7 py-2.5 bg-white dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs font-mono text-zinc-800 dark:text-zinc-200 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 cursor-pointer shadow-sm transition-shadow appearance-none"
+                >
+                  <option :value="null" disabled>Day</option>
+                  <option v-for="d in dobDays" :key="d" :value="d">{{ d }}</option>
+                </select>
+                <ChevronDown class="w-3.5 h-3.5 text-zinc-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+              </div>
+            </div>
           </div>
           <div>
-            <label class="block text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 mb-0.5">Ta'lim darajasi</label>
-            <select
-              v-model="educationLevel"
-              class="w-full px-3 py-1.5 bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs text-zinc-800 dark:text-zinc-200 focus:outline-none focus:border-blue-500 cursor-pointer"
-            >
-              <option value="">Tanlang...</option>
-              <option v-for="lvl in levelOptions" :key="lvl" :value="lvl">
-                {{ lvl }}
-              </option>
-            </select>
+            <label class="block text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 mb-0.5">Education Level</label>
+            <div class="relative">
+              <GraduationCap class="w-3.5 h-3.5 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <select
+                v-model="educationLevel"
+                class="w-full pl-8 pr-7 py-2.5 bg-white dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs text-zinc-800 dark:text-zinc-200 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 cursor-pointer shadow-sm transition-shadow appearance-none"
+              >
+                <option value="">Select...</option>
+                <option v-for="lvl in levelOptions" :key="lvl" :value="lvl">
+                  {{ lvl }}
+                </option>
+              </select>
+              <ChevronDown class="w-3.5 h-3.5 text-zinc-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            </div>
           </div>
           <div>
-            <label class="block text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 mb-0.5">Ofis / Filial</label>
-            <select
-              v-model="office"
-              class="w-full px-3 py-1.5 bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs text-zinc-800 dark:text-zinc-200 focus:outline-none focus:border-blue-500 cursor-pointer"
-            >
-              <option value="">Tanlang...</option>
-              <option v-for="br in branchOptions" :key="br" :value="br">
-                {{ br }}
-              </option>
-            </select>
+            <label class="block text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 mb-0.5">Office / Branch</label>
+            <div class="relative">
+              <Building2 class="w-3.5 h-3.5 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <select
+                v-model="office"
+                class="w-full pl-8 pr-7 py-2.5 bg-white dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs text-zinc-800 dark:text-zinc-200 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 cursor-pointer shadow-sm transition-shadow appearance-none"
+              >
+                <option value="">Select...</option>
+                <option v-for="br in branchOptions" :key="br" :value="br">
+                  {{ br }}
+                </option>
+              </select>
+              <ChevronDown class="w-3.5 h-3.5 text-zinc-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            </div>
           </div>
           <div>
-            <label class="block text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 mb-0.5">Telefon 1</label>
-            <input
-              :value="phone1"
-              @input="(e: any) => phone1 = formatUzPhoneInput(e.target.value)"
-              type="tel"
-              placeholder="88-146-47-07"
-              class="w-full px-3 py-1.5 bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs font-mono text-zinc-800 dark:text-zinc-200 focus:outline-none focus:border-blue-500"
-            />
+            <label class="block text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 mb-0.5">Phone 1</label>
+            <div class="relative">
+              <Phone class="w-3.5 h-3.5 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                :value="phone1"
+                @input="(e: any) => phone1 = formatUzPhoneInput(e.target.value)"
+                type="tel"
+                placeholder="88-146-47-07"
+                class="w-full pl-8 pr-3 py-2.5 bg-white dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs font-mono text-zinc-800 dark:text-zinc-200 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 shadow-sm transition-shadow"
+              />
+            </div>
           </div>
           <div>
-            <label class="block text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 mb-0.5">Telefon 2</label>
-            <input
-              :value="phone2"
-              @input="(e: any) => phone2 = formatUzPhoneInput(e.target.value)"
-              type="tel"
-              placeholder="88-083-56-83"
-              class="w-full px-3 py-1.5 bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs font-mono text-zinc-800 dark:text-zinc-200 focus:outline-none focus:border-blue-500"
-            />
+            <label class="block text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 mb-0.5">Phone 2</label>
+            <div class="relative">
+              <Phone class="w-3.5 h-3.5 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                :value="phone2"
+                @input="(e: any) => phone2 = formatUzPhoneInput(e.target.value)"
+                type="tel"
+                placeholder="88-083-56-83"
+                class="w-full pl-8 pr-3 py-2.5 bg-white dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs font-mono text-zinc-800 dark:text-zinc-200 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 shadow-sm transition-shadow"
+              />
+            </div>
           </div>
           <div>
-            <label class="block text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 mb-0.5">Narx</label>
-            <input
-              v-model="tariffPrice"
-              type="text"
-              :placeholder="String(selectedTemplate?.priceDisplay || '')"
-              class="w-full px-3 py-1.5 bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs font-mono text-zinc-800 dark:text-zinc-200 focus:outline-none focus:border-blue-500"
-            />
+            <label class="block text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 mb-0.5">Price</label>
+            <div class="relative">
+              <Wallet class="w-3.5 h-3.5 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                :value="tariffPrice"
+                type="text"
+                readonly
+                tabindex="-1"
+                placeholder="Select a tariff first"
+                title="The price is automatically set by the selected tariff in Settings"
+                class="w-full pl-8 pr-3 py-2.5 bg-zinc-100 dark:bg-zinc-800/40 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs font-mono text-zinc-600 dark:text-zinc-300 cursor-not-allowed shadow-sm"
+              />
+            </div>
           </div>
           <div>
-            <label class="block text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 mb-0.5">Chegirma</label>
-            <input
-              :value="discount"
-              @input="(e: any) => discount = formatAmountInput(e.target.value)"
-              type="text"
-              placeholder="0"
-              class="w-full px-3 py-1.5 bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs font-mono text-zinc-800 dark:text-zinc-200 focus:outline-none focus:border-blue-500"
-            />
+            <label class="block text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 mb-0.5">Discount</label>
+            <div class="relative">
+              <BadgePercent class="w-3.5 h-3.5 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                :value="discount"
+                @input="(e: any) => discount = formatAmountInput(e.target.value)"
+                type="text"
+                placeholder="0"
+                class="w-full pl-8 pr-3 py-2.5 bg-white dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs font-mono text-zinc-800 dark:text-zinc-200 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 shadow-sm transition-shadow"
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -721,29 +958,44 @@ watch(
       <div v-if="isMinor" class="space-y-2 p-3 rounded-xl border border-amber-200 dark:border-amber-900/50 bg-amber-50/50 dark:bg-amber-950/20">
         <label class="flex items-center gap-2 text-[11px] font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wider">
           <ShieldAlert class="w-3.5 h-3.5" />
-          4. Kafil — 18 yoshdan kichik
+          4. Guardian — Under 18
         </label>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
           <div class="sm:col-span-2">
-            <label class="block text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 mb-0.5">F.I.O.</label>
-            <input v-model="guardianFullName" type="text" class="w-full px-3 py-1.5 bg-white dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs font-semibold text-zinc-800 dark:text-zinc-200 focus:outline-none focus:border-blue-500 uppercase" />
+            <label class="block text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 mb-0.5">Full Name</label>
+            <div class="relative">
+              <UserRound class="w-3.5 h-3.5 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input v-model="guardianFullName" type="text" class="w-full pl-8 pr-3 py-2.5 bg-white dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs font-semibold text-zinc-800 dark:text-zinc-200 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 uppercase shadow-sm transition-shadow" />
+            </div>
           </div>
           <div>
-            <label class="block text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 mb-0.5">Pasport</label>
-            <input v-model="guardianPassportNumber" type="text" class="w-full px-3 py-1.5 bg-white dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs font-mono font-semibold text-zinc-800 dark:text-zinc-200 focus:outline-none focus:border-blue-500 uppercase" />
+            <label class="block text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 mb-0.5">Passport</label>
+            <div class="relative">
+              <CreditCard class="w-3.5 h-3.5 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input v-model="guardianPassportNumber" type="text" class="w-full pl-8 pr-3 py-2.5 bg-white dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs font-mono font-semibold text-zinc-800 dark:text-zinc-200 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 uppercase shadow-sm transition-shadow" />
+            </div>
           </div>
           <div>
-            <label class="block text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 mb-0.5">Qarindoshligi</label>
-            <input v-model="guardianRelation" type="text" placeholder="Ota / Ona" class="w-full px-3 py-1.5 bg-white dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs text-zinc-800 dark:text-zinc-200 focus:outline-none focus:border-blue-500" />
+            <label class="block text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 mb-0.5">Relation to Student</label>
+            <div class="relative">
+              <UserRound class="w-3.5 h-3.5 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input v-model="guardianRelation" type="text" placeholder="Father / Mother" class="w-full pl-8 pr-3 py-2.5 bg-white dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs text-zinc-800 dark:text-zinc-200 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 shadow-sm transition-shadow" />
+            </div>
           </div>
           <div>
-            <label class="block text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 mb-0.5">Telefon</label>
-            <input v-model="guardianPhone" type="text" class="w-full px-3 py-1.5 bg-white dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs font-mono text-zinc-800 dark:text-zinc-200 focus:outline-none focus:border-blue-500" />
+            <label class="block text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 mb-0.5">Phone</label>
+            <div class="relative">
+              <Phone class="w-3.5 h-3.5 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input v-model="guardianPhone" type="text" class="w-full pl-8 pr-3 py-2.5 bg-white dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs font-mono text-zinc-800 dark:text-zinc-200 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 shadow-sm transition-shadow" />
+            </div>
           </div>
           <div>
-            <label class="block text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 mb-0.5">Manzil</label>
-            <input v-model="guardianAddress" type="text" class="w-full px-3 py-1.5 bg-white dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs text-zinc-800 dark:text-zinc-200 focus:outline-none focus:border-blue-500" />
+            <label class="block text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 mb-0.5">Address</label>
+            <div class="relative">
+              <Building2 class="w-3.5 h-3.5 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input v-model="guardianAddress" type="text" class="w-full pl-8 pr-3 py-2.5 bg-white dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs text-zinc-800 dark:text-zinc-200 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 shadow-sm transition-shadow" />
+            </div>
           </div>
         </div>
       </div>
@@ -755,7 +1007,7 @@ watch(
           @click="emit('close')"
           class="px-4 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
         >
-          Bekor qilish
+          Cancel
         </button>
 
         <button
@@ -763,7 +1015,7 @@ watch(
           @click="goToPreview"
           class="inline-flex items-center gap-2 px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
         >
-          <span>Ko'rib chiqish</span>
+          <span>Preview</span>
           <ArrowRight class="w-3.5 h-3.5" />
         </button>
       </div>

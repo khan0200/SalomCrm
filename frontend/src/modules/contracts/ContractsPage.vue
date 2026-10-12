@@ -665,6 +665,32 @@ function copyCodeToClipboard(code: string) {
   }, 2000)
 }
 
+// Staff-driven contracts (contract.status === 'draft', the new flow's
+// just-created state) have no verification_code yet - the only way to
+// reach the student is the sign_token link. If staff closed
+// ContractCreateDialog.vue's one-time "Contract created" screen without
+// copying it, this row-level button is the sole place it can be
+// recovered from.
+function signLinkUrlFor(contract: Contract): string {
+  if (!contract.sign_token || contract.sign_token_used_at) return ''
+  const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'
+  return `${origin}/sign/${contract.sign_token}`
+}
+const copiedSignLinkContractId = ref<string | null>(null)
+async function copySignLinkForContract(contract: Contract) {
+  const url = signLinkUrlFor(contract)
+  if (!url) return
+  try {
+    await navigator.clipboard.writeText(url)
+    copiedSignLinkContractId.value = contract.id
+    setTimeout(() => {
+      if (copiedSignLinkContractId.value === contract.id) copiedSignLinkContractId.value = null
+    }, 2000)
+  } catch (err) {
+    console.error('Failed to copy sign link:', err)
+  }
+}
+
 // Fetch single contract being edited
 const {
   data: currentEditingContract,
@@ -730,10 +756,12 @@ function handleBackToList() {
 }
 
 function handleContractCreated(contract: Contract) {
+  // The New Contract dialog (ContractCreateDialog.vue) now shows the
+  // signing link itself and stays open until staff closes it - it does
+  // NOT hand off to the A4 document editor anymore (that was the old
+  // template-first flow's behavior). Just refresh the table underneath.
   queryClient.setQueryData(['contract-detail', contract.id], contract)
   queryClient.invalidateQueries({ queryKey: ['contracts-list'] })
-  editingContent.value = contract.content || ''
-  editingContractId.value = contract.id
 }
 
 async function handleDuplicate(contract: Contract) {
@@ -1339,6 +1367,34 @@ async function handleUnarchive(contract: Contract) {
                             title="Rad etilgan shartnomani bazadan butunlay o'chirib yuborish"
                           >
                             <Trash2 class="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+
+                        <!-- Draft status (new staff-driven flow, not yet signed):
+                             badge + date + recover-the-signing-link button -->
+                        <div v-else-if="contract.status === 'draft' && signLinkUrlFor(contract)" class="flex items-center justify-end gap-2.5 flex-nowrap whitespace-nowrap">
+                          <div class="flex flex-col items-end gap-0.5">
+                            <span
+                              class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium border leading-none"
+                              :class="getStatusBadgeClass(contract.status)"
+                            >
+                              <span class="w-1.5 h-1.5 rounded-full shrink-0" :class="getStatusDotClass(contract.status)" />
+                              <span>{{ getStatusLabel(contract.status) }}</span>
+                            </span>
+                            <span class="font-mono text-[10px] text-zinc-400 dark:text-zinc-500 pr-0.5 whitespace-nowrap">
+                              {{ formatContractDate(contract.created_at) }}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            @click.stop="copySignLinkForContract(contract)"
+                            class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-blue-50 dark:bg-blue-950/40 border border-blue-200/80 dark:border-blue-900/50 text-blue-700 dark:text-blue-300 text-xs font-medium transition-colors cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/50"
+                            :class="{ '!bg-emerald-50 dark:!bg-emerald-950/40 !text-emerald-700 dark:!text-emerald-400 !border-emerald-200 dark:!border-emerald-900/50': copiedSignLinkContractId === contract.id }"
+                            title="Shartnomani imzolash havolasini nusxalash"
+                          >
+                            <Check v-if="copiedSignLinkContractId === contract.id" class="w-3.5 h-3.5" />
+                            <Globe v-else class="w-3.5 h-3.5" />
+                            <span>{{ copiedSignLinkContractId === contract.id ? 'Nusxalandi!' : 'Havola' }}</span>
                           </button>
                         </div>
 

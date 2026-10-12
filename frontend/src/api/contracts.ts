@@ -6,6 +6,12 @@ export interface Contract {
   title: string
   template_name: string
   content: string
+  // Original canvas-contract JSON (unresolved {{tokens}}), only present
+  // when the tariff was built in the A4 canvas editor - see Contract.canvas_source
+  // on the backend. Used by contractPdf.ts for correctly laid-out PDF
+  // export; `content` alone (flattened HTML) loses each page's fixed
+  // 210x297mm sizing.
+  canvas_source?: string | null
   status: 'draft' | 'pending' | 'verified' | 'rejected' | 'sent' | 'viewed' | 'signed' | 'completed' | 'cancelled'
   version: number
   is_deleted: boolean
@@ -68,6 +74,7 @@ export interface ContractCreatePayload {
   title: string
   template_name?: string
   content: string
+  canvas_source?: string
   status?: string
   // Staff pre-fill for the token-based signing link flow
   // (ContractSignLinkPage.vue) - all optional.

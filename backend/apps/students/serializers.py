@@ -448,7 +448,11 @@ class ContractListSerializer(serializers.ModelSerializer):
             'guardian_relation', 'guardian_phone', 'guardian_address',
             'guardian_signature_data', 'guardian_contract_text',
             'created_at', 'updated_at', 'signed_at', 'created_by_name',
-            'updated_by_name', 'updated_by_branch_name', 'is_identity_verified'
+            'updated_by_name', 'updated_by_branch_name', 'is_identity_verified',
+            # Needed so the Contracts table can offer a "copy signing link"
+            # action on draft (not-yet-signed) rows without a second
+            # per-row detail fetch - see ContractsPage.vue's signLinkUrlFor().
+            'sign_token', 'sign_token_used_at',
         )
         read_only_fields = ('id', 'version', 'created_at', 'updated_at')
 
@@ -529,7 +533,7 @@ class ContractDetailSerializer(serializers.ModelSerializer):
         model = Contract
         fields = (
             'id', 'contract_number', 'title', 'template_name',
-            'content', 'status', 'version', 'is_deleted', 'is_archived', 'archived_at',
+            'content', 'canvas_source', 'status', 'version', 'is_deleted', 'is_archived', 'archived_at',
             'student', 'student_id', 'student_name', 'student_passport',
             'student_phone', 'student_tariff', 'student_university',
             'tariff_name', 'tariff_price', 'discount', 'email', 'passport_number', 'full_name',
@@ -602,7 +606,7 @@ class ContractCreateUpdateSerializer(serializers.ModelSerializer):
         model = Contract
         fields = (
             'id', 'student', 'contract_number', 'title',
-            'template_name', 'content', 'status', 'version',
+            'template_name', 'content', 'canvas_source', 'status', 'version',
             # Staff pre-fill fields for the token-based signing link flow
             # (contract_sign_views.py) - all optional, all already existed
             # as model columns, just not writable through this serializer

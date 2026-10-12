@@ -705,6 +705,18 @@ class Contract(TenantAwareModel):
     title = models.CharField(max_length=255)
     template_name = models.CharField(max_length=100, blank=True, default='')
     content = models.TextField(help_text="Structured HTML document content")
+    # When the tariff was built in the A4 canvas editor (ContractDocumentEditor.vue),
+    # `content` above stores that page's HTML already rendered with THIS
+    # contract's own student data flattened in ({{tokens}} replaced, pages
+    # joined with <hr data-page-break="true" />) so the no-login student
+    # signing page (contract_sign_views.py) can serve it verbatim with no
+    # further templating step. PDF export, however, needs the ORIGINAL
+    # canvas-contract JSON (still carrying {{tokens}} and each page's own
+    # fixed 210x297mm sizing) to lay the document out correctly -
+    # flattening loses the structured per-page layout contractPdf.ts's
+    # canvas renderer depends on. This field holds that original source,
+    # blank for contracts built from plain-HTML (non-canvas) tariffs.
+    canvas_source = models.TextField(blank=True, default='', help_text="Original canvas-contract JSON (tokens unresolved), for PDF export only")
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft', db_index=True)
     version = models.PositiveIntegerField(default=1)
     is_deleted = models.BooleanField(default=False, db_index=True)

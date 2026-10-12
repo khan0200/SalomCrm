@@ -16,6 +16,7 @@ import {
   AlertCircle,
   Archive,
   ArchiveRestore,
+  Globe,
 } from 'lucide-vue-next'
 import BaseModal from '@/components/common/BaseModal.vue'
 import { useAuthStore } from '@/stores/auth'
@@ -93,6 +94,28 @@ async function copyCodeToClipboard(code: string) {
   }
 }
 
+// Staff may close the "Contract created" link screen in ContractCreateDialog.vue
+// without copying the link - this is the only other place that link can be
+// recovered from afterwards, so it's shown here whenever a sign_token
+// exists and hasn't been consumed yet (sign_token_used_at unset).
+const signLinkUrl = computed(() => {
+  const c = activeContract.value
+  if (!c?.sign_token || c.sign_token_used_at) return ''
+  const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'
+  return `${origin}/sign/${c.sign_token}`
+})
+const isSignLinkCopied = ref(false)
+async function copySignLink() {
+  if (!signLinkUrl.value) return
+  try {
+    await navigator.clipboard.writeText(signLinkUrl.value)
+    isSignLinkCopied.value = true
+    setTimeout(() => { isSignLinkCopied.value = false }, 2000)
+  } catch (err) {
+    console.error('Failed to copy sign link', err)
+  }
+}
+
 const isDownloadingPdf = ref(false)
 const showDownloadMenu = ref(false)
 
@@ -120,7 +143,20 @@ function pagesFromContent(raw: string | undefined, vars: Record<string, string>)
 
   cleaned = replaceVariablesInHtml(cleaned, vars)
   const parts = cleaned.split(/<hr[^>]*\/?>/i).map(p => p.trim()).filter(p => p.length > 0)
-  return (parts.length > 0 ? parts : [cleaned]).map(html => ({ html, isCanvas: false }))
+  // A staff-prefilled contract created from a canvas-contract tariff
+  // (ContractCreateDialog.vue) flattens its already-fixed-size
+  // 210x297mm pages into this TextField, <hr data-page-break> joined -
+  // each resulting part still carries its own canvas-a4-page-print
+  // wrapper (width/height/overflow already baked in from
+  // contractCanvasConverter.ts), so wrapping it AGAIN in the plain-HTML
+  // sheet's own min-h-[1050px] box double-sizes it. Detecting that
+  // wrapper and flagging isCanvas:true here lets the template apply the
+  // same w-[210mm] min-h-[297mm] p-0 sizing canvas pages already get,
+  // instead of the flowing-text sizing meant for prose templates.
+  return (parts.length > 0 ? parts : [cleaned]).map(html => ({
+    html,
+    isCanvas: /class="canvas-a4-page-print"/.test(html),
+  }))
 }
 
 const contractVariables = computed<Record<string, string>>(() => {
@@ -157,6 +193,15 @@ async function handleDownload(format: 'pdf' | 'doc' = 'pdf') {
   if (!c || isDownloadingPdf.value) return
   const safeTitle = `${c.contract_number}_${c.student_name || c.full_name || c.title}`.replace(/[/\\?%*:|"<>]/g, '_')
   const rawContent = c.content || ''
+  // PDF export needs the ORIGINAL canvas-contract JSON (still carrying
+  // {{tokens}}, each page's own fixed 210x297mm sizing intact) when this
+  // contract came from the new staff-prefilled flow (ContractCreateDialog.vue) -
+  // `content` there is already-flattened HTML (tokens resolved, pages
+  // joined with <hr data-page-break>) for the student signing page to
+  // serve verbatim, which collapses the structured per-page layout
+  // contractPdf.ts's canvas renderer depends on. Word export stays on
+  // `content` - downloadWordDoc works off flattened HTML either way.
+  const pdfSource = c.canvas_source || rawContent
 
   if (format === 'doc') {
     downloadWordDoc(safeTitle, rawContent)
@@ -174,7 +219,7 @@ async function handleDownload(format: 'pdf' | 'doc' = 'pdf') {
     }
     await downloadContractAsPdf(
       safeTitle,
-      rawContent,
+      pdfSource,
       { top: 20, right: 15, bottom: 20, left: 25 },
       contractVariables.value,
       c.signature_data || undefined,
@@ -298,6 +343,22 @@ function formatRejectionDate(dateStr?: string | null): string {
         <span class="text-xs text-zinc-400">
           v{{ activeContract?.version || 1 }}
         </span>
+
+        <!-- Signing link: the only recoverable copy of it once the New
+             Contract dialog's one-time "Contract created" screen is
+             closed, so staff who forgot to copy it there can get it here. -->
+        <button
+          v-if="signLinkUrl"
+          type="button"
+          @click="copySignLink"
+          class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/40 border border-blue-200/80 dark:border-blue-900/50 text-blue-700 dark:text-blue-300 text-[11px] font-semibold transition-colors cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/50"
+          :class="{ '!bg-emerald-50 dark:!bg-emerald-950/40 !text-emerald-700 dark:!text-emerald-400 !border-emerald-200 dark:!border-emerald-900/50': isSignLinkCopied }"
+          title="Shartnomani imzolash havolasini nusxalash"
+        >
+          <Check v-if="isSignLinkCopied" class="w-3 h-3" />
+          <Globe v-else class="w-3 h-3" />
+          <span>{{ isSignLinkCopied ? 'Nusxalandi!' : 'Imzolash havolasi' }}</span>
+        </button>
       </div>
 
       <!-- Right: Actions Toolbar -->
@@ -427,8 +488,15 @@ function formatRejectionDate(dateStr?: string | null): string {
          body wrapper (max-h-[75vh] overflow-y-auto around the whole slot);
          a second overflow-y-auto here nested two nested scroll containers
          with mismatched heights, so scrolling either one stopped short of
-         the real bottom and both scrollbars showed up side by side. -->
-    <div class="p-4 sm:p-8 bg-zinc-100 dark:bg-zinc-950 flex flex-col items-center gap-8">
+         the real bottom and both scrollbars showed up side by side.
+         Horizontal padding here stacks with BaseModal's own body p-6, which
+         left less room than an A4 sheet (w-[210mm] ~= 793.7px) actually
+         needs at max-w-4xl - the sheet overflowed its rounded container by
+         a few px, showing as a dark sliver in the corner (the modal's own
+         bg-zinc-900 behind the clipped content). Negative horizontal margin
+         cancels BaseModal's p-6 on this row only, so the sheet gets the
+         full modal width to scale against. -->
+    <div class="pt-4 sm:pt-8 pb-4 sm:pb-8 -mx-6 px-4 sm:px-8 bg-zinc-100 dark:bg-zinc-950 flex flex-col items-center gap-8">
       <div v-if="isLoadingDetail" class="py-16 flex flex-col items-center justify-center text-zinc-400 gap-2">
         <Loader2 class="w-7 h-7 animate-spin text-blue-600 mb-2" />
         <span class="text-xs font-mono">Shartnoma ma'lumotlari yuklanmoqda...</span>
