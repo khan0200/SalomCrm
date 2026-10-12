@@ -436,7 +436,7 @@ class ContractListSerializer(serializers.ModelSerializer):
         model = Contract
         fields = (
             'id', 'contract_number', 'title', 'template_name',
-            'content', 'signature_data',
+            'content', 'canvas_source', 'signature_data',
             'student', 'student_id', 'student_name', 'student_passport',
             'status', 'version', 'is_deleted', 'is_archived', 'archived_at',
             'tariff_name', 'tariff_price', 'discount', 'email', 'office', 'phone1', 'phone2',

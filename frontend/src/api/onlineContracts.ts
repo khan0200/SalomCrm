@@ -82,6 +82,13 @@ export interface ContractSignStatusResponse {
   kyc_status?: IdentityVerificationStatus
   has_signature?: boolean
   content?: string
+  // Already visible verbatim inside `content`'s rendered text - returned
+  // again here so canvas_source's {{tokens}} (full_name/office/education_level
+  // above resolve the same way) can be fully resolved for the preview.
+  passport_number?: string
+  date_of_birth?: string
+  phone1?: string
+  phone2?: string
   // Original canvas-contract JSON (unresolved {{tokens}}), when the tariff
   // was built in the A4 canvas editor - see Contract.canvas_source on the
   // backend. Used for a correctly paginated, true-to-size preview/PDF.

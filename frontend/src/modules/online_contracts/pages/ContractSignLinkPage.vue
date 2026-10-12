@@ -16,6 +16,7 @@ import {
   deserializeCanvasDocument,
   convertCanvasDocumentToHtml,
 } from '@/modules/contracts/utils/contractCanvasConverter'
+import { buildVariableValues } from '@/modules/contracts/utils/contractVariables'
 import OnlineContractSignatureModal from '../components/OnlineContractSignatureModal.vue'
 
 // Single-page state machine for the staff-prefilled, no-login signing
@@ -40,11 +41,7 @@ const identityError = ref('')
 const isConfirmingIdentity = ref(false)
 
 const dobDays = Array.from({ length: 31 }, (_, i) => i + 1)
-const dobMonths = [
-  { v: 1, l: "Yanvar" }, { v: 2, l: "Fevral" }, { v: 3, l: "Mart" }, { v: 4, l: "Aprel" },
-  { v: 5, l: "May" }, { v: 6, l: "Iyun" }, { v: 7, l: "Iyul" }, { v: 8, l: "Avgust" },
-  { v: 9, l: "Sentabr" }, { v: 10, l: "Oktabr" }, { v: 11, l: "Noyabr" }, { v: 12, l: "Dekabr" },
-]
+const dobMonths = Array.from({ length: 12 }, (_, i) => i + 1)
 const currentYear = new Date().getFullYear()
 const dobYears = Array.from({ length: 80 }, (_, i) => currentYear - i)
 const dobDay = ref<number | null>(null)
@@ -104,9 +101,24 @@ const previewPages = computed<string[]>(() => {
   if (!isCanvasDocumentJson(source)) return []
   const doc = deserializeCanvasDocument(source)
   if (!doc) return []
+  const c = contractInfo.value
+  // canvas_source still carries unresolved {{tokens}} (full_name,
+  // passport_number, date_of_birth, etc.) - ContractCreateDialog.vue
+  // resolves these from the staff-entered form fields; here they're
+  // resolved from this same contract's own fields as returned by
+  // ContractSignStatusView, the same duck-typed shape buildVariableValues
+  // already expects elsewhere.
+  const vars = buildVariableValues(c, {
+    contractNumber: c?.contract_number,
+    templateName: c?.tariff_name,
+    price: c?.tariff_price,
+    discount: c?.discount,
+    office: c?.office,
+    educationLevel: c?.education_level,
+  })
   const totalPages = doc.pages.length
   return doc.pages.map((p, pageOffset) =>
-    convertCanvasDocumentToHtml({ ...doc, pages: [p] }, {}, { pageOffset, totalPages })
+    convertCanvasDocumentToHtml({ ...doc, pages: [p] }, vars, { pageOffset, totalPages })
   )
 })
 
@@ -523,13 +535,13 @@ onBeforeUnmount(() => {
               <label class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">Tug'ilgan kuningizni kiriting</label>
               <div class="grid grid-cols-3 gap-2">
                 <select
-                  v-model="dobDay"
+                  v-model="dobYear"
                   required
                   class="px-2 py-2.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 text-sm text-zinc-900 dark:text-zinc-100 focus:outline-hidden focus:border-zinc-400 dark:focus:border-zinc-600"
                   @change="syncDobInput"
                 >
-                  <option :value="null" disabled>Kun</option>
-                  <option v-for="d in dobDays" :key="d" :value="d">{{ d }}</option>
+                  <option :value="null" disabled>Yil</option>
+                  <option v-for="y in dobYears" :key="y" :value="y">{{ y }}</option>
                 </select>
                 <select
                   v-model="dobMonth"
@@ -538,16 +550,16 @@ onBeforeUnmount(() => {
                   @change="syncDobInput"
                 >
                   <option :value="null" disabled>Oy</option>
-                  <option v-for="m in dobMonths" :key="m.v" :value="m.v">{{ m.l }}</option>
+                  <option v-for="m in dobMonths" :key="m" :value="m">{{ m }}</option>
                 </select>
                 <select
-                  v-model="dobYear"
+                  v-model="dobDay"
                   required
                   class="px-2 py-2.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 text-sm text-zinc-900 dark:text-zinc-100 focus:outline-hidden focus:border-zinc-400 dark:focus:border-zinc-600"
                   @change="syncDobInput"
                 >
-                  <option :value="null" disabled>Yil</option>
-                  <option v-for="y in dobYears" :key="y" :value="y">{{ y }}</option>
+                  <option :value="null" disabled>Kun</option>
+                  <option v-for="d in dobDays" :key="d" :value="d">{{ d }}</option>
                 </select>
               </div>
             </div>

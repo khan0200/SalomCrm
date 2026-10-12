@@ -156,8 +156,16 @@ class ContractSignStatusView(APIView):
             'has_signature': bool(contract.signature_data),
             # Full contract text - needed for the preview+download step
             # before the student signs. Not sensitive (same text staff
-            # already see), unlike passport/DOB which stay write-only here.
+            # already see), unlike passport/DOB which stay write-only
+            # for the CONFIRM-IDENTITY check above - but both already
+            # appear verbatim inside `content`'s rendered text, so
+            # returning them again here (to resolve canvas_source's
+            # {{tokens}}) doesn't newly expose anything.
             'content': contract.content,
+            'passport_number': contract.passport_number,
+            'date_of_birth': contract.date_of_birth,
+            'phone1': contract.phone1,
+            'phone2': contract.phone2,
             # Original canvas-contract JSON (unresolved {{tokens}}, each
             # page's own fixed 210x297mm sizing) - lets the signing page
             # render true-to-size, correctly paginated pages and produce a
