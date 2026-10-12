@@ -107,6 +107,19 @@ class Command(BaseCommand):
             }
         }
 
+        def is_legacy_legal_element(content, y=None):
+            c = (content or '').lower()
+            is_keyword = any(k in c for k in [
+                'nizolar', 'faoliyat', 'fors-major', 'favqulotda', 'bekor qilish', '<hr'
+            ]) or c.strip() in ['<p><strong>3</strong></p>', '<p style="text-align: right;"><strong>3</strong></p>']
+            if is_keyword:
+                return True
+            if y is not None and y < 175:
+                is_requisite = any(r in c for r in ['bajaruvchi', 'mijoz', 'inn:', 'f.i.o', 'passport'])
+                if not is_requisite:
+                    return True
+            return False
+
         # 1. Update TariffOptions
         for to in TariffOption.objects.filter(name__icontains='STANDART'):
             if not to.contract_text or not to.contract_text.startswith('{'):
@@ -123,7 +136,11 @@ class Command(BaseCommand):
                     p4 = doc['pages'][3]
                     p4_els = p4.get('elements', [])
                     # Find elements to keep (requisites, tokens, stamp, qr, pgnum)
-                    rest_p4 = [el for el in p4_els if el.get('id') not in ('text_p4_merged_legal',) and not ('Nizolarni' in el.get('content', '') or 'FORS-MAJOR' in el.get('content', ''))]
+                    rest_p4 = [
+                        el for el in p4_els
+                        if el.get('id') != 'text_p4_merged_legal'
+                        and not is_legacy_legal_element(el.get('content', ''), el.get('y'))
+                    ]
                     p4['elements'] = [merged_p4_element] + rest_p4
                     to.contract_text = json.dumps(doc, ensure_ascii=False)
                     to.save(update_fields=['contract_text'])
@@ -140,16 +157,35 @@ class Command(BaseCommand):
                     needs_update = False
                     p2 = doc['pages'][1]
                     p4 = doc['pages'][3]
+
+                    # Check Page 4 cleanup if it already has text_p4_merged_legal
+                    has_merged_p4 = any(el.get('id') == 'text_p4_merged_legal' for el in p4.get('elements', []))
+                    if has_merged_p4:
+                        filtered_p4 = [
+                            el for el in p4.get('elements', [])
+                            if el.get('id') == 'text_p4_merged_legal'
+                            or not is_legacy_legal_element(el.get('content', ''), el.get('y'))
+                        ]
+                        if len(filtered_p4) != len(p4.get('elements', [])):
+                            p4['elements'] = filtered_p4
+                            needs_update = True
+
                     # Check if p2 has the old unmerged structure (e.g. 2+ text elements with rights)
                     p2_text_count = sum(1 for el in p2.get('elements', []) if el.get('type') == 'text' and 'majburiyat' in el.get('content', '').lower())
                     if p2_text_count > 1 or c.id == '450a1c0e-04cf-44a4-97e1-87ed2ef3e9ec':
                         pgnum_p2 = [el for el in p2.get('elements', []) if 'page_number' in el.get('content', '')]
                         if pgnum_p2:
                             p2['elements'] = [merged_p2_element, pgnum_p2[0]]
-                        rest_p4 = [el for el in p4.get('elements', []) if el.get('id') not in ('text_p4_merged_legal',) and not ('Nizolarni' in el.get('content', '') or 'FORS-MAJOR' in el.get('content', ''))]
+                        rest_p4 = [
+                            el for el in p4.get('elements', [])
+                            if el.get('id') != 'text_p4_merged_legal'
+                            and not is_legacy_legal_element(el.get('content', ''), el.get('y'))
+                        ]
                         p4['elements'] = [merged_p4_element] + rest_p4
+                        needs_update = True
+
+                    if needs_update:
                         c.canvas_source = json.dumps(doc, ensure_ascii=False)
-                        
                         # Also sync plain html content
                         pages_html = []
                         for p in doc['pages']:

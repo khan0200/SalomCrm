@@ -544,8 +544,56 @@ export function convertCanvasDocumentToHtml(
       total_pages: String(totalPagesForNumbering),
     }
 
+    // Defensive check: If this page has a merged legal block (like `text_p4_merged_legal`),
+    // remove any duplicate legacy separate legal blocks that would collide with it.
+    const hasMergedLegal = page.elements.some(
+      el => el.id === 'text_p4_merged_legal' || (
+        typeof (el as any).content === 'string' &&
+        (el as any).content.includes('contract-section') &&
+        (el as any).content.toLowerCase().includes('nizolar') &&
+        (el as any).content.toLowerCase().includes('fors-major')
+      )
+    )
+
+    // Defensive check: If this page has a merged rights block (like `text_p2_merged_rights`),
+    // remove any duplicate legacy separate rights elements that would collide with it.
+    const hasMergedRights = page.elements.some(
+      el => el.id === 'text_p2_merged_rights' || (
+        typeof (el as any).content === 'string' &&
+        (el as any).content.includes('contract-section') &&
+        (el as any).content.toLowerCase().includes('bajaruvchining huquq') &&
+        (el as any).content.toLowerCase().includes('mijozning huquq')
+      )
+    )
+
+    const safeElements = page.elements.filter(el => {
+      if (hasMergedLegal && el.id !== 'text_p4_merged_legal') {
+        const c = ((el as any).content || '').toLowerCase()
+        const isLegalDuplicate = (
+          c.includes('nizolar') ||
+          c.includes('faoliyat') ||
+          c.includes('fors-major') ||
+          c.includes('favqulotda') ||
+          c.includes('bekor qilish') ||
+          c.includes('<hr') ||
+          c.includes('<strong>3</strong>')
+        )
+        const isNotRequisites = !c.includes('bajaruvchi') && !c.includes('mijoz') && !c.includes('inn:') && !c.includes('f.i.o')
+        if (isLegalDuplicate || ((el.y || 0) < 175 && isNotRequisites)) {
+          return false
+        }
+      }
+      if (hasMergedRights && el.id !== 'text_p2_merged_rights') {
+        const c = ((el as any).content || '').toLowerCase()
+        if (c.includes('huquq va majburiyat') || (c.includes('bajaruvchi mijoz') && c.includes('hujjatlarini'))) {
+          return false
+        }
+      }
+      return true
+    })
+
     // Sort elements by zIndex
-    const sorted = [...page.elements].sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0))
+    const sorted = [...safeElements].sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0))
 
     sorted.forEach(el => {
       if (el.hidden) return
