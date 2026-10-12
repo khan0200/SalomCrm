@@ -412,8 +412,19 @@ export function convertHtmlToCanvasDocument(
 
       // Default: Paragraph, list, div, etc.
       const htmlContent = child.outerHTML
-      const textLen = child.textContent?.length || 10
-      const estimatedH = Math.max(8, Math.ceil(textLen / 75) * 5.5)
+      let estimatedH: number
+      const listItems = child.querySelectorAll('li')
+      if (listItems.length > 0) {
+        let listLines = 0
+        listItems.forEach(li => {
+          const itemTextLen = li.textContent?.trim().length || 0
+          listLines += Math.max(1, Math.ceil(itemTextLen / 60))
+        })
+        estimatedH = Math.max(15, listLines * 6.5 + listItems.length * 2.5)
+      } else {
+        const textLen = child.textContent?.length || 10
+        estimatedH = Math.max(8, Math.ceil(textLen / 70) * 6)
+      }
 
       addElement(
         {

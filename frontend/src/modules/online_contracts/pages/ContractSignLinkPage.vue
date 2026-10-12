@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router'
 import {
   ShieldCheck, ScanFace, FileSignature, CheckCircle2, AlertCircle,
   Loader2, ArrowRight, ExternalLink, RotateCw, XCircle, Download, ShieldAlert,
+  ZoomIn, ZoomOut, Maximize2, Minimize2, X,
 } from 'lucide-vue-next'
 import {
   onlineContractsApi,
@@ -102,13 +103,19 @@ const previewPages = computed<string[]>(() => {
   const doc = deserializeCanvasDocument(source)
   if (!doc) return []
   const c = contractInfo.value
-  // canvas_source still carries unresolved {{tokens}} (full_name,
-  // passport_number, date_of_birth, etc.) - ContractCreateDialog.vue
-  // resolves these from the staff-entered form fields; here they're
-  // resolved from this same contract's own fields as returned by
-  // ContractSignStatusView, the same duck-typed shape buildVariableValues
-  // already expects elsewhere.
-  const vars = buildVariableValues(c, {
+  // canvas_source carries unresolved {{tokens}} (full_name, passport_number, etc.)
+  // resolved from this same contract's own fields via buildVariableValues.
+  const vars = resolvedVariableValues.value
+  const totalPages = doc.pages.length
+  return doc.pages.map((p, pageOffset) =>
+    convertCanvasDocumentToHtml({ ...doc, pages: [p] }, vars, { pageOffset, totalPages })
+  )
+})
+
+const resolvedVariableValues = computed<Record<string, string>>(() => {
+  const c = contractInfo.value
+  if (!c) return {}
+  return buildVariableValues(c, {
     contractNumber: c?.contract_number,
     templateName: c?.tariff_name,
     price: c?.tariff_price,
@@ -116,11 +123,30 @@ const previewPages = computed<string[]>(() => {
     office: c?.office,
     educationLevel: c?.education_level,
   })
-  const totalPages = doc.pages.length
-  return doc.pages.map((p, pageOffset) =>
-    convertCanvasDocumentToHtml({ ...doc, pages: [p] }, vars, { pageOffset, totalPages })
-  )
 })
+
+// Mobile & Desktop preview zoom & fullscreen reading mode
+const zoomLevel = ref(1.0)
+const isFullscreenPreview = ref(false)
+
+function zoomIn() {
+  zoomLevel.value = Math.min(2.5, Math.round((zoomLevel.value + 0.25) * 100) / 100)
+}
+
+function zoomOut() {
+  zoomLevel.value = Math.max(0.6, Math.round((zoomLevel.value - 0.25) * 100) / 100)
+}
+
+function resetZoom() {
+  zoomLevel.value = 1.0
+}
+
+function toggleFullscreenPreview() {
+  isFullscreenPreview.value = !isFullscreenPreview.value
+  if (isFullscreenPreview.value) {
+    zoomLevel.value = 1.0
+  }
+}
 
 // Same mm->px scaling approach as ContractCreateDialog.vue's preview -
 // browser's own 96dpi conversion instead of measuring the rendered
@@ -129,9 +155,12 @@ const PAGE_WIDTH_PX = 210 * (96 / 25.4)
 const PAGE_HEIGHT_PX = 297 * (96 / 25.4)
 const previewWrapperRef = ref<HTMLElement | null>(null)
 const previewWrapperWidth = ref(0)
-const previewScale = computed(() => {
+const baseScale = computed(() => {
   if (!previewWrapperWidth.value) return 1
   return Math.min(1, previewWrapperWidth.value / PAGE_WIDTH_PX)
+})
+const previewScale = computed(() => {
+  return baseScale.value * zoomLevel.value
 })
 let previewResizeObserver: ResizeObserver | null = null
 
@@ -152,15 +181,22 @@ async function handleDownloadPreview() {
   if (!contractInfo.value?.content) return
   isDownloadingPreview.value = true
   try {
+    const c = contractInfo.value
+    const vars = resolvedVariableValues.value
+    const verificationMeta = {
+      contractNumber: c?.contract_number,
+      studentName: c?.full_name,
+      status: 'pending',
+    }
     await downloadContractAsPdf(
-      contractInfo.value.title || 'shartnoma',
-      contractInfo.value.canvas_source || contractInfo.value.content,
+      c.title || 'shartnoma',
+      c.canvas_source || c.content || '',
       undefined,
+      vars,
       undefined,
-      undefined,
-      { status: 'pending' },
-      isMinor.value && contractInfo.value.guardian_contract_text
-        ? { content: contractInfo.value.guardian_contract_text }
+      verificationMeta,
+      isMinor.value && c.guardian_contract_text
+        ? { content: c.guardian_contract_text, variableValues: vars }
         : undefined
     )
   } finally {
@@ -403,15 +439,32 @@ async function handleFinalDownload() {
   if (!contractInfo.value) return
   try {
     const fresh = await onlineContractsApi.getSignableContract(token.value)
+    const vars = buildVariableValues(fresh, {
+      contractNumber: fresh.contract_number,
+      templateName: fresh.tariff_name,
+      price: fresh.tariff_price,
+      discount: fresh.discount,
+      office: fresh.office,
+      educationLevel: fresh.education_level,
+      signatureData: studentSignature.value || undefined,
+    })
+    const verificationMeta = {
+      contractNumber: fresh.contract_number,
+      studentName: fresh.full_name,
+      verifiedAt: (fresh as unknown as { signed_at?: string }).signed_at
+        ? new Date((fresh as unknown as { signed_at?: string }).signed_at!).toLocaleDateString('uz-UZ')
+        : new Date().toLocaleDateString('uz-UZ'),
+      status: 'signed',
+    }
     await downloadContractAsPdf(
       fresh.title || 'shartnoma',
       fresh.canvas_source || fresh.content || '',
       undefined,
-      undefined,
+      vars,
       studentSignature.value || undefined,
-      { status: 'pending' },
+      verificationMeta,
       isMinor.value && fresh.guardian_contract_text
-        ? { content: fresh.guardian_contract_text }
+        ? { content: fresh.guardian_contract_text, variableValues: vars }
         : undefined
     )
   } catch (err) {
@@ -577,31 +630,73 @@ onBeforeUnmount(() => {
         </div>
 
         <!-- STEP: preview + 4 declarations -->
-        <div v-else-if="step === 'preview'" class="bg-white dark:bg-zinc-900/60 border border-zinc-200/80 dark:border-zinc-800 rounded-xl p-6 sm:p-8 shadow-xs">
-          <div class="mb-5 flex items-center justify-between gap-3">
-            <h1 class="text-xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">
+        <div v-else-if="step === 'preview'" class="bg-white dark:bg-zinc-900/60 border border-zinc-200/80 dark:border-zinc-800 rounded-xl p-5 sm:p-8 shadow-xs">
+          <div class="mb-4 flex items-center justify-between gap-2 flex-wrap">
+            <h1 class="text-lg sm:text-xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">
               Shartnoma bilan tanishing
             </h1>
-            <button
-              type="button"
-              @click="handleDownloadPreview"
-              :disabled="isDownloadingPreview"
-              class="shrink-0 inline-flex items-center gap-1.5 text-xs font-medium text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white border border-zinc-200 dark:border-zinc-700 rounded-lg px-2.5 py-1.5 transition-colors cursor-pointer disabled:opacity-50"
-            >
-              <Loader2 v-if="isDownloadingPreview" class="w-3.5 h-3.5 animate-spin" />
-              <Download v-else class="w-3.5 h-3.5" />
-              <span>Yuklab olish</span>
-            </button>
+            <div class="flex items-center gap-1.5 flex-wrap">
+              <!-- Mobile/Desktop Zoom controls -->
+              <div v-if="isCanvasPreview" class="inline-flex items-center bg-zinc-100 dark:bg-zinc-800 rounded-lg p-0.5 border border-zinc-200 dark:border-zinc-700">
+                <button
+                  type="button"
+                  @click="zoomOut"
+                  :disabled="zoomLevel <= 0.6"
+                  class="p-1 rounded-md text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white hover:bg-white dark:hover:bg-zinc-700 disabled:opacity-40 transition-colors cursor-pointer"
+                  title="Kichiklashtirish"
+                >
+                  <ZoomOut class="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  @click="resetZoom"
+                  class="px-1.5 py-0.5 text-[11px] font-mono font-medium text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white cursor-pointer"
+                  title="Asl o'lchamga qaytarish"
+                >
+                  {{ Math.round(zoomLevel * 100) }}%
+                </button>
+                <button
+                  type="button"
+                  @click="zoomIn"
+                  :disabled="zoomLevel >= 2.5"
+                  class="p-1 rounded-md text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white hover:bg-white dark:hover:bg-zinc-700 disabled:opacity-40 transition-colors cursor-pointer"
+                  title="Kattalashtirish"
+                >
+                  <ZoomIn class="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              <!-- Fullscreen button for mobile/desktop reading -->
+              <button
+                type="button"
+                @click="toggleFullscreenPreview"
+                class="shrink-0 inline-flex items-center gap-1 text-xs font-medium text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white border border-zinc-200 dark:border-zinc-700 rounded-lg px-2.5 py-1.5 transition-colors cursor-pointer"
+                title="To'liq ekranda o'qish"
+              >
+                <Maximize2 class="w-3.5 h-3.5" />
+                <span class="hidden sm:inline">To'liq ekran</span>
+              </button>
+
+              <!-- Download button -->
+              <button
+                type="button"
+                @click="handleDownloadPreview"
+                :disabled="isDownloadingPreview"
+                class="shrink-0 inline-flex items-center gap-1.5 text-xs font-medium text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white border border-zinc-200 dark:border-zinc-700 rounded-lg px-2.5 py-1.5 transition-colors cursor-pointer disabled:opacity-50"
+              >
+                <Loader2 v-if="isDownloadingPreview" class="w-3.5 h-3.5 animate-spin" />
+                <Download v-else class="w-3.5 h-3.5" />
+                <span>Yuklab olish</span>
+              </button>
+            </div>
           </div>
 
           <div
             ref="previewWrapperRef"
-            class="max-h-[45vh] overflow-y-auto overflow-x-hidden rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-950 p-3 mb-5"
+            class="max-h-[50vh] sm:max-h-[60vh] overflow-y-auto overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-950 p-2 sm:p-3 mb-5"
           >
-            <!-- Canvas-contract tariff: one scaled A4 sheet per page, so
-                 page boundaries and each page's true 210x297mm sizing
-                 stay visible (mirrors ContractCreateDialog.vue's preview). -->
-            <div v-if="isCanvasPreview" class="flex flex-col items-center gap-3">
+            <!-- Canvas-contract tariff: one scaled A4 sheet per page -->
+            <div v-if="isCanvasPreview" class="flex flex-col items-center gap-3 min-w-fit mx-auto">
               <div
                 v-for="(pageHtml, idx) in previewPages"
                 :key="idx"
@@ -615,8 +710,7 @@ onBeforeUnmount(() => {
                 />
               </div>
             </div>
-            <!-- Plain HTML template (not an A4 canvas document) - no fixed
-                 page size to scale against, just render as flowing text. -->
+            <!-- Plain HTML template (not an A4 canvas document) -->
             <div v-else class="bg-white p-4 text-[13px] leading-relaxed" v-html="contractInfo?.content || ''" />
           </div>
 
@@ -953,5 +1047,111 @@ onBeforeUnmount(() => {
       @close="isGuardianSignatureModalOpen = false"
       @confirm="handleGuardianSignatureConfirm"
     />
+
+    <!-- Fullscreen Contract Reader Modal (Optimized for Mobile) -->
+    <Teleport to="body">
+      <div
+        v-if="isFullscreenPreview"
+        class="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex flex-col"
+      >
+        <!-- Top navigation bar -->
+        <div class="h-14 bg-zinc-900 text-white px-3 sm:px-4 flex items-center justify-between border-b border-zinc-800 shrink-0">
+          <div class="flex items-center gap-2 font-medium text-xs sm:text-sm truncate">
+            <span class="truncate">Shartnoma matni</span>
+            <span v-if="previewPages.length" class="text-[11px] text-zinc-400 font-mono">({{ previewPages.length }} sahifa)</span>
+          </div>
+
+          <div class="flex items-center gap-1.5 sm:gap-2">
+            <!-- Modal Zoom controls -->
+            <div v-if="isCanvasPreview" class="inline-flex items-center bg-zinc-800 rounded-lg p-0.5 border border-zinc-700">
+              <button
+                type="button"
+                @click="zoomOut"
+                :disabled="zoomLevel <= 0.6"
+                class="p-1 sm:p-1.5 rounded-md text-zinc-300 hover:text-white hover:bg-zinc-700 disabled:opacity-40 transition-colors cursor-pointer"
+                title="Kichiklashtirish"
+              >
+                <ZoomOut class="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                @click="resetZoom"
+                class="px-1.5 sm:px-2 py-0.5 text-[11px] sm:text-xs font-mono font-medium text-zinc-300 hover:text-white cursor-pointer"
+                title="Asl o'lcham"
+              >
+                {{ Math.round(zoomLevel * 100) }}%
+              </button>
+              <button
+                type="button"
+                @click="zoomIn"
+                :disabled="zoomLevel >= 2.5"
+                class="p-1 sm:p-1.5 rounded-md text-zinc-300 hover:text-white hover:bg-zinc-700 disabled:opacity-40 transition-colors cursor-pointer"
+                title="Kattalashtirish"
+              >
+                <ZoomIn class="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            <button
+              type="button"
+              @click="handleDownloadPreview"
+              :disabled="isDownloadingPreview"
+              class="inline-flex items-center gap-1 text-xs font-medium text-zinc-200 hover:text-white bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-lg px-2 sm:px-2.5 py-1.5 transition-colors cursor-pointer disabled:opacity-50"
+            >
+              <Loader2 v-if="isDownloadingPreview" class="w-3.5 h-3.5 animate-spin" />
+              <Download v-else class="w-3.5 h-3.5" />
+              <span class="hidden sm:inline">Yuklab olish</span>
+            </button>
+
+            <button
+              type="button"
+              @click="isFullscreenPreview = false"
+              class="p-1.5 sm:p-2 rounded-lg bg-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-700 transition-colors cursor-pointer"
+              title="Yopish"
+            >
+              <X class="w-4 h-4 sm:w-5 sm:h-5" />
+            </button>
+          </div>
+        </div>
+
+        <!-- Scrollable document body -->
+        <div class="flex-1 overflow-y-auto overflow-x-auto p-2 sm:p-4 flex flex-col items-center gap-4 bg-zinc-950">
+          <div
+            v-if="isCanvasPreview"
+            class="flex flex-col items-center gap-4 min-w-fit py-2"
+          >
+            <div
+              v-for="(pageHtml, idx) in previewPages"
+              :key="idx"
+              class="shrink-0 bg-white shadow-xl overflow-hidden rounded-xs"
+              :style="{ width: `${PAGE_WIDTH_PX * previewScale}px`, height: `${PAGE_HEIGHT_PX * previewScale}px` }"
+            >
+              <div
+                class="origin-top-left"
+                :style="{ width: `${PAGE_WIDTH_PX}px`, height: `${PAGE_HEIGHT_PX}px`, transform: `scale(${previewScale})` }"
+                v-html="pageHtml"
+              />
+            </div>
+          </div>
+          <div
+            v-else
+            class="max-w-2xl w-full bg-white text-zinc-900 p-6 rounded-lg text-sm leading-relaxed"
+            v-html="contractInfo?.content || ''"
+          />
+        </div>
+
+        <!-- Bottom bar with close/return button -->
+        <div class="p-3 bg-zinc-900 border-t border-zinc-800 flex items-center justify-between shrink-0">
+          <span class="text-[11px] sm:text-xs text-zinc-400">Shartnoma bilan to'liq tanishib chiqing</span>
+          <button
+            type="button"
+            @click="isFullscreenPreview = false"
+            class="px-4 py-2 rounded-lg bg-white text-zinc-950 text-xs font-semibold hover:bg-zinc-100 transition-colors cursor-pointer"
+          >
+            Yopish va davom etish
+          </button>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
