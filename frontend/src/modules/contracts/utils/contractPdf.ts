@@ -295,7 +295,7 @@ async function renderDocumentIntoPdf(
           }
 
           const canvas = await html2canvas(pageContainer, {
-            scale: 3,
+            scale: 2.5,
             useCORS: true,
             logging: false,
             backgroundColor: '#ffffff',
@@ -326,8 +326,13 @@ async function renderDocumentIntoPdf(
             pdf.addPage()
           }
 
-          const imgData = canvas.toDataURL('image/png')
-          pdf.addImage(imgData, 'PNG', 0, 0, 210, 297, undefined, 'NONE')
+          // JPEG at high quality keeps text crisp while landing at a
+          // fraction of lossless PNG's size (a 4-page contract was 90+ MB
+          // as PNG/NONE - unusable on a slow connection). 0.92 is visually
+          // indistinguishable from PNG for flat text/line art like a
+          // contract page.
+          const imgData = canvas.toDataURL('image/jpeg', 0.92)
+          pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297, undefined, 'FAST')
         } finally {
           if (pageContainer.parentNode) {
             pageContainer.parentNode.removeChild(pageContainer)
@@ -505,7 +510,7 @@ async function renderDocumentIntoPdf(
     }
 
     const canvas = await html2canvas(container, {
-      scale: 3,
+      scale: 2.5,
       useCORS: true,
       logging: false,
       backgroundColor: '#ffffff',
@@ -534,12 +539,14 @@ async function renderDocumentIntoPdf(
 
     const imgWidth = canvas.width
     const imgHeight = canvas.height
-    const fullImgData = canvas.toDataURL('image/png')
+    // JPEG at high quality instead of lossless PNG - see the canvas-document
+    // path above for why (same 90+ MB problem on multi-page contracts).
+    const fullImgData = canvas.toDataURL('image/jpeg', 0.92)
     const scaledPdfHeight = (imgHeight * contentWidthMm) / imgWidth
 
     if (scaledPdfHeight <= contentHeightMm) {
       if (startNewPage) pdf.addPage()
-      pdf.addImage(fullImgData, 'PNG', marginLeft, marginTop, contentWidthMm, scaledPdfHeight, undefined, 'NONE')
+      pdf.addImage(fullImgData, 'JPEG', marginLeft, marginTop, contentWidthMm, scaledPdfHeight, undefined, 'FAST')
     } else {
       const pageCanvasHeight = (imgWidth * contentHeightMm) / contentWidthMm
       let heightLeft = imgHeight
@@ -560,9 +567,9 @@ async function renderDocumentIntoPdf(
 
         if (!isFirstSlice || startNewPage) pdf.addPage()
         isFirstSlice = false
-        const sliceData = sliceCanvas.toDataURL('image/png')
+        const sliceData = sliceCanvas.toDataURL('image/jpeg', 0.92)
         const slicePdfHeight = (currentSliceHeight * contentWidthMm) / imgWidth
-        pdf.addImage(sliceData, 'PNG', marginLeft, marginTop, contentWidthMm, slicePdfHeight, undefined, 'NONE')
+        pdf.addImage(sliceData, 'JPEG', marginLeft, marginTop, contentWidthMm, slicePdfHeight, undefined, 'FAST')
 
         position += currentSliceHeight
         heightLeft -= currentSliceHeight
