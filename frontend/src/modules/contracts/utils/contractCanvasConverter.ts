@@ -468,14 +468,23 @@ export function convertHtmlToCanvasDocument(
  */
 export function convertCanvasDocumentToHtml(
   doc: ContractDocumentModel,
-  variableValues?: Record<string, string>
+  variableValues?: Record<string, string>,
+  pageNumbering?: { pageOffset: number; totalPages: number }
 ): string {
   if (!doc || !doc.pages) return '<p></p>'
 
   const pageHtmls: string[] = []
 
-  doc.pages.forEach((page, pageIdx) => {
-    const isLastPage = pageIdx === doc.pages.length - 1
+  doc.pages.forEach((page, pageIdxInDoc) => {
+    // When the caller passes a single-page slice of a larger document
+    // (e.g. one page at a time, for per-page rendering), doc.pages.length
+    // is always 1 and pageIdxInDoc is always 0 - {{page_number}} and
+    // {{total_pages}} would then read "1 / 1" on every page instead of
+    // this page's real position. pageNumbering lets the caller supply the
+    // true position in the original, unsliced document.
+    const pageIdx = pageNumbering ? pageNumbering.pageOffset : pageIdxInDoc
+    const totalPagesForNumbering = pageNumbering ? pageNumbering.totalPages : doc.pages.length
+    const isLastPage = pageIdxInDoc === doc.pages.length - 1
 
     let elementsHtml = ''
 
@@ -516,7 +525,7 @@ export function convertCanvasDocumentToHtml(
     const pageVariableValues = {
       ...(variableValues || {}),
       page_number: String(pageIdx + 1),
-      total_pages: String(doc.pages.length),
+      total_pages: String(totalPagesForNumbering),
     }
 
     // Sort elements by zIndex

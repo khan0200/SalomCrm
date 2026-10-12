@@ -232,10 +232,11 @@ async function renderDocumentIntoPdf(
     if (doc && Array.isArray(doc.pages) && doc.pages.length > 0) {
       let signatureRendered = false
 
+      const totalPages = doc.pages.length
       for (let pageIdx = 0; pageIdx < doc.pages.length; pageIdx++) {
         const isLastPage = pageIdx === doc.pages.length - 1
         const singlePageDoc = { ...doc, pages: [doc.pages[pageIdx]] }
-        let pageHtml = convertCanvasDocumentToHtml(singlePageDoc, mergedVars)
+        let pageHtml = convertCanvasDocumentToHtml(singlePageDoc, mergedVars, { pageOffset: pageIdx, totalPages })
 
         if (pageHtml.includes('alt="Talaba Imzosi"') || pageHtml.includes('alt="Imzo"')) {
           signatureRendered = true

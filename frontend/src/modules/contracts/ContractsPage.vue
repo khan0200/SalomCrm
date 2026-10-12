@@ -1453,8 +1453,6 @@ async function handleUnarchive(contract: Contract) {
     <!-- CREATE CONTRACT MODAL -->
     <ContractCreateDialog
       :is-open="isCreateDialogOpen"
-      :initial-template-key="activeTariff?.name"
-      :initial-content="tariffEditingContent"
       @close="isCreateDialogOpen = false"
       @created="handleContractCreated"
     />

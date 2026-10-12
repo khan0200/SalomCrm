@@ -130,8 +130,9 @@ function pagesFromContent(raw: string | undefined, vars: Record<string, string>)
   if (isCanvasDocumentJson(raw)) {
     const doc = deserializeCanvasDocument(raw)
     if (doc) {
-      return doc.pages.map(p => ({
-        html: convertCanvasDocumentToHtml({ ...doc, pages: [p] }, vars),
+      const totalPages = doc.pages.length
+      return doc.pages.map((p, pageOffset) => ({
+        html: convertCanvasDocumentToHtml({ ...doc, pages: [p] }, vars, { pageOffset, totalPages }),
         isCanvas: true,
       }))
     }

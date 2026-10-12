@@ -37,14 +37,9 @@ import { useUiStore } from '@/stores/ui'
 import { useAuthStore } from '@/stores/auth'
 import type { Student } from '@/types'
 
-const props = withDefaults(defineProps<{
+const props = defineProps<{
   isOpen: boolean
-  initialTemplateKey?: string
-  initialContent?: string
-}>(), {
-  initialTemplateKey: '',
-  initialContent: ''
-})
+}>()
 
 const emit = defineEmits<{
   close: []
@@ -345,7 +340,15 @@ const previewPages = computed<string[]>(() => {
     const doc = deserializeCanvasDocument(templateContent)
     if (doc) {
       const vars = buildVariableValues(previewStudentShape.value, meta)
-      return doc.pages.map(p => convertCanvasDocumentToHtml({ ...doc, pages: [p] }, vars))
+      const totalPages = doc.pages.length
+      // Each page is converted from a single-page slice (so contract
+      // page-break CSS/markers stay per-page), which on its own would
+      // make every page compute pageIdx=0/totalPages=1 for {{page_number}}
+      // - pageNumbering supplies this page's real position in the full
+      // document instead.
+      return doc.pages.map((p, pageOffset) =>
+        convertCanvasDocumentToHtml({ ...doc, pages: [p] }, vars, { pageOffset, totalPages })
+      )
     }
   }
 
@@ -548,7 +551,7 @@ watch(
     if (val) {
       step.value = 'form'
       errorMessage.value = ''
-      selectedTemplateKey.value = props.initialTemplateKey || ''
+      selectedTemplateKey.value = ''
       fullNameQuery.value = ''
       selectedExistingStudent.value = null
       isNameFocused.value = false
