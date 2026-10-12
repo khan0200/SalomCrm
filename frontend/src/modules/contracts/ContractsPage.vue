@@ -1313,65 +1313,8 @@ async function handleUnarchive(contract: Contract) {
                       <!-- Column 5: Status + Contextual Action (At the right edge) -->
                       <td class="py-3 px-4 align-middle text-right" @click.stop>
                         <div class="flex items-center justify-end gap-2">
-                        <!-- Pending status: shows badge + Tasdiqlash button / code -->
-                        <div v-if="contract.status === 'pending'" class="flex items-center justify-end gap-2.5 flex-nowrap whitespace-nowrap">
-                          <div class="flex flex-col items-end gap-0.5">
-                            <span
-                              class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium border leading-none"
-                              :class="getStatusBadgeClass(contract.status)"
-                            >
-                              <span class="w-1.5 h-1.5 rounded-full shrink-0" :class="getStatusDotClass(contract.status)" />
-                              <span>{{ getStatusLabel(contract.status) }}</span>
-                            </span>
-                            <span class="font-mono text-[10px] text-zinc-400 dark:text-zinc-500 pr-0.5 whitespace-nowrap">
-                              {{ formatContractDate(contract.created_at) }}
-                            </span>
-                          </div>
-
-                          <!-- Tasdiqlash Button (if code not generated yet) - Manager+ only,
-                               matches the rest of the app's "Staff views, doesn't confirm" rule -->
-                          <template v-if="!contract.verification_code">
-                            <button
-                              v-if="authStore.isManager"
-                              type="button"
-                              @click.stop="openAssignModal(contract)"
-                              class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-black text-white dark:bg-zinc-100 dark:hover:bg-white dark:text-zinc-950 text-xs font-medium shadow-2xs transition-all active:scale-[0.98] cursor-pointer"
-                              title="Student ID biriktirish va tasdiqlash kodi berish"
-                            >
-                              <KeyRound class="w-3.5 h-3.5 text-zinc-300 dark:text-zinc-600" />
-                              <span>Tasdiqlash</span>
-                            </button>
-                          </template>
-
-                          <!-- If Code Already Generated: Show Code + Copy + Regenerate -->
-                          <template v-else>
-                            <div class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-zinc-100 dark:bg-zinc-800/80 border border-zinc-200/80 dark:border-zinc-700/80 rounded-lg" @click.stop>
-                              <span class="font-mono font-semibold text-xs text-zinc-900 dark:text-zinc-100 tracking-wider">{{ contract.verification_code }}</span>
-                              <button
-                                type="button"
-                                @click.stop="copyCodeToClipboard(contract.verification_code)"
-                                class="p-0.5 hover:text-zinc-900 dark:hover:text-zinc-100 text-zinc-400 transition-colors cursor-pointer"
-                                title="Kodni nusxalash"
-                              >
-                                <Check v-if="copyFeedback" class="w-3.5 h-3.5 text-emerald-500" />
-                                <Copy v-else class="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                            <button
-                              v-if="authStore.isManager"
-                              type="button"
-                              @click.stop="handleRegenerateCode(contract)"
-                              :disabled="isRegenerating"
-                              class="p-1.5 rounded-md text-zinc-400 hover:text-amber-600 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
-                              title="Kodni qayta olish"
-                            >
-                              <RotateCcw class="w-3.5 h-3.5 text-amber-500" :class="{ 'animate-spin': isRegenerating }" />
-                            </button>
-                          </template>
-                        </div>
-
                         <!-- Rejected status: shows badge + permanent delete button -->
-                        <div v-else-if="contract.status === 'rejected'" class="flex items-center justify-end gap-2.5 flex-nowrap whitespace-nowrap">
+                        <div v-if="contract.status === 'rejected'" class="flex items-center justify-end gap-2.5 flex-nowrap whitespace-nowrap">
                           <div class="flex flex-col items-end gap-0.5">
                             <span
                               class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium border leading-none"

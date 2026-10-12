@@ -356,40 +356,50 @@ async function doSubmit() {
   }
 }
 
+const isDownloadingFinal = ref(false)
+const finalDownloadError = ref('')
+
 async function handleFinalDownload() {
-  if (!contractInfo.value) return
+  const c = contractInfo.value
+  if (!c) return
+  // The sign_token is marked used the moment doSubmit() succeeds, so
+  // re-fetching via getSignableContract here (like handleDownloadPreview
+  // does pre-signing) now 410s with reason 'used' - the already-loaded
+  // contractInfo from the successful submit is used instead of refetching.
+  isDownloadingFinal.value = true
+  finalDownloadError.value = ''
   try {
-    const fresh = await onlineContractsApi.getSignableContract(token.value)
-    const vars = buildVariableValues(fresh, {
-      contractNumber: fresh.contract_number,
-      templateName: fresh.tariff_name,
-      price: fresh.tariff_price,
-      discount: fresh.discount,
-      office: fresh.office,
-      educationLevel: fresh.education_level,
+    const vars = buildVariableValues(c, {
+      contractNumber: c.contract_number,
+      templateName: c.tariff_name,
+      price: c.tariff_price,
+      discount: c.discount,
+      office: c.office,
+      educationLevel: c.education_level,
       signatureData: studentSignature.value || undefined,
     })
     const verificationMeta = {
-      contractNumber: fresh.contract_number,
-      studentName: fresh.full_name,
-      verifiedAt: (fresh as unknown as { signed_at?: string }).signed_at
-        ? new Date((fresh as unknown as { signed_at?: string }).signed_at!).toLocaleDateString('uz-UZ')
-        : new Date().toLocaleDateString('uz-UZ'),
+      contractNumber: c.contract_number,
+      studentName: c.full_name,
+      verifiedAt: new Date().toLocaleDateString('uz-UZ'),
       status: 'signed',
     }
     await downloadContractAsPdf(
-      fresh.title || 'shartnoma',
-      fresh.canvas_source || fresh.content || '',
+      c.title || 'shartnoma',
+      c.canvas_source || c.content || '',
       undefined,
       vars,
       studentSignature.value || undefined,
       verificationMeta,
-      isMinor.value && fresh.guardian_contract_text
-        ? { content: fresh.guardian_contract_text, variableValues: vars }
+      isMinor.value && c.guardian_contract_text
+        ? { content: c.guardian_contract_text, variableValues: vars }
         : undefined
     )
   } catch (err) {
     console.error('Failed to download signed contract:', err)
+    finalDownloadError.value = "Shartnomani yuklab olishda xatolik yuz berdi. Qayta urinib ko'ring."
+  } finally {
+    isDownloadingFinal.value = false
   }
 }
 
@@ -883,13 +893,22 @@ onBeforeUnmount(() => {
           <p class="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed mb-5">
             Konsalting agentligi tez orada ko'rib chiqadi. Qo'shimcha savollar uchun agentlikka murojaat qiling.
           </p>
+          <div
+            v-if="finalDownloadError"
+            class="mb-4 p-3 rounded-lg bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/60 text-xs text-red-700 dark:text-red-300 flex items-start gap-2 text-left"
+          >
+            <AlertCircle class="w-4 h-4 shrink-0 mt-0.5 text-red-500" />
+            <span>{{ finalDownloadError }}</span>
+          </div>
           <button
             type="button"
             @click="handleFinalDownload"
-            class="inline-flex items-center justify-center gap-2 py-2.5 px-5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:hover:bg-white dark:text-zinc-950 text-xs font-semibold transition-all cursor-pointer active:scale-98 shadow-xs"
+            :disabled="isDownloadingFinal"
+            class="inline-flex items-center justify-center gap-2 py-2.5 px-5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:hover:bg-white dark:text-zinc-950 text-xs font-semibold transition-all cursor-pointer active:scale-98 shadow-xs disabled:opacity-60"
           >
-            <Download class="w-3.5 h-3.5" />
-            <span>Shartnomani yuklab olish</span>
+            <Loader2 v-if="isDownloadingFinal" class="w-3.5 h-3.5 animate-spin" />
+            <Download v-else class="w-3.5 h-3.5" />
+            <span>{{ isDownloadingFinal ? 'Tayyorlanmoqda...' : "Shartnomani yuklab olish" }}</span>
           </button>
         </div>
       </div>

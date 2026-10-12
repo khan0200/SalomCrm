@@ -537,11 +537,11 @@ class ContractSignSubmitView(APIView):
     identity_confirmed_at set AND kyc_status == 'VERIFIED', re-checked
     server-side (not just gated in the UI) since this is the endpoint
     that actually makes the contract binding. On success: status becomes
-    'pending' - the SAME status the old self-service flow lands on, so
-    every existing staff action (assign_student_id, reject_contract,
-    etc.) works on these contracts unmodified. Per the agreed design, no
-    separate post-signing verification-code step applies here - staff
-    already fully vetted the data up front.
+    'verified' directly - staff already fully vetted the data up front
+    and Didit has already verified the student's identity, so there is
+    no further "Assign Student ID / generate verification code" step
+    left for staff to do (that step belonged to the old self-service
+    email/OTP flow, where staff hadn't seen the student yet).
     """
     permission_classes = [permissions.AllowAny]
     throttle_classes = [ContractSignWriteThrottle]
@@ -625,7 +625,8 @@ class ContractSignSubmitView(APIView):
             'student': declarations,
             **({'guardian': data.get('guardian_declarations') or {}} if is_minor else {}),
         }
-        contract.status = 'pending'
+        contract.status = 'verified'
+        contract.verified_at = now
         contract.signed_at = now
         contract.signer_ip = get_client_ip(request)
         contract.signer_user_agent = request.META.get('HTTP_USER_AGENT', '')
