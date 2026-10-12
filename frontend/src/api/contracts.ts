@@ -63,6 +63,7 @@ export interface Contract {
   created_at: string
   updated_at: string
   created_by_name?: string | null
+  created_by_email?: string | null
   updated_by_name?: string | null
   updated_by_branch_name?: string | null
   is_identity_verified?: boolean

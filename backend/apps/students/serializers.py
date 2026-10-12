@@ -425,6 +425,7 @@ class ContractListSerializer(serializers.ModelSerializer):
     student_name = serializers.SerializerMethodField()
     student_passport = serializers.SerializerMethodField()
     created_by_name = serializers.SerializerMethodField()
+    created_by_email = serializers.SerializerMethodField()
     rejected_by_name = serializers.SerializerMethodField()
     updated_by_name = serializers.SerializerMethodField()
     updated_by_branch_name = serializers.SerializerMethodField()
@@ -447,7 +448,7 @@ class ContractListSerializer(serializers.ModelSerializer):
             'is_minor', 'guardian_full_name', 'guardian_passport_number',
             'guardian_relation', 'guardian_phone', 'guardian_address',
             'guardian_signature_data', 'guardian_contract_text',
-            'created_at', 'updated_at', 'signed_at', 'created_by_name',
+            'created_at', 'updated_at', 'signed_at', 'created_by_name', 'created_by_email',
             'updated_by_name', 'updated_by_branch_name', 'is_identity_verified',
             # Needed so the Contracts table can offer a "copy signing link"
             # action on draft (not-yet-signed) rows without a second
@@ -474,6 +475,11 @@ class ContractListSerializer(serializers.ModelSerializer):
     def get_created_by_name(self, obj):
         if obj.created_by:
             return getattr(obj.created_by, 'full_name', None) or getattr(obj.created_by, 'email', None) or str(obj.created_by)
+        return None
+
+    def get_created_by_email(self, obj):
+        if obj.created_by:
+            return getattr(obj.created_by, 'email', None) or None
         return None
 
     def get_rejected_by_name(self, obj):
@@ -524,6 +530,7 @@ class ContractDetailSerializer(serializers.ModelSerializer):
     student_tariff = serializers.SerializerMethodField()
     student_university = serializers.CharField(source='student.university_1', read_only=True)
     created_by_name = serializers.SerializerMethodField()
+    created_by_email = serializers.SerializerMethodField()
     updated_by_name = serializers.SerializerMethodField()
     rejected_by_name = serializers.SerializerMethodField()
     email = serializers.SerializerMethodField()
@@ -547,7 +554,7 @@ class ContractDetailSerializer(serializers.ModelSerializer):
             'verification_code_used', 'verified_at', 'rejection_reason',
             'rejected_at', 'rejected_by_name', 'sign_token', 'sign_token_expires_at', 'sign_token_used_at',
             'kyc_status', 'signed_at', 'signer_ip', 'signer_user_agent',
-            'created_at', 'updated_at', 'created_by_name', 'updated_by_name'
+            'created_at', 'updated_at', 'created_by_name', 'created_by_email', 'updated_by_name'
         )
         read_only_fields = ('id', 'version', 'created_at', 'updated_at')
 
@@ -569,6 +576,11 @@ class ContractDetailSerializer(serializers.ModelSerializer):
     def get_created_by_name(self, obj):
         if obj.created_by:
             return getattr(obj.created_by, 'full_name', None) or getattr(obj.created_by, 'email', None) or str(obj.created_by)
+        return None
+
+    def get_created_by_email(self, obj):
+        if obj.created_by:
+            return getattr(obj.created_by, 'email', None) or None
         return None
 
     def get_updated_by_name(self, obj):

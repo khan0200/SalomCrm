@@ -1241,7 +1241,7 @@ async function handleUnarchive(contract: Contract) {
                       <th class="py-2.5 px-4 font-medium w-36">Contract / ID</th>
                       <th class="py-2.5 px-4 font-medium w-52 sm:w-60">Tariff & Price</th>
                       <th class="py-2.5 px-4 font-medium">Student & Passport</th>
-                      <th class="py-2.5 px-4 font-medium">Tasdiqlagan xodim</th>
+                      <th class="py-2.5 px-4 font-medium">Shartnoma tuzgan xodim</th>
                       <th class="py-2.5 px-4 font-medium text-right">Status</th>
                     </tr>
                   </thead>
@@ -1298,12 +1298,16 @@ async function handleUnarchive(contract: Contract) {
                         </div>
                       </td>
 
-                      <!-- Column 4: Which staff member confirmed/last touched this contract, and their branch -->
+                      <!-- Column 4: Which staff member filled in / created this contract (who to ask
+                           if there's a question about this student later), and their branch -->
                       <td class="py-3 px-4 align-middle">
-                        <div v-if="contract.updated_by_name" class="font-medium text-zinc-900 dark:text-zinc-100 text-xs leading-snug">
-                          {{ contract.updated_by_name }}
+                        <div v-if="contract.created_by_name" class="font-medium text-zinc-900 dark:text-zinc-100 text-xs leading-snug">
+                          {{ contract.created_by_name }}
                         </div>
                         <div v-else class="text-zinc-400 italic text-[11px]">—</div>
+                        <div v-if="contract.created_by_email" class="text-[11px] text-zinc-400 truncate">
+                          {{ contract.created_by_email }}
+                        </div>
                         <div v-if="contract.updated_by_branch_name" class="text-[11px] text-zinc-400 flex items-center gap-1 mt-0.5">
                           <Building2 class="w-3 h-3 shrink-0" />
                           <span>{{ contract.updated_by_branch_name }}</span>
