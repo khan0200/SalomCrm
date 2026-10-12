@@ -62,15 +62,9 @@ const elementStyle = computed(() => {
   const fontSizePt = st.fontSize || 14
   // 1pt = 4/3 px at 96 DPI (rendered at 100% base scale on canvas sheet)
   const fontSizePx = fontSizePt * (4 / 3)
-  // Matches resolveFontFamilyCss's convention (contractFonts.ts): when the
-  // element's own font is the default "Times New Roman" (or unset), the
-  // actual glyphs come from the 'Tinos' web font so the editor's own text
-  // measurement agrees with every downstream render (preview/PDF/signing
-  // page) - otherwise element heights estimated here drift from what the
-  // student or staff later sees, same issue that caused page 2/4 overlap.
-  const resolvedFont = st.fontFamily && st.fontFamily !== 'Times New Roman'
+  const resolvedFont = st.fontFamily
     ? `"${st.fontFamily}", 'Times New Roman', Times, Georgia, serif`
-    : "'Tinos', 'Times New Roman', Times, Georgia, serif"
+    : "'Times New Roman', Times, Georgia, serif"
 
   let fontColor = st.color || '#000000'
   if (!props.isEditing && (props.readonly || (props.variableValues && Object.keys(props.variableValues).length > 0))) {

@@ -1,6 +1,5 @@
 // Dynamic Contract Variables Catalog & Resolver
 import { generateQrCodeDataUrl } from './qrCode'
-import { resolveFontFamilyCss } from './contractFonts'
 
 /**
  * Public verification page: anyone holding the printed contract (or its QR
@@ -476,7 +475,7 @@ export function buildVariableValues(
   if (verificationUrl) {
     try {
       const qrDataUrl = generateQrCodeDataUrl(verificationUrl, { size: 200, color: '#2563eb' })
-      qrCodeHtml = `<div style="display:inline-flex;flex-direction:column;align-items:center;gap:1mm;line-height:1;"><img src="${qrDataUrl}" style="width:24mm;height:24mm;object-fit:contain;" alt="QR" /><span style="font-family:${resolveFontFamilyCss()};font-size:6.5pt;color:#2563eb;font-weight:bold;">${qrDateLabel}</span></div>`
+      qrCodeHtml = `<div style="display:inline-flex;flex-direction:column;align-items:center;gap:1mm;line-height:1;"><img src="${qrDataUrl}" style="width:24mm;height:24mm;object-fit:contain;" alt="QR" /><span style="font-family:'Times New Roman',serif;font-size:6.5pt;color:#2563eb;font-weight:bold;">${qrDateLabel}</span></div>`
     } catch {
       qrCodeHtml = ''
     }

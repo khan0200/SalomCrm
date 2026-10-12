@@ -4,7 +4,6 @@ import {
   deserializeCanvasDocument,
   convertCanvasDocumentToHtml,
 } from './contractCanvasConverter'
-import { resolveFontFamilyCss } from './contractFonts'
 import { replaceVariablesInHtml } from './contractVariables'
 
 /**
@@ -90,7 +89,7 @@ export function prepareContractHtml(
       // If signature is provided and not already rendered in canvas HTML
       if (signatureData && !canvasHtml.includes('alt="Talaba Imzosi"') && !canvasHtml.includes('alt="Imzo"')) {
         canvasHtml += `
-          <div style="margin: 20px 0; padding: 14px 18px; border: 1.5px solid #059669; border-radius: 10px; background: #f0fdf4; font-family: ${resolveFontFamilyCss()}; font-size: 11pt; color: #064e3b; page-break-inside: avoid;">
+          <div style="margin: 20px 0; padding: 14px 18px; border: 1.5px solid #059669; border-radius: 10px; background: #f0fdf4; font-family: 'Times New Roman', serif; font-size: 11pt; color: #064e3b; page-break-inside: avoid;">
             <div style="display: flex; justify-content: space-between; align-items: center;">
               <div>
                 <div style="font-weight: bold; font-size: 11.5pt; text-transform: uppercase; color: #065f46;">Elektron Imzolangan Shartnoma</div>
@@ -147,7 +146,7 @@ export function prepareContractHtml(
   // If signature is provided and not already rendered
   if (signatureData && !processedHtml.includes('alt="Talaba Imzosi"')) {
     processedHtml += `
-      <div style="margin-top: 24px; padding: 14px 18px; border: 1.5px solid #059669; border-radius: 10px; background: #f0fdf4; font-family: ${resolveFontFamilyCss()}; font-size: 11pt; color: #064e3b; page-break-inside: avoid;">
+      <div style="margin-top: 24px; padding: 14px 18px; border: 1.5px solid #059669; border-radius: 10px; background: #f0fdf4; font-family: 'Times New Roman', serif; font-size: 11pt; color: #064e3b; page-break-inside: avoid;">
         <div style="display: flex; justify-content: space-between; align-items: center;">
           <div>
             <div style="font-weight: bold; font-size: 11.5pt; text-transform: uppercase; color: #065f46;">Elektron Imzolangan Shartnoma</div>
@@ -211,7 +210,7 @@ async function renderDocumentIntoPdf(
   }
 
   const verificationBanner = signatureData ? `
-    <div style="margin: 20px 0 0; padding: 14px 18px; border: 1.5px solid #059669; border-radius: 10px; background: #f0fdf4; font-family: ${resolveFontFamilyCss()}; font-size: 11pt; color: #064e3b; page-break-inside: avoid;">
+    <div style="margin: 20px 0 0; padding: 14px 18px; border: 1.5px solid #059669; border-radius: 10px; background: #f0fdf4; font-family: 'Times New Roman', serif; font-size: 11pt; color: #064e3b; page-break-inside: avoid;">
       <div style="display: flex; justify-content: space-between; align-items: center;">
         <div>
           <div style="font-weight: bold; font-size: 11.5pt; text-transform: uppercase; color: #065f46;">Elektron Imzolangan Shartnoma</div>
@@ -362,7 +361,7 @@ async function renderDocumentIntoPdf(
     width: 794px;
     background: #ffffff;
     color: #111827;
-    font-family: ${resolveFontFamilyCss()};
+    font-family: 'Times New Roman', serif;
     font-size: 13.5px;
     line-height: 1.65;
     box-sizing: border-box;
@@ -380,7 +379,7 @@ async function renderDocumentIntoPdf(
         text-size-adjust: 100% !important;
       }
       .contract-pdf-content {
-        font-family: ${resolveFontFamilyCss()} !important;
+        font-family: 'Times New Roman', Times, serif !important;
         font-size: 13.5px;
         line-height: 1.65;
         color: #111827 !important;
@@ -656,9 +655,6 @@ export function printContractAsPdf(
     <head>
       <meta charset="utf-8">
       <title>${safeTitle}</title>
-      <link rel="preconnect" href="https://fonts.googleapis.com">
-      <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-      <link href="https://fonts.googleapis.com/css2?family=Tinos:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
       <style>
         @page {
           size: A4 portrait;
@@ -667,7 +663,7 @@ export function printContractAsPdf(
         body {
           margin: 0;
           padding: 0;
-          font-family: ${resolveFontFamilyCss()};
+          font-family: 'Times New Roman', serif;
           font-size: 13.5px;
           line-height: 1.65;
           color: #000;

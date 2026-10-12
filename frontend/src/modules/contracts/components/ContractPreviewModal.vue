@@ -28,7 +28,6 @@ import {
   convertCanvasDocumentToHtml,
 } from '@/modules/contracts/utils/contractCanvasConverter'
 import { buildVariableValues, replaceVariablesInHtml } from '@/modules/contracts/utils/contractVariables'
-import { resolveFontFamilyCss } from '@/modules/contracts/utils/contractFonts'
 
 const props = defineProps<{
   isOpen: boolean
@@ -479,7 +478,7 @@ function formatRejectionDate(dateStr?: string | null): string {
           :key="pageIndex"
           class="preview-a4-sheet relative bg-white text-zinc-900 shadow-xl border border-zinc-200/90 font-serif rounded-xs"
           :class="page.isCanvas ? 'is-canvas-sheet p-0 overflow-hidden w-[210mm] min-h-[297mm] shrink-0' : 'p-8 sm:p-14 min-h-[1050px] w-full max-w-[794px]'"
-          :style="{ fontFamily: resolveFontFamilyCss() }"
+          style="font-family: 'Times New Roman', Times, serif;"
         >
           <!-- Top Page badge (non-canvas only) -->
           <div v-if="!page.isCanvas" class="absolute top-4 right-6 text-[10.5px] uppercase font-bold tracking-widest text-zinc-400 select-none no-print">
@@ -503,14 +502,14 @@ function formatRejectionDate(dateStr?: string | null): string {
 
 <style>
 .preview-a4-sheet {
-  font-family: 'Tinos', 'Times New Roman', Times, serif !important;
+  font-family: 'Times New Roman', Times, serif !important;
   font-size: 13px;
   line-height: 1.6;
 }
 
 .preview-a4-sheet,
 .preview-a4-sheet * {
-  font-family: 'Tinos', 'Times New Roman', Times, serif !important;
+  font-family: 'Times New Roman', Times, serif !important;
 }
 
 .preview-a4-sheet:not(.is-canvas-sheet) p {

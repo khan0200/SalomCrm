@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { SignatureCanvasElement } from '../../types/contractCanvas'
-import { resolveFontFamilyCss } from '../../utils/contractFonts'
 
 const props = defineProps<{
   element: SignatureCanvasElement
@@ -58,7 +57,7 @@ const borderTopWidthPx = 2
   <div
     class="canvas-signature-element w-full h-full border-zinc-900 font-serif text-zinc-900"
     :style="{
-      fontFamily: resolveFontFamilyCss(),
+      fontFamily: '\'Times New Roman\', Times, serif',
       fontSize: `${baseFontSizePx}px`,
       borderTop: `${borderTopWidthPx}px solid #18181b`,
       paddingTop: '10px'
