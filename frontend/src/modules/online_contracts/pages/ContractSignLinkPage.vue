@@ -163,18 +163,28 @@ async function loadStatus() {
       return
     }
     contractInfo.value = res
+    // Preloaded so the 'kyc' step can skip itself straight to 'signature'
+    // once identity is re-verified, without a second network round-trip -
+    // KYC's own completion (unlike identity) stays valid across visits,
+    // since Didit already independently verified the document+face once.
+    kycStatus.value = res.kyc_status || 'NOT_STARTED'
 
     // Resume at whichever step matches server state, so a returning
     // student (closed the tab, or scanned the QR on the finished contract
     // weeks later) never has to redo a finished step - has_signature now
     // stays true forever once set, so this same link permanently lands here.
+    //
+    // identity_confirmed/kyc_status are intentionally NOT used to skip
+    // straight to 'preview'/'signature': a sign_token is one shared link,
+    // and a past successful confirm-identity or KYC call doesn't prove
+    // THIS visitor is the real student - every visit must re-enter
+    // passport+DOB before anything else, so a signature can never be
+    // collected from someone who never typed in the real student's own
+    // identifying details. handleConfirmIdentity() picks the right next
+    // step (kyc vs signature) once identity is freshly re-verified.
     if (res.has_signature) {
       justSigned.value = false
       step.value = 'done'
-    } else if (res.kyc_status === 'VERIFIED') {
-      step.value = 'signature'
-    } else if (res.identity_confirmed) {
-      step.value = 'preview'
     } else {
       step.value = 'identity'
     }
@@ -623,7 +633,7 @@ onBeforeUnmount(() => {
 
           <button
             type="button"
-            @click="step = 'kyc'"
+            @click="step = kycStatus === 'VERIFIED' ? 'signature' : 'kyc'"
             :disabled="!canProceedFromPreview"
             class="w-full inline-flex items-center justify-center gap-2 py-3 px-4 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:hover:bg-white dark:text-zinc-950 text-sm font-medium transition-all cursor-pointer disabled:opacity-40 active:scale-98 shadow-xs"
           >

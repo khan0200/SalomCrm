@@ -218,9 +218,6 @@ class ContractConfirmIdentityView(APIView):
         if reason != 'ok':
             return Response({'detail': "Bu havola endi amal qilmaydi."}, status=status.HTTP_410_GONE)
 
-        if contract.identity_confirmed_at:
-            return Response({'detail': 'Shaxs allaqachon tasdiqlangan.', 'identity_confirmed': True}, status=status.HTTP_200_OK)
-
         input_dob = normalize_date_to_iso((request.data.get('date_of_birth') or '').strip())
         input_passport = (request.data.get('passport_number') or '').strip().upper()
         stored_dob = normalize_date_to_iso(contract.date_of_birth)
