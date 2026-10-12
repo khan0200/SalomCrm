@@ -590,10 +590,6 @@ watch(
           <Check class="w-6 h-6" />
         </div>
         <h3 class="text-sm font-bold text-zinc-900 dark:text-zinc-100">Contract created</h3>
-        <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-          Send the link below to the student - no account needed, they just confirm their date of birth and
-          passport number, complete identity verification, and sign.
-        </p>
       </div>
 
       <!-- Student details summary -->
