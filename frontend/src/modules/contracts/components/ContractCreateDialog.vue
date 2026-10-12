@@ -48,7 +48,7 @@ const emit = defineEmits<{
 
 const uiStore = useUiStore()
 const authStore = useAuthStore()
-const { formatAmountInput, parseAmount } = useCurrency()
+const { formatAmountInput, parseAmount, formatCurrency } = useCurrency()
 
 // ── Education Level options from Settings ────────────────────────────────
 const { data: levelsData } = useQuery({
@@ -596,6 +596,79 @@ watch(
         </p>
       </div>
 
+      <!-- Student details summary -->
+      <div class="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/60 dark:bg-zinc-900/40 overflow-hidden">
+        <div class="px-4 py-3 border-b border-zinc-200 dark:border-zinc-800 flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-lg bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-950 flex items-center justify-center shrink-0">
+            <UserRound class="w-4 h-4" />
+          </div>
+          <div class="min-w-0">
+            <div class="text-sm font-bold text-zinc-900 dark:text-zinc-100 truncate">
+              {{ createdContract?.full_name || '—' }}
+            </div>
+            <div class="text-[11px] text-zinc-500 dark:text-zinc-400 font-mono">
+              {{ createdContract?.contract_number || '—' }}
+            </div>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-px bg-zinc-200 dark:bg-zinc-800">
+          <div class="bg-zinc-50/60 dark:bg-zinc-900/40 px-4 py-2.5">
+            <div class="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 mb-0.5">
+              <CreditCard class="w-3 h-3" />
+              <span>Passport</span>
+            </div>
+            <div class="text-xs font-mono font-semibold text-zinc-800 dark:text-zinc-200 truncate">
+              {{ createdContract?.passport_number || '—' }}
+            </div>
+          </div>
+          <div class="bg-zinc-50/60 dark:bg-zinc-900/40 px-4 py-2.5">
+            <div class="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 mb-0.5">
+              <CreditCard class="w-3 h-3" />
+              <span>Date of Birth</span>
+            </div>
+            <div class="text-xs font-semibold text-zinc-800 dark:text-zinc-200 truncate">
+              {{ createdContract?.date_of_birth || '—' }}
+            </div>
+          </div>
+          <div class="bg-zinc-50/60 dark:bg-zinc-900/40 px-4 py-2.5">
+            <div class="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 mb-0.5">
+              <GraduationCap class="w-3 h-3" />
+              <span>Tariff</span>
+            </div>
+            <div class="text-xs font-semibold text-zinc-800 dark:text-zinc-200 truncate">
+              {{ createdContract?.tariff_name || '—' }}
+            </div>
+          </div>
+          <div class="bg-zinc-50/60 dark:bg-zinc-900/40 px-4 py-2.5">
+            <div class="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 mb-0.5">
+              <Building2 class="w-3 h-3" />
+              <span>Office</span>
+            </div>
+            <div class="text-xs font-semibold text-zinc-800 dark:text-zinc-200 truncate">
+              {{ createdContract?.office || '—' }}
+            </div>
+          </div>
+          <div class="bg-zinc-50/60 dark:bg-zinc-900/40 px-4 py-2.5">
+            <div class="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 mb-0.5">
+              <Phone class="w-3 h-3" />
+              <span>Phone</span>
+            </div>
+            <div class="text-xs font-semibold text-zinc-800 dark:text-zinc-200 truncate">
+              {{ createdContract?.phone1 || '—' }}
+            </div>
+          </div>
+          <div v-if="createdContract?.discount" class="bg-zinc-50/60 dark:bg-zinc-900/40 px-4 py-2.5">
+            <div class="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 mb-0.5">
+              <Wallet class="w-3 h-3" />
+              <span>Discount</span>
+            </div>
+            <div class="text-xs font-semibold text-zinc-800 dark:text-zinc-200 truncate">
+              {{ formatCurrency(createdContract.discount) }}
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div v-if="signLinkUrl" class="p-3.5 rounded-2xl bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/40 dark:to-indigo-950/30 border border-blue-200/80 dark:border-blue-900/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-2xs">
         <div class="flex items-center gap-2.5 min-w-0">
           <div class="w-7 h-7 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-xs">
@@ -620,6 +693,9 @@ watch(
           <Copy v-else class="w-3.5 h-3.5" />
           <span>{{ isCopiedSignLink ? 'Copied!' : 'Copy Link' }}</span>
         </button>
+      </div>
+      <div v-else class="p-3.5 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200/80 dark:border-amber-900/50 text-xs text-amber-700 dark:text-amber-300">
+        Signing link is not available for this contract yet.
       </div>
 
       <div class="flex items-center justify-end gap-3 pt-2">

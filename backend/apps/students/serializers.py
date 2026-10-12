@@ -611,7 +611,7 @@ class ContractCreateUpdateSerializer(serializers.ModelSerializer):
             # (contract_sign_views.py) - all optional, all already existed
             # as model columns, just not writable through this serializer
             # before. sign_token/kyc_*/identity_confirm_* stay server-managed
-            # only (never listed here), same as verification_code already was.
+            # only (never writable here), same as verification_code already was.
             'tariff_option', 'tariff_name', 'tariff_price', 'discount',
             'passport_number', 'full_name', 'education_level', 'date_of_birth',
             'office', 'phone1', 'phone2',
@@ -627,8 +627,13 @@ class ContractCreateUpdateSerializer(serializers.ModelSerializer):
             # never retypes this data.
             'guardian_full_name', 'guardian_passport_number', 'guardian_relation',
             'guardian_phone', 'guardian_address',
+            # Read-only so the create() response carries the freshly-generated
+            # token straight away - ContractCreateDialog.vue's "done" step
+            # renders the signing link from this same create() response,
+            # without it the link silently never appeared.
+            'sign_token', 'sign_token_expires_at',
         )
-        read_only_fields = ('id', 'version')
+        read_only_fields = ('id', 'version', 'sign_token', 'sign_token_expires_at')
 
     def to_internal_value(self, data):
         data = data.copy() if hasattr(data, 'copy') else dict(data)
