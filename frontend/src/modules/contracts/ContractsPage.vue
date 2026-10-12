@@ -1386,11 +1386,10 @@ async function handleUnarchive(contract: Contract) {
                           </div>
 
                           <button
-                            v-if="authStore.isManager"
                             type="button"
                             @click.stop="deletingContract = contract"
                             class="p-1.5 rounded-lg border border-rose-200 dark:border-rose-900/60 bg-rose-50/70 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/60 transition-all cursor-pointer shadow-2xs active:scale-95"
-                            title="Rad etilgan shartnomani bazadan butunlay o'chirib yuborish"
+                            title="Rad etilgan shartnomani bazadan butunlay o'chirib yuborish (Head Manager tasdig'i talab qilinadi)"
                           >
                             <Trash2 class="w-3.5 h-3.5" />
                           </button>
@@ -1422,20 +1421,40 @@ async function handleUnarchive(contract: Contract) {
                             <Globe v-else class="w-3.5 h-3.5" />
                             <span>{{ copiedSignLinkContractId === contract.id ? 'Nusxalandi!' : 'Havola' }}</span>
                           </button>
+                          <button
+                            type="button"
+                            @click.stop="deletingContract = contract"
+                            class="p-1.5 rounded-lg border border-rose-200 dark:border-rose-900/60 bg-rose-50/70 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/60 transition-all cursor-pointer shadow-2xs active:scale-95"
+                            title="Shartnomani o'chirish"
+                          >
+                            <Trash2 class="w-3.5 h-3.5" />
+                          </button>
                         </div>
 
-                        <!-- All other statuses (verified, signed, etc.): Flush right status badge + date -->
-                        <div v-else class="flex flex-col items-end gap-1">
-                          <span
-                            class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium border leading-none"
-                            :class="getStatusBadgeClass(contract.status)"
+                        <!-- All other statuses (verified, signed, etc.): badge + date, plus
+                             delete when the backend would actually allow it (not verified/pending). -->
+                        <div v-else class="flex items-center justify-end gap-2.5 flex-nowrap whitespace-nowrap">
+                          <div class="flex flex-col items-end gap-0.5">
+                            <span
+                              class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium border leading-none"
+                              :class="getStatusBadgeClass(contract.status)"
+                            >
+                              <span class="w-1.5 h-1.5 rounded-full shrink-0" :class="getStatusDotClass(contract.status)" />
+                              <span>{{ getStatusLabel(contract.status) }}</span>
+                            </span>
+                            <span class="font-mono text-[10.5px] text-zinc-400 dark:text-zinc-500 pr-0.5 whitespace-nowrap">
+                              {{ formatContractDate(contract.created_at) }}
+                            </span>
+                          </div>
+                          <button
+                            v-if="!['verified', 'pending'].includes(contract.status)"
+                            type="button"
+                            @click.stop="deletingContract = contract"
+                            class="p-1.5 rounded-lg border border-rose-200 dark:border-rose-900/60 bg-rose-50/70 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/60 transition-all cursor-pointer shadow-2xs active:scale-95"
+                            title="Shartnomani o'chirish"
                           >
-                            <span class="w-1.5 h-1.5 rounded-full shrink-0" :class="getStatusDotClass(contract.status)" />
-                            <span>{{ getStatusLabel(contract.status) }}</span>
-                          </span>
-                          <span class="font-mono text-[10.5px] text-zinc-400 dark:text-zinc-500 pr-0.5 whitespace-nowrap">
-                            {{ formatContractDate(contract.created_at) }}
-                          </span>
+                            <Trash2 class="w-3.5 h-3.5" />
+                          </button>
                         </div>
 
                         <!-- View: available for any status, always shown -->

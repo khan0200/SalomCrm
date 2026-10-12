@@ -423,13 +423,15 @@ function formatRejectionDate(dateStr?: string | null): string {
           <span>Bekor qilish</span>
         </button>
 
-        <!-- Shartnomani butunlay o'chirish (Permanently Delete - Faqat Rejected holatida) -->
+        <!-- Shartnomani o'chirish (rejected uchun butunlay, boshqa holatlar uchun soft-delete -
+             haqiqiy ruxsat Head Manager parol tasdig'i orqali tekshiriladi, shuning uchun bu
+             yerda rolga qarab yashirilmaydi). verified/pending holatini backend baribir rad etadi. -->
         <button
-          v-if="activeContract.status === 'rejected' && authStore.isManager"
+          v-if="!['verified', 'pending'].includes(activeContract.status)"
           type="button"
           @click="emit('delete', activeContract)"
           class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-rose-200 dark:border-rose-900/60 bg-rose-50/80 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/60 text-xs font-medium transition-all shadow-2xs cursor-pointer active:scale-95"
-          title="Rad etilgan shartnomani bazadan butunlay o'chirib yuborish"
+          :title="activeContract.status === 'rejected' ? 'Rad etilgan shartnomani bazadan butunlay o\'chirib yuborish' : 'Shartnomani o\'chirish'"
         >
           <Trash2 class="w-3.5 h-3.5" />
           <span>O'chirib yuborish</span>
