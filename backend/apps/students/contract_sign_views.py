@@ -158,6 +158,12 @@ class ContractSignStatusView(APIView):
             # before the student signs. Not sensitive (same text staff
             # already see), unlike passport/DOB which stay write-only here.
             'content': contract.content,
+            # Original canvas-contract JSON (unresolved {{tokens}}, each
+            # page's own fixed 210x297mm sizing) - lets the signing page
+            # render true-to-size, correctly paginated pages and produce a
+            # correctly laid-out PDF, the same way the staff Contracts
+            # preview does. Blank for plain-HTML (non-canvas) tariffs.
+            'canvas_source': contract.canvas_source,
             'guardian_contract_text': get_guardian_contract_text(contract.tenant) if is_minor_hint else '',
             'tenant': {
                 'id': str(tenant.id),

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute } from 'vue-router'
 import {
   ShieldCheck, ScanFace, FileSignature, CheckCircle2, AlertCircle,
@@ -11,6 +11,11 @@ import {
   type IdentityVerificationStatus,
 } from '@/api/onlineContracts'
 import { downloadContractAsPdf } from '@/modules/contracts/utils/contractPdf'
+import {
+  isCanvasDocumentJson,
+  deserializeCanvasDocument,
+  convertCanvasDocumentToHtml,
+} from '@/modules/contracts/utils/contractCanvasConverter'
 import OnlineContractSignatureModal from '../components/OnlineContractSignatureModal.vue'
 
 // Single-page state machine for the staff-prefilled, no-login signing
@@ -87,13 +92,57 @@ const canProceedFromPreview = computed(() =>
 )
 const isDownloadingPreview = ref(false)
 
+// A canvas-contract tariff (built in the A4 editor) stores fixed
+// 210x297mm pages - rendering contract.content (flattened HTML) as one
+// unbroken v-html blob loses that sizing and page boundaries entirely,
+// same issue ContractCreateDialog.vue's own preview had. canvas_source
+// (the original, per-page-sized JSON) is used instead when present, split
+// into one scaled sheet per page; otherwise this just flows as plain text.
+const isCanvasPreview = computed(() => isCanvasDocumentJson(contractInfo.value?.canvas_source || ''))
+const previewPages = computed<string[]>(() => {
+  const source = contractInfo.value?.canvas_source || ''
+  if (!isCanvasDocumentJson(source)) return []
+  const doc = deserializeCanvasDocument(source)
+  if (!doc) return []
+  const totalPages = doc.pages.length
+  return doc.pages.map((p, pageOffset) =>
+    convertCanvasDocumentToHtml({ ...doc, pages: [p] }, {}, { pageOffset, totalPages })
+  )
+})
+
+// Same mm->px scaling approach as ContractCreateDialog.vue's preview -
+// browser's own 96dpi conversion instead of measuring the rendered
+// element (unreliable right after a step change, before v-html paints).
+const PAGE_WIDTH_PX = 210 * (96 / 25.4)
+const PAGE_HEIGHT_PX = 297 * (96 / 25.4)
+const previewWrapperRef = ref<HTMLElement | null>(null)
+const previewWrapperWidth = ref(0)
+const previewScale = computed(() => {
+  if (!previewWrapperWidth.value) return 1
+  return Math.min(1, previewWrapperWidth.value / PAGE_WIDTH_PX)
+})
+let previewResizeObserver: ResizeObserver | null = null
+
+watch(previewWrapperRef, (el) => {
+  previewResizeObserver?.disconnect()
+  previewResizeObserver = null
+  if (el) {
+    previewWrapperWidth.value = el.clientWidth
+    previewResizeObserver = new ResizeObserver((entries) => {
+      const width = entries[0]?.contentRect.width
+      if (width) previewWrapperWidth.value = width
+    })
+    previewResizeObserver.observe(el)
+  }
+})
+
 async function handleDownloadPreview() {
   if (!contractInfo.value?.content) return
   isDownloadingPreview.value = true
   try {
     await downloadContractAsPdf(
       contractInfo.value.title || 'shartnoma',
-      contractInfo.value.content,
+      contractInfo.value.canvas_source || contractInfo.value.content,
       undefined,
       undefined,
       undefined,
@@ -344,7 +393,7 @@ async function handleFinalDownload() {
     const fresh = await onlineContractsApi.getSignableContract(token.value)
     await downloadContractAsPdf(
       fresh.title || 'shartnoma',
-      fresh.content || '',
+      fresh.canvas_source || fresh.content || '',
       undefined,
       undefined,
       studentSignature.value || undefined,
@@ -363,7 +412,10 @@ onMounted(async () => {
   await loadStatus()
 })
 
-onBeforeUnmount(() => stopPolling())
+onBeforeUnmount(() => {
+  stopPolling()
+  previewResizeObserver?.disconnect()
+})
 </script>
 
 <template>
@@ -530,8 +582,30 @@ onBeforeUnmount(() => stopPolling())
             </button>
           </div>
 
-          <div class="max-h-[45vh] overflow-y-auto rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50/60 dark:bg-zinc-950/40 p-4 text-[13px] leading-relaxed mb-5">
-            <div v-html="contractInfo?.content || ''" />
+          <div
+            ref="previewWrapperRef"
+            class="max-h-[45vh] overflow-y-auto overflow-x-hidden rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-950 p-3 mb-5"
+          >
+            <!-- Canvas-contract tariff: one scaled A4 sheet per page, so
+                 page boundaries and each page's true 210x297mm sizing
+                 stay visible (mirrors ContractCreateDialog.vue's preview). -->
+            <div v-if="isCanvasPreview" class="flex flex-col items-center gap-3">
+              <div
+                v-for="(pageHtml, idx) in previewPages"
+                :key="idx"
+                class="shrink-0 bg-white shadow-sm overflow-hidden"
+                :style="{ width: `${PAGE_WIDTH_PX * previewScale}px`, height: `${PAGE_HEIGHT_PX * previewScale}px` }"
+              >
+                <div
+                  class="origin-top-left"
+                  :style="{ width: `${PAGE_WIDTH_PX}px`, height: `${PAGE_HEIGHT_PX}px`, transform: `scale(${previewScale})` }"
+                  v-html="pageHtml"
+                />
+              </div>
+            </div>
+            <!-- Plain HTML template (not an A4 canvas document) - no fixed
+                 page size to scale against, just render as flowing text. -->
+            <div v-else class="bg-white p-4 text-[13px] leading-relaxed" v-html="contractInfo?.content || ''" />
           </div>
 
           <div class="space-y-3 mb-5">

@@ -82,6 +82,10 @@ export interface ContractSignStatusResponse {
   kyc_status?: IdentityVerificationStatus
   has_signature?: boolean
   content?: string
+  // Original canvas-contract JSON (unresolved {{tokens}}), when the tariff
+  // was built in the A4 canvas editor - see Contract.canvas_source on the
+  // backend. Used for a correctly paginated, true-to-size preview/PDF.
+  canvas_source?: string
   guardian_contract_text?: string
   tenant?: {
     id: string
