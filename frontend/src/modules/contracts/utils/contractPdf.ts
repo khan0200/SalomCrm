@@ -293,6 +293,18 @@ async function renderDocumentIntoPdf(
             )
           }
 
+          // Without an explicit windowHeight, html2canvas falls back to
+          // the real window.innerHeight as its virtual viewport - on a
+          // phone that's often 600-800px, far short of this A4 page's
+          // ~1123px (297mm @ 96dpi) or more if this page's own content
+          // overflows its nominal height. Anything below that line never
+          // made it into the screenshot and was silently cut off when
+          // addImage stretched the (shorter) capture to fill a full
+          // 297mm-tall PDF page. pageContainer.scrollHeight is this
+          // element's own actual rendered height, so it's always tall
+          // enough regardless of device or content length.
+          const windowHeight = Math.max(1200, pageContainer.scrollHeight)
+
           const canvas = await html2canvas(pageContainer, {
             scale: 2.5,
             useCORS: true,
@@ -301,6 +313,7 @@ async function renderDocumentIntoPdf(
             scrollX: 0,
             scrollY: 0,
             windowWidth: 794,
+            windowHeight,
             onclone: (clonedDoc: Document) => {
               const fixStyle = clonedDoc.createElement('style')
               fixStyle.textContent = `
@@ -508,6 +521,16 @@ async function renderDocumentIntoPdf(
       )
     }
 
+    // Same reasoning as the canvas-document path above: without an
+    // explicit windowHeight, html2canvas falls back to the real
+    // window.innerHeight (often well under 800px on a phone) as its
+    // virtual viewport, silently cutting off anything below that line in
+    // this single tall flowing container before it's later sliced into
+    // pages. container.scrollHeight is this element's own actual
+    // rendered height, so it's always tall enough regardless of content
+    // length or device.
+    const windowHeight = Math.max(1200, container.scrollHeight)
+
     const canvas = await html2canvas(container, {
       scale: 2.5,
       useCORS: true,
@@ -516,6 +539,7 @@ async function renderDocumentIntoPdf(
       scrollX: 0,
       scrollY: 0,
       windowWidth: 794,
+      windowHeight,
       onclone: (clonedDoc: Document) => {
         const fixStyle = clonedDoc.createElement('style')
         fixStyle.textContent = `
