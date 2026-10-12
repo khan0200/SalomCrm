@@ -8,6 +8,7 @@ import type {
   PageMargins,
 } from '../types/contractCanvas'
 import { replaceVariablesInHtml } from './contractVariables'
+import { resolveFontFamilyCss } from './contractFonts'
 
 const DEFAULT_MARGINS: PageMargins = {
   top: 20,
@@ -22,6 +23,7 @@ const PAGE_HEIGHT_MM = 297
 function generateId(prefix: string): string {
   return `${prefix}_${Math.random().toString(36).substring(2, 9)}`
 }
+
 
 /**
  * Parses a real `<table>` element (our own exported HTML, or one pasted
@@ -633,10 +635,10 @@ export function convertCanvasDocumentToHtml(
         const fontWeight = st.fontWeight || 'normal'
         const fontStyle = st.fontStyle || 'normal'
         const textDecoration = st.textDecoration || 'none'
-        const fontFamily = st.fontFamily || 'Times New Roman'
+        const fontFamily = resolveFontFamilyCss(st.fontFamily)
         const letterSpacing = typeof st.letterSpacing === 'number' && st.letterSpacing !== 0 ? `${st.letterSpacing}px` : 'normal'
         const bg = st.backgroundColor && st.backgroundColor !== 'transparent' && st.backgroundColor !== '#ffffff' ? `background-color: ${st.backgroundColor};` : ''
-        innerContent = `<div style="display: flex; align-items: center; gap: 6px; font-family: ${fontFamily}, Times, serif; font-size: ${fontSize}pt; font-weight: ${fontWeight}; font-style: ${fontStyle}; text-decoration: ${textDecoration}; color: ${color}; letter-spacing: ${letterSpacing}; ${bg}"><span>${checkedBox}</span><span>${cb.label || ''}</span></div>`
+        innerContent = `<div style="display: flex; align-items: center; gap: 6px; font-family: ${fontFamily}; font-size: ${fontSize}pt; font-weight: ${fontWeight}; font-style: ${fontStyle}; text-decoration: ${textDecoration}; color: ${color}; letter-spacing: ${letterSpacing}; ${bg}"><span>${checkedBox}</span><span>${cb.label || ''}</span></div>`
       } else {
         // Text / Heading / Paragraph
         const textEl = el as TextCanvasElement
@@ -652,7 +654,7 @@ export function convertCanvasDocumentToHtml(
           }
         }
         const fontStyle = `
-          font-family: ${st.fontFamily || 'Times New Roman'}, Times, serif;
+          font-family: ${resolveFontFamilyCss(st.fontFamily)};
           font-size: ${st.fontSize || 12}pt;
           font-weight: ${st.fontWeight || 'normal'};
           font-style: ${st.fontStyle || 'normal'};
@@ -681,7 +683,7 @@ export function convertCanvasDocumentToHtml(
     // signing). Before that there is nothing to link to, so it's omitted.
     const verificationUrl = variableValues?.verification_url || variableValues?.verification_link || ''
     const footerHtml = verificationUrl
-      ? `<div style="position: absolute; left: 0; right: 0; bottom: 6mm; text-align: center; font-family: 'Times New Roman', serif; font-size: 7.5pt; color: #2563eb;">${verificationUrl}</div>`
+      ? `<div style="position: absolute; left: 0; right: 0; bottom: 6mm; text-align: center; font-family: ${resolveFontFamilyCss()}; font-size: 7.5pt; color: #2563eb;">${verificationUrl}</div>`
       : ''
 
     const pageWrapper = `

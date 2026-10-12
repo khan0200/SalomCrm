@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import { resolveFontFamilyCss } from '../../utils/contractFonts'
 import type {
   CanvasPageModel,
   CanvasElement,
@@ -333,7 +334,7 @@ function confirmDeletePage() {
               height: `${BASE_PAGE_HEIGHT_PX}px`,
               transform: `scale(${zoomLevel / 100})`,
               transformOrigin: 'top left',
-              fontFamily: `'Times New Roman', Times, serif`,
+              fontFamily: resolveFontFamilyCss(),
             }"
             @pointermove="onCanvasPointerMove"
             @pointerleave="onCanvasPointerLeave"
@@ -515,7 +516,7 @@ function confirmDeletePage() {
 
 <style scoped>
 .canvas-sheet-background {
-  font-family: 'Times New Roman', Times, Georgia, serif !important;
+  font-family: 'Tinos', 'Times New Roman', Times, Georgia, serif !important;
 }
 
 /* Shared bounding box drawn around every selected element on a page when 2+

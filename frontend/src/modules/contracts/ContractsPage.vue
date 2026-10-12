@@ -1796,11 +1796,11 @@ async function handleUnarchive(contract: Contract) {
 
 <style>
 .tariff-preview-sheet {
-  font-family: 'Times New Roman', Times, Georgia, serif !important;
+  font-family: 'Tinos', 'Times New Roman', Times, Georgia, serif !important;
 }
 .tariff-preview-sheet,
 .tariff-preview-sheet * {
-  font-family: 'Times New Roman', Times, Georgia, serif !important;
+  font-family: 'Tinos', 'Times New Roman', Times, Georgia, serif !important;
 }
 .tariff-preview-sheet table {
   width: 100% !important;

@@ -2,6 +2,7 @@
 import { ref, computed, watch, nextTick } from 'vue'
 import { CheckSquare, Square } from 'lucide-vue-next'
 import type { CheckboxCanvasElement, TextStyleProps } from '../../types/contractCanvas'
+import { resolveFontFamilyCss } from '../../utils/contractFonts'
 
 const props = withDefaults(
   defineProps<{
@@ -148,7 +149,7 @@ const gapPx = computed(() => {
 const textStyle = computed(() => {
   const st = props.element.style || {}
   const color = st.color || props.element.color || '#111827'
-  const fontFamily = st.fontFamily || `'Times New Roman', Times, serif`
+  const fontFamily = resolveFontFamilyCss(st.fontFamily)
   const fontWeight = st.fontWeight || 'normal'
   const fontStyle = st.fontStyle || 'normal'
   const textDecoration = st.textDecoration || 'none'

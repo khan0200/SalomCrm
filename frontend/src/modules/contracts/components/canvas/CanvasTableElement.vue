@@ -11,6 +11,7 @@ import {
 import type { TableCanvasElement, TableCellModel } from '../../types/contractCanvas'
 import { cleanClipboardContent } from '../../utils/clipboardUtils'
 import { replaceVariablesInHtml } from '../../utils/contractVariables'
+import { resolveFontFamilyCss } from '../../utils/contractFonts'
 import * as Grid from '../../utils/tableGrid'
 import type { Rect } from '../../utils/tableGrid'
 
@@ -1008,7 +1009,7 @@ function renderCellContent(content: string): string {
               textAlign: cell.textAlign || 'left',
               verticalAlign: cell.verticalAlign || 'top',
               color: cell.color || '#111827',
-              fontFamily: `'Times New Roman', Times, serif`,
+              fontFamily: resolveFontFamilyCss(),
               fontSize: `${cell.fontSize ? cell.fontSize * PT_TO_PX : cellFontSizePx}px`,
               fontWeight: cellFontWeight(cell, rIdx),
               fontStyle: cell.fontStyle || 'normal',
@@ -1060,7 +1061,7 @@ function renderCellContent(content: string): string {
 .canvas-table-element div,
 .canvas-table-element span,
 .canvas-table-element p {
-  font-family: 'Times New Roman', Times, Georgia, serif !important;
+  font-family: 'Tinos', 'Times New Roman', Times, Georgia, serif !important;
 }
 
 /* The ancestor element wrapper sets pointer-events:none on its content slot
