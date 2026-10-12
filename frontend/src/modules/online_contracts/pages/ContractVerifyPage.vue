@@ -65,7 +65,9 @@ async function handleDownload() {
   isDownloading.value = true
   try {
     const { downloadContractAsPdf } = await import('@/modules/contracts/utils/contractPdf')
-    const title = `SHARTNOMA_${data.value.contract_number}_${data.value.full_name || ''}`
+    // Matches the staff Contracts admin's and the sign-link page's own
+    // download filename convention - `${contract_number}_${full_name}`.
+    const title = `${data.value.contract_number || 'Contract'}_${data.value.full_name || ''}`
     const variableValues = buildVariableValues(data.value, {
       contractNumber: data.value.contract_number,
       price: data.value.tariff_price,

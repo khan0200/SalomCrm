@@ -307,7 +307,12 @@ async function handleDownloadContract(contract: Contract, format: 'pdf' | 'doc' 
         office: contract.office || contract.tenant_office_name || undefined,
         educationLevel: contract.education_level || undefined,
         email: contract.email || (contract as any).student_email || '',
-        signUrl: contract.sign_token ? `${window.location.origin}/sign/${contract.sign_token}` : undefined,
+        // Only a signed contract's sign_token link is a real view/verify
+        // page (see ContractSignStatusView's has_signature-permanent
+        // behavior) - on a draft/pending contract that same link still
+        // runs the live signing flow, so showing its QR here would let
+        // anyone scan an unfinished contract straight into signing it.
+        signUrl: contract.sign_token && contract.signature_data ? `${window.location.origin}/sign/${contract.sign_token}` : undefined,
       })
       const verificationMeta = {
         contractNumber: contract.contract_number || contract.student_id_assigned || undefined,

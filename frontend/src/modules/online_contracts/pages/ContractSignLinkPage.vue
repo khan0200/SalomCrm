@@ -114,7 +114,11 @@ async function handleDownloadPreview() {
       status: 'pending',
     }
     await downloadContractAsPdf(
-      c.title || 'shartnoma',
+      // Matches the staff Contracts admin's own download filename
+      // convention (ContractsPage.vue) - `${contract_number}_${full_name}`
+      // - so the same contract carries the same filename whoever
+      // downloads it, staff or student.
+      `${c.contract_number || 'Contract'}_${c.full_name || c.title || 'shartnoma'}`,
       c.canvas_source || c.content || '',
       undefined,
       vars,
@@ -413,7 +417,11 @@ async function handleFinalDownload() {
       status: 'signed',
     }
     await downloadContractAsPdf(
-      c.title || 'shartnoma',
+      // Matches the staff Contracts admin's own download filename
+      // convention (ContractsPage.vue) - `${contract_number}_${full_name}`
+      // - so the same contract carries the same filename whoever
+      // downloads it, staff or student.
+      `${c.contract_number || 'Contract'}_${c.full_name || c.title || 'shartnoma'}`,
       c.canvas_source || c.content || '',
       undefined,
       vars,

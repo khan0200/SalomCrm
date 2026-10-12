@@ -174,7 +174,12 @@ const contractVariables = computed<Record<string, string>>(() => {
     office: c.office || c.tenant_office_name || undefined,
     educationLevel: c.education_level || undefined,
     email: c.email || undefined,
-    signUrl: c.sign_token ? `${window.location.origin}/sign/${c.sign_token}` : undefined,
+    // Only a signed contract's sign_token link is a real view/verify page
+    // (see ContractSignStatusView's has_signature-permanent behavior) - on
+    // a draft/pending contract that same link still runs the live signing
+    // flow, so showing its QR here would let anyone scan an unfinished
+    // contract's preview straight into signing it.
+    signUrl: c.sign_token && c.signature_data ? `${window.location.origin}/sign/${c.sign_token}` : undefined,
   })
 })
 
