@@ -120,10 +120,19 @@ class ContractSignStatusView(APIView):
         contract, reason = _resolve_signable_contract(token)
         if reason == 'not_found':
             return Response({'detail': "Havola topilmadi.", 'reason': reason}, status=status.HTTP_404_NOT_FOUND)
-        if reason in ('expired', 'used', 'locked'):
+        # A 'used' token (sign_token_used_at set, by ContractSignSubmitView)
+        # means the contract is already signed - this same link now serves a
+        # second, permanent purpose: the student (and the {{qr_code}}/
+        # footer-link token, and the "Verified" tab's copy button) can keep
+        # using it forever to view/re-download the finished contract. Only
+        # 'expired'/'locked' still hard-block here, since those describe a
+        # link that was never completed and should not grant read access
+        # either. The signing/declaration/KYC endpoints below are NOT
+        # changed - they still reject 'used' via _resolve_signable_contract,
+        # so a used link can never re-enter the signing flow.
+        if reason in ('expired', 'locked'):
             messages = {
                 'expired': "Havola muddati tugagan. Konsalting agentligiga murojaat qiling.",
-                'used': "Ushbu shartnoma allaqachon imzolangan.",
                 'locked': "Shaxsni tasdiqlashda ko'p marta xato kiritildi. Konsalting agentligiga murojaat qiling.",
             }
             return Response({'detail': messages[reason], 'reason': reason}, status=status.HTTP_410_GONE)

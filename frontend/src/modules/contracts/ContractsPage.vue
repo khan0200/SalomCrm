@@ -307,6 +307,7 @@ async function handleDownloadContract(contract: Contract, format: 'pdf' | 'doc' 
         office: contract.office || contract.tenant_office_name || undefined,
         educationLevel: contract.education_level || undefined,
         email: contract.email || (contract as any).student_email || '',
+        signUrl: contract.sign_token ? `${window.location.origin}/sign/${contract.sign_token}` : undefined,
       })
       const verificationMeta = {
         contractNumber: contract.contract_number || contract.student_id_assigned || undefined,
@@ -1393,6 +1394,21 @@ async function handleUnarchive(contract: Contract) {
                               {{ formatContractDate(contract.created_at) }}
                             </span>
                           </div>
+                          <!-- Verified/signed: the same sign_token link now serves as a permanent
+                               view/re-download/verification page (see ContractSignStatusView) -
+                               same link the QR code on the printed contract resolves to. -->
+                          <button
+                            v-if="signLinkUrlFor(contract)"
+                            type="button"
+                            @click.stop="copySignLinkForContract(contract)"
+                            class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-blue-50 dark:bg-blue-950/40 border border-blue-200/80 dark:border-blue-900/50 text-blue-700 dark:text-blue-300 text-xs font-medium transition-colors cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/50"
+                            :class="{ '!bg-emerald-50 dark:!bg-emerald-950/40 !text-emerald-700 dark:!text-emerald-400 !border-emerald-200 dark:!border-emerald-900/50': copiedSignLinkContractId === contract.id }"
+                            title="Shartnomani ko'rish/yuklab olish havolasini nusxalash"
+                          >
+                            <Check v-if="copiedSignLinkContractId === contract.id" class="w-3.5 h-3.5" />
+                            <Globe v-else class="w-3.5 h-3.5" />
+                            <span>{{ copiedSignLinkContractId === contract.id ? 'Nusxalandi!' : 'Havola' }}</span>
+                          </button>
                           <button
                             v-if="!['verified', 'pending'].includes(contract.status)"
                             type="button"

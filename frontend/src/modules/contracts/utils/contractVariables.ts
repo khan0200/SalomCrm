@@ -391,6 +391,12 @@ export function buildVariableValues(
     consultantName?: string
     signatureData?: string
     verificationCode?: string
+    // Full /sign/<token> URL - once signed, this SAME link the student used
+    // to sign stays permanently valid as a view/re-download/verification
+    // page (see ContractSignStatusView), so the QR/footer link on the
+    // finished contract points right back at it instead of a separate
+    // verification_code-based URL.
+    signUrl?: string
     office?: string
     educationLevel?: string
     email?: string
@@ -457,10 +463,13 @@ export function buildVariableValues(
         : rawGuardianSignature)
     : ''
 
-  // Public verification QR: only exists once the agency has assigned a
-  // Student ID and generated a code (see assign_student_id on the backend).
-  // Before that, both tokens resolve to '' and simply render nothing.
-  const verificationUrl = rawVerifCode ? `${CONTRACT_VERIFICATION_BASE_URL}/${rawVerifCode}` : ''
+  // Public verification QR: the same /sign/<token> link the student used to
+  // sign stays valid forever as a view/re-download page once signed (see
+  // ContractSignStatusView), so that's the preferred target. Falls back to
+  // the older /contracts/<verification_code> page (still fully functional,
+  // still generated on signing) only when no signUrl was supplied by the
+  // caller - e.g. a template preview rendered before any token exists.
+  const verificationUrl = contractMeta?.signUrl || (rawVerifCode ? `${CONTRACT_VERIFICATION_BASE_URL}/${rawVerifCode}` : '')
   const qrDateLabel = formatDateIso(student?.verified_at || student?.signed_at || student?.created_at || new Date())
   let qrCodeHtml = ''
   if (verificationUrl) {

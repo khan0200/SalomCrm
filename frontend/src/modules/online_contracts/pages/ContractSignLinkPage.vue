@@ -29,6 +29,10 @@ const invalidReason = ref('')
 const invalidDetail = ref('')
 const contractInfo = ref<ContractSignStatusResponse | null>(null)
 const isMinor = computed(() => !!contractInfo.value?.is_minor_hint)
+// true only right after doSubmit() succeeds in THIS visit - false when the
+// 'done' step is reached because the student (re-)opened an already-signed
+// link, so the two cases can show slightly different copy.
+const justSigned = ref(false)
 
 // ── Step: identity confirmation ─────────────────────────────────────────
 const dobInput = ref('')
@@ -161,8 +165,11 @@ async function loadStatus() {
     contractInfo.value = res
 
     // Resume at whichever step matches server state, so a returning
-    // student (closed the tab mid-flow) never has to redo a finished step.
+    // student (closed the tab, or scanned the QR on the finished contract
+    // weeks later) never has to redo a finished step - has_signature now
+    // stays true forever once set, so this same link permanently lands here.
     if (res.has_signature) {
+      justSigned.value = false
       step.value = 'done'
     } else if (res.kyc_status === 'VERIFIED') {
       step.value = 'signature'
@@ -348,13 +355,13 @@ async function doSubmit() {
         },
       } : {}),
     })
-    // Submit response carries the freshly-generated verification_code - the
-    // status endpoint can no longer be refetched for it (sign_token is now
-    // used), so it's merged into the already-loaded contractInfo here for
-    // handleFinalDownload's {{qr_code}}/{{verification_link}} resolution.
+    // Merge the freshly-generated verification_code into the already-loaded
+    // contractInfo so handleFinalDownload's {{qr_code}}/{{verification_link}}
+    // resolve without waiting on a second round-trip.
     if (contractInfo.value) {
       contractInfo.value = { ...contractInfo.value, verification_code: res.verification_code }
     }
+    justSigned.value = true
     step.value = 'done'
   } catch (err: any) {
     submitError.value = err?.response?.data?.detail || "Shartnomani yuborishda xatolik yuz berdi."
@@ -369,13 +376,15 @@ const finalDownloadError = ref('')
 async function handleFinalDownload() {
   const c = contractInfo.value
   if (!c) return
-  // The sign_token is marked used the moment doSubmit() succeeds, so
-  // re-fetching via getSignableContract here (like handleDownloadPreview
-  // does pre-signing) now 410s with reason 'used' - the already-loaded
-  // contractInfo from the successful submit is used instead of refetching.
+  // A 'used' sign_token (set the moment doSubmit() succeeds) no longer 410s
+  // on the status endpoint - this same link stays valid forever as a view/
+  // re-download page (see ContractSignStatusView) - but contractInfo is
+  // already loaded from that same successful fetch, so a refetch here would
+  // just be redundant network round-trip, not a correctness fix.
   isDownloadingFinal.value = true
   finalDownloadError.value = ''
   try {
+    const signUrl = `${window.location.origin}/sign/${token.value}`
     const vars = buildVariableValues(c, {
       contractNumber: c.contract_number,
       templateName: c.tariff_name,
@@ -385,6 +394,7 @@ async function handleFinalDownload() {
       educationLevel: c.education_level,
       signatureData: studentSignature.value || undefined,
       verificationCode: c.verification_code || undefined,
+      signUrl,
     })
     const verificationMeta = {
       contractNumber: c.contract_number,
@@ -896,10 +906,12 @@ onBeforeUnmount(() => {
             <CheckCircle2 class="w-6 h-6" />
           </div>
           <h1 class="text-base font-semibold text-zinc-900 dark:text-zinc-100 mb-1.5">
-            Shartnomangiz muvaffaqiyatli imzolandi
+            {{ justSigned ? "Shartnomangiz muvaffaqiyatli imzolandi" : "Shartnoma imzolangan" }}
           </h1>
           <p class="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed mb-5">
-            Konsalting agentligi tez orada ko'rib chiqadi. Qo'shimcha savollar uchun agentlikka murojaat qiling.
+            {{ justSigned
+              ? "Konsalting agentligi tez orada ko'rib chiqadi. Qo'shimcha savollar uchun agentlikka murojaat qiling."
+              : "Shartnomangizning rasmiy nusxasini istalgan vaqtda shu havoladan yuklab olishingiz mumkin." }}
           </p>
           <div
             v-if="finalDownloadError"

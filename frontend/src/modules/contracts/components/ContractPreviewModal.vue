@@ -174,6 +174,7 @@ const contractVariables = computed<Record<string, string>>(() => {
     office: c.office || c.tenant_office_name || undefined,
     educationLevel: c.education_level || undefined,
     email: c.email || undefined,
+    signUrl: c.sign_token ? `${window.location.origin}/sign/${c.sign_token}` : undefined,
   })
 })
 
