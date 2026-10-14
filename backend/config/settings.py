@@ -200,6 +200,18 @@ STORAGES = {
     },
 }
 
+# Private storage for Contract.final_pdf (Stage 2 canary - see
+# contract_pdf_service.py). Deliberately OUTSIDE MEDIA_ROOT: production's
+# nginx vhost serves /media/ as a fully public, unauthenticated static
+# alias (location /media/ { alias .../backend/media/; }, confirmed in the
+# live config), so a file saved under MEDIA_ROOT is reachable by anyone who
+# learns its filename, bypassing every permission check in
+# ContractViewSet.download_pdf_canary entirely. This path has no nginx
+# location block pointing at it, so the only way to read a file here is
+# through that Django view - a real access-control boundary, not an
+# obscurity one.
+PRIVATE_MEDIA_ROOT = BASE_DIR / 'private_media'
+
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # REST Framework
@@ -311,4 +323,14 @@ DIDIT_API_KEY = os.getenv('DIDIT_API_KEY', '')
 DIDIT_WORKFLOW_ID = os.getenv('DIDIT_WORKFLOW_ID', '')
 DIDIT_WEBHOOK_SECRET = os.getenv('DIDIT_WEBHOOK_SECRET', '')
 DIDIT_BASE_URL = os.getenv('DIDIT_BASE_URL', 'https://verification.didit.me')
+
+# Stage 2 canary: server-side Chromium PDF rendering for finalized online
+# contracts (see backend/pdf_renderer/ and contract_pdf_service.py).
+# OFF by default on every environment, including production, until the
+# infrastructure audit + canary testing are explicitly approved to proceed
+# to Stage 3 - see the Stage 1/Stage 2 audit reports. Flipping this to
+# 'true' only enables the manual, staff-only test endpoint
+# (ContractViewSet.generate_pdf_canary); it does NOT change
+# handleFinalDownload() or any student-facing download path.
+CONTRACT_PDF_CANARY_ENABLED = os.getenv('CONTRACT_PDF_CANARY_ENABLED', 'false').lower() in ('true', '1', 'yes')
 

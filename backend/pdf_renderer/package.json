@@ -1,0 +1,20 @@
+{
+  "name": "pdf_renderer",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Server-side canonical PDF rendering for finalized online contracts (Stage 2 canary). Reuses the frontend's own contractCanvasConverter.ts/contractVariables.ts so the server renders the exact same HTML structure as the editor, instead of a second reimplementation.",
+  "type": "commonjs",
+  "scripts": {
+    "build": "node build.js",
+    "render": "node dist/render.js"
+  },
+  "dependencies": {
+    "playwright": "^1.48.0",
+    "pngjs": "^7.0.0",
+    "qrcode-generator": "^1.4.4"
+  },
+  "devDependencies": {
+    "esbuild": "^0.21.5",
+    "typescript": "^5.5.0"
+  }
+}

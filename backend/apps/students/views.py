@@ -10,7 +10,7 @@ from typing import Any, cast
 import openpyxl
 from openpyxl.utils import get_column_letter
 from openpyxl.styles import Font, PatternFill, Alignment
-from django.http import HttpResponse
+from django.http import HttpResponse, FileResponse
 from django.db import transaction
 from django.utils import timezone
 from rest_framework import viewsets, permissions, status
@@ -2176,6 +2176,12 @@ class ContractViewSet(viewsets.ModelViewSet):
     MANAGER_ONLY_ACTIONS = {
         'archive', 'unarchive',
         'assign_student_id', 'regenerate_code', 'reject_contract',
+        # Stage 2 canary (see generate_pdf_canary docstring) - a manual
+        # Chromium render is a resource-cost action on the production host,
+        # not a routine view, so it follows the same Manager+ bar as the
+        # other agency-facing actions above rather than plain STAFF's
+        # view+create default.
+        'generate_pdf_canary',
     }
 
     # Deleting a contract requires step-up Head Manager password verification
@@ -2780,4 +2786,75 @@ class ContractViewSet(viewsets.ModelViewSet):
             'status': 'rejected',
             'rejection_reason': reason
         }, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'], url_path='generate-pdf-canary')
+    def generate_pdf_canary(self, request, pk=None):
+        """
+        Stage 2 canary: manually trigger server-side Chromium PDF generation
+        for this contract. OFF by default - gated on
+        settings.CONTRACT_PDF_CANARY_ENABLED (see that setting's docstring).
+
+        This is a developer/admin test entry point, not the production
+        download path - handleFinalDownload() on the student-facing sign
+        page is untouched and still uses the existing html2canvas/jsPDF
+        flow. Staff can use this action to generate and inspect a canonical
+        PDF for an already-signed contract before any student traffic is
+        routed through it.
+        """
+        from django.conf import settings as dj_settings
+        if not dj_settings.CONTRACT_PDF_CANARY_ENABLED:
+            return Response(
+                {'detail': 'Server-side PDF generation canary is disabled.'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        contract = self.get_object()
+        if not contract.signature_data:
+            return Response(
+                {'detail': 'Contract has no persisted signature - cannot generate final PDF for an unsigned contract.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        from .contract_pdf_service import generate_final_pdf, PdfGenerationError
+        sign_url = f"{request.scheme}://{request.get_host()}/sign/{contract.sign_token}" if contract.sign_token else ''
+        try:
+            contract = generate_final_pdf(contract.id, sign_url=sign_url, force=True)
+        except PdfGenerationError as exc:
+            return Response({'detail': str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
+
+        return Response({
+            'detail': 'PDF generated.',
+            'final_pdf_status': contract.final_pdf_status,
+            'final_pdf_generated_at': contract.final_pdf_generated_at,
+            'bytes': contract.final_pdf.size if contract.final_pdf else 0,
+        }, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['get'], url_path='download-pdf-canary')
+    def download_pdf_canary(self, request, pk=None):
+        """
+        Stage 2 canary: stream the server-generated canonical PDF for this
+        contract, through the SAME tenant-scoped get_queryset()/get_object()
+        every other action on this ViewSet uses - never through MEDIA_URL,
+        which would serve it unauthenticated to anyone who guessed the
+        path. 404s (not 403) when the canary is disabled, to avoid
+        confirming the endpoint's existence to an unauthorized caller.
+        """
+        from django.conf import settings as dj_settings
+        if not dj_settings.CONTRACT_PDF_CANARY_ENABLED:
+            return Response({'detail': 'Not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        contract = self.get_object()
+        if contract.final_pdf_status != 'ready' or not contract.final_pdf:
+            return Response(
+                {'detail': 'No generated PDF available for this contract yet.'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        filename = f"{contract.contract_number or contract.id}.pdf"
+        response = FileResponse(
+            contract.final_pdf.open('rb'),
+            content_type='application/pdf',
+        )
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return response
 

@@ -4,6 +4,7 @@ from django.conf import settings
 from django.db import models
 from django.contrib.postgres.fields import ArrayField
 from apps.core.models import TenantAwareModel, TimeStampedModel, SimpleTenantModel
+from apps.students.storage import private_pdf_storage
 
 class StudentLevel(models.TextChoices):
     COLLEGE = 'COLLEGE', 'College'
@@ -826,6 +827,26 @@ class Contract(TenantAwareModel):
     kyc_face_match_result = models.CharField(max_length=50, blank=True, default='')
     kyc_liveness_result = models.CharField(max_length=50, blank=True, default='')
     kyc_confirmed_at = models.DateTimeField(null=True, blank=True)
+
+    # Server-side canonical PDF (Stage 2 canary - see contract_pdf_service.py).
+    # Generated once from the authoritative snapshot (template + student data
+    # + signature_data, all already persisted above) via headless Chromium,
+    # so every device downloads these exact bytes instead of re-rendering
+    # with html2canvas/jsPDF locally. Null until first generated. Immutable
+    # once set - a contract needing changes goes through the existing
+    # re-sign/versioning flow, never a silent overwrite of this file.
+    final_pdf = models.FileField(upload_to='', storage=private_pdf_storage, null=True, blank=True)
+    final_pdf_generated_at = models.DateTimeField(null=True, blank=True)
+    # Guards concurrent generation requests from racing each other into two
+    # different renders for the same contract - 'pending' is held for the
+    # duration of one render attempt (see generate_final_pdf's select_for_update).
+    FINAL_PDF_STATUS_CHOICES = [
+        ('not_generated', 'Not generated'),
+        ('pending', 'Generating'),
+        ('ready', 'Ready'),
+        ('failed', 'Failed'),
+    ]
+    final_pdf_status = models.CharField(max_length=20, choices=FINAL_PDF_STATUS_CHOICES, default='not_generated')
 
     class Meta:
         db_table = 'contracts'
