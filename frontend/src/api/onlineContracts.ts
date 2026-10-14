@@ -169,4 +169,15 @@ export const onlineContractsApi = {
     const { data } = await apiClient.post(`/contracts/sign/${encodeURIComponent(token)}/submit/`, payload)
     return data
   },
+
+  // Stage 3: the canonical, server-rendered PDF for a signed contract -
+  // same stored bytes on every call/device (see ContractSignDownloadPdfView).
+  // Idempotent on the backend: the first call after signing pays the
+  // render cost, every later call streams the already-stored file.
+  async downloadFinalPdf(token: string): Promise<Blob> {
+    const { data } = await apiClient.get(`/contracts/sign/${encodeURIComponent(token)}/pdf/`, {
+      responseType: 'blob',
+    })
+    return data
+  },
 }

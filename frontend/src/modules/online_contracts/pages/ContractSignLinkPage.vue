@@ -387,54 +387,83 @@ async function doSubmit() {
 const isDownloadingFinal = ref(false)
 const finalDownloadError = ref('')
 
+// Stage 3: the finalized download now fetches the canonical, server-
+// rendered PDF (ContractSignDownloadPdfView) instead of re-rendering
+// locally with html2canvas/jsPDF - every device downloads the exact same
+// stored bytes, and the signature comes from the server's own persisted
+// Contract.signature_data rather than this page's studentSignature ref
+// (which is empty on a returning visit, after the tab was closed and
+// reopened - the bug the server-side path sidesteps by construction).
+//
+// Minor-student contracts still use the old client-side path: the server
+// renderer doesn't yet compose the guardian consent appendix onto the PDF
+// (deferred in Stage 2 - see that stage's report), so routing a minor's
+// download through it would silently produce a PDF missing a legally
+// required page. Safer to keep the known-complete path for that one case
+// until appendix rendering is built server-side too.
 async function handleFinalDownload() {
   const c = contractInfo.value
   if (!c) return
-  // A 'used' sign_token (set the moment doSubmit() succeeds) no longer 410s
-  // on the status endpoint - this same link stays valid forever as a view/
-  // re-download page (see ContractSignStatusView) - but contractInfo is
-  // already loaded from that same successful fetch, so a refetch here would
-  // just be redundant network round-trip, not a correctness fix.
+  if (isDownloadingFinal.value) return // guard against double-click firing two requests
   isDownloadingFinal.value = true
   finalDownloadError.value = ''
-  try {
-    const signUrl = `${window.location.origin}/sign/${token.value}`
-    const vars = buildVariableValues(c, {
-      contractNumber: c.contract_number,
-      templateName: c.tariff_name,
-      price: c.tariff_price,
-      discount: c.discount,
-      office: c.office,
-      educationLevel: c.education_level,
-      signatureData: studentSignature.value || undefined,
-      verificationCode: c.verification_code || undefined,
-      signUrl,
-    })
-    const verificationMeta = {
-      contractNumber: c.contract_number,
-      studentName: c.full_name,
-      verifiedAt: new Date().toLocaleDateString('uz-UZ'),
-      status: 'signed',
+
+  if (isMinor.value && c.guardian_contract_text) {
+    try {
+      const signUrl = `${window.location.origin}/sign/${token.value}`
+      const vars = buildVariableValues(c, {
+        contractNumber: c.contract_number,
+        templateName: c.tariff_name,
+        price: c.tariff_price,
+        discount: c.discount,
+        office: c.office,
+        educationLevel: c.education_level,
+        signatureData: studentSignature.value || undefined,
+        verificationCode: c.verification_code || undefined,
+        signUrl,
+      })
+      const verificationMeta = {
+        contractNumber: c.contract_number,
+        studentName: c.full_name,
+        verifiedAt: new Date().toLocaleDateString('uz-UZ'),
+        status: 'signed',
+      }
+      await downloadContractAsPdf(
+        `${c.contract_number || 'Contract'}_${c.full_name || c.title || 'shartnoma'}`,
+        c.canvas_source || c.content || '',
+        undefined,
+        vars,
+        studentSignature.value || undefined,
+        verificationMeta,
+        { content: c.guardian_contract_text, variableValues: vars }
+      )
+    } catch (err) {
+      console.error('Failed to download signed contract (minor path):', err)
+      finalDownloadError.value = "Shartnomani yuklab olishda xatolik yuz berdi. Qayta urinib ko'ring."
+    } finally {
+      isDownloadingFinal.value = false
     }
-    await downloadContractAsPdf(
-      // Matches the staff Contracts admin's own download filename
-      // convention (ContractsPage.vue) - `${contract_number}_${full_name}`
-      // - so the same contract carries the same filename whoever
-      // downloads it, staff or student.
-      `${c.contract_number || 'Contract'}_${c.full_name || c.title || 'shartnoma'}`,
-      c.canvas_source || c.content || '',
-      undefined,
-      vars,
-      studentSignature.value || undefined,
-      verificationMeta,
-      isMinor.value && c.guardian_contract_text
-        ? { content: c.guardian_contract_text, variableValues: vars }
-        : undefined
-    )
+    return
+  }
+
+  let objectUrl: string | null = null
+  try {
+    const blob = await onlineContractsApi.downloadFinalPdf(token.value)
+    objectUrl = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = objectUrl
+    // Matches the staff Contracts admin's own download filename convention
+    // (ContractsPage.vue) - `${contract_number}_${full_name}` - so the same
+    // contract carries the same filename whoever downloads it.
+    a.download = `${c.contract_number || 'Contract'}_${c.full_name || c.title || 'shartnoma'}.pdf`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
   } catch (err) {
     console.error('Failed to download signed contract:', err)
     finalDownloadError.value = "Shartnomani yuklab olishda xatolik yuz berdi. Qayta urinib ko'ring."
   } finally {
+    if (objectUrl) URL.revokeObjectURL(objectUrl)
     isDownloadingFinal.value = false
   }
 }

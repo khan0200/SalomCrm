@@ -28,6 +28,7 @@ from .contract_sign_views import (
     ContractSignKycStatusView,
     ContractSignKycConfirmView,
     ContractSignSubmitView,
+    ContractSignDownloadPdfView,
 )
 
 router = DefaultRouter()
@@ -84,6 +85,7 @@ urlpatterns = [
     path('contracts/sign/<str:token>/kyc/status/', ContractSignKycStatusView.as_view(), name='contract-sign-kyc-status'),
     path('contracts/sign/<str:token>/kyc/confirm/', ContractSignKycConfirmView.as_view(), name='contract-sign-kyc-confirm'),
     path('contracts/sign/<str:token>/submit/', ContractSignSubmitView.as_view(), name='contract-sign-submit'),
+    path('contracts/sign/<str:token>/pdf/', ContractSignDownloadPdfView.as_view(), name='contract-sign-download-pdf'),
 
     path('', include(router.urls)),
 ]

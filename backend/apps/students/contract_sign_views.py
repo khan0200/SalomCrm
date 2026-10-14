@@ -696,3 +696,64 @@ class ContractSignSubmitView(APIView):
             # refetch (the sign_token is already used by this point).
             'verification_code': contract.verification_code,
         }, status=status.HTTP_200_OK)
+
+
+class ContractSignDownloadPdfView(APIView):
+    """
+    Stage 3: GET /api/contracts/sign/<token>/pdf/
+
+    Serves the canonical, server-rendered PDF for a signed contract to the
+    student - the sign_token-based equivalent of
+    ContractViewSet.download_pdf_canary (that one needs a staff JWT; this
+    flow has no student account, so the sign_token is the only access key
+    available here, same as every other view in this file).
+
+    Uses the SAME _resolve_signable_contract + 'used' handling as
+    ContractSignStatusView.get() above: a signed link stays a valid,
+    permanent view/re-download page forever, so 'used' is allowed through
+    while 'expired'/'locked' still 410. An unsigned contract (reason='ok'
+    but no signature_data yet) is rejected - there is nothing final to
+    download before signing completes.
+
+    Generation is idempotent (see generate_final_pdf) - the first request
+    after signing pays the ~2s Chromium cost and persists the PDF; every
+    later request, from this student or anyone re-opening the link,
+    streams that same stored file.
+    """
+    permission_classes = [permissions.AllowAny]
+    throttle_classes = [ContractSignReadThrottle]
+
+    def get(self, request, token):
+        contract, reason = _resolve_signable_contract(token)
+        if reason == 'not_found':
+            return Response({'detail': "Havola topilmadi."}, status=status.HTTP_404_NOT_FOUND)
+        if reason in ('expired', 'locked'):
+            return Response({'detail': "Havola amal qilmaydi."}, status=status.HTTP_410_GONE)
+
+        if not contract.signature_data:
+            return Response(
+                {'detail': "Shartnoma hali imzolanmagan."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        from django.conf import settings as dj_settings
+        if not dj_settings.CONTRACT_PDF_CANARY_ENABLED:
+            return Response({'detail': "Xizmat vaqtincha mavjud emas."}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+        from django.http import FileResponse
+        from .contract_pdf_service import generate_final_pdf, PdfGenerationError
+
+        sign_url = f"{request.scheme}://{request.get_host()}/sign/{token}"
+        try:
+            contract = generate_final_pdf(contract.id, sign_url=sign_url)
+        except PdfGenerationError as exc:
+            logger.error('contract_pdf_service failed for sign_token download, contract=%s: %s', contract.id, exc)
+            return Response(
+                {'detail': "Shartnomani tayyorlashda xatolik yuz berdi. Birozdan so'ng qayta urinib ko'ring."},
+                status=status.HTTP_502_BAD_GATEWAY
+            )
+
+        filename = f"{contract.contract_number or contract.id}_{contract.full_name or 'shartnoma'}.pdf"
+        response = FileResponse(contract.final_pdf.open('rb'), content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return response
