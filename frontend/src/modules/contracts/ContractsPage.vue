@@ -126,6 +126,9 @@ watch(
 )
 
 function selectTariff(tariff: TariffOption) {
+  if (selectedTariffId.value === String(tariff.id) && showTemplatePreview.value) {
+    return
+  }
   selectedTariffId.value = String(tariff.id)
   showTemplatePreview.value = true
   tariffViewMode.value = 'preview' // Always reset to preview mode on entry!

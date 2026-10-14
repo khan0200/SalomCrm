@@ -137,8 +137,8 @@ function measureAndEmitHeight() {
   // Add a small 0.8mm padding buffer for descenders (g, y, p, q, j) so bounding box fits cleanly
   const finalMm = Math.max(4, Math.round((heightMm + 0.8) * 10) / 10)
 
-  // Only emit if there is a noticeable difference (> 0.3mm)
-  if (Math.abs(finalMm - props.element.height) > 0.3) {
+  // Only emit if there is a noticeable difference (> 0.3mm) and not readonly
+  if (!props.readonly && Math.abs(finalMm - props.element.height) > 0.3) {
     emit('auto-resize-height', finalMm)
   }
 }
@@ -150,13 +150,15 @@ onMounted(() => {
       ? normalizeLegacyRequisites(props.element.content || '')
       : displayContent.value
   }
-  // Auto-fit height to actual text content on mount
-  nextTick(() => {
-    measureAndEmitHeight()
-    if (typeof document !== 'undefined' && 'fonts' in document) {
-      document.fonts.ready.then(() => measureAndEmitHeight())
-    }
-  })
+  // Auto-fit height to actual text content on mount only if not readonly (prevents layout thrashing on preview)
+  if (!props.readonly) {
+    nextTick(() => {
+      measureAndEmitHeight()
+      if (typeof document !== 'undefined' && 'fonts' in document) {
+        document.fonts.ready.then(() => measureAndEmitHeight())
+      }
+    })
+  }
 })
 
 // Watch external content changes (e.g. Undo/Redo or Variable insertion from outside)

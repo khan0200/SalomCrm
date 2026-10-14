@@ -390,10 +390,23 @@ function updateCustomMargin(key: keyof PageMargins, delta: number) {
 }
 
 // Watch canvas changes and emit update:content
+let isInternalSync = false
+let updateContentTimer: ReturnType<typeof setTimeout> | null = null
+
 watch(
   () => canvas.document.value,
   newDoc => {
-    emit('update:content', serializeCanvasDocument(newDoc))
+    // In readonly preview mode, never emit changes back to parent
+    if (props.readonly) return
+
+    if (updateContentTimer) clearTimeout(updateContentTimer)
+    updateContentTimer = setTimeout(() => {
+      isInternalSync = true
+      emit('update:content', serializeCanvasDocument(newDoc))
+      nextTick(() => {
+        isInternalSync = false
+      })
+    }, 250)
   },
   { deep: true }
 )
@@ -402,7 +415,7 @@ watch(
 watch(
   () => props.content,
   newContent => {
-    if (!newContent) return
+    if (isInternalSync || !newContent) return
     const currentSerialized = serializeCanvasDocument(canvas.document.value)
     if (newContent !== currentSerialized) {
       const parsed = convertHtmlToCanvasDocument(newContent)
