@@ -538,11 +538,22 @@ export function convertCanvasDocumentToHtml(
     // {{page_number}}/{{total_pages}} resolve per page, not from the passed-in
     // document-wide variableValues map: the exact same element, copy/pasted
     // onto several pages, shows each page's own number.
-    const pageVariableValues = {
+    const pageVariableValues: Record<string, string> = {
       ...(variableValues || {}),
       page_number: String(pageIdx + 1),
       total_pages: String(totalPagesForNumbering),
     }
+
+    // Defensive check: If this page has a merged body block (like `text_p1_merged_body`),
+    // remove any duplicate legacy separate body elements that would collide with it.
+    const hasMergedP1 = page.elements.some(
+      el => el.id === 'text_p1_merged_body' || (
+        typeof (el as any).content === 'string' &&
+        (el as any).content.includes('contract-section') &&
+        (el as any).content.toLowerCase().includes("xizmatlarni o'z ichiga oladi") &&
+        (el as any).content.toLowerCase().includes("birinchi to'lov")
+      )
+    )
 
     // Defensive check: If this page has a merged legal block (like `text_p4_merged_legal`),
     // remove any duplicate legacy separate legal blocks that would collide with it.
@@ -566,7 +577,60 @@ export function convertCanvasDocumentToHtml(
       )
     )
 
+    // Inline floating discount tag on Page 1 into the pricing paragraph to avoid collision
+    let discountHandledId: string | null = null
+    if (!hasMergedP1 && pageIdx === 0) {
+      const discountEl = page.elements.find(
+        el => !el.hidden && (el.y || 0) >= 80 && (el.y || 0) <= 125 &&
+              typeof (el as any).content === 'string' &&
+              (el as any).content.includes('{{discount}}')
+      )
+      if (discountEl) {
+        const pricingEl = page.elements.find(
+          el => el.id !== discountEl.id && typeof (el as any).content === 'string' &&
+                (el as any).content.toLowerCase().includes('chegirma miqdori')
+        )
+        if (pricingEl) {
+          const rawDiscount = (pageVariableValues['discount'] || '0').trim()
+          const formattedDiscount = rawDiscount
+            ? (rawDiscount.includes("so'm") ? rawDiscount : `${rawDiscount} so'm`)
+            : "0 so'm"
+          const inlineHtml = `<span style="font-weight: bold; text-decoration: underline;">&nbsp;${formattedDiscount}&nbsp;</span>`
+
+          let pContent = (pricingEl as any).content || ''
+          if (/_{2,}\s*so'?m/i.test(pContent)) {
+            pContent = pContent.replace(/_{2,}\s*so'?m/i, inlineHtml)
+          } else if (/_{2,}/.test(pContent)) {
+            pContent = pContent.replace(/_{2,}/, inlineHtml)
+          } else {
+            pContent = pContent.replace(/(chegirma miqdori:\s*)/i, `$1${inlineHtml} `)
+          }
+          (pricingEl as any).content = pContent
+          discountHandledId = discountEl.id
+        }
+      }
+    }
+
     const safeElements = page.elements.filter(el => {
+      if (discountHandledId && el.id === discountHandledId) {
+        return false
+      }
+      if (hasMergedP1 && el.id !== 'text_p1_merged_body') {
+        const c = ((el as any).content || '').toLowerCase()
+        const isBodyDuplicate = (
+          c.includes("xizmatlarni o'z ichiga oladi") ||
+          c.includes("xizmat haqi to'lovi") ||
+          c.includes("chegirma miqdori") ||
+          c.includes("{{discount}}") ||
+          c.includes("ish boshlanganidan so'ng qaytarib berilmaydi") ||
+          c.includes("qiymati jami") ||
+          c.includes("to'lov quyidagi tartibda") ||
+          c.includes("rasmiy refund")
+        )
+        if (isBodyDuplicate || ((el.y || 0) >= 75 && (el.y || 0) < 275 && el.type !== 'checkbox')) {
+          return false
+        }
+      }
       if (hasMergedLegal && el.id !== 'text_p4_merged_legal') {
         const c = ((el as any).content || '').toLowerCase()
         const isLegalDuplicate = (
@@ -592,31 +656,13 @@ export function convertCanvasDocumentToHtml(
       return true
     })
 
-    // Sort elements by zIndex
-    const sorted = [...safeElements].sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0))
-
-    sorted.forEach(el => {
-      if (el.hidden) return
-
-      const leftMm = el.x
-      const topMm = el.y
-      const widthMm = el.width
-      const heightMm = el.height
-      const rot = el.rotation || 0
-      const transformCss = rot ? `transform: rotate(${rot}deg); transform-origin: center center;` : ''
-
-      let innerContent = ''
-
+    const renderElementInnerContent = (el: CanvasElement): string => {
       if (el.type === 'table') {
         const table = el as TableCanvasElement
         const cellPadding =
           table.density === 'compact' ? '4px 6px' : table.density === 'spacious' ? '10px 14px' : '6px 10px'
         const defaultBorder = `${table.borderWidth || '1px'} ${table.borderStyle || 'solid'} ${table.borderColor || '#94a3b8'}`
 
-        // Column widths only survive into the PDF/print/signing output if they
-        // are emitted as a <colgroup>: `table-layout: fixed` alone distributes
-        // every column evenly, which silently discarded whatever widths the
-        // editor had been showing.
         const colgroup = table.colWidths?.length
           ? `<colgroup>${table.colWidths
               .map(w => `<col style="width: ${Math.round(w * 100) / 100}mm;" />`)
@@ -627,10 +673,6 @@ export function convertCanvasDocumentToHtml(
         table.cells.forEach((row, rowIdx) => {
           let colsHtml = ''
           row.forEach(cell => {
-            // A merge's covered slots carry no content of their own - the
-            // master's colspan/rowspan already claims their grid space, so a
-            // real HTML table (like the browser that renders it) must not see
-            // a <td> for them at all.
             if (cell.coveredBy) return
 
             const cellContent = replaceVariablesInHtml(cell.content || '', pageVariableValues, {
@@ -667,17 +709,15 @@ export function convertCanvasDocumentToHtml(
 
             colsHtml += `<td ${spanAttrs} style="${borders}padding: ${cellPadding}; ${bg}${align}${vAlign}${color}${fontSize}${fontWeight}${fontStyle}${textDecoration}">${cellContent}</td>`
           })
-          // Row heights are authored in mm like every other canvas dimension.
-          // `height` (not `min-height`) is what a table row actually honours.
           const rowH = table.rowHeights?.[rowIdx]
           rowsHtml += `<tr${rowH ? ` style="height: ${Math.round(rowH * 100) / 100}mm;"` : ''}>${colsHtml}</tr>`
         })
 
-        innerContent = `<table style="width: 100%; border-collapse: collapse; table-layout: fixed;">${colgroup}${rowsHtml}</table>`
+        return `<table style="width: 100%; border-collapse: collapse; table-layout: fixed;">${colgroup}${rowsHtml}</table>`
       } else if (el.type === 'line') {
         const line = el as any
         const borderProp = line.orientation === 'vertical' ? 'border-left' : 'border-top'
-        innerContent = `<div style="width: 100%; height: 100%; ${borderProp}: ${line.strokeWidth || 1}px ${line.strokeStyle || 'solid'} ${line.strokeColor || '#000'};"></div>`
+        return `<div style="width: 100%; height: 100%; ${borderProp}: ${line.strokeWidth || 1}px ${line.strokeStyle || 'solid'} ${line.strokeColor || '#000'};"></div>`
       } else if (el.type === 'checkbox') {
         const cb = el as any
         const st = cb.style || {}
@@ -690,7 +730,7 @@ export function convertCanvasDocumentToHtml(
         const fontFamily = st.fontFamily || 'Times New Roman'
         const letterSpacing = typeof st.letterSpacing === 'number' && st.letterSpacing !== 0 ? `${st.letterSpacing}px` : 'normal'
         const bg = st.backgroundColor && st.backgroundColor !== 'transparent' && st.backgroundColor !== '#ffffff' ? `background-color: ${st.backgroundColor};` : ''
-        innerContent = `<div style="display: flex; align-items: center; gap: 6px; font-family: ${fontFamily}, Times, serif; font-size: ${fontSize}pt; font-weight: ${fontWeight}; font-style: ${fontStyle}; text-decoration: ${textDecoration}; color: ${color}; letter-spacing: ${letterSpacing}; ${bg}"><span>${checkedBox}</span><span>${cb.label || ''}</span></div>`
+        return `<div style="display: flex; align-items: center; gap: 6px; font-family: ${fontFamily}, Times, serif; font-size: ${fontSize}pt; font-weight: ${fontWeight}; font-style: ${fontStyle}; text-decoration: ${textDecoration}; color: ${color}; letter-spacing: ${letterSpacing}; ${bg}"><span>${checkedBox}</span><span>${cb.label || ''}</span></div>`
       } else {
         // Text / Heading / Paragraph
         const textEl = el as TextCanvasElement
@@ -722,8 +762,84 @@ export function convertCanvasDocumentToHtml(
           overflow-wrap: break-word;
           box-sizing: border-box;
         `
-        innerContent = `<div class="canvas-text-element" style="${fontStyle}">${content}</div>`
+        return `<div class="canvas-text-element" style="${fontStyle}">${content}</div>`
       }
+    }
+
+    // Helper to identify if an element is a sequential body block on Page 1
+    const isP1SequentialBody = (el: CanvasElement): boolean => {
+      if (pageIdx !== 0 || el.hidden) return false
+      if (el.type === 'checkbox' || el.type === 'table' || el.type === 'line') return false
+      const y = el.y || 0
+      const w = el.width || 0
+      const x = el.x || 0
+      const c = ((el as any).content || '').toLowerCase()
+      if (c.includes('page_number') || y >= 275 || y < 70) return false
+      return w >= 150 && x <= 25
+    }
+
+    const p1BodyEls = !hasMergedP1 && pageIdx === 0
+      ? safeElements.filter(isP1SequentialBody).sort((a, b) => (a.y || 0) - (b.y || 0))
+      : []
+
+    const p1BodyIdSet = new Set(p1BodyEls.map(e => e.id))
+
+    // Sort elements in visual/logical order (by Y coordinate, then zIndex)
+    const sorted = [...safeElements].sort((a, b) => {
+      const yA = a.y || 0
+      const yB = b.y || 0
+      if (Math.abs(yA - yB) > 1) return yA - yB
+      return (a.zIndex || 0) - (b.zIndex || 0)
+    })
+
+    let renderedFlowingBody = false
+
+    sorted.forEach(el => {
+      if (el.hidden) return
+
+      // If this element belongs to the sequential Page 1 body cluster,
+      // render all of them inside a single flowing container on the first encounter.
+      if (p1BodyEls.length >= 2 && p1BodyIdSet.has(el.id)) {
+        if (!renderedFlowingBody) {
+          renderedFlowingBody = true
+          const firstEl = p1BodyEls[0]
+          const leftMm = Math.min(...p1BodyEls.map(e => e.x || 12.7))
+          const topMm = firstEl.y || 78
+          const widthMm = Math.max(...p1BodyEls.map(e => e.width || 184.6))
+
+          let flowingBlocksHtml = ''
+          p1BodyEls.forEach((bodyEl, bIdx) => {
+            const inner = renderElementInnerContent(bodyEl)
+            let marginTopMm = 0
+            if (bIdx > 0) {
+              const prev = p1BodyEls[bIdx - 1]
+              const gap = (bodyEl.y || 0) - ((prev.y || 0) + (prev.height || 0))
+              marginTopMm = Math.max(0, Math.min(6, Math.round(gap * 10) / 10))
+            }
+            flowingBlocksHtml += `
+              <div class="canvas-flowing-block" style="position: relative; width: 100%; margin-top: ${marginTopMm}mm; box-sizing: border-box;">
+                ${inner}
+              </div>
+            `
+          })
+
+          elementsHtml += `
+            <div class="canvas-flowing-section" style="position: absolute; left: ${leftMm}mm; top: ${topMm}mm; width: ${widthMm}mm; z-index: 1; box-sizing: border-box;">
+              ${flowingBlocksHtml}
+            </div>
+          `
+        }
+        return
+      }
+
+      const leftMm = el.x
+      const topMm = el.y
+      const widthMm = el.width
+      const heightMm = el.height
+      const rot = el.rotation || 0
+      const transformCss = rot ? `transform: rotate(${rot}deg); transform-origin: center center;` : ''
+
+      const innerContent = renderElementInnerContent(el)
 
       elementsHtml += `
         <div style="position: absolute; left: ${leftMm}mm; top: ${topMm}mm; width: ${widthMm}mm; min-height: ${heightMm}mm; z-index: ${el.zIndex || 1}; box-sizing: border-box; ${transformCss}">
