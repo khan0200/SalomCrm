@@ -31,6 +31,19 @@ class PrivateFileSystemStorage(FileSystemStorage):
         )
 
 
-private_pdf_storage = PrivateFileSystemStorage(
-    location=str(settings.PRIVATE_MEDIA_ROOT / 'contracts_final_pdf'),
-)
+def private_pdf_storage():
+    """
+    Factory, not an instance - Django's migration framework deconstructs a
+    FileField's `storage=` kwarg by calling it, and for a bare instance that
+    bakes the CURRENT MACHINE's resolved absolute path
+    (settings.PRIVATE_MEDIA_ROOT, under BASE_DIR) directly into the
+    generated migration file. That migration then "drifts" on every other
+    machine whose BASE_DIR differs (exactly what happened: the local dev
+    checkout and the production server disagree, so every deploy re-flagged
+    a spurious AlterField). A callable instead gets stored as an import
+    path and re-invoked wherever the migration runs, so the location is
+    always resolved fresh against that machine's own settings.
+    """
+    return PrivateFileSystemStorage(
+        location=str(settings.PRIVATE_MEDIA_ROOT / 'contracts_final_pdf'),
+    )
