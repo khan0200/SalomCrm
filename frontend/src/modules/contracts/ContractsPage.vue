@@ -296,7 +296,40 @@ async function handleDownloadContract(contract: Contract, format: 'pdf' | 'doc' 
   const title = `${contract.contract_number || 'Contract'}_${contract.student_name || contract.title}`
   if (format === 'doc') {
     downloadContractDoc(title, rawContent)
-  } else {
+    return
+  }
+
+  // Stage 3: a SIGNED contract downloads the same canonical, server-
+  // rendered PDF the student gets (download_pdf_canary via generate-pdf-
+  // canary) - staff and student see byte-identical output for the same
+  // finalized contract. Draft/pending contracts have no signature yet, so
+  // generate_final_pdf would reject them anyway - those keep using the
+  // client-side preview path below, same as before.
+  if (contract.signature_data) {
+    isDownloadingPdf.value = true
+    let objectUrl: string | null = null
+    try {
+      await contractsApi.generatePdfCanary(contract.id)
+      const blob = await contractsApi.downloadPdfCanary(contract.id)
+      objectUrl = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = objectUrl
+      a.download = `${title}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      return
+    } catch (e) {
+      console.error('Server-side PDF download failed, falling back to client-side render:', e)
+      // Fall through to the client-side path below rather than leaving
+      // staff with no way to download at all.
+    } finally {
+      if (objectUrl) URL.revokeObjectURL(objectUrl)
+      isDownloadingPdf.value = false
+    }
+  }
+
+  {
     isDownloadingPdf.value = true
     try {
       const contractNum = contract.student_id_assigned || contract.contract_number || ''

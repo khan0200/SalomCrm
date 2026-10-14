@@ -213,4 +213,21 @@ export const contractsApi = {
     const { data } = await apiClient.post(`/contracts/${id}/regenerate-sign-link/`)
     return data
   },
+
+  // Stage 3: staff-side equivalent of onlineContractsApi.downloadFinalPdf -
+  // same canonical server-rendered bytes a student would get for the same
+  // signed contract. Only valid once the contract has a persisted
+  // signature (generate_final_pdf rejects unsigned ones); draft/pending
+  // contracts still go through the client-side preview path.
+  async generatePdfCanary(id: string): Promise<{ detail: string; final_pdf_status: string; bytes: number }> {
+    const { data } = await apiClient.post(`/contracts/${id}/generate-pdf-canary/`)
+    return data
+  },
+
+  async downloadPdfCanary(id: string): Promise<Blob> {
+    const { data } = await apiClient.get(`/contracts/${id}/download-pdf-canary/`, {
+      responseType: 'blob',
+    })
+    return data
+  },
 }
