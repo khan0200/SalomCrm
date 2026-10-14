@@ -256,7 +256,7 @@ def deploy(client, path):
         label="Database migrations")
     run(client, "cd %s/backend && ../venv/bin/python manage.py fix_sequences" % path,
         label="Syncing database sequences", check=False)
-    run(client, "cd %s/backend && ../venv/bin/python manage.py fix_standart_contract_layout" % path,
+    run(client, "cd %s/backend && ../venv/bin/python manage.py fix_all_contract_layouts" % path,
         label="Fixing contract canvas layouts", check=False)
     run(client, "cd %s/backend && ../venv/bin/python manage.py collectstatic --noinput" % path,
         label="Collecting static files")
