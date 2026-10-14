@@ -156,13 +156,32 @@ def _run_node_renderer(payload: dict, output_path: Path) -> None:
     except json.JSONDecodeError:
         result = {}
 
-    if proc.returncode != 0 or not result.get('ok'):
-        error_detail = result.get('error') or (proc.stderr or '')[-2000:]
-        logger.error('contract_pdf_service: render failed (exit=%s): %s', proc.returncode, error_detail)
-        raise PdfGenerationError(f"Chromium render failed: {error_detail}")
+    # render.ts prints {"ok":true,...} ONLY after page.pdf() has fully
+    # flushed the file to disk - everything after that line (browser.close()
+    # in its `finally` block) is teardown that happens once the real work is
+    # already done. Observed in production: browser.close() can crash the
+    # Node process (SIGABRT) under the gunicorn worker environment
+    # specifically, which previously turned an already-successful render
+    # into a reported failure purely because of a nonzero exit code. A
+    # truthful {"ok":true} plus a real, correctly-sized output file is what
+    # actually matters - the exit code is only consulted when that line is
+    # missing or malformed.
+    file_is_valid = output_path.exists() and output_path.stat().st_size > 0
+    if result.get('ok') and file_is_valid:
+        if proc.returncode != 0:
+            logger.warning(
+                'contract_pdf_service: render succeeded (valid PDF on disk) but process exited with code=%s - '
+                'likely a crash during browser.close() teardown, not a render failure. stderr=%r',
+                proc.returncode, proc.stderr,
+            )
+        return
 
-    if not output_path.exists() or output_path.stat().st_size == 0:
-        raise PdfGenerationError("Render reported success but produced no output file")
+    error_detail = result.get('error') or (proc.stderr or '')[-2000:]
+    logger.error(
+        'contract_pdf_service: render failed (exit=%s) stdout=%r stderr=%r',
+        proc.returncode, proc.stdout, proc.stderr,
+    )
+    raise PdfGenerationError(f"Chromium render failed: {error_detail}")
 
 
 def generate_final_pdf(contract_id, sign_url: str = '', force: bool = False) -> Contract:

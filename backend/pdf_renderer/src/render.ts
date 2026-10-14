@@ -168,7 +168,25 @@ ${guardianHtml}
     const stats = fs.statSync(input.outputPath)
     console.log(JSON.stringify({ ok: true, bytes: stats.size }))
   } finally {
-    await browser.close()
+    // The PDF is already fully written to disk by this point (page.pdf()
+    // above only resolves once the file is flushed) - a crash/hang while
+    // tearing down Chromium itself must never turn a successful render
+    // into a reported failure. Observed in production under the gunicorn
+    // worker environment specifically (not reproducible via an interactive
+    // shell or `python manage.py shell`): browser.close() intermittently
+    // kills the Node process with SIGABRT after the real work is done,
+    // which the parent (contract_pdf_service.py) then saw as exit=-6 even
+    // though stdout already contained a valid {"ok":true} line. Wrapping
+    // in try/catch plus a hard timeout stops a slow/crashing close() from
+    // undoing a render that already succeeded.
+    try {
+      await Promise.race([
+        browser.close(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('browser.close() timed out')), 5000)),
+      ])
+    } catch (closeErr) {
+      console.error('browser.close() failed (render already succeeded, ignoring):', closeErr)
+    }
   }
 }
 
