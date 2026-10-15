@@ -803,7 +803,7 @@ class StudentExportView(APIView):
 
         headers = [
             "ID", "Full Name", "Korean Name", "Phone 1", "Phone 2", "Tariff",
-            "Level", "Language Certificate", "Certificate Score", "Language Cert 2", "Cert 2 Score",
+            "Level", "Language Certificate", "Certificate Score", "Certificate Points", "Language Cert 2", "Cert 2 Score",
             "University 1", "University 2", "University 3", "University 4", "University 5",
             "Student Group", "Lead By", "Coordinator", "CoA", "Invoice", "Embassy"
         ]
@@ -829,6 +829,7 @@ class StudentExportView(APIView):
                 s.level or '',
                 s.language_certificate or '',
                 s.certificate_score or '',
+                s.certificate_points or '',
                 s.language_certificate_2 or '',
                 s.certificate_score_2 or '',
                 s.university_1 or '',
@@ -1860,14 +1861,17 @@ def _serialize_students_for_fill(request, student_ids):
             # Language Certificates (up to 3)
             "language_certificate": s.language_certificate,
             "certificate_score": s.certificate_score,
+            "certificate_points": s.certificate_points,
             "certificate_test_date": s.certificate_test_date,
             "certificate_valid_date": s.certificate_valid_date,
             "language_certificate_2": s.language_certificate_2,
             "certificate_score_2": s.certificate_score_2,
+            "certificate_points_2": s.certificate_points_2,
             "certificate_2_test_date": s.certificate_2_test_date,
             "certificate_2_valid_date": s.certificate_2_valid_date,
             "language_certificate_3": s.language_certificate_3,
             "certificate_score_3": s.certificate_score_3,
+            "certificate_points_3": s.certificate_points_3,
             "certificate_3_test_date": s.certificate_3_test_date,
             "certificate_3_valid_date": s.certificate_3_valid_date,
             # Target Universities

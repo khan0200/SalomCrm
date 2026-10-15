@@ -271,6 +271,9 @@ const FIELD_MAPPING: Record<string, keyof Student> = {
   'CERTIFICATE SCORE': 'certificate_score',
   'CERTIFICATE_SCORE': 'certificate_score',
   'SCORE': 'certificate_score',
+  'CERTIFICATE POINTS': 'certificate_points',
+  'CERTIFICATE_POINTS': 'certificate_points',
+  'POINTS': 'certificate_points',
   'CERTIFICATE TEST DATE': 'certificate_test_date',
   'CERTIFICATE_TEST_DATE': 'certificate_test_date',
   'TEST DATE': 'certificate_test_date',
@@ -734,12 +737,18 @@ const detectedCertData = computed(() => {
   type = (type || '').toUpperCase().trim()
 
   let score = getVal(['CERTIFICATE_SCORE', 'SCORE', 'LEVEL', 'GRADE', 'TOTAL_SCORE', 'BAND_SCORE', 'OVERALL_SCORE', 'OVERALL_BAND_SCORE'])
+  let points = ''
   if (type === 'TOPIK') {
+    points = getVal(['CERTIFICATE_POINTS', 'POINTS', 'TOTAL_SCORE'])
     // If raw OCR text has an explicit level (e.g. '2급' or near 등급/Level), prioritize it
     if (rawOcrText.value) {
       const geupMatch = rawOcrText.value.match(/(?:등급|Level|Total\s*Score|총점)[\s\S]{0,60}?([1-6])\s*급/i) || rawOcrText.value.match(/([1-6])\s*급/)
       if (geupMatch && geupMatch[1]) {
         score = geupMatch[1]
+      }
+      if (!points) {
+        const ptsMatch = rawOcrText.value.match(/(?:Total\s*Score|총점)[\s\S]{0,40}?(\d{2,3})\s*(?:\/\s*(?:200|300))?/i) || rawOcrText.value.match(/\b(\d{2,3})\s*\/\s*(?:200|300)\b/)
+        if (ptsMatch) points = ptsMatch[1]
       }
     }
     if (score) {
@@ -766,6 +775,7 @@ const detectedCertData = computed(() => {
   return {
     type,
     score,
+    points,
     test_date: testDate,
     valid_date: validDate
   }
@@ -777,6 +787,7 @@ const certSlots = computed(() => [
     label: 'Certificate 1',
     currentType: student.value?.language_certificate,
     currentScore: student.value?.certificate_score,
+    currentPoints: student.value?.certificate_points,
     currentTestDate: student.value?.certificate_test_date,
     currentValidDate: student.value?.certificate_valid_date,
     isEmpty: !student.value?.language_certificate || student.value?.language_certificate === 'NO CERTIFICATE'
@@ -786,6 +797,7 @@ const certSlots = computed(() => [
     label: 'Certificate 2',
     currentType: student.value?.language_certificate_2,
     currentScore: student.value?.certificate_score_2,
+    currentPoints: student.value?.certificate_points_2,
     currentTestDate: student.value?.certificate_2_test_date,
     currentValidDate: student.value?.certificate_2_valid_date,
     isEmpty: !student.value?.language_certificate_2 || student.value?.language_certificate_2 === 'NO CERTIFICATE'
@@ -795,6 +807,7 @@ const certSlots = computed(() => [
     label: 'Certificate 3',
     currentType: student.value?.language_certificate_3,
     currentScore: student.value?.certificate_score_3,
+    currentPoints: student.value?.certificate_points_3,
     currentTestDate: student.value?.certificate_3_test_date,
     currentValidDate: student.value?.certificate_3_valid_date,
     isEmpty: !student.value?.language_certificate_3 || student.value?.language_certificate_3 === 'NO CERTIFICATE'
@@ -821,16 +834,19 @@ const handleSaveToCertSlot = async (slot: 1 | 2 | 3) => {
   if (slot === 1) {
     updatePayload.language_certificate = cData.type
     updatePayload.certificate_score = cData.score || null
+    updatePayload.certificate_points = cData.type === 'TOPIK' ? (cData.points || null) : null
     updatePayload.certificate_test_date = cData.test_date || null
     updatePayload.certificate_valid_date = cData.valid_date || null
   } else if (slot === 2) {
     updatePayload.language_certificate_2 = cData.type
     updatePayload.certificate_score_2 = cData.score || null
+    updatePayload.certificate_points_2 = cData.type === 'TOPIK' ? (cData.points || null) : null
     updatePayload.certificate_2_test_date = cData.test_date || null
     updatePayload.certificate_2_valid_date = cData.valid_date || null
   } else {
     updatePayload.language_certificate_3 = cData.type
     updatePayload.certificate_score_3 = cData.score || null
+    updatePayload.certificate_points_3 = cData.type === 'TOPIK' ? (cData.points || null) : null
     updatePayload.certificate_3_test_date = cData.test_date || null
     updatePayload.certificate_3_valid_date = cData.valid_date || null
   }
@@ -1485,6 +1501,9 @@ const getInitials = (name?: string) => {
                   <span class="px-2 py-0.5 rounded-md text-[11px] font-mono font-black bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800">
                     {{ detectedCertData.type === 'TOPIK' ? `Level ${detectedCertData.score || '—'}` : `Score: ${detectedCertData.score || '—'}` }}
                   </span>
+                  <span v-if="detectedCertData.type === 'TOPIK' && detectedCertData.points" class="px-2 py-0.5 rounded-md text-[11px] font-mono font-black bg-violet-50 dark:bg-violet-950/60 text-violet-600 dark:text-violet-400 border border-violet-200 dark:border-violet-800">
+                    {{ detectedCertData.points }} ball
+                  </span>
                 </div>
 
                 <!-- Right: Test Date & Validity Date -->
@@ -1541,7 +1560,7 @@ const getInitials = (name?: string) => {
                         Empty (Click to apply)
                       </span>
                       <span v-else class="text-zinc-600 dark:text-zinc-400 font-medium truncate block">
-                        {{ item.currentType }} ({{ item.currentScore || '—' }})
+                        {{ item.currentType }} ({{ item.currentScore || '—' }}<template v-if="item.currentType === 'TOPIK' && item.currentPoints">, {{ item.currentPoints }} ball</template>)
                       </span>
                     </div>
                   </div>

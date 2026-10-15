@@ -126,6 +126,7 @@ const certModalSlot = ref<1 | 2 | 3>(1)
 const certForm = ref({
   type: '',
   score: '',
+  points: '',
   test_date: '',
   valid_date: ''
 })
@@ -441,9 +442,10 @@ const handleCopy = (fieldKey: string, text?: string | null) => {
   }, 1600)
 }
 
-const getCertScoreCopyText = (cert?: string | null, score?: string | null) => {
+const getCertScoreCopyText = (cert?: string | null, score?: string | null, points?: string | null) => {
   if (!cert || cert === 'NO CERTIFICATE') return ''
-  return score ? `${cert} ${score}` : cert
+  if (!score) return cert
+  return points ? `${cert} ${score} (${points})` : `${cert} ${score}`
 }
 
 // Inline Edit Handlers
@@ -1605,6 +1607,7 @@ const openCertModal = (slot: 1 | 2 | 3) => {
     certForm.value = {
       type: s.language_certificate || 'TOPIK',
       score: s.certificate_score || '',
+      points: s.certificate_points || '',
       test_date: s.certificate_test_date || '',
       valid_date: s.certificate_valid_date || ''
     }
@@ -1612,6 +1615,7 @@ const openCertModal = (slot: 1 | 2 | 3) => {
     certForm.value = {
       type: s.language_certificate_2 || 'IELTS',
       score: s.certificate_score_2 || '',
+      points: s.certificate_points_2 || '',
       test_date: s.certificate_2_test_date || '',
       valid_date: s.certificate_2_valid_date || ''
     }
@@ -1619,6 +1623,7 @@ const openCertModal = (slot: 1 | 2 | 3) => {
     certForm.value = {
       type: s.language_certificate_3 || 'SAT',
       score: s.certificate_score_3 || '',
+      points: s.certificate_points_3 || '',
       test_date: s.certificate_3_test_date || '',
       valid_date: s.certificate_3_valid_date || ''
     }
@@ -1632,16 +1637,19 @@ const saveCertModal = () => {
   if (slot === 1) {
     patch.language_certificate = certForm.value.type || null
     patch.certificate_score = certForm.value.type === 'NO CERTIFICATE' ? null : (certForm.value.score || null)
+    patch.certificate_points = certForm.value.type === 'TOPIK' ? (certForm.value.points || null) : null
     patch.certificate_test_date = certForm.value.type === 'NO CERTIFICATE' ? null : (certForm.value.test_date || null)
     patch.certificate_valid_date = certForm.value.type === 'NO CERTIFICATE' ? null : (certForm.value.valid_date || null)
   } else if (slot === 2) {
     patch.language_certificate_2 = certForm.value.type || null
     patch.certificate_score_2 = certForm.value.type === 'NO CERTIFICATE' ? null : (certForm.value.score || null)
+    patch.certificate_points_2 = certForm.value.type === 'TOPIK' ? (certForm.value.points || null) : null
     patch.certificate_2_test_date = certForm.value.type === 'NO CERTIFICATE' ? null : (certForm.value.test_date || null)
     patch.certificate_2_valid_date = certForm.value.type === 'NO CERTIFICATE' ? null : (certForm.value.valid_date || null)
   } else {
     patch.language_certificate_3 = certForm.value.type || null
     patch.certificate_score_3 = certForm.value.type === 'NO CERTIFICATE' ? null : (certForm.value.score || null)
+    patch.certificate_points_3 = certForm.value.type === 'TOPIK' ? (certForm.value.points || null) : null
     patch.certificate_3_test_date = certForm.value.type === 'NO CERTIFICATE' ? null : (certForm.value.test_date || null)
     patch.certificate_3_valid_date = certForm.value.type === 'NO CERTIFICATE' ? null : (certForm.value.valid_date || null)
   }
@@ -1666,6 +1674,7 @@ const clearAndHideCert = (slot: 2 | 3) => {
     emit('update-student', {
       language_certificate_2: null,
       certificate_score_2: null,
+      certificate_points_2: null,
       certificate_2_test_date: null,
       certificate_2_valid_date: null
     })
@@ -1675,6 +1684,7 @@ const clearAndHideCert = (slot: 2 | 3) => {
     emit('update-student', {
       language_certificate_3: null,
       certificate_score_3: null,
+      certificate_points_3: null,
       certificate_3_test_date: null,
       certificate_3_valid_date: null
     })
@@ -2792,12 +2802,12 @@ const handleRestoreStudent = () => {
                         <div
                           class="inline-flex items-center text-xs font-bold rounded-full overflow-hidden shadow-2xs select-none self-start cursor-pointer"
                           :class="[copiedField === 'cert1_score' && 'animate-copy-press']"
-                          @click="handleCopy('cert1_score', getCertScoreCopyText(student.language_certificate, student.certificate_score))"
+                          @click="handleCopy('cert1_score', getCertScoreCopyText(student.language_certificate, student.certificate_score, student.certificate_points))"
                           title="Single-click to copy Language & Score"
                         >
                           <span class="bg-[#de350b] text-white px-2.5 py-0.5 uppercase tracking-wide text-[11px]">{{ student.language_certificate }}</span>
                           <span class="bg-[#0052cc] text-white px-2.5 py-0.5 text-[11px] flex items-center gap-1">
-                            SCORE: {{ student.certificate_score || '—' }}
+                            SCORE: {{ student.certificate_score || '—' }}<template v-if="student.language_certificate === 'TOPIK' && student.certificate_points"> ({{ student.certificate_points }} BALL)</template>
                             <Check v-if="copiedField === 'cert1_score'" class="w-3 h-3" />
                             <Copy v-else class="w-3 h-3 opacity-70" />
                           </span>
@@ -2867,12 +2877,12 @@ const handleRestoreStudent = () => {
                         <div
                           class="inline-flex items-center text-xs font-bold rounded-full overflow-hidden shadow-2xs select-none self-start cursor-pointer"
                           :class="[copiedField === 'cert2_score' && 'animate-copy-press']"
-                          @click="handleCopy('cert2_score', getCertScoreCopyText(student.language_certificate_2, student.certificate_score_2))"
+                          @click="handleCopy('cert2_score', getCertScoreCopyText(student.language_certificate_2, student.certificate_score_2, student.certificate_points_2))"
                           title="Single-click to copy Language & Score"
                         >
                           <span class="bg-[#00b8d9] text-white px-2.5 py-0.5 uppercase tracking-wide text-[11px]">{{ student.language_certificate_2 }}</span>
                           <span class="bg-[#0052cc] text-white px-2.5 py-0.5 text-[11px] flex items-center gap-1">
-                            SCORE: {{ student.certificate_score_2 || '—' }}
+                            SCORE: {{ student.certificate_score_2 || '—' }}<template v-if="student.language_certificate_2 === 'TOPIK' && student.certificate_points_2"> ({{ student.certificate_points_2 }} BALL)</template>
                             <Check v-if="copiedField === 'cert2_score'" class="w-3 h-3" />
                             <Copy v-else class="w-3 h-3 opacity-70" />
                           </span>
@@ -2933,12 +2943,12 @@ const handleRestoreStudent = () => {
                         <div
                           class="inline-flex items-center text-xs font-bold rounded-full overflow-hidden shadow-2xs select-none self-start cursor-pointer"
                           :class="[copiedField === 'cert3_score' && 'animate-copy-press']"
-                          @click="handleCopy('cert3_score', getCertScoreCopyText(student.language_certificate_3, student.certificate_score_3))"
+                          @click="handleCopy('cert3_score', getCertScoreCopyText(student.language_certificate_3, student.certificate_score_3, student.certificate_points_3))"
                           title="Single-click to copy Language & Score"
                         >
                           <span class="bg-[#ff5630] text-white px-2.5 py-0.5 uppercase tracking-wide text-[11px]">{{ student.language_certificate_3 }}</span>
                           <span class="bg-[#0052cc] text-white px-2.5 py-0.5 text-[11px] flex items-center gap-1">
-                            SCORE: {{ student.certificate_score_3 || '—' }}
+                            SCORE: {{ student.certificate_score_3 || '—' }}<template v-if="student.language_certificate_3 === 'TOPIK' && student.certificate_points_3"> ({{ student.certificate_points_3 }} BALL)</template>
                             <Check v-if="copiedField === 'cert3_score'" class="w-3 h-3" />
                             <Copy v-else class="w-3 h-3 opacity-70" />
                           </span>
@@ -4367,6 +4377,20 @@ const handleRestoreStudent = () => {
                   v-model="certForm.score"
                   type="text"
                   placeholder="e.g. 6.0 or 1400"
+                  class="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 px-3 py-2 rounded-xl outline-none focus:border-blue-500 font-bold text-xs"
+                />
+              </div>
+
+              <!-- TOPIK raw exam score (e.g. 144), distinct from the 1-6 level above -->
+              <div v-if="certForm.type === 'TOPIK'">
+                <label class="block text-[11px] font-bold uppercase text-zinc-500 mb-1.5 tracking-wider">
+                  Ball (Points)
+                </label>
+                <input
+                  v-model="certForm.points"
+                  type="text"
+                  inputmode="numeric"
+                  placeholder="masalan 144"
                   class="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 px-3 py-2 rounded-xl outline-none focus:border-blue-500 font-bold text-xs"
                 />
               </div>

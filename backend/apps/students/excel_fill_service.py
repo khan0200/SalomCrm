@@ -237,14 +237,17 @@ CRM_FIELDS = [
     # Certificates (Language Certificates)
     {"key": "language_certificate", "label": "1-Til sertifikati turi (TOPIK / IELTS / SKA)", "category": "certificates"},
     {"key": "certificate_score", "label": "1-Sertifikat bali (Score / 급수)", "category": "certificates"},
+    {"key": "certificate_points", "label": "1-Sertifikat ball (TOPIK Points / 점수)", "category": "certificates"},
     {"key": "certificate_test_date", "label": "1-Sertifikat topshirilgan sana (Test Date / 응시일)", "category": "certificates"},
     {"key": "certificate_valid_date", "label": "1-Sertifikat amal qilish muddati (Valid Date / 유효기간)", "category": "certificates"},
     {"key": "language_certificate_2", "label": "2-Til sertifikati turi (2nd Certificate Type)", "category": "certificates"},
     {"key": "certificate_score_2", "label": "2-Sertifikat bali (2nd Certificate Score)", "category": "certificates"},
+    {"key": "certificate_points_2", "label": "2-Sertifikat ball (2nd TOPIK Points)", "category": "certificates"},
     {"key": "certificate_2_test_date", "label": "2-Sertifikat topshirilgan sana (2nd Test Date)", "category": "certificates"},
     {"key": "certificate_2_valid_date", "label": "2-Sertifikat amal qilish muddati (2nd Valid Date)", "category": "certificates"},
     {"key": "language_certificate_3", "label": "3-Til sertifikati turi (3rd Certificate Type)", "category": "certificates"},
     {"key": "certificate_score_3", "label": "3-Sertifikat bali (3rd Certificate Score)", "category": "certificates"},
+    {"key": "certificate_points_3", "label": "3-Sertifikat ball (3rd TOPIK Points)", "category": "certificates"},
     {"key": "certificate_3_test_date", "label": "3-Sertifikat topshirilgan sana (3rd Test Date)", "category": "certificates"},
     {"key": "certificate_3_valid_date", "label": "3-Sertifikat amal qilish muddati (3rd Valid Date)", "category": "certificates"},
 
@@ -320,7 +323,8 @@ SEMANTIC_PATTERNS = [
     # Language certificate dates & scores & types
     (r"(test\s*date|exam\s*date|examination\s*date|응시\s*일자?|시험\s*일자?|imtihon\s*sanasi|topshirilgan\s*sana|дата\s*экзамена)", "certificate_test_date"),
     (r"(cert.*expir|cert.*valid|유효\s*기간|만료\s*일자?|sertifikat\s*amal\s*qilish|срок\s*действия\s*сертификата)", "certificate_valid_date"),
-    (r"(certificate\s*score|topik\s*score|ielts\s*score|sat\s*score|sat\s*point|topik\s*level|급수|취득\s*점수|sertifikat\s*bali|балл\s*сертификата)", "certificate_score"),
+    (r"(topik\s*points?|topik\s*ball|취득\s*점수|점수|sertifikat\s*ball(i)?|балл\s*topik)", "certificate_points"),
+    (r"(certificate\s*score|topik\s*score|ielts\s*score|sat\s*score|sat\s*point|topik\s*level|급수|sertifikat\s*bali|балл\s*сертификата)", "certificate_score"),
     (r"(language\s*certificate|language\s*proficiency|토픽\s*/?\s*ielts|topik|ielts|toefl|cefr|^sat$|ska|어학\s*능력|공인\s*어학|한국어\s*능력|til\s*sertifikati|языковой\s*сертификат|сертификат)", "language_certificate"),
 
     # GPA & Scale
@@ -498,7 +502,9 @@ def match_column_field(header_text: str) -> Tuple[str, float]:
     if 'university' in cleaned or 'school' in cleaned or 'college' in cleaned or '학교' in cleaned:
         return ('final_school_name', 0.85)
     if any(k in cleaned for k in ('sat', 'ielts', 'topik', 'toefl', 'cefr', 'sertifikat', 'certificate')):
-        if 'score' in cleaned or 'bali' in cleaned or 'point' in cleaned or '점수' in cleaned or '급수' in cleaned:
+        if 'point' in cleaned or 'ball' in cleaned or '점수' in cleaned:
+            return ('certificate_points', 0.85)
+        if 'score' in cleaned or 'bali' in cleaned or '급수' in cleaned:
             return ('certificate_score', 0.85)
         return ('language_certificate', 0.85)
         

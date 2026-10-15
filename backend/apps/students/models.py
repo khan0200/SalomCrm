@@ -121,18 +121,24 @@ class Student(TenantAwareModel):
     )
 
     # 3. Language Certificates (Supports up to 3 slots)
+    # certificate_points holds the raw TOPIK exam score (e.g. 144), distinct
+    # from certificate_score which holds the level/band (e.g. "2"). Only
+    # TOPIK uses points; other certificate types leave it blank.
     language_certificate = models.CharField(max_length=50, blank=True, null=True, db_index=True)
     certificate_score = models.CharField(max_length=50, blank=True, null=True)
+    certificate_points = models.CharField(max_length=50, blank=True, null=True)
     certificate_test_date = models.CharField(max_length=50, blank=True, null=True)
     certificate_valid_date = models.CharField(max_length=50, blank=True, null=True)
 
     language_certificate_2 = models.CharField(max_length=50, blank=True, null=True)
     certificate_score_2 = models.CharField(max_length=50, blank=True, null=True)
+    certificate_points_2 = models.CharField(max_length=50, blank=True, null=True)
     certificate_2_test_date = models.CharField(max_length=50, blank=True, null=True)
     certificate_2_valid_date = models.CharField(max_length=50, blank=True, null=True)
 
     language_certificate_3 = models.CharField(max_length=50, blank=True, null=True)
     certificate_score_3 = models.CharField(max_length=50, blank=True, null=True)
+    certificate_points_3 = models.CharField(max_length=50, blank=True, null=True)
     certificate_3_test_date = models.CharField(max_length=50, blank=True, null=True)
     certificate_3_valid_date = models.CharField(max_length=50, blank=True, null=True)
 

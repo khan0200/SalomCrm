@@ -347,15 +347,42 @@ Return JSON only. Do not explain anything. Output must be exactly in this JSON f
                     topik_level = all_geup[-1]
 
             # 3. Check Total Score threshold calculation as backup
-            # For TOPIK I (max 200 points): >= 140 is Level 2 (2급), 80-139 is Level 1 (1급)
-            # For TOPIK II (max 300 points): >= 230: 6급, 190-229: 5급, 150-189: 4급, 120-149: 3급
+            # Only valid for PBT (paper-based, max 200/300): TOPIK I >= 140 is
+            # Level 2 (2급), 80-139 is Level 1 (1급). TOPIK II >= 230: 6급,
+            # 190-229: 5급, 150-189: 4급, 120-149: 3급.
+            # IBT (internet-based, max 400/600) level cutoffs are NOT simply
+            # 2x the PBT ones -- a confirmed real certificate scored 338/600
+            # as Level 5, which falls well outside where a linear doubling
+            # would place it. Since the exact official IBT cutoffs aren't
+            # reliably known, points are still captured (staff enter/verify
+            # the level by hand for IBT), but no level is ever guessed from
+            # an IBT total -- only the level/등급 column printed on the
+            # certificate itself is trusted for IBT documents.
             score_calc_level = None
-            ts_match = re.search(r'(?:Total\s*Score|총점)[\s\S]{0,40}?(\d{2,3})\s*(?:/\s*(200|300))?', raw_ocr_text, re.IGNORECASE)
+            # Prefer the explicit "NNN/<denominator>" pattern first -- it is
+            # unambiguous. Falling back to "near Total Score/총점" without the
+            # denominator is risky because the Listening/Reading section
+            # scores sit right next to that label in the OCR text too, and
+            # would otherwise be picked up instead of the real total.
+            # IBT reports its per-section scores out of 200 (e.g. "200/200"),
+            # which collides with PBT TOPIK I's own total-score denominator
+            # (200). So on IBT documents, only /300|400|600 are matched for
+            # the total (IBT TOPIK I's own total is always /400, never /200);
+            # on PBT documents /200 is matched too, since there a /200 can
+            # only be the TOPIK I total (its own sections are out of 100).
+            is_ibt = bool(re.search(r'IBT', raw_ocr_text, re.IGNORECASE))
+            total_denoms = r'(300|400|600)' if is_ibt else r'(200|300|400|600)'
+            ts_match = re.search(r'\b(\d{2,3})\s*/\s*' + total_denoms + r'\b', raw_ocr_text)
             if not ts_match:
-                ts_match = re.search(r'\b(\d{2,3})\s*/\s*(200|300)\b', raw_ocr_text)
+                ts_match = re.search(r'(?:Total\s*Score|총점)[\s\S]{0,40}?(\d{2,3})\s*(?:/\s*' + total_denoms + r')?', raw_ocr_text, re.IGNORECASE)
             if ts_match:
                 pts = int(ts_match.group(1))
-                denom = int(ts_match.group(2)) if ts_match.group(2) else (200 if pts <= 200 and ('TOPIK I' in raw_ocr_text or 'TOPIK 1' in raw_ocr_text) else 300)
+                simple_fields["CERTIFICATE_POINTS"] = str(pts)
+                is_topik_1 = 'TOPIK I' in raw_ocr_text or 'TOPIK 1' in raw_ocr_text
+                if ts_match.group(2):
+                    denom = int(ts_match.group(2))
+                else:
+                    denom = (200 if pts <= 200 else 400) if is_topik_1 else (300 if pts <= 300 else 600)
                 if denom == 200:
                     if pts >= 140:
                         score_calc_level = '2'
@@ -374,6 +401,9 @@ Return JSON only. Do not explain anything. Output must be exactly in this JSON f
                         score_calc_level = '3'
                     else:
                         score_calc_level = 'EXPECTED'
+                # denom in (400, 600) -> IBT: leave score_calc_level unset,
+                # rely solely on the printed 등급/Level column (topik_level /
+                # field_level below).
 
             # 4. Check if other fields in simple_fields have level/grade (e.g. "LEVEL": "2급")
             field_level = None

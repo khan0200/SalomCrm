@@ -101,16 +101,19 @@ export interface Student {
   // Language Certificates
   language_certificate?: StudentLanguageCertificate | string | null
   certificate_score?: string | null
+  certificate_points?: string | null
   certificate_test_date?: string | null
   certificate_valid_date?: string | null
 
   language_certificate_2?: StudentLanguageCertificate | string | null
   certificate_score_2?: string | null
+  certificate_points_2?: string | null
   certificate_2_test_date?: string | null
   certificate_2_valid_date?: string | null
 
   language_certificate_3?: StudentLanguageCertificate | string | null
   certificate_score_3?: string | null
+  certificate_points_3?: string | null
   certificate_3_test_date?: string | null
   certificate_3_valid_date?: string | null
 
