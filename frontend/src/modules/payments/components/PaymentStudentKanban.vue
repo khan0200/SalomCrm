@@ -145,17 +145,17 @@ const studentsByColumn = computed(() => {
                 </div>
               </div>
 
-              <!-- Discount only (FULL + B2B) -->
+              <!-- Discount only (FULL) -->
               <div
-                v-else-if="student.discount !== null && student.discount !== undefined && Number(student.discount) > 0"
+                v-else-if="col.key === 'full' && student.discount !== null && student.discount !== undefined && Number(student.discount) > 0"
                 class="flex items-center justify-between mt-1.5 text-[11px]"
               >
                 <span class="text-zinc-600 dark:text-zinc-300 font-semibold uppercase tracking-wide">Discount:</span>
                 <span class="font-bold font-mono text-pink-600 dark:text-pink-400">{{ formatAmount(student.discount) }} UZS</span>
               </div>
 
-              <!-- Payments Done / Withdrawal (Qarzdor, FULL, B2B) -->
-              <div v-if="col.key !== 'new'" class="pt-2 mt-2 border-t border-zinc-100 dark:border-zinc-800 flex flex-col gap-0.5">
+              <!-- Payments Done / Withdrawal (Qarzdor, FULL only - B2B card is ID + name only) -->
+              <div v-if="col.key === 'debtor' || col.key === 'full'" class="pt-2 mt-2 border-t border-zinc-100 dark:border-zinc-800 flex flex-col gap-0.5">
                 <div class="flex items-center justify-between text-[10.5px]">
                   <span class="text-zinc-600 dark:text-zinc-300 font-semibold uppercase tracking-wide">Payments Done:</span>
                   <span class="font-bold font-mono text-zinc-700 dark:text-zinc-300">{{ formatAmount(student.total_payments) }} UZS</span>
