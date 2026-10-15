@@ -65,7 +65,7 @@ const studentsByColumn = computed(() => {
       <div
         v-for="col in COLUMNS"
         :key="col.key"
-        class="flex flex-col min-w-[280px] flex-1 max-h-[calc(100vh-280px)] bg-zinc-50/70 dark:bg-zinc-900/60 border-2 rounded-2xl overflow-hidden select-none"
+        class="flex flex-col min-w-[280px] flex-1 max-h-[calc(100vh-220px)] bg-zinc-50/70 dark:bg-zinc-900/60 border-2 rounded-2xl overflow-hidden select-none"
         :class="col.columnBorderClass"
       >
         <!-- Column header -->
