@@ -10,7 +10,8 @@ import { useUiStore } from '@/stores/ui'
 import { useStudentDashboardStore } from '@/stores/studentDashboard'
 import { useStudentFiltering } from '@/composables/useStudentFiltering'
 import {
-  Users, Receipt, Plus, Minus, DollarSign, Lock
+  Users, Receipt, Plus, Minus, DollarSign, Lock,
+  FileSpreadsheet, Columns3, Table as TableIcon
 } from 'lucide-vue-next'
 
 import PaymentStudentOverview from './components/PaymentStudentOverview.vue'
@@ -840,6 +841,44 @@ const exportPaymentHistoryToExcel = async () => {
 
       <!-- Right: Action Buttons -->
       <div class="flex items-center gap-2">
+        <template v-if="activeTab === 'students'">
+          <button
+            type="button"
+            @click="exportStudentOverviewToExcel"
+            class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg border border-emerald-300 dark:border-emerald-700/60 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-all cursor-pointer shadow-2xs"
+            title="Download Filtered Students Excel"
+          >
+            <FileSpreadsheet class="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+            <span>Export Excel</span>
+          </button>
+
+          <!-- View Mode Switcher -->
+          <div class="flex items-center gap-1 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-850 p-1">
+            <button
+              type="button"
+              @click="studentsViewMode = 'kanban'"
+              class="p-1.5 rounded-md transition-all cursor-pointer"
+              :class="studentsViewMode === 'kanban'
+                ? 'bg-blue-600 text-white shadow-xs'
+                : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100'"
+              title="Kanban View (Payment Status Board)"
+            >
+              <Columns3 class="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              @click="studentsViewMode = 'table'"
+              class="p-1.5 rounded-md transition-all cursor-pointer"
+              :class="studentsViewMode === 'table'
+                ? 'bg-blue-600 text-white shadow-xs'
+                : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100'"
+              title="Table View"
+            >
+              <TableIcon class="h-4 w-4" />
+            </button>
+          </div>
+        </template>
+
         <button
           type="button"
           @click="openAddModal()"
@@ -888,10 +927,8 @@ const exportPaymentHistoryToExcel = async () => {
         :is-loading="isOverviewLoading"
         :view-mode="studentsViewMode"
         :sort-order="sortOrder"
-        @update:view-mode="studentsViewMode = $event"
         @toggle-sort="sortOrder = sortOrder === 'asc' ? 'desc' : 'asc'"
         @open-add-payment="openAddModal"
-        @export-excel="exportStudentOverviewToExcel"
       />
 
       <!-- Pagination (hidden in Kanban - it shows the full filtered set across 4 scrollable columns) -->

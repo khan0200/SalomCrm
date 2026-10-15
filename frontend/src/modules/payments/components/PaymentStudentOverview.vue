@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { Student } from '@/types'
 import {
-  Table as TableIcon, Columns3, UserX, FileSpreadsheet, Plus, ChevronDown, ChevronUp
+  UserX, Plus, ChevronDown, ChevronUp
 } from 'lucide-vue-next'
 import PaymentStudentKanban from './PaymentStudentKanban.vue'
 
@@ -14,10 +14,8 @@ defineProps<{
 }>()
 
 const emit = defineEmits<{
-  (e: 'update:viewMode', val: 'kanban' | 'table'): void
   (e: 'toggle-sort'): void
   (e: 'open-add-payment', studentId?: string): void
-  (e: 'export-excel'): void
 }>()
 
 function formatAmount(val: number | string | null | undefined) {
@@ -29,48 +27,6 @@ function formatAmount(val: number | string | null | undefined) {
 
 <template>
   <div class="flex flex-col gap-4 select-none text-xs">
-    <!-- ── Actions Bar (search + filters now live in the global AppHeader) ── -->
-    <div class="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#111315] p-3 shadow-2xs flex flex-wrap gap-2.5 items-center justify-end">
-      <!-- Actions: Export Excel + View Mode Switcher -->
-      <div class="flex items-center gap-2">
-        <button
-          type="button"
-          @click="emit('export-excel')"
-          class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg border border-emerald-300 dark:border-emerald-700/60 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-all cursor-pointer shadow-2xs"
-          title="Download Filtered Students Excel"
-        >
-          <FileSpreadsheet class="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-          <span>Export Excel</span>
-        </button>
-
-        <!-- View Mode Switcher -->
-        <div class="flex items-center gap-1 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-850 p-1">
-          <button
-            type="button"
-            @click="emit('update:viewMode', 'kanban')"
-            class="p-1.5 rounded-md transition-all cursor-pointer"
-            :class="viewMode === 'kanban'
-              ? 'bg-blue-600 text-white shadow-xs'
-              : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100'"
-            title="Kanban View (Payment Status Board)"
-          >
-            <Columns3 class="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            @click="emit('update:viewMode', 'table')"
-            class="p-1.5 rounded-md transition-all cursor-pointer"
-            :class="viewMode === 'table'
-              ? 'bg-blue-600 text-white shadow-xs'
-              : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100'"
-            title="Table View"
-          >
-            <TableIcon class="h-4 w-4" />
-          </button>
-        </div>
-      </div>
-    </div>
-
     <!-- Student Count -->
     <div class="text-xs text-zinc-500 dark:text-zinc-400 italic px-1">
       <span v-if="isLoading" class="inline-block h-3 w-24 rounded bg-zinc-200 dark:bg-zinc-800 animate-pulse align-middle" />
