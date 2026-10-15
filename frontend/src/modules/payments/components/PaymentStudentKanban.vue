@@ -103,13 +103,13 @@ const columnFlexClass = (key: ColumnKey) => {
             <p class="text-[11px] text-zinc-400 dark:text-zinc-500 font-medium">No students</p>
           </div>
 
-          <div v-else class="flex flex-col gap-1.5">
+          <div v-else class="flex flex-col gap-1">
             <button
               v-for="student in studentsByColumn[col.key]"
               :key="student.id"
               type="button"
               @click="emit('open-add-payment', student.id)"
-              class="text-left rounded-xl border-2 border-dashed bg-white dark:bg-zinc-900 p-3 shadow-md hover:shadow-lg transition-all cursor-pointer w-full group"
+              class="text-left rounded-xl border-2 border-dashed bg-white dark:bg-zinc-900 p-2 shadow-md hover:shadow-lg transition-all cursor-pointer w-full group"
               :class="col.cardBorderClass"
             >
               <!-- Name + Archive badge -->
@@ -132,7 +132,7 @@ const columnFlexClass = (key: ColumnKey) => {
               </div>
 
               <!-- ID + Tariff (ghost text, not pills) + Eye icon (open Student Detail Drawer) -->
-              <div class="flex items-center justify-between gap-2 mt-2">
+              <div class="flex items-center justify-between gap-2 mt-1">
                 <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] font-semibold text-zinc-400 dark:text-zinc-500 min-w-0">
                   <span class="font-mono">{{ student.id }}</span>
                   <span v-if="hasTariff(student)" class="truncate max-w-[160px]">{{ student.tariff }}</span>
@@ -148,7 +148,7 @@ const columnFlexClass = (key: ColumnKey) => {
               </div>
 
               <!-- Balance (NEW + Qarzdor only) -->
-              <div v-if="col.key === 'new' || col.key === 'debtor'" class="flex flex-col gap-0.5 mt-1.5 text-[11px]">
+              <div v-if="col.key === 'new' || col.key === 'debtor'" class="flex flex-col gap-0.5 mt-1 text-[11px]">
                 <div class="flex items-center justify-between">
                   <span class="text-zinc-600 dark:text-zinc-300 font-semibold uppercase tracking-wide">Balance:</span>
                   <span
@@ -170,14 +170,14 @@ const columnFlexClass = (key: ColumnKey) => {
               <!-- Discount only (FULL) -->
               <div
                 v-else-if="col.key === 'full' && student.discount !== null && student.discount !== undefined && Number(student.discount) > 0"
-                class="flex items-center justify-between mt-1.5 text-[11px]"
+                class="flex items-center justify-between mt-1 text-[11px]"
               >
                 <span class="text-zinc-600 dark:text-zinc-300 font-semibold uppercase tracking-wide">Discount:</span>
                 <span class="font-bold font-mono text-pink-600 dark:text-pink-400">{{ formatAmount(student.discount) }} UZS</span>
               </div>
 
               <!-- Payments Done / Withdrawal (Qarzdor, FULL only - B2B card is ID + name only) -->
-              <div v-if="col.key === 'debtor' || col.key === 'full'" class="pt-2 mt-2 border-t border-zinc-100 dark:border-zinc-800 flex flex-col gap-0.5">
+              <div v-if="col.key === 'debtor' || col.key === 'full'" class="pt-1 mt-1 border-t border-zinc-100 dark:border-zinc-800 flex flex-col gap-0.5">
                 <div class="flex items-center justify-between text-[10.5px]">
                   <span class="text-zinc-600 dark:text-zinc-300 font-semibold uppercase tracking-wide">Payments Done:</span>
                   <span class="font-bold font-mono text-zinc-700 dark:text-zinc-300">{{ formatAmount(student.total_payments) }} UZS</span>
