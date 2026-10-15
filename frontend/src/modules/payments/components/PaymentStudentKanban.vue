@@ -94,7 +94,7 @@ const studentsByColumn = computed(() => {
               :key="student.id"
               type="button"
               @click="emit('open-add-payment', student.id)"
-              class="text-left rounded-xl border-2 border-dashed bg-white dark:bg-zinc-900 p-3 shadow-md hover:shadow-lg transition-all cursor-pointer w-full hover:-translate-y-0.5 group"
+              class="text-left rounded-xl border-2 border-dashed bg-white dark:bg-zinc-900 p-3 shadow-[0_4px_14px_rgba(0,0,0,0.12)] dark:shadow-[0_4px_14px_rgba(0,0,0,0.4)] hover:shadow-[0_8px_20px_rgba(0,0,0,0.16)] dark:hover:shadow-[0_8px_20px_rgba(0,0,0,0.5)] transition-all cursor-pointer w-full hover:-translate-y-0.5 group"
               :class="col.cardBorderClass"
             >
               <!-- Name + Archive badge -->
@@ -125,7 +125,7 @@ const studentsByColumn = computed(() => {
               <!-- Balance (NEW + Qarzdor only) -->
               <div v-if="col.key === 'new' || col.key === 'debtor'" class="flex flex-col gap-0.5 mt-1.5 text-[11px]">
                 <div class="flex items-center justify-between">
-                  <span class="text-zinc-400 dark:text-zinc-500 font-semibold uppercase tracking-wide">Balance:</span>
+                  <span class="text-zinc-600 dark:text-zinc-300 font-semibold uppercase tracking-wide">Balance:</span>
                   <span
                     class="font-bold font-mono"
                     :class="(Number(student.balance) || 0) < 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'"
@@ -137,7 +137,7 @@ const studentsByColumn = computed(() => {
                   v-if="student.discount !== null && student.discount !== undefined && Number(student.discount) > 0"
                   class="flex items-center justify-between"
                 >
-                  <span class="text-zinc-400 dark:text-zinc-500 font-semibold uppercase tracking-wide">Discount:</span>
+                  <span class="text-zinc-600 dark:text-zinc-300 font-semibold uppercase tracking-wide">Discount:</span>
                   <span class="font-bold font-mono text-pink-600 dark:text-pink-400">{{ formatAmount(student.discount) }} UZS</span>
                 </div>
               </div>
@@ -147,21 +147,21 @@ const studentsByColumn = computed(() => {
                 v-else-if="student.discount !== null && student.discount !== undefined && Number(student.discount) > 0"
                 class="flex items-center justify-between mt-1.5 text-[11px]"
               >
-                <span class="text-zinc-400 dark:text-zinc-500 font-semibold uppercase tracking-wide">Discount:</span>
+                <span class="text-zinc-600 dark:text-zinc-300 font-semibold uppercase tracking-wide">Discount:</span>
                 <span class="font-bold font-mono text-pink-600 dark:text-pink-400">{{ formatAmount(student.discount) }} UZS</span>
               </div>
 
               <!-- Payments Done / Withdrawal (Qarzdor, FULL, B2B) -->
               <div v-if="col.key !== 'new'" class="pt-2 mt-2 border-t border-zinc-100 dark:border-zinc-800 flex flex-col gap-0.5">
                 <div class="flex items-center justify-between text-[10.5px]">
-                  <span class="text-zinc-400 dark:text-zinc-500 font-semibold uppercase tracking-wide">Payments Done:</span>
+                  <span class="text-zinc-600 dark:text-zinc-300 font-semibold uppercase tracking-wide">Payments Done:</span>
                   <span class="font-bold font-mono text-zinc-700 dark:text-zinc-300">{{ formatAmount(student.total_payments) }} UZS</span>
                 </div>
                 <div
                   v-if="(Number(student.total_withdrawals) || 0) > 0"
                   class="flex items-center justify-between text-[10.5px]"
                 >
-                  <span class="text-rose-400 dark:text-rose-500 font-semibold uppercase tracking-wide">Withdrawal:</span>
+                  <span class="text-rose-500 dark:text-rose-400 font-semibold uppercase tracking-wide">Withdrawal:</span>
                   <span class="font-bold font-mono text-rose-600 dark:text-rose-400">{{ formatAmount(student.total_withdrawals) }} UZS</span>
                 </div>
               </div>
