@@ -315,11 +315,6 @@ const createStudentMutation = useMutation({
     queryClient.invalidateQueries({ queryKey: ['all-students-master'] })
     queryClient.invalidateQueries({ queryKey: ['folders'] })
     queryClient.invalidateQueries({ queryKey: ['student-options'] })
-    // A tariff set at creation writes balance server-side (see
-    // recalculate_student_financials); the Payments page keeps its own
-    // separate cache of the same student/balance data and must be told too,
-    // or it keeps showing pre-creation figures until a full page reload.
-    queryClient.invalidateQueries({ queryKey: ['payment-overview-all'] })
     queryClient.invalidateQueries({ queryKey: ['payment-history-all'] })
     isAddModalOpen.value = false
     uiStore.addToast({
@@ -369,12 +364,6 @@ const updateStudentMutation = useMutation({
     queryClient.invalidateQueries({ queryKey: ['folders'] })
     queryClient.invalidateQueries({ queryKey: ['student-options'] })
     queryClient.invalidateQueries({ queryKey: ['student-detail', selectedDetailStudentId.value] })
-    // Assigning/changing a tariff (or recording other financial fields here)
-    // recalculates balance server-side. The Payments page reads that same
-    // balance from its own cache keys, which are otherwise never told this
-    // student changed — without this it keeps showing the pre-update balance
-    // until a full page reload forces a refetch.
-    queryClient.invalidateQueries({ queryKey: ['payment-overview-all'] })
     queryClient.invalidateQueries({ queryKey: ['payment-history-all'] })
     if (selectedDetailStudentId.value) {
       queryClient.invalidateQueries({ queryKey: ['student-payments', selectedDetailStudentId.value] })

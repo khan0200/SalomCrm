@@ -16,6 +16,7 @@ defineProps<{
 const emit = defineEmits<{
   (e: 'toggle-sort'): void
   (e: 'open-add-payment', studentId?: string): void
+  (e: 'open-detail', studentId: string): void
 }>()
 
 function formatAmount(val: number | string | null | undefined) {
@@ -97,6 +98,7 @@ function formatAmount(val: number | string | null | undefined) {
       v-else-if="viewMode === 'kanban'"
       :students="students"
       @open-add-payment="(id) => emit('open-add-payment', id)"
+      @open-detail="(id) => emit('open-detail', id)"
     />
 
     <!-- ── 2. Table View (UniApp2 Table 1-to-1) ────────────────────────────── -->

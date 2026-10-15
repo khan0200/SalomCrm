@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { Student } from '@/types'
-import { Users } from 'lucide-vue-next'
+import { Users, Eye } from 'lucide-vue-next'
 
 const props = defineProps<{
   students: Student[]
@@ -9,6 +9,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'open-add-payment', studentId: string): void
+  (e: 'open-detail', studentId: string): void
 }>()
 
 function formatAmount(val: number | string | null | undefined) {
@@ -119,10 +120,20 @@ const studentsByColumn = computed(() => {
                 </span>
               </div>
 
-              <!-- ID + Tariff (ghost text, not pills) -->
-              <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-2 text-[11px] font-semibold text-zinc-400 dark:text-zinc-500">
-                <span class="font-mono">{{ student.id }}</span>
-                <span v-if="hasTariff(student)" class="truncate max-w-[160px]">{{ student.tariff }}</span>
+              <!-- ID + Tariff (ghost text, not pills) + Eye icon (open Student Detail Drawer) -->
+              <div class="flex items-center justify-between gap-2 mt-2">
+                <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] font-semibold text-zinc-400 dark:text-zinc-500 min-w-0">
+                  <span class="font-mono">{{ student.id }}</span>
+                  <span v-if="hasTariff(student)" class="truncate max-w-[160px]">{{ student.tariff }}</span>
+                </div>
+                <button
+                  type="button"
+                  @click.stop="emit('open-detail', student.id)"
+                  class="p-1 rounded-md text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer shrink-0"
+                  title="View Student Details"
+                >
+                  <Eye class="w-3.5 h-3.5" />
+                </button>
               </div>
 
               <!-- Balance (NEW + Qarzdor only) -->

@@ -23,6 +23,7 @@ import WithdrawModal from './components/WithdrawModal.vue'
 import EditPaymentModal from './components/EditPaymentModal.vue'
 import StudentFilters from '@/modules/students/components/StudentFilters.vue'
 import ActiveFilterChips from '@/components/ActiveFilterChips.vue'
+import StudentDetailDrawer from '@/modules/students/components/StudentDetailDrawer.vue'
 
 const queryClient = useQueryClient()
 const uiStore = useUiStore()
@@ -173,6 +174,10 @@ const isEditModalOpen = ref(false)
 const preselectedStudentId = ref<string | null>(null)
 const editingPayment = ref<Payment | null>(null)
 
+// Student Detail Drawer State (opened via the Eye icon on a Kanban card)
+const selectedDetailStudentId = ref<string | null>(null)
+const isDetailDrawerOpen = ref(false)
+
 // ── Settings Data (Methods, Receivers, Note Pills) ─────────────────────
 const paymentMethods = ref<string[]>(PAYMENT_METHODS_DEFAULT)
 const paymentReceivers = ref<string[]>(RECEIVED_BY_DEFAULT)
@@ -243,6 +248,36 @@ const { data: allStudentsData, isLoading: isOverviewLoading } = useQuery({
 })
 
 const allStudents = computed<Student[]>(() => allStudentsData.value?.results || [])
+
+// Student Detail Drawer: same pattern as StudentsPage.vue - a reactive
+// per-student query layered on top of the roster row, so the drawer shows
+// fresh detail fields without waiting on a full master-roster refetch.
+const { data: detailStudent } = useQuery({
+  queryKey: computed(() => ['student-detail', selectedDetailStudentId.value]),
+  queryFn: () => selectedDetailStudentId.value ? studentsApi.getStudentDetail(selectedDetailStudentId.value) : null,
+  enabled: computed(() => !!selectedDetailStudentId.value),
+  staleTime: 0,
+})
+
+const selectedStudent = computed<Student | null>(() => {
+  if (!selectedDetailStudentId.value) return null
+  const fromRoster = allStudents.value.find(s => s.id === selectedDetailStudentId.value)
+  if (detailStudent.value && detailStudent.value.id === selectedDetailStudentId.value) {
+    return { ...(fromRoster || {}), ...detailStudent.value }
+  }
+  return fromRoster || null
+})
+
+const updateStudentMutation = useMutation({
+  mutationFn: (data: Partial<Student>) => {
+    if (!selectedDetailStudentId.value) throw new Error('No student selected')
+    return studentsApi.updateStudent(selectedDetailStudentId.value, data)
+  },
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: ['all-students-master'] })
+    queryClient.invalidateQueries({ queryKey: ['student-detail', selectedDetailStudentId.value] })
+  },
+})
 
 const { data: historyData, isLoading: isHistoryLoading } = useQuery({
   queryKey: ['payment-history-all'],
@@ -594,6 +629,11 @@ const openAddModal = (studentId?: string) => {
   isAddModalOpen.value = true
 }
 
+const openDetail = (studentId: string) => {
+  selectedDetailStudentId.value = studentId
+  isDetailDrawerOpen.value = true
+}
+
 const openWithdrawModal = (studentId?: string) => {
   preselectedStudentId.value = studentId || null
   isWithdrawModalOpen.value = true
@@ -929,6 +969,7 @@ const exportPaymentHistoryToExcel = async () => {
         :sort-order="sortOrder"
         @toggle-sort="sortOrder = sortOrder === 'asc' ? 'desc' : 'asc'"
         @open-add-payment="openAddModal"
+        @open-detail="openDetail"
       />
 
       <!-- Pagination (hidden in Kanban - it shows the full filtered set across 4 scrollable columns) -->
@@ -1053,6 +1094,16 @@ const exportPaymentHistoryToExcel = async () => {
       :note-pills="notePills"
       @close="isEditModalOpen = false"
       @submit="editPaymentMutation.mutate($event)"
+    />
+
+    <!-- Student Detail Drawer (opened via the Eye icon on a Kanban card) -->
+    <StudentDetailDrawer
+      :is-open="isDetailDrawerOpen"
+      :student="selectedStudent"
+      :options="options"
+      @close="isDetailDrawerOpen = false"
+      @update-student="data => updateStudentMutation.mutate(data)"
+      @open-add-payment="id => { isDetailDrawerOpen = false; openAddModal(id); }"
     />
   </div>
 </template>
