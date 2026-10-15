@@ -1,5 +1,5 @@
 import apiClient from './client'
-import type { Payment, Student, PaginatedResponse } from '@/types'
+import type { Payment, PaginatedResponse } from '@/types'
 
 export interface PaymentFilterParams {
   page?: number
@@ -10,16 +10,6 @@ export interface PaymentFilterParams {
   received_by?: string
   is_discount?: boolean
   is_withdrawal?: boolean
-}
-
-export interface PaymentOverviewFilterParams {
-  page?: number
-  page_size?: number
-  status?: string
-  search?: string
-  tariff?: string[]
-  group?: string[]
-  balance?: string[]
 }
 
 export const paymentsApi = {
@@ -35,21 +25,6 @@ export const paymentsApi = {
     if (params.is_withdrawal !== undefined) queryParams.set('is_withdrawal', String(params.is_withdrawal))
 
     const response = await apiClient.get(`/payments/?${queryParams.toString()}`)
-    return response.data
-  },
-
-  getPaymentOverview: async (params: PaymentOverviewFilterParams = {}): Promise<PaginatedResponse<Student>> => {
-    const queryParams = new URLSearchParams()
-    if (params.page) queryParams.set('page', String(params.page))
-    if (params.page_size) queryParams.set('page_size', String(params.page_size))
-    if (params.status) queryParams.set('status', params.status)
-    if (params.search) queryParams.set('search', params.search)
-
-    if (params.tariff?.length) params.tariff.forEach(t => queryParams.append('tariff', t))
-    if (params.group?.length) params.group.forEach(g => queryParams.append('group', g))
-    if (params.balance?.length) params.balance.forEach(b => queryParams.append('balance', b))
-
-    const response = await apiClient.get(`/payment-overview/?${queryParams.toString()}`)
     return response.data
   },
 

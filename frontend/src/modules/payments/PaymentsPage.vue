@@ -7,6 +7,8 @@ import { settingsApi } from '@/api/settings'
 import { authApi } from '@/api/auth'
 import type { Payment, Student } from '@/types'
 import { useUiStore } from '@/stores/ui'
+import { useStudentDashboardStore } from '@/stores/studentDashboard'
+import { useStudentFiltering } from '@/composables/useStudentFiltering'
 import {
   Users, Receipt, Plus, Minus, DollarSign, Lock
 } from 'lucide-vue-next'
@@ -18,29 +20,18 @@ import VerifyFinanceModal from './components/VerifyFinanceModal.vue'
 import AddPaymentModal from './components/AddPaymentModal.vue'
 import WithdrawModal from './components/WithdrawModal.vue'
 import EditPaymentModal from './components/EditPaymentModal.vue'
+import StudentFilters from '@/modules/students/components/StudentFilters.vue'
+import ActiveFilterChips from '@/components/ActiveFilterChips.vue'
 
 const queryClient = useQueryClient()
 const uiStore = useUiStore()
+const dashboardStore = useStudentDashboardStore()
 
 const ITEMS_PER_PAGE = 30
 
 const PAYMENT_METHODS_DEFAULT = ['CARD', 'CASH', 'BANK']
 const RECEIVED_BY_DEFAULT = ['ADMIN']
 const NOTE_PILLS_DEFAULT = ['DISCOUNT', 'SHARTNOMA UCHUN', 'QARZ', 'ELCHIXONA UCHUN']
-
-// Permanently Deleted students are excluded from this tab entirely (not a
-// filterable option) -- they're removed records, not something staff need
-// to track payment status for.
-const STATUS_FILTER_OPTIONS = ['Active', 'Archive']
-const BALANCE_FILTER_OPTIONS = [
-  'Balance < 0 (Debt)',
-  'Balance = 0 (Fully Paid)',
-  'Balance > 500,000',
-  'Balance > 1,000,000',
-  'Balance > 2,000,000',
-  'Balance > 5,000,000',
-  'Balance > 10,000,000'
-]
 
 // ── Alphanumeric ID Sorting Logic (Matching UniApp2 1-to-1) ─────────────
 const compareStudentIds = (a: Student, b: Student, order: 'asc' | 'desc' = 'asc') => {
@@ -78,28 +69,6 @@ const compareStudentIds = (a: Student, b: Student, order: 'asc' | 'desc' = 'asc'
   return order === 'asc' ? idA.localeCompare(idB) : idB.localeCompare(idA)
 }
 
-// ── Balance Filter Matching (Matching UniApp2 1-to-1) ───────────────────
-const matchesBalanceOption = (studentBalance: number, option: string) => {
-  switch (option) {
-    case 'Balance < 0 (Debt)':
-      return studentBalance < 0
-    case 'Balance = 0 (Fully Paid)':
-      return studentBalance === 0
-    case 'Balance > 500,000':
-      return studentBalance > 500000
-    case 'Balance > 1,000,000':
-      return studentBalance > 1000000
-    case 'Balance > 2,000,000':
-      return studentBalance > 2000000
-    case 'Balance > 5,000,000':
-      return studentBalance > 5000000
-    case 'Balance > 10,000,000':
-      return studentBalance > 10000000
-    default:
-      return false
-  }
-}
-
 // ── Main Page State ───────────────────────────────────────────────────
 const activeTab = ref<'students' | 'history' | 'finance'>('students')
 const studentsViewMode = ref<'kanban' | 'table'>('kanban')
@@ -112,12 +81,81 @@ const isVerifyModalOpen = ref(false)
 const isVerifyingPassword = ref(false)
 const verifyPasswordError = ref<string | null>(null)
 
-// Students Tab Filter State (Multi-Select Arrays)
-const studentSearch = ref('')
-const selectedStatuses = ref<string[]>([])
-const selectedTariffs = ref<string[]>([])
-const selectedBalances = ref<string[]>([])
-const selectedGroups = ref<string[]>([])
+// Students Tab: search + 9 filter criteria now come from the shared global
+// header/panel (AppHeader.vue + StudentFilters.vue), same store StudentsPage.vue
+// and StatusPage.vue already use -- not page-local state.
+const searchQuery = computed({
+  get: () => dashboardStore.searchQuery,
+  set: (v) => dashboardStore.searchQuery = v,
+})
+const searchMode = computed({
+  get: () => dashboardStore.searchMode,
+  set: (v) => dashboardStore.searchMode = v,
+})
+const isFilterPanelOpen = computed({
+  get: () => dashboardStore.isFilterPanelOpen,
+  set: (v) => dashboardStore.isFilterPanelOpen = v,
+})
+const selectedTariffs = computed({
+  get: () => dashboardStore.selectedTariffs,
+  set: (v) => dashboardStore.selectedTariffs = v,
+})
+const selectedLevels = computed({
+  get: () => dashboardStore.selectedLevels,
+  set: (v) => dashboardStore.selectedLevels = v,
+})
+const selectedGroups = computed({
+  get: () => dashboardStore.selectedGroups,
+  set: (v) => dashboardStore.selectedGroups = v,
+})
+const selectedBranches = computed({
+  get: () => dashboardStore.selectedBranches,
+  set: (v) => dashboardStore.selectedBranches = v,
+})
+const selectedCerts = computed({
+  get: () => dashboardStore.selectedCerts,
+  set: (v) => dashboardStore.selectedCerts = v,
+})
+const selectedScores = computed({
+  get: () => dashboardStore.selectedScores,
+  set: (v) => dashboardStore.selectedScores = v,
+})
+const selectedTags = computed({
+  get: () => dashboardStore.selectedTags,
+  set: (v) => dashboardStore.selectedTags = v,
+})
+const selectedLeads = computed({
+  get: () => dashboardStore.selectedLeads,
+  set: (v) => dashboardStore.selectedLeads = v,
+})
+const selectedMissingDocs = computed({
+  get: () => dashboardStore.selectedMissingDocs,
+  set: (v) => dashboardStore.selectedMissingDocs = v,
+})
+
+const handleApplyFilters = (filters: {
+  tariffs: string[]
+  levels: string[]
+  groups: string[]
+  branches?: string[]
+  certs: string[]
+  scores: string[]
+  tags: string[]
+  leads: string[]
+  missingDocs?: string[]
+}) => {
+  selectedTariffs.value = filters.tariffs
+  selectedLevels.value = filters.levels
+  selectedGroups.value = filters.groups
+  selectedBranches.value = filters.branches || []
+  selectedCerts.value = filters.certs
+  selectedScores.value = filters.scores
+  selectedTags.value = filters.tags
+  selectedLeads.value = filters.leads
+  selectedMissingDocs.value = filters.missingDocs || []
+  isFilterPanelOpen.value = false
+}
+
 const studentsPage = ref(1)
 
 // History Tab Filter State
@@ -194,13 +232,16 @@ const options = computed(() => optionsData.value || {
   offices: [],
 })
 
-const { data: overviewData, isLoading: isOverviewLoading } = useQuery({
-  queryKey: ['payment-overview-all'],
-  queryFn: () => paymentsApi.getPaymentOverview({ page_size: 2500, status: 'all' }),
-  staleTime: 1000 * 60 * 5,
+// Same cache as StudentsPage.vue/StatusPage.vue -- not a separate narrow
+// payment-overview endpoint -- so the shared Filter panel's 9 criteria
+// (level/certificate/tags/lead_by/etc, fields the old narrow endpoint never
+// carried) all actually work here too.
+const { data: allStudentsData, isLoading: isOverviewLoading } = useQuery({
+  queryKey: ['all-students-master'],
+  queryFn: () => studentsApi.getStudents({ page: 1, page_size: 5000, folder: 'all', include_archive: true }),
 })
 
-const allStudents = computed<Student[]>(() => overviewData.value?.results || [])
+const allStudents = computed<Student[]>(() => allStudentsData.value?.results || [])
 
 const { data: historyData, isLoading: isHistoryLoading } = useQuery({
   queryKey: ['payment-history-all'],
@@ -210,156 +251,32 @@ const { data: historyData, isLoading: isHistoryLoading } = useQuery({
 
 const allPayments = computed<Payment[]>(() => historyData.value?.results || [])
 
-// ── Multi-Select Handlers ─────────────────────────────────────────────
-const toggleStatus = (val: string) => {
-  if (selectedStatuses.value.includes(val)) {
-    selectedStatuses.value = selectedStatuses.value.filter(s => s !== val)
-  } else {
-    selectedStatuses.value.push(val)
-  }
-}
-const toggleAllStatuses = () => {
-  if (selectedStatuses.value.length === STATUS_FILTER_OPTIONS.length) {
-    selectedStatuses.value = []
-  } else {
-    selectedStatuses.value = [...STATUS_FILTER_OPTIONS]
-  }
-}
-
-const tariffFilterOptions = computed<string[]>(() => {
-  const fromApi: string[] = (optionsData.value?.tariffs || []).map((t: any) =>
-    typeof t === 'string' ? t : (t?.name || '')
-  ).filter(Boolean)
-  const set = new Set<string>(fromApi)
-  allStudents.value.forEach(s => {
-    if (s.tariff) set.add(s.tariff)
-  })
-  const list = Array.from(set).filter(t => t !== 'No Tariff' && t !== 'NO_TARIFF').sort()
-  return [...list, 'No Tariff']
-})
-
-const toggleTariff = (val: string) => {
-  if (selectedTariffs.value.includes(val)) {
-    selectedTariffs.value = selectedTariffs.value.filter(t => t !== val)
-  } else {
-    selectedTariffs.value.push(val)
-  }
-}
-const toggleAllTariffs = () => {
-  if (selectedTariffs.value.length === tariffFilterOptions.value.length) {
-    selectedTariffs.value = []
-  } else {
-    selectedTariffs.value = [...tariffFilterOptions.value]
-  }
-}
-
-const toggleBalance = (val: string) => {
-  if (selectedBalances.value.includes(val)) {
-    selectedBalances.value = selectedBalances.value.filter(b => b !== val)
-  } else {
-    selectedBalances.value.push(val)
-  }
-}
-const toggleAllBalances = () => {
-  if (selectedBalances.value.length === BALANCE_FILTER_OPTIONS.length) {
-    selectedBalances.value = []
-  } else {
-    selectedBalances.value = [...BALANCE_FILTER_OPTIONS]
-  }
-}
-
-const ALL_GROUP_OPTIONS = computed(() => {
-  const custom = (optionsData.value?.groups || []).map((g: any) => typeof g === 'string' ? g : (g?.name || ''))
-  const set = new Set<string>(custom)
-  allStudents.value.forEach(s => { if (s.student_group) set.add(s.student_group) })
-  const list = Array.from(set).filter(Boolean).sort()
-  return ['No Group', ...list]
-})
-
-const toggleGroup = (val: string) => {
-  if (selectedGroups.value.includes(val)) {
-    selectedGroups.value = selectedGroups.value.filter(g => g !== val)
-  } else {
-    selectedGroups.value.push(val)
-  }
-}
-const toggleAllGroups = () => {
-  if (selectedGroups.value.length === ALL_GROUP_OPTIONS.value.length) {
-    selectedGroups.value = []
-  } else {
-    selectedGroups.value = [...ALL_GROUP_OPTIONS.value]
-  }
-}
-
 // ── Filtered & Sorted Students ────────────────────────────────────────
-const filteredStudents = computed(() => {
-  return allStudents.value.filter(s => {
-    if (s.is_permanently_deleted) return false
+// Permanently deleted students are excluded from this tab entirely (removed
+// records, not something staff need to track payment status for) -- applied
+// before the shared search/filter composable, same way StudentsPage.vue
+// applies its own folder scope before delegating to it.
+const nonDeletedStudents = computed(() => allStudents.value.filter(s => !s.is_permanently_deleted))
 
-    if (studentSearch.value) {
-      const q = studentSearch.value.toLowerCase()
-      const matches = (s.id || '').toLowerCase().includes(q) || (s.full_name || '').toLowerCase().includes(q)
-      if (!matches) return false
-    }
+const filterCriteria = computed(() => ({
+  searchQuery: searchQuery.value,
+  searchMode: searchMode.value,
+  selectedTariffs: selectedTariffs.value,
+  selectedLevels: selectedLevels.value,
+  selectedGroups: selectedGroups.value,
+  selectedBranches: selectedBranches.value,
+  selectedCerts: selectedCerts.value,
+  selectedScores: selectedScores.value,
+  selectedTags: selectedTags.value,
+  selectedLeads: selectedLeads.value,
+  selectedMissingDocs: selectedMissingDocs.value,
+}))
 
-    if (selectedStatuses.value.length > 0 && selectedStatuses.value.length < STATUS_FILTER_OPTIONS.length) {
-      const isArchived = !!s.is_deleted
-      const isActive = !s.is_deleted
-
-      const matchActive = selectedStatuses.value.includes('Active') && isActive
-      const matchArchived = selectedStatuses.value.includes('Archive') && isArchived
-
-      if (!matchActive && !matchArchived) return false
-    }
-
-    if (selectedTariffs.value.length > 0) {
-      let matchesTariff = false
-      for (const selected of selectedTariffs.value) {
-        if (selected === 'No Tariff' && !s.tariff) {
-          matchesTariff = true
-          break
-        } else if (s.tariff === selected) {
-          matchesTariff = true
-          break
-        }
-      }
-      if (!matchesTariff) return false
-    }
-
-    if (selectedBalances.value.length > 0) {
-      let matchesBalance = false
-      const bal = Number(s.balance) || 0
-      for (const selected of selectedBalances.value) {
-        if (matchesBalanceOption(bal, selected)) {
-          matchesBalance = true
-          break
-        }
-      }
-      if (!matchesBalance) return false
-    }
-
-    if (selectedGroups.value.length > 0) {
-      let matchesGroup = false
-      for (const selected of selectedGroups.value) {
-        if (selected === 'No Group' && !s.student_group) {
-          matchesGroup = true
-          break
-        } else if (s.student_group === selected) {
-          matchesGroup = true
-          break
-        }
-      }
-      if (!matchesGroup) return false
-    }
-
-    return true
-  })
-})
+const { searchedStudents, filteredStudents } = useStudentFiltering(nonDeletedStudents, filterCriteria)
 
 const sortedStudents = computed(() => {
   return [...filteredStudents.value].sort((a, b) => {
-    // Active students first, then archived (permanently deleted students
-    // never reach here - filteredStudents excludes them entirely)
+    // Active students first, then archived
     const aScore = a.is_deleted ? 1 : 0
     const bScore = b.is_deleted ? 1 : 0
     if (aScore !== bScore) return aScore - bScore
@@ -417,7 +334,7 @@ const paginatedPayments = computed(() => {
   return sortedPayments.value.slice(start, start + ITEMS_PER_PAGE)
 })
 
-watch([studentSearch, selectedStatuses, selectedTariffs, selectedBalances, selectedGroups, sortOrder], () => {
+watch([searchQuery, filterCriteria, sortOrder], () => {
   studentsPage.value = 1
 })
 
@@ -455,21 +372,20 @@ const removePaymentFromCache = (paymentId: string) => {
 }
 
 const backgroundRefreshAll = () => {
-  queryClient.invalidateQueries({ queryKey: ['payment-overview-all'] })
   queryClient.invalidateQueries({ queryKey: ['payment-history-all'] })
-  queryClient.invalidateQueries({ queryKey: ['students'] })
   queryClient.invalidateQueries({ queryKey: ['all-students-master'] })
   queryClient.invalidateQueries({ queryKey: ['student-payments'] })
 }
 
-// Patches the Balance/Discount columns on the overview table (this page's own
-// list) the instant a payment/discount/withdrawal is submitted, mirroring the
-// same formula the backend applies in recalculate_student_financials:
-// balance = (payments + discount) - tariff - withdrawals. This must run
-// silently in the background — the API call itself is still in flight, this
-// only updates what the user sees while it completes.
+// Patches the Balance/Discount columns on the shared master roster (same
+// cache StudentsPage.vue/StatusPage.vue read) the instant a payment/
+// discount/withdrawal is submitted, mirroring the same formula the backend
+// applies in recalculate_student_financials: balance = (payments + discount)
+// - tariff - withdrawals. This must run silently in the background — the API
+// call itself is still in flight, this only updates what the user sees while
+// it completes.
 const patchOverviewBalance = (studentId: string, balanceDelta: number, discountDelta: number = 0) => {
-  queryClient.setQueryData(['payment-overview-all'], (old: any) => {
+  queryClient.setQueryData(['all-students-master'], (old: any) => {
     if (!old?.results) return old
     return {
       ...old,
@@ -945,28 +861,33 @@ const exportPaymentHistoryToExcel = async () => {
 
     <!-- ── Tab 1: Students Overview ──────────────────────────────────── -->
     <div v-if="activeTab === 'students'">
+      <!-- Shared Filter Panel (triggered from the global AppHeader Filter
+           button) + active-filter chips, same as StudentsPage.vue/StatusPage.vue -->
+      <StudentFilters
+        :is-open="isFilterPanelOpen"
+        :options="options"
+        :students="searchedStudents"
+        :selected-tariffs="selectedTariffs"
+        :selected-levels="selectedLevels"
+        :selected-groups="selectedGroups"
+        :selected-branches="selectedBranches"
+        :selected-certs="selectedCerts"
+        :selected-scores="selectedScores"
+        :selected-tags="selectedTags"
+        :selected-leads="selectedLeads"
+        :selected-missing-docs="selectedMissingDocs"
+        :matching-count="sortedStudents.length"
+        @close="isFilterPanelOpen = false"
+        @apply="handleApplyFilters"
+      />
+      <ActiveFilterChips class="mb-4" />
+
       <PaymentStudentOverview
         :students="studentsViewMode === 'kanban' ? sortedStudents : paginatedStudents"
         :total-filtered-count="sortedStudents.length"
         :is-loading="isOverviewLoading"
-        :options="options"
-        :tariff-options="tariffFilterOptions"
-        :search-query="studentSearch"
-        :selected-statuses="selectedStatuses"
-        :selected-tariffs="selectedTariffs"
-        :selected-balances="selectedBalances"
-        :selected-groups="selectedGroups"
         :view-mode="studentsViewMode"
         :sort-order="sortOrder"
-        @update:search-query="studentSearch = $event"
-        @toggle-status="toggleStatus"
-        @toggle-all-statuses="toggleAllStatuses"
-        @toggle-tariff="toggleTariff"
-        @toggle-all-tariffs="toggleAllTariffs"
-        @toggle-balance="toggleBalance"
-        @toggle-all-balances="toggleAllBalances"
-        @toggle-group="toggleGroup"
-        @toggle-all-groups="toggleAllGroups"
         @update:view-mode="studentsViewMode = $event"
         @toggle-sort="sortOrder = sortOrder === 'asc' ? 'desc' : 'asc'"
         @open-add-payment="openAddModal"

@@ -32,7 +32,7 @@ const isRequisitesModalOpen = ref(false)
 const pathname = computed(() => route.path)
 
 const isStudentOrStatusPage = computed(() => {
-  return pathname.value === '/students' || pathname.value === '/status' || pathname.value === '/documents' || pathname.value === '/visacheck'
+  return pathname.value === '/students' || pathname.value === '/status' || pathname.value === '/documents' || pathname.value === '/visacheck' || pathname.value === '/payments'
 })
 
 const isMac = computed(() => {
@@ -418,9 +418,10 @@ onUnmounted(() => {
         <span class="hidden lg:inline 2xl:hidden">Export</span>
       </button>
 
-      <!-- Add Student Button (Hidden on /documents and for Tenant Staff) -->
+      <!-- Add Student Button (Hidden on /documents, /payments, and for Tenant Staff -
+           Payments has its own Add Payment/Withdraw buttons in its own header row) -->
       <button
-        v-if="pathname !== '/documents' && authStore.canEdit"
+        v-if="pathname !== '/documents' && pathname !== '/payments' && authStore.canEdit"
         type="button"
         @click="dashboardStore.isAddStudentModalOpen = true"
         class="flex-1 md:flex-initial flex items-center justify-center gap-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 px-3 sm:px-3.5 lg:px-4 py-1.5 text-xs md:text-sm font-bold text-white shadow-md shadow-blue-500/25 transition-all cursor-pointer select-none h-8 md:h-[34px] shrink-0 whitespace-nowrap"

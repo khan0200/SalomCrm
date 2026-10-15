@@ -1,6 +1,5 @@
 from rest_framework import serializers
 from .models import Payment, PaymentMethodTemplate, PaymentReceiverTemplate, PaymentNotePill
-from apps.students.models import Student
 
 class PaymentSerializer(serializers.ModelSerializer):
     student_id = serializers.SerializerMethodField()
@@ -58,27 +57,6 @@ class PaymentEditSerializer(serializers.Serializer):
     method = serializers.CharField(max_length=100)
     received_by = serializers.CharField(max_length=100)
     notes = serializers.CharField(required=False, allow_blank=True, allow_null=True)
-
-
-class PaymentOverviewStudentSerializer(serializers.ModelSerializer):
-    """
-    Student financial overview serializer with formatted tariff, balance, and discount.
-
-    total_payments/total_withdrawals come from annotate()d queryset fields (see
-    PaymentOverviewViewSet.get_queryset) so they're plain DecimalFields here, not
-    SerializerMethodFields -- keeps the Payments Kanban board's per-student sums
-    to one query for the whole list instead of one query per student.
-    """
-    total_payments = serializers.DecimalField(max_digits=14, decimal_places=2, read_only=True)
-    total_withdrawals = serializers.DecimalField(max_digits=14, decimal_places=2, read_only=True)
-
-    class Meta:
-        model = Student
-        fields = (
-            'id', 'full_name', 'tariff', 'balance', 'discount',
-            'student_group', 'is_deleted', 'is_permanently_deleted', 'phone1', 'office',
-            'coordinator', 'level', 'level2', 'total_payments', 'total_withdrawals'
-        )
 
 
 class PaymentMethodTemplateSerializer(serializers.ModelSerializer):

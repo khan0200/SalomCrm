@@ -1,8 +1,7 @@
 from decimal import Decimal
 import io
 from django.http import HttpResponse
-from django.db.models import Q, Sum, Case, When, DecimalField, F
-from django.db.models.functions import Coalesce
+from django.db.models import Q
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
@@ -19,7 +18,7 @@ from apps.students.models import Student
 from .models import Payment, PaymentMethodTemplate, PaymentReceiverTemplate, PaymentNotePill
 from .serializers import (
     PaymentSerializer, PaymentCreateSerializer, PaymentWithdrawSerializer,
-    PaymentEditSerializer, PaymentOverviewStudentSerializer,
+    PaymentEditSerializer,
     PaymentMethodTemplateSerializer, PaymentReceiverTemplateSerializer, PaymentNotePillSerializer
 )
 from .services import record_payment, edit_payment, delete_payment
@@ -205,109 +204,6 @@ class PaymentViewSet(viewsets.ModelViewSet):
             pass
 
         return Response(status=status.HTTP_204_NO_CONTENT)
-
-
-class PaymentOverviewViewSet(viewsets.ReadOnlyModelViewSet):
-    """
-    Student Financial Overview ViewSet.
-    Calculates and displays students' financial positions (Balance, Discount, Tariff).
-    """
-    serializer_class = PaymentOverviewStudentSerializer
-    permission_classes = [IsTenantManager]
-
-    def get_queryset(self):
-        user = self.request.user
-        tenant = getattr(self.request, 'tenant', None) or getattr(user, 'tenant', None)
-
-        if user.is_superuser or getattr(user, 'role', '') == UserRole.SUPER_ADMIN:
-            qs = Student.objects.filter(tenant=tenant) if tenant else Student.objects.all()
-        else:
-            qs = Student.objects.filter(tenant=user.tenant)
-
-        qs = qs.filter(branch_scope_filter(user))
-
-        # Status filter (active vs archive vs all)
-        status_filter = self.request.query_params.get('status')
-        if status_filter == 'Archive':
-            qs = qs.filter(is_deleted=True, is_permanently_deleted=False)
-        elif status_filter == 'Active':
-            qs = qs.filter(is_deleted=False, is_permanently_deleted=False)
-
-        # Search
-        search = self.request.query_params.get('search', '').strip()
-        if search:
-            qs = qs.filter(is_permanently_deleted=False).filter(
-                Q(id__icontains=search) |
-                Q(full_name__icontains=search) |
-                Q(phone1__icontains=search)
-            )
-
-        # Tariff filter
-        tariffs = self.request.query_params.getlist('tariff') or (self.request.query_params.get('tariff', '').split(',') if self.request.query_params.get('tariff') else [])
-        if tariffs and tariffs[0]:
-            if 'No Tariff' in tariffs:
-                qs = qs.filter(Q(tariff__in=tariffs) | Q(tariff__isnull=True) | Q(tariff=''))
-            else:
-                qs = qs.filter(tariff__in=tariffs)
-
-        # Group filter
-        groups = self.request.query_params.getlist('group') or (self.request.query_params.get('group', '').split(',') if self.request.query_params.get('group') else [])
-        if groups and groups[0]:
-            qs = qs.filter(student_group__in=groups)
-
-        # Balance Range filter
-        balances = self.request.query_params.getlist('balance') or (self.request.query_params.get('balance', '').split(',') if self.request.query_params.get('balance') else [])
-        if balances and balances[0]:
-            bal_q = Q()
-            for b in balances:
-                if 'Debt' in b or '< 0' in b:
-                    bal_q = bal_q | Q(balance__lt=0)
-                elif 'Fully Paid' in b or '= 0' in b:
-                    bal_q = bal_q | Q(balance=0)
-                elif '> 500,000' in b or '> 500000' in b:
-                    bal_q = bal_q | Q(balance__gt=500000)
-                elif '> 1,000,000' in b or '> 1000000' in b:
-                    bal_q = bal_q | Q(balance__gt=1000000)
-                elif '> 2,000,000' in b or '> 2000000' in b:
-                    bal_q = bal_q | Q(balance__gt=2000000)
-                elif '> 5,000,000' in b or '> 5000000' in b:
-                    bal_q = bal_q | Q(balance__gt=5000000)
-                elif '> 10,000,000' in b or '> 10000000' in b:
-                    bal_q = bal_q | Q(balance__gt=10000000)
-            qs = qs.filter(bal_q)
-
-        # total_payments/total_withdrawals power the Payments Kanban board and
-        # must match the Student Detail Drawer's own payment sums exactly (see
-        # recalculate_student_financials) -- computed here via annotate() so a
-        # list of up to ~5000 students costs one query, not one per student.
-        # Withdrawal amounts are stored negative (Payment model convention),
-        # so the Coalesce(..., -amount) flips the sign back to a positive total.
-        qs = qs.annotate(
-            total_payments=Coalesce(
-                Sum(
-                    Case(
-                        When(payments__is_discount=False, payments__is_withdrawal=False, then='payments__amount'),
-                        default=0,
-                        output_field=DecimalField(max_digits=14, decimal_places=2)
-                    )
-                ),
-                0,
-                output_field=DecimalField(max_digits=14, decimal_places=2)
-            ),
-            total_withdrawals=Coalesce(
-                Sum(
-                    Case(
-                        When(payments__is_withdrawal=True, then=-F('payments__amount')),
-                        default=0,
-                        output_field=DecimalField(max_digits=14, decimal_places=2)
-                    )
-                ),
-                0,
-                output_field=DecimalField(max_digits=14, decimal_places=2)
-            ),
-        )
-
-        return qs.order_by('id')
 
 
 class PaymentExportView(APIView):

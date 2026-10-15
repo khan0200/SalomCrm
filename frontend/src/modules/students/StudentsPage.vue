@@ -20,16 +20,14 @@ import ExportExcelModal from './components/ExportExcelModal.vue'
 import AddStudentsToFolderModal from './components/AddStudentsToFolderModal.vue'
 import { useStudentDashboardStore } from '@/stores/studentDashboard'
 import { useCustomTags } from '@/composables/useCustomTags'
-import { useDocumentHelpers } from '@/composables/useDocumentHelpers'
+import { useStudentFiltering } from '@/composables/useStudentFiltering'
 import { getTariffPrice } from '@/utils/tariff'
-import { normalizeCertificateScore } from '@/utils/certificateScore'
 
 const queryClient = useQueryClient()
 const uiStore = useUiStore()
 const dashboardStore = useStudentDashboardStore()
 const { fetchTags } = useCustomTags()
 fetchTags()
-const { getEffectiveMissingDocs } = useDocumentHelpers()
 
 const activeFolder = ref('all')
 const currentPage = ref(1)
@@ -218,13 +216,12 @@ const dynamicFolderCounts = computed(() => {
 })
 
 // ── Ultra-Fast Instant In-Memory Filter (0ms Latency on Folder Switch & Keystrokes) ──────────
-// Folder scope + search only — this is the base the filter modal's live
-// "Show N Students" preview must also start from, so its count matches the
-// table (which additionally applies the multi-criteria filters below).
-const folderScopedStudents = computed(() => {
+// Folder scope first (not part of the shared composable - Payments has no
+// folder concept), then delegate search + the 9 multi-criteria filters to
+// useStudentFiltering so both this page and PaymentsPage.vue share one
+// filter implementation instead of maintaining duplicate copies.
+const folderScoped = computed(() => {
   let list = allStudents.value
-
-  // 1. Folder Scope (In-Memory Filter - 0 network delay)
   const q = searchQuery.value.trim().toLowerCase()
 
   if (activeFolder.value === 'permanently_deleted') {
@@ -247,136 +244,26 @@ const folderScopedStudents = computed(() => {
     }
   }
 
-  // 2. Search Query (In-Memory Filter)
-  if (q) {
-    if (searchMode.value === 'id') {
-      list = list.filter(s => (s.id || '').toLowerCase().includes(q))
-    } else {
-      list = list.filter(s => {
-        const idMatch = (s.id || '').toLowerCase().includes(q)
-        const nameMatch = (s.full_name || '').toLowerCase().includes(q)
-        const passportMatch = (s.passport || '').toLowerCase().includes(q)
-        const phone1Match = (s.phone1 || '').toLowerCase().includes(q)
-        const phone2Match = (s.phone2 || '').toLowerCase().includes(q)
-        const uni1Match = (s.university_1 || '').toLowerCase().includes(q)
-        const uni2Match = (s.university_2 || '').toLowerCase().includes(q)
-        const uni3Match = (s.university_3 || '').toLowerCase().includes(q)
-        const uni4Match = (s.university_4 || '').toLowerCase().includes(q)
-        const uni5Match = (s.university_5 || '').toLowerCase().includes(q)
-        return idMatch || nameMatch || passportMatch || phone1Match || phone2Match || uni1Match || uni2Match || uni3Match || uni4Match || uni5Match
-      })
-    }
-  }
-
   return list
 })
 
-const filteredStudents = computed(() => {
-  let list = folderScopedStudents.value
+const filterCriteria = computed(() => ({
+  searchQuery: searchQuery.value,
+  searchMode: searchMode.value,
+  selectedTariffs: selectedTariffs.value,
+  selectedLevels: selectedLevels.value,
+  selectedGroups: selectedGroups.value,
+  selectedBranches: selectedBranches.value,
+  selectedCerts: selectedCerts.value,
+  selectedScores: selectedScores.value,
+  selectedTags: selectedTags.value,
+  selectedLeads: selectedLeads.value,
+  selectedMissingDocs: selectedMissingDocs.value,
+}))
 
-  // 3. Multi-Criteria Filters (Tariffs, Levels, Groups, Certs, Scores, Tags, Leads)
-  if (selectedTariffs.value.length > 0) {
-    const hasNoTariff = selectedTariffs.value.includes('NO_TARIFF') || selectedTariffs.value.includes('No Tariff')
-    const cleanTariffs = selectedTariffs.value.filter(t => t !== 'NO_TARIFF' && t !== 'No Tariff')
-    list = list.filter(s => {
-      if (hasNoTariff && (!s.tariff || cleanTariffs.includes(s.tariff))) return true
-      return s.tariff && cleanTariffs.includes(s.tariff)
-    })
-  }
+const { searchedStudents: folderScopedStudents, filteredStudents: multiCriteriaFiltered } = useStudentFiltering(folderScoped, filterCriteria)
 
-  if (selectedLevels.value.length > 0) {
-    const hasNoLevel = selectedLevels.value.includes('NO_LEVEL') || selectedLevels.value.includes('No Level')
-    const cleanLevels = selectedLevels.value.filter(l => l !== 'NO_LEVEL' && l !== 'No Level')
-    list = list.filter(s => {
-      if (hasNoLevel && (!s.level || cleanLevels.includes(s.level) || cleanLevels.includes(s.level2 || ''))) return true
-      return (s.level && cleanLevels.includes(s.level)) || (s.level2 && cleanLevels.includes(s.level2))
-    })
-  }
-
-  if (selectedGroups.value.length > 0) {
-    const hasNoGroup = selectedGroups.value.includes('NO_GROUP') || selectedGroups.value.includes('No Group')
-    const cleanGroups = selectedGroups.value.filter(g => g !== 'NO_GROUP' && g !== 'No Group')
-    list = list.filter(s => {
-      if (hasNoGroup && (!s.student_group || cleanGroups.includes(s.student_group))) return true
-      return s.student_group && cleanGroups.includes(s.student_group)
-    })
-  }
-
-  if (selectedBranches.value.length > 0) {
-    const hasNoBranch = selectedBranches.value.includes('NO_BRANCH') || selectedBranches.value.includes('No Branch')
-    const cleanBranches = selectedBranches.value.filter(b => b !== 'NO_BRANCH' && b !== 'No Branch').map(b => b.trim().toLowerCase())
-    list = list.filter(s => {
-      if (!s.office) return hasNoBranch
-      const sOffice = s.office.trim().toLowerCase()
-      const sOfficeBase = sOffice.replace(/\s+offis$/i, '').replace(/\s+office$/i, '').trim()
-      const matchesSelected = cleanBranches.some(b => {
-        const bBase = b.replace(/\s+offis$/i, '').replace(/\s+office$/i, '').trim()
-        return sOffice === b || sOfficeBase === bBase || sOffice.startsWith(b) || b.startsWith(sOffice)
-      })
-      if (hasNoBranch && matchesSelected) return true
-      return matchesSelected
-    })
-  }
-
-  if (selectedCerts.value.length > 0) {
-    list = list.filter(s => {
-      return selectedCerts.value.some(c => {
-        if (c === 'NO CERTIFICATE') {
-          return !s.language_certificate || s.language_certificate === 'NO CERTIFICATE'
-        }
-        // "EXPECTED" is a certificate_score value, not a certificate type -
-        // the filter panel (StudentFilters.vue) offers it as a Certificate
-        // checkbox, so it must be matched against the score slots here too,
-        // same as DocumentsPage.vue already does.
-        if (c === 'EXPECTED') {
-          return s.certificate_score?.toUpperCase() === 'EXPECTED' ||
-            s.certificate_score_2?.toUpperCase() === 'EXPECTED' ||
-            s.certificate_score_3?.toUpperCase() === 'EXPECTED'
-        }
-        return s.language_certificate === c || s.language_certificate_2 === c || s.language_certificate_3 === c
-      })
-    })
-  }
-
-  if (selectedScores.value.length > 0) {
-    const normalizedSelected = selectedScores.value.map(normalizeCertificateScore)
-    list = list.filter(s => {
-      const studentScores = [s.certificate_score, s.certificate_score_2, s.certificate_score_3]
-        .map(normalizeCertificateScore)
-        .filter(Boolean)
-      return normalizedSelected.some(sc => studentScores.includes(sc))
-    })
-  }
-
-  if (selectedTags.value.length > 0) {
-    list = list.filter(s => {
-      const studentTags = Array.isArray(s.task_tags) ? s.task_tags : []
-      return selectedTags.value.some(t => studentTags.includes(t))
-    })
-  }
-
-  if (selectedLeads.value.length > 0) {
-    const hasNoLead = selectedLeads.value.includes('NO_LEADBY') || selectedLeads.value.includes('No Lead by')
-    const cleanLeads = selectedLeads.value.filter(l => l !== 'NO_LEADBY' && l !== 'No Lead by')
-    // lead_by is free-text, so the same source can be saved with different
-    // casing (e.g. "Ali Uncle" vs "ALI UNCLE") — compare case-insensitively
-    // or a student silently drops out of the filtered results.
-    const cleanLeadsLower = cleanLeads.map(l => l.toLowerCase())
-    list = list.filter(s => {
-      if (hasNoLead && (!s.lead_by || cleanLeadsLower.includes(s.lead_by.toLowerCase()))) return true
-      return !!s.lead_by && cleanLeadsLower.includes(s.lead_by.toLowerCase())
-    })
-  }
-
-  if (selectedMissingDocs.value.length > 0) {
-    list = list.filter(s => {
-      const missingList = getEffectiveMissingDocs(s)
-      return selectedMissingDocs.value.some(d => missingList.includes(d))
-    })
-  }
-
-  return [...list].sort((a, b) => compareStudentIds(a, b, sortOrder.value))
-})
+const filteredStudents = computed(() => [...multiCriteriaFiltered.value].sort((a, b) => compareStudentIds(a, b, sortOrder.value)))
 
 const PAGE_SIZE = 50
 const totalCount = computed(() => filteredStudents.value.length)

@@ -64,6 +64,11 @@ class StudentListSerializer(MyPreferenceFieldsMixin, serializers.ModelSerializer
     created_by = serializers.SerializerMethodField()
     my_row_color = serializers.SerializerMethodField()
     my_task_tags = serializers.SerializerMethodField()
+    # Annotation-only fields (not model columns) from StudentViewSet.get_queryset's
+    # list-action Sum() annotate -- must be declared explicitly since fields = '__all__'
+    # only auto-includes real model fields.
+    total_payments = serializers.DecimalField(max_digits=14, decimal_places=2, read_only=True)
+    total_withdrawals = serializers.DecimalField(max_digits=14, decimal_places=2, read_only=True)
 
     class Meta:
         model = Student

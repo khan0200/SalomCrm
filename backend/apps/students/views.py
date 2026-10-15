@@ -19,7 +19,8 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.request import Request
 from django.db import IntegrityError
-from django.db.models import Q
+from django.db.models import Q, Sum, Case, When, F, DecimalField
+from django.db.models.functions import Coalesce
 from apps.core.permissions import IsTenantUser, IsTenantHeadManager, IsTenantManager, IsTenantManagerOrReadOnly
 from apps.core.access import branch_scope_filter
 from apps.authentication.models import UserRole
@@ -267,6 +268,39 @@ class StudentViewSet(viewsets.ModelViewSet):
         if sort_by != 'id':
             order_prefix = '-' if sort_order == 'desc' else ''
             qs = qs.order_by(f"{order_prefix}{sort_by}")
+
+        # total_payments/total_withdrawals power the Payments Kanban board
+        # (and any other consumer of the master student list) and must match
+        # the Student Detail Drawer's own payment sums exactly -- same
+        # annotate() pattern as PaymentOverviewViewSet.get_queryset
+        # (apps/payments/views.py), computed here so the list of up to ~5000
+        # students costs one query, not one per student. Withdrawal amounts
+        # are stored negative (Payment model convention), so negating via
+        # F() flips the sign back to a positive total.
+        qs = qs.annotate(
+            total_payments=Coalesce(
+                Sum(
+                    Case(
+                        When(payments__is_discount=False, payments__is_withdrawal=False, then='payments__amount'),
+                        default=0,
+                        output_field=DecimalField(max_digits=14, decimal_places=2)
+                    )
+                ),
+                0,
+                output_field=DecimalField(max_digits=14, decimal_places=2)
+            ),
+            total_withdrawals=Coalesce(
+                Sum(
+                    Case(
+                        When(payments__is_withdrawal=True, then=-F('payments__amount')),
+                        default=0,
+                        output_field=DecimalField(max_digits=14, decimal_places=2)
+                    )
+                ),
+                0,
+                output_field=DecimalField(max_digits=14, decimal_places=2)
+            ),
+        )
 
         return qs
 

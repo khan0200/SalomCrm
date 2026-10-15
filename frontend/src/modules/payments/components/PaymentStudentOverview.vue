@@ -1,351 +1,38 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
 import type { Student } from '@/types'
 import {
-  Search, Plus, Table as TableIcon, Columns3,
-  ChevronDown, ChevronUp, UserX, FileSpreadsheet
+  Table as TableIcon, Columns3, UserX, FileSpreadsheet, Plus, ChevronDown, ChevronUp
 } from 'lucide-vue-next'
 import PaymentStudentKanban from './PaymentStudentKanban.vue'
 
-const props = defineProps<{
+defineProps<{
   students: Student[]
   totalFilteredCount: number
   isLoading: boolean
-  options?: any
-  tariffOptions?: string[]
-  searchQuery: string
-  selectedStatuses: string[]
-  selectedTariffs: string[]
-  selectedBalances: string[]
-  selectedGroups: string[]
   viewMode: 'kanban' | 'table'
   sortOrder: 'asc' | 'desc'
 }>()
 
 const emit = defineEmits<{
-  (e: 'update:searchQuery', val: string): void
-  (e: 'toggle-status', val: string): void
-  (e: 'toggle-all-statuses'): void
-  (e: 'toggle-tariff', val: string): void
-  (e: 'toggle-all-tariffs'): void
-  (e: 'toggle-balance', val: string): void
-  (e: 'toggle-all-balances'): void
-  (e: 'toggle-group', val: string): void
-  (e: 'toggle-all-groups'): void
   (e: 'update:viewMode', val: 'kanban' | 'table'): void
   (e: 'toggle-sort'): void
   (e: 'open-add-payment', studentId?: string): void
   (e: 'export-excel'): void
 }>()
 
-const isStatusOpen = ref(false)
-const isTariffOpen = ref(false)
-const isBalanceOpen = ref(false)
-const isGroupOpen = ref(false)
-
-const statusRef = ref<HTMLElement | null>(null)
-const tariffRef = ref<HTMLElement | null>(null)
-const balanceRef = ref<HTMLElement | null>(null)
-const groupRef = ref<HTMLElement | null>(null)
-
-const STATUS_FILTER_OPTIONS = ['Active', 'Archive']
-
-const availableTariffs = computed<string[]>(() => {
-  if (props.tariffOptions && props.tariffOptions.length > 0) {
-    return props.tariffOptions
-  }
-  const custom = (props.options?.tariffs || []).map((t: any) => typeof t === 'string' ? t : (t?.name || '')).filter(Boolean)
-  const set = new Set<string>(custom)
-  props.students.forEach(s => { if (s.tariff) set.add(s.tariff) })
-  const list = Array.from(set).filter(t => t !== 'No Tariff' && t !== 'NO_TARIFF').sort()
-  return [...list, 'No Tariff']
-})
-
-const BALANCE_FILTER_OPTIONS = [
-  'Balance < 0 (Debt)',
-  'Balance = 0 (Fully Paid)',
-  'Balance > 500,000',
-  'Balance > 1,000,000',
-  'Balance > 2,000,000',
-  'Balance > 5,000,000',
-  'Balance > 10,000,000'
-]
-
-const ALL_GROUP_OPTIONS = computed(() => {
-  const custom = (props.options?.groups || []).map((g: any) => typeof g === 'string' ? g : (g?.name || '')).filter(Boolean)
-  const set = new Set<string>(custom)
-  props.students.forEach(s => { if (s.student_group) set.add(s.student_group) })
-  const unique = Array.from(set).filter(Boolean).sort()
-  return ['No Group', ...unique]
-})
-
 function formatAmount(val: number | string | null | undefined) {
   if (val === null || val === undefined) return '0'
   const num = typeof val === 'string' ? parseFloat(val) : val
   return new Intl.NumberFormat('uz-UZ').format(Math.round(num || 0))
 }
-
-const handleClickOutside = (e: MouseEvent) => {
-  const target = e.target as Node
-  if (statusRef.value && !statusRef.value.contains(target)) isStatusOpen.value = false
-  if (tariffRef.value && !tariffRef.value.contains(target)) isTariffOpen.value = false
-  if (balanceRef.value && !balanceRef.value.contains(target)) isBalanceOpen.value = false
-  if (groupRef.value && !groupRef.value.contains(target)) isGroupOpen.value = false
-}
-
-onMounted(() => {
-  document.addEventListener('mousedown', handleClickOutside)
-})
-
-onUnmounted(() => {
-  document.removeEventListener('mousedown', handleClickOutside)
-})
 </script>
 
 <template>
   <div class="flex flex-col gap-4 select-none text-xs">
-    <!-- ── Filter Bar matching UniApp2 ────────────────────────────────── -->
-    <div class="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#111315] p-3 shadow-2xs flex flex-wrap gap-2.5 items-center">
-      <!-- Search Input -->
-      <div class="relative flex-1 min-w-[200px]">
-        <Search class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400 pointer-events-none" />
-        <input
-          type="text"
-          :value="searchQuery"
-          @input="emit('update:searchQuery', ($event.target as HTMLInputElement).value)"
-          placeholder="Search by name or ID..."
-          class="w-full pl-9 pr-4 py-2 text-xs border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-850 rounded-lg text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:border-blue-500 transition-colors"
-        />
-      </div>
-
-      <!-- 1. Status Filter Dropdown -->
-      <div class="relative" ref="statusRef">
-        <button
-          type="button"
-          @click="isStatusOpen = !isStatusOpen; isTariffOpen = false; isBalanceOpen = false; isGroupOpen = false"
-          class="px-3.5 py-2 text-xs border rounded-full text-zinc-700 dark:text-zinc-200 cursor-pointer flex items-center justify-between gap-2 min-w-[125px] select-none transition-all shadow-2xs font-semibold"
-          :class="isStatusOpen
-            ? 'border-blue-600 bg-blue-50/50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 ring-1 ring-blue-600'
-            : 'border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-850 hover:border-blue-400'"
-        >
-          <span class="truncate max-w-[130px]">
-            {{ selectedStatuses.length === 0 || selectedStatuses.length === STATUS_FILTER_OPTIONS.length
-              ? 'All Statuses'
-              : selectedStatuses.join(', ') }}
-          </span>
-          <ChevronDown
-            class="h-3.5 w-3.5 text-zinc-400 transition-transform duration-200"
-            :class="isStatusOpen ? 'rotate-180 text-blue-600' : ''"
-          />
-        </button>
-
-        <div
-          v-if="isStatusOpen"
-          class="absolute left-0 mt-1.5 w-44 rounded-xl border border-zinc-200 dark:border-zinc-750 bg-white dark:bg-[#181a1d] shadow-xl py-2 z-40 max-h-80 overflow-y-auto"
-        >
-          <div
-            @click="emit('toggle-all-statuses')"
-            class="px-3.5 py-1.5 flex items-center gap-2.5 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors text-xs font-bold text-zinc-800 dark:text-zinc-200"
-          >
-            <input
-              type="checkbox"
-              :checked="selectedStatuses.length === STATUS_FILTER_OPTIONS.length"
-              class="h-3.5 w-3.5 rounded border-zinc-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-            />
-            <span>Select All</span>
-          </div>
-          <div class="h-px bg-zinc-100 dark:bg-zinc-800 my-1" />
-          <div
-            v-for="opt in STATUS_FILTER_OPTIONS"
-            :key="opt"
-            @click="emit('toggle-status', opt)"
-            class="px-3.5 py-1.5 flex items-center gap-2.5 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors text-xs font-medium text-zinc-700 dark:text-zinc-300"
-          >
-            <input
-              type="checkbox"
-              :checked="selectedStatuses.includes(opt)"
-              class="h-3.5 w-3.5 rounded border-zinc-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-            />
-            <span class="flex items-center gap-1.5">
-              <span
-                v-if="opt === 'Active'"
-                class="w-1.5 h-1.5 rounded-full bg-emerald-500"
-              />
-              <span
-                v-else-if="opt === 'Archive'"
-                class="w-1.5 h-1.5 rounded-full bg-amber-500"
-              />
-              <span
-                v-else
-                class="w-1.5 h-1.5 rounded-full bg-rose-500"
-              />
-              <span>{{ opt }}</span>
-            </span>
-          </div>
-        </div>
-      </div>
-
-      <!-- 2. Tariff Filter Dropdown -->
-      <div class="relative" ref="tariffRef">
-        <button
-          type="button"
-          @click="isTariffOpen = !isTariffOpen; isStatusOpen = false; isBalanceOpen = false; isGroupOpen = false"
-          class="px-3.5 py-2 text-xs border rounded-full text-zinc-700 dark:text-zinc-200 cursor-pointer flex items-center justify-between gap-2 min-w-[130px] select-none transition-all shadow-2xs font-semibold"
-          :class="isTariffOpen
-            ? 'border-blue-600 bg-blue-50/50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 ring-1 ring-blue-600'
-            : 'border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-850 hover:border-blue-400'"
-        >
-          <span class="truncate max-w-[140px]">
-            {{ selectedTariffs.length === 0 || selectedTariffs.length === availableTariffs.length
-              ? 'All Tariffs'
-              : selectedTariffs.join(', ') }}
-          </span>
-          <ChevronDown
-            class="h-3.5 w-3.5 text-zinc-400 transition-transform duration-200"
-            :class="isTariffOpen ? 'rotate-180 text-blue-600' : ''"
-          />
-        </button>
-
-        <div
-          v-if="isTariffOpen"
-          class="absolute left-0 mt-1.5 w-60 rounded-xl border border-zinc-200 dark:border-zinc-750 bg-white dark:bg-[#181a1d] shadow-xl py-2 z-40 max-h-80 overflow-y-auto"
-        >
-          <div
-            @click="emit('toggle-all-tariffs')"
-            class="px-3.5 py-1.5 flex items-center gap-2.5 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors text-xs font-bold text-zinc-800 dark:text-zinc-200"
-          >
-            <input
-              type="checkbox"
-              :checked="selectedTariffs.length === availableTariffs.length"
-              class="h-3.5 w-3.5 rounded border-zinc-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-            />
-            <span>Select All</span>
-          </div>
-          <div class="h-px bg-zinc-100 dark:bg-zinc-800 my-1" />
-          <div
-            v-for="opt in availableTariffs"
-            :key="opt"
-            @click="emit('toggle-tariff', opt)"
-            class="px-3.5 py-1.5 flex items-center gap-2.5 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors text-xs font-medium text-zinc-700 dark:text-zinc-300"
-          >
-            <input
-              type="checkbox"
-              :checked="selectedTariffs.includes(opt)"
-              class="h-3.5 w-3.5 rounded border-zinc-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-            />
-            <span class="truncate">{{ opt }}</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- 3. Balance Filter Dropdown -->
-      <div class="relative" ref="balanceRef">
-        <button
-          type="button"
-          @click="isBalanceOpen = !isBalanceOpen; isStatusOpen = false; isTariffOpen = false; isGroupOpen = false"
-          class="px-3.5 py-2 text-xs border rounded-full text-zinc-700 dark:text-zinc-200 cursor-pointer flex items-center justify-between gap-2 min-w-[130px] select-none transition-all shadow-2xs font-semibold"
-          :class="isBalanceOpen
-            ? 'border-blue-600 bg-blue-50/50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 ring-1 ring-blue-600'
-            : 'border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-850 hover:border-blue-400'"
-        >
-          <span class="truncate max-w-[140px]">
-            {{ selectedBalances.length === 0 || selectedBalances.length === BALANCE_FILTER_OPTIONS.length
-              ? 'All Balances'
-              : selectedBalances.join(', ') }}
-          </span>
-          <ChevronDown
-            class="h-3.5 w-3.5 text-zinc-400 transition-transform duration-200"
-            :class="isBalanceOpen ? 'rotate-180 text-blue-600' : ''"
-          />
-        </button>
-
-        <div
-          v-if="isBalanceOpen"
-          class="absolute left-0 mt-1.5 w-60 rounded-xl border border-zinc-200 dark:border-zinc-750 bg-white dark:bg-[#181a1d] shadow-xl py-2 z-40 max-h-80 overflow-y-auto"
-        >
-          <div
-            @click="emit('toggle-all-balances')"
-            class="px-3.5 py-1.5 flex items-center gap-2.5 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors text-xs font-bold text-zinc-800 dark:text-zinc-200"
-          >
-            <input
-              type="checkbox"
-              :checked="selectedBalances.length === BALANCE_FILTER_OPTIONS.length"
-              class="h-3.5 w-3.5 rounded border-zinc-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-            />
-            <span>Select All</span>
-          </div>
-          <div class="h-px bg-zinc-100 dark:bg-zinc-800 my-1" />
-          <div
-            v-for="opt in BALANCE_FILTER_OPTIONS"
-            :key="opt"
-            @click="emit('toggle-balance', opt)"
-            class="px-3.5 py-1.5 flex items-center gap-2.5 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors text-xs font-medium text-zinc-700 dark:text-zinc-300"
-          >
-            <input
-              type="checkbox"
-              :checked="selectedBalances.includes(opt)"
-              class="h-3.5 w-3.5 rounded border-zinc-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-            />
-            <span class="truncate">{{ opt }}</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- 4. Group Filter Dropdown -->
-      <div class="relative" ref="groupRef">
-        <button
-          type="button"
-          @click="isGroupOpen = !isGroupOpen; isStatusOpen = false; isTariffOpen = false; isBalanceOpen = false"
-          class="px-3.5 py-2 text-xs border rounded-full text-zinc-700 dark:text-zinc-200 cursor-pointer flex items-center justify-between gap-2 min-w-[130px] select-none transition-all shadow-2xs font-semibold"
-          :class="isGroupOpen
-            ? 'border-blue-600 bg-blue-50/50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 ring-1 ring-blue-600'
-            : 'border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-850 hover:border-blue-400'"
-        >
-          <span class="truncate max-w-[140px]">
-            {{ selectedGroups.length === 0 || selectedGroups.length === ALL_GROUP_OPTIONS.length
-              ? 'All Groups'
-              : selectedGroups.join(', ') }}
-          </span>
-          <ChevronDown
-            class="h-3.5 w-3.5 text-zinc-400 transition-transform duration-200"
-            :class="isGroupOpen ? 'rotate-180 text-blue-600' : ''"
-          />
-        </button>
-
-        <div
-          v-if="isGroupOpen"
-          class="absolute left-0 mt-1.5 w-56 rounded-xl border border-zinc-200 dark:border-zinc-750 bg-white dark:bg-[#181a1d] shadow-xl py-2 z-40 max-h-80 overflow-y-auto"
-        >
-          <div
-            @click="emit('toggle-all-groups')"
-            class="px-3.5 py-1.5 flex items-center gap-2.5 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors text-xs font-bold text-zinc-800 dark:text-zinc-200"
-          >
-            <input
-              type="checkbox"
-              :checked="selectedGroups.length === ALL_GROUP_OPTIONS.length"
-              class="h-3.5 w-3.5 rounded border-zinc-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-            />
-            <span>Select All</span>
-          </div>
-          <div class="h-px bg-zinc-100 dark:bg-zinc-800 my-1" />
-          <div
-            v-for="opt in ALL_GROUP_OPTIONS"
-            :key="opt"
-            @click="emit('toggle-group', opt)"
-            class="px-3.5 py-1.5 flex items-center gap-2.5 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors text-xs font-medium text-zinc-700 dark:text-zinc-300"
-          >
-            <input
-              type="checkbox"
-              :checked="selectedGroups.includes(opt)"
-              class="h-3.5 w-3.5 rounded border-zinc-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-            />
-            <span class="truncate">{{ opt }}</span>
-          </div>
-        </div>
-      </div>
-
+    <!-- ── Actions Bar (search + filters now live in the global AppHeader) ── -->
+    <div class="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#111315] p-3 shadow-2xs flex flex-wrap gap-2.5 items-center justify-end">
       <!-- Actions: Export Excel + View Mode Switcher -->
-      <div class="flex items-center gap-2 ml-auto">
+      <div class="flex items-center gap-2">
         <button
           type="button"
           @click="emit('export-excel')"
@@ -578,9 +265,7 @@ onUnmounted(() => {
       </div>
       <p class="font-bold text-sm text-zinc-800 dark:text-zinc-200">No students found</p>
       <p class="text-xs text-zinc-500 dark:text-zinc-400">
-        {{ searchQuery
-          ? 'No students match your search or filters. Try adjusting them.'
-          : 'No students are available for this view yet.' }}
+        No students match your search or filters. Try adjusting them.
       </p>
     </div>
   </div>
