@@ -110,9 +110,9 @@ const getLevelBadgeClass = (level?: string | null) => {
 
 const certs = computed(() => {
   const list = [
-    { type: props.student.language_certificate, score: props.student.certificate_score, isTopik: props.student.language_certificate?.toUpperCase() === 'TOPIK' },
-    { type: props.student.language_certificate_2, score: props.student.certificate_score_2, isTopik: props.student.language_certificate_2?.toUpperCase() === 'TOPIK' },
-    { type: props.student.language_certificate_3, score: props.student.certificate_score_3, isTopik: props.student.language_certificate_3?.toUpperCase() === 'TOPIK' },
+    { type: props.student.language_certificate, score: props.student.certificate_score, points: props.student.certificate_points, isTopik: props.student.language_certificate?.toUpperCase() === 'TOPIK' },
+    { type: props.student.language_certificate_2, score: props.student.certificate_score_2, points: props.student.certificate_points_2, isTopik: props.student.language_certificate_2?.toUpperCase() === 'TOPIK' },
+    { type: props.student.language_certificate_3, score: props.student.certificate_score_3, points: props.student.certificate_points_3, isTopik: props.student.language_certificate_3?.toUpperCase() === 'TOPIK' },
   ]
   return list.filter(c => c.type && c.type !== 'NO CERTIFICATE')
 })
@@ -309,6 +309,7 @@ const universities = computed(() => {
           >
             <span>{{ c.type }}</span>
             <span v-if="c.score" class="opacity-90 font-mono">({{ c.score }})</span>
+            <span v-if="c.isTopik && c.points" class="opacity-90 font-mono">({{ c.points }})</span>
           </span>
         </div>
       </div>
