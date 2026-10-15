@@ -32,12 +32,14 @@ const hasAnyPaymentHistory = (s: Student) => {
 type ColumnKey = 'new' | 'debtor' | 'full' | 'b2b'
 
 // Card border matches the Status module's Kanban card style (border-2
-// border-dashed, colored per column) instead of a plain thin border.
-const COLUMNS: { key: ColumnKey; label: string; headerClass: string; countClass: string; cardBorderClass: string }[] = [
-  { key: 'new', label: "NEW (TO'LOV QILMAGAN)", headerClass: 'text-zinc-500 dark:text-zinc-400', countClass: 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400', cardBorderClass: 'border-zinc-400 dark:border-zinc-500' },
-  { key: 'debtor', label: 'QARZDOR', headerClass: 'text-amber-600 dark:text-amber-400', countClass: 'bg-amber-100 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400', cardBorderClass: 'border-amber-500 dark:border-amber-400' },
-  { key: 'full', label: 'FULL', headerClass: 'text-emerald-600 dark:text-emerald-400', countClass: 'bg-emerald-100 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400', cardBorderClass: 'border-emerald-500 dark:border-emerald-400' },
-  { key: 'b2b', label: 'B2B', headerClass: 'text-violet-600 dark:text-violet-400', countClass: 'bg-violet-100 dark:bg-violet-950/50 text-violet-600 dark:text-violet-400', cardBorderClass: 'border-violet-500 dark:border-violet-400' },
+// border-dashed, colored per column) instead of a plain thin border. The
+// column shell itself also gets a colored border (not just zinc-200/800)
+// since the columns otherwise blend into one continuous table at a glance.
+const COLUMNS: { key: ColumnKey; label: string; headerClass: string; countClass: string; cardBorderClass: string; columnBorderClass: string }[] = [
+  { key: 'new', label: "NEW (TO'LOV QILMAGAN)", headerClass: 'text-zinc-500 dark:text-zinc-400', countClass: 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400', cardBorderClass: 'border-zinc-400 dark:border-zinc-500', columnBorderClass: 'border-zinc-300 dark:border-zinc-600' },
+  { key: 'debtor', label: 'QARZDOR', headerClass: 'text-amber-600 dark:text-amber-400', countClass: 'bg-amber-100 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400', cardBorderClass: 'border-amber-500 dark:border-amber-400', columnBorderClass: 'border-amber-300 dark:border-amber-700' },
+  { key: 'full', label: 'FULL', headerClass: 'text-emerald-600 dark:text-emerald-400', countClass: 'bg-emerald-100 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400', cardBorderClass: 'border-emerald-500 dark:border-emerald-400', columnBorderClass: 'border-emerald-300 dark:border-emerald-700' },
+  { key: 'b2b', label: 'B2B', headerClass: 'text-violet-600 dark:text-violet-400', countClass: 'bg-violet-100 dark:bg-violet-950/50 text-violet-600 dark:text-violet-400', cardBorderClass: 'border-violet-500 dark:border-violet-400', columnBorderClass: 'border-violet-300 dark:border-violet-700' },
 ]
 
 const studentsByColumn = computed(() => {
@@ -59,11 +61,12 @@ const studentsByColumn = computed(() => {
 
 <template>
   <div class="overflow-x-auto scrollbar-thin">
-    <div class="flex gap-3 pb-2 w-full">
+    <div class="flex gap-6 pb-2 w-full">
       <div
         v-for="col in COLUMNS"
         :key="col.key"
-        class="flex flex-col min-w-[280px] flex-1 max-h-[calc(100vh-280px)] bg-zinc-50/70 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 rounded-2xl overflow-hidden select-none"
+        class="flex flex-col min-w-[280px] flex-1 max-h-[calc(100vh-280px)] bg-zinc-50/70 dark:bg-zinc-900/60 border-2 rounded-2xl overflow-hidden select-none"
+        :class="col.columnBorderClass"
       >
         <!-- Column header -->
         <div class="flex items-center justify-between px-3.5 py-3 border-b border-zinc-200 dark:border-zinc-800 shrink-0 bg-white/60 dark:bg-zinc-850/60">
