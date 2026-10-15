@@ -58,6 +58,17 @@ const studentsByColumn = computed(() => {
   }
   return groups
 })
+
+// B2B sits outside the normal tariff-balance flow and is usually the
+// smallest/least-important column, so it always takes a narrower share of
+// the row - freeing width for Qarzdor/FULL, the columns staff actually work
+// from. NEW shrinks the same way whenever it's empty (no students to show),
+// rather than wasting a full-width column on nothing.
+const columnFlexClass = (key: ColumnKey) => {
+  if (key === 'b2b') return 'flex-[0.7_0.7_0%]'
+  if (key === 'new' && studentsByColumn.value.new.length === 0) return 'flex-[0.7_0.7_0%]'
+  return 'flex-1'
+}
 </script>
 
 <template>
@@ -66,8 +77,8 @@ const studentsByColumn = computed(() => {
       <div
         v-for="col in COLUMNS"
         :key="col.key"
-        class="flex flex-col min-w-[280px] flex-1 max-h-[calc(100vh-220px)] bg-zinc-50/70 dark:bg-zinc-900/60 border-2 rounded-2xl overflow-hidden select-none"
-        :class="col.columnBorderClass"
+        class="flex flex-col min-w-[280px] max-h-[calc(100vh-220px)] bg-zinc-50/70 dark:bg-zinc-900/60 border-2 rounded-2xl overflow-hidden select-none"
+        :class="[col.columnBorderClass, columnFlexClass(col.key)]"
       >
         <!-- Column header -->
         <div class="flex items-center justify-between px-3.5 py-3 border-b border-zinc-200 dark:border-zinc-800 shrink-0 bg-white/60 dark:bg-zinc-850/60">
