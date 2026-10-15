@@ -392,9 +392,9 @@ onUnmounted(() => {
 
     <!-- Right Column: Action Buttons -->
     <div class="flex items-center gap-1.5 sm:gap-2 lg:gap-2.5 justify-end shrink-0 mt-1 md:mt-0">
-      <!-- Admissions Link Button (Hidden on /visacheck and /documents) -->
+      <!-- Admissions Link Button (Hidden on /visacheck, /documents, /payments) -->
       <a
-        v-if="pathname !== '/visacheck' && pathname !== '/documents'"
+        v-if="pathname !== '/visacheck' && pathname !== '/documents' && pathname !== '/payments'"
         href="https://www.salomkorea.uz/#admission"
         target="_blank"
         rel="noopener noreferrer"
@@ -405,9 +405,10 @@ onUnmounted(() => {
         <span class="hidden xl:inline">Admissions</span>
       </a>
 
-      <!-- Excel Download Button (Hidden on /visacheck and /documents) -->
+      <!-- Excel Download Button (Hidden on /visacheck, /documents, /payments -
+           Payments has its own distinct Excel export in its own filter bar) -->
       <button
-        v-if="pathname !== '/visacheck' && pathname !== '/documents'"
+        v-if="pathname !== '/visacheck' && pathname !== '/documents' && pathname !== '/payments'"
         type="button"
         @click="dashboardStore.isExcelModalOpen = true"
         class="flex items-center justify-center gap-1.5 px-2.5 sm:px-3 lg:px-3.5 h-[34px] rounded-full border border-emerald-600/30 bg-emerald-50 hover:bg-emerald-100/70 text-emerald-700 dark:bg-emerald-950/20 dark:border-emerald-800/40 dark:text-emerald-400 text-xs font-semibold select-none cursor-pointer transition-all duration-300 shadow-[0_8px_30px_rgba(0,0,0,0.06)] hover:shadow-md outline-none shrink-0 whitespace-nowrap"
