@@ -28,7 +28,10 @@ const PAYMENT_METHODS_DEFAULT = ['CARD', 'CASH', 'BANK']
 const RECEIVED_BY_DEFAULT = ['ADMIN']
 const NOTE_PILLS_DEFAULT = ['DISCOUNT', 'SHARTNOMA UCHUN', 'QARZ', 'ELCHIXONA UCHUN']
 
-const STATUS_FILTER_OPTIONS = ['Active', 'Archive', 'Permanently Deleted']
+// Permanently Deleted students are excluded from this tab entirely (not a
+// filterable option) -- they're removed records, not something staff need
+// to track payment status for.
+const STATUS_FILTER_OPTIONS = ['Active', 'Archive']
 const BALANCE_FILTER_OPTIONS = [
   'Balance < 0 (Debt)',
   'Balance = 0 (Fully Paid)',
@@ -291,23 +294,22 @@ const toggleAllGroups = () => {
 // ── Filtered & Sorted Students ────────────────────────────────────────
 const filteredStudents = computed(() => {
   return allStudents.value.filter(s => {
+    if (s.is_permanently_deleted) return false
+
     if (studentSearch.value) {
-      if (s.is_permanently_deleted) return false
       const q = studentSearch.value.toLowerCase()
       const matches = (s.id || '').toLowerCase().includes(q) || (s.full_name || '').toLowerCase().includes(q)
       if (!matches) return false
     }
 
     if (selectedStatuses.value.length > 0 && selectedStatuses.value.length < STATUS_FILTER_OPTIONS.length) {
-      const isPermDeleted = !!s.is_permanently_deleted
-      const isArchived = !!s.is_deleted && !isPermDeleted
-      const isActive = !s.is_deleted && !isPermDeleted
+      const isArchived = !!s.is_deleted
+      const isActive = !s.is_deleted
 
       const matchActive = selectedStatuses.value.includes('Active') && isActive
       const matchArchived = selectedStatuses.value.includes('Archive') && isArchived
-      const matchPermDeleted = selectedStatuses.value.includes('Permanently Deleted') && isPermDeleted
 
-      if (!matchActive && !matchArchived && !matchPermDeleted) return false
+      if (!matchActive && !matchArchived) return false
     }
 
     if (selectedTariffs.value.length > 0) {
@@ -356,9 +358,10 @@ const filteredStudents = computed(() => {
 
 const sortedStudents = computed(() => {
   return [...filteredStudents.value].sort((a, b) => {
-    // Active students first, then archived, then permanently deleted
-    const aScore = a.is_permanently_deleted ? 2 : (a.is_deleted ? 1 : 0)
-    const bScore = b.is_permanently_deleted ? 2 : (b.is_deleted ? 1 : 0)
+    // Active students first, then archived (permanently deleted students
+    // never reach here - filteredStudents excludes them entirely)
+    const aScore = a.is_deleted ? 1 : 0
+    const bScore = b.is_deleted ? 1 : 0
     if (aScore !== bScore) return aScore - bScore
     return compareStudentIds(a, b, sortOrder.value)
   })
@@ -779,7 +782,7 @@ const exportStudentOverviewToExcel = async () => {
       'Discount (UZS)': discount,
       'Balance (UZS)': balance,
       'Financial Status': finStatus,
-      'Status': s.is_permanently_deleted ? 'Permanently Deleted' : (s.is_deleted ? 'Archived' : 'Active')
+      'Status': s.is_deleted ? 'Archived' : 'Active'
     }
   })
 

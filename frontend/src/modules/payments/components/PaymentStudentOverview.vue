@@ -48,7 +48,7 @@ const tariffRef = ref<HTMLElement | null>(null)
 const balanceRef = ref<HTMLElement | null>(null)
 const groupRef = ref<HTMLElement | null>(null)
 
-const STATUS_FILTER_OPTIONS = ['Active', 'Archive', 'Permanently Deleted']
+const STATUS_FILTER_OPTIONS = ['Active', 'Archive']
 
 const availableTariffs = computed<string[]>(() => {
   if (props.tariffOptions && props.tariffOptions.length > 0) {
