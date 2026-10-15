@@ -97,7 +97,7 @@ const studentsByColumn = computed(() => {
               :key="student.id"
               type="button"
               @click="emit('open-add-payment', student.id)"
-              class="text-left rounded-xl border-2 border-dashed bg-white dark:bg-zinc-900 p-3 shadow-[0_4px_14px_rgba(0,0,0,0.12)] dark:shadow-[0_4px_14px_rgba(0,0,0,0.4)] hover:shadow-[0_8px_20px_rgba(0,0,0,0.16)] dark:hover:shadow-[0_8px_20px_rgba(0,0,0,0.5)] transition-all cursor-pointer w-full hover:-translate-y-0.5 group"
+              class="text-left rounded-xl border-2 border-dashed bg-white dark:bg-zinc-900 p-3 shadow-md hover:shadow-lg transition-all cursor-pointer w-full group"
               :class="col.cardBorderClass"
             >
               <!-- Name + Archive badge -->
