@@ -116,43 +116,39 @@ const studentsByColumn = computed(() => {
                 </span>
               </div>
 
-              <!-- ID + Tariff badges -->
-              <div class="flex flex-wrap gap-1 mt-2">
-                <span class="text-[11px] font-bold px-1.5 py-0.5 rounded-[5px] bg-[#0066cc] text-white font-mono shadow-2xs">
-                  {{ student.id }}
-                </span>
-                <span
-                  v-if="hasTariff(student)"
-                  class="text-[11px] font-bold px-2 py-0.5 rounded-[5px] bg-[#10b981] text-white uppercase shadow-2xs truncate max-w-[140px]"
-                >
-                  {{ student.tariff }}
-                </span>
+              <!-- ID + Tariff (ghost text, not pills) -->
+              <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-2 text-[11px] font-semibold text-zinc-400 dark:text-zinc-500">
+                <span class="font-mono">{{ student.id }}</span>
+                <span v-if="hasTariff(student)" class="truncate max-w-[160px]">{{ student.tariff }}</span>
               </div>
 
               <!-- Balance (NEW + Qarzdor only) -->
-              <div v-if="col.key === 'new' || col.key === 'debtor'" class="flex flex-wrap gap-1 mt-1.5">
-                <span
-                  class="text-[11px] font-bold px-2 py-0.5 rounded-[5px] text-white shadow-2xs font-mono"
-                  :class="(Number(student.balance) || 0) < 0 ? 'bg-[#ef4444]' : 'bg-[#10b981]'"
-                >
-                  {{ (Number(student.balance) || 0) > 0 ? '+' : '' }}{{ formatAmount(student.balance) }}
-                </span>
-                <span
+              <div v-if="col.key === 'new' || col.key === 'debtor'" class="flex flex-col gap-0.5 mt-1.5 text-[11px]">
+                <div class="flex items-center justify-between">
+                  <span class="text-zinc-400 dark:text-zinc-500 font-semibold uppercase tracking-wide">Balance:</span>
+                  <span
+                    class="font-bold font-mono"
+                    :class="(Number(student.balance) || 0) < 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'"
+                  >
+                    {{ (Number(student.balance) || 0) > 0 ? '+' : '' }}{{ formatAmount(student.balance) }} UZS
+                  </span>
+                </div>
+                <div
                   v-if="student.discount !== null && student.discount !== undefined && Number(student.discount) > 0"
-                  class="text-[11px] font-bold px-2 py-0.5 rounded-[5px] bg-[#be185d] text-white font-mono shadow-2xs"
+                  class="flex items-center justify-between"
                 >
-                  {{ formatAmount(student.discount) }}
-                </span>
+                  <span class="text-zinc-400 dark:text-zinc-500 font-semibold uppercase tracking-wide">Discount:</span>
+                  <span class="font-bold font-mono text-pink-600 dark:text-pink-400">{{ formatAmount(student.discount) }} UZS</span>
+                </div>
               </div>
 
               <!-- Discount only (FULL + B2B) -->
-              <div v-else class="flex flex-wrap gap-1 mt-1.5">
-                <span
-                  v-if="student.discount !== null && student.discount !== undefined && Number(student.discount) > 0"
-                  class="text-[11px] font-bold px-2 py-0.5 rounded-[5px] bg-[#be185d] text-white font-mono shadow-2xs"
-                >
-                  {{ formatAmount(student.discount) }}
-                </span>
+              <div
+                v-else-if="student.discount !== null && student.discount !== undefined && Number(student.discount) > 0"
+                class="flex items-center justify-between mt-1.5 text-[11px]"
+              >
+                <span class="text-zinc-400 dark:text-zinc-500 font-semibold uppercase tracking-wide">Discount:</span>
+                <span class="font-bold font-mono text-pink-600 dark:text-pink-400">{{ formatAmount(student.discount) }} UZS</span>
               </div>
 
               <!-- Payments Done / Withdrawal (Qarzdor, FULL, B2B) -->
