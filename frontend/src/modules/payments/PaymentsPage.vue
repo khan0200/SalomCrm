@@ -99,7 +99,8 @@ const matchesBalanceOption = (studentBalance: number, option: string) => {
 
 // ── Main Page State ───────────────────────────────────────────────────
 const activeTab = ref<'students' | 'history' | 'finance'>('students')
-const viewMode = ref<'grid' | 'table'>('table')
+const studentsViewMode = ref<'kanban' | 'table'>('kanban')
+const historyViewMode = ref<'grid' | 'table'>('table')
 const sortOrder = ref<'asc' | 'desc'>('asc')
 
 // Finance Tab Security & Access State
@@ -942,7 +943,7 @@ const exportPaymentHistoryToExcel = async () => {
     <!-- ── Tab 1: Students Overview ──────────────────────────────────── -->
     <div v-if="activeTab === 'students'">
       <PaymentStudentOverview
-        :students="paginatedStudents"
+        :students="studentsViewMode === 'kanban' ? sortedStudents : paginatedStudents"
         :total-filtered-count="sortedStudents.length"
         :is-loading="isOverviewLoading"
         :options="options"
@@ -952,7 +953,7 @@ const exportPaymentHistoryToExcel = async () => {
         :selected-tariffs="selectedTariffs"
         :selected-balances="selectedBalances"
         :selected-groups="selectedGroups"
-        :view-mode="viewMode"
+        :view-mode="studentsViewMode"
         :sort-order="sortOrder"
         @update:search-query="studentSearch = $event"
         @toggle-status="toggleStatus"
@@ -963,14 +964,14 @@ const exportPaymentHistoryToExcel = async () => {
         @toggle-all-balances="toggleAllBalances"
         @toggle-group="toggleGroup"
         @toggle-all-groups="toggleAllGroups"
-        @update:view-mode="viewMode = $event"
+        @update:view-mode="studentsViewMode = $event"
         @toggle-sort="sortOrder = sortOrder === 'asc' ? 'desc' : 'asc'"
         @open-add-payment="openAddModal"
         @export-excel="exportStudentOverviewToExcel"
       />
 
-      <!-- Pagination -->
-      <div v-if="studentsTotalPages > 1" class="flex items-center justify-center gap-2 mt-4">
+      <!-- Pagination (hidden in Kanban - it shows the full filtered set across 4 scrollable columns) -->
+      <div v-if="studentsViewMode !== 'kanban' && studentsTotalPages > 1" class="flex items-center justify-center gap-2 mt-4">
         <button
           :disabled="studentsPage === 1"
           @click="studentsPage--"
@@ -1001,12 +1002,12 @@ const exportPaymentHistoryToExcel = async () => {
         :selected-status="historySelectedStatus"
         :payment-methods="paymentMethods"
         :payment-receivers="paymentReceivers"
-        :view-mode="viewMode"
+        :view-mode="historyViewMode"
         @update:search-query="historySearch = $event"
         @update:selected-method="selectedMethod = $event"
         @update:selected-receiver="selectedReceiver = $event"
         @update:selected-status="historySelectedStatus = $event"
-        @update:view-mode="viewMode = $event"
+        @update:view-mode="historyViewMode = $event"
         @open-edit="openEditModal"
         @delete-payment="handleDeletePayment"
         @export-excel="exportPaymentHistoryToExcel"

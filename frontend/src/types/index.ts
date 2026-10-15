@@ -139,6 +139,8 @@ export interface Student {
   discount: number
   invoice_sum?: number
   payments_sum?: number
+  total_payments?: number | string | null
+  total_withdrawals?: number | string | null
 
   // Documents Checklist & Hand counts
   pick_needed?: string[]

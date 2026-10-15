@@ -63,13 +63,21 @@ class PaymentEditSerializer(serializers.Serializer):
 class PaymentOverviewStudentSerializer(serializers.ModelSerializer):
     """
     Student financial overview serializer with formatted tariff, balance, and discount.
+
+    total_payments/total_withdrawals come from annotate()d queryset fields (see
+    PaymentOverviewViewSet.get_queryset) so they're plain DecimalFields here, not
+    SerializerMethodFields -- keeps the Payments Kanban board's per-student sums
+    to one query for the whole list instead of one query per student.
     """
+    total_payments = serializers.DecimalField(max_digits=14, decimal_places=2, read_only=True)
+    total_withdrawals = serializers.DecimalField(max_digits=14, decimal_places=2, read_only=True)
+
     class Meta:
         model = Student
         fields = (
             'id', 'full_name', 'tariff', 'balance', 'discount',
-            'student_group', 'is_deleted', 'phone1', 'office',
-            'coordinator', 'level', 'level2'
+            'student_group', 'is_deleted', 'is_permanently_deleted', 'phone1', 'office',
+            'coordinator', 'level', 'level2', 'total_payments', 'total_withdrawals'
         )
 
 

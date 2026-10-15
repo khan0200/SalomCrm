@@ -2,9 +2,10 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import type { Student } from '@/types'
 import {
-  Search, Plus, LayoutGrid, Table as TableIcon,
+  Search, Plus, Table as TableIcon, Columns3,
   ChevronDown, ChevronUp, UserX, FileSpreadsheet
 } from 'lucide-vue-next'
+import PaymentStudentKanban from './PaymentStudentKanban.vue'
 
 const props = defineProps<{
   students: Student[]
@@ -17,7 +18,7 @@ const props = defineProps<{
   selectedTariffs: string[]
   selectedBalances: string[]
   selectedGroups: string[]
-  viewMode: 'grid' | 'table'
+  viewMode: 'kanban' | 'table'
   sortOrder: 'asc' | 'desc'
 }>()
 
@@ -31,7 +32,7 @@ const emit = defineEmits<{
   (e: 'toggle-all-balances'): void
   (e: 'toggle-group', val: string): void
   (e: 'toggle-all-groups'): void
-  (e: 'update:viewMode', val: 'grid' | 'table'): void
+  (e: 'update:viewMode', val: 'kanban' | 'table'): void
   (e: 'toggle-sort'): void
   (e: 'open-add-payment', studentId?: string): void
   (e: 'export-excel'): void
@@ -359,14 +360,14 @@ onUnmounted(() => {
         <div class="flex items-center gap-1 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-850 p-1">
           <button
             type="button"
-            @click="emit('update:viewMode', 'grid')"
+            @click="emit('update:viewMode', 'kanban')"
             class="p-1.5 rounded-md transition-all cursor-pointer"
-            :class="viewMode === 'grid'
+            :class="viewMode === 'kanban'
               ? 'bg-blue-600 text-white shadow-xs'
               : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100'"
-            title="Grid View (Cards)"
+            title="Kanban View (Payment Status Board)"
           >
-            <LayoutGrid class="h-4 w-4" />
+            <Columns3 class="h-4 w-4" />
           </button>
           <button
             type="button"
@@ -389,8 +390,8 @@ onUnmounted(() => {
       <template v-else>{{ totalFilteredCount }} students</template>
     </div>
 
-    <!-- ── Loading Skeleton: Grid View ─────────────────────────────────────── -->
-    <div v-if="isLoading && viewMode === 'grid'" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+    <!-- ── Loading Skeleton: Kanban View ───────────────────────────────────── -->
+    <div v-if="isLoading && viewMode === 'kanban'" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
       <div
         v-for="i in 9"
         :key="i"
@@ -448,67 +449,12 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <!-- ── 1. Grid View (UniApp2 Student Cards 1-to-1) ────────────────────── -->
-    <div v-else-if="viewMode === 'grid'" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-      <button
-        v-for="student in students"
-        :key="student.id"
-        type="button"
-        @click="emit('open-add-payment', student.id)"
-        class="text-left rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#15171a] p-4 shadow-sm hover:bg-zinc-50 dark:hover:bg-zinc-850/80 transition-all cursor-pointer w-full hover:-translate-y-0.5 group"
-      >
-        <!-- Card Header: Full Name + Archive Badge -->
-        <div class="flex items-center justify-between gap-2">
-          <div class="font-bold text-[17px] uppercase text-zinc-900 dark:text-zinc-100 truncate tracking-wide group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-            {{ student.full_name }}
-          </div>
-          <span
-            v-if="student.is_permanently_deleted"
-            class="px-1.5 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase bg-rose-600/15 text-rose-700 dark:text-rose-400 border border-rose-600/25 shrink-0"
-          >
-            Permanently Deleted
-          </span>
-          <span
-            v-else-if="student.is_deleted"
-            class="px-1.5 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 shrink-0"
-          >
-            Archive
-          </span>
-        </div>
-
-        <!-- Badges Row -->
-        <div class="flex flex-wrap gap-1.5 mt-3">
-          <!-- Blue ID Badge -->
-          <span class="text-[13px] font-bold px-2 py-1 rounded-[6px] bg-[#0066cc] text-white font-mono shadow-2xs">
-            {{ student.id }}
-          </span>
-
-          <!-- Green Tariff Badge with Certificate Suffix -->
-          <span
-            v-if="student.tariff"
-            class="text-[13px] font-bold px-2.5 py-1 rounded-[6px] bg-[#10b981] text-white uppercase shadow-2xs"
-          >
-            {{ student.tariff }}
-          </span>
-
-          <!-- Balance Badge (Red if < 0 debt, Green if >= 0) -->
-          <span
-            class="text-[13px] font-bold px-2.5 py-1 rounded-[6px] text-white shadow-2xs font-mono"
-            :class="(Number(student.balance) || 0) < 0 ? 'bg-[#ef4444]' : 'bg-[#10b981]'"
-          >
-            {{ (Number(student.balance) || 0) > 0 ? '+' : '' }}{{ formatAmount(student.balance) }}
-          </span>
-
-          <!-- Discount Badge (Pink #be185d if exists) -->
-          <span
-            v-if="student.discount !== null && student.discount !== undefined && Number(student.discount) > 0"
-            class="text-[13px] font-bold px-2.5 py-1 rounded-[6px] bg-[#be185d] text-white font-mono shadow-2xs"
-          >
-            {{ formatAmount(student.discount) }}
-          </span>
-        </div>
-      </button>
-    </div>
+    <!-- ── 1. Kanban View (Payment Status Board: NEW / Qarzdor / FULL / B2B) ── -->
+    <PaymentStudentKanban
+      v-else-if="viewMode === 'kanban'"
+      :students="students"
+      @open-add-payment="(id) => emit('open-add-payment', id)"
+    />
 
     <!-- ── 2. Table View (UniApp2 Table 1-to-1) ────────────────────────────── -->
     <div v-else class="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#111315] overflow-hidden shadow-2xs">

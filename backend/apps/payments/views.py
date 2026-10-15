@@ -1,7 +1,8 @@
 from decimal import Decimal
 import io
 from django.http import HttpResponse
-from django.db.models import Q
+from django.db.models import Q, Sum, Case, When, DecimalField, F
+from django.db.models.functions import Coalesce
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
@@ -274,6 +275,37 @@ class PaymentOverviewViewSet(viewsets.ReadOnlyModelViewSet):
                 elif '> 10,000,000' in b or '> 10000000' in b:
                     bal_q = bal_q | Q(balance__gt=10000000)
             qs = qs.filter(bal_q)
+
+        # total_payments/total_withdrawals power the Payments Kanban board and
+        # must match the Student Detail Drawer's own payment sums exactly (see
+        # recalculate_student_financials) -- computed here via annotate() so a
+        # list of up to ~5000 students costs one query, not one per student.
+        # Withdrawal amounts are stored negative (Payment model convention),
+        # so the Coalesce(..., -amount) flips the sign back to a positive total.
+        qs = qs.annotate(
+            total_payments=Coalesce(
+                Sum(
+                    Case(
+                        When(payments__is_discount=False, payments__is_withdrawal=False, then='payments__amount'),
+                        default=0,
+                        output_field=DecimalField(max_digits=14, decimal_places=2)
+                    )
+                ),
+                0,
+                output_field=DecimalField(max_digits=14, decimal_places=2)
+            ),
+            total_withdrawals=Coalesce(
+                Sum(
+                    Case(
+                        When(payments__is_withdrawal=True, then=-F('payments__amount')),
+                        default=0,
+                        output_field=DecimalField(max_digits=14, decimal_places=2)
+                    )
+                ),
+                0,
+                output_field=DecimalField(max_digits=14, decimal_places=2)
+            ),
+        )
 
         return qs.order_by('id')
 
