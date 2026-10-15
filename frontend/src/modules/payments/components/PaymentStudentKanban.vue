@@ -31,11 +31,13 @@ const hasAnyPaymentHistory = (s: Student) => {
 
 type ColumnKey = 'new' | 'debtor' | 'full' | 'b2b'
 
-const COLUMNS: { key: ColumnKey; label: string; headerClass: string; countClass: string }[] = [
-  { key: 'new', label: 'NEW', headerClass: 'text-zinc-500 dark:text-zinc-400', countClass: 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400' },
-  { key: 'debtor', label: 'QARZDOR', headerClass: 'text-amber-600 dark:text-amber-400', countClass: 'bg-amber-100 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400' },
-  { key: 'full', label: 'FULL', headerClass: 'text-emerald-600 dark:text-emerald-400', countClass: 'bg-emerald-100 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400' },
-  { key: 'b2b', label: 'B2B', headerClass: 'text-violet-600 dark:text-violet-400', countClass: 'bg-violet-100 dark:bg-violet-950/50 text-violet-600 dark:text-violet-400' },
+// Card border matches the Status module's Kanban card style (border-2
+// border-dashed, colored per column) instead of a plain thin border.
+const COLUMNS: { key: ColumnKey; label: string; headerClass: string; countClass: string; cardBorderClass: string }[] = [
+  { key: 'new', label: 'NEW', headerClass: 'text-zinc-500 dark:text-zinc-400', countClass: 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400', cardBorderClass: 'border-zinc-400 dark:border-zinc-500' },
+  { key: 'debtor', label: 'QARZDOR', headerClass: 'text-amber-600 dark:text-amber-400', countClass: 'bg-amber-100 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400', cardBorderClass: 'border-amber-500 dark:border-amber-400' },
+  { key: 'full', label: 'FULL', headerClass: 'text-emerald-600 dark:text-emerald-400', countClass: 'bg-emerald-100 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400', cardBorderClass: 'border-emerald-500 dark:border-emerald-400' },
+  { key: 'b2b', label: 'B2B', headerClass: 'text-violet-600 dark:text-violet-400', countClass: 'bg-violet-100 dark:bg-violet-950/50 text-violet-600 dark:text-violet-400', cardBorderClass: 'border-violet-500 dark:border-violet-400' },
 ]
 
 const studentsByColumn = computed(() => {
@@ -92,7 +94,8 @@ const studentsByColumn = computed(() => {
               :key="student.id"
               type="button"
               @click="emit('open-add-payment', student.id)"
-              class="text-left rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#15171a] p-3 shadow-sm hover:bg-zinc-50 dark:hover:bg-zinc-850/80 transition-all cursor-pointer w-full hover:-translate-y-0.5 group"
+              class="text-left rounded-xl border-2 border-dashed bg-white dark:bg-zinc-900 p-3 shadow-md hover:shadow-lg transition-all cursor-pointer w-full hover:-translate-y-0.5 group"
+              :class="col.cardBorderClass"
             >
               <!-- Name + Archive badge -->
               <div class="flex items-center justify-between gap-2">
