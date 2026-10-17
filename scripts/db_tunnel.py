@@ -5,11 +5,9 @@ so dev.bat starts this tunnel: 127.0.0.1:15432 (local) -> 127.0.0.1:5432 (VPS).
 Credentials come from the git-ignored .env (VPS_HOST, VPS_SSH_USER, VPS_ROOT_PASSWORD).
 """
 import os
-import select
 import socketserver
 import sys
 import threading
-import time
 from pathlib import Path
 
 import paramiko
@@ -43,6 +41,16 @@ def connect(env):
 
 
 def make_handler(client):
+    def forward(source, target):
+        try:
+            while True:
+                data = source.recv(32768)
+                if not data:
+                    break
+                target.sendall(data)
+        except (OSError, EOFError):
+            pass
+
     class Handler(socketserver.BaseRequestHandler):
         def handle(self):
             try:
@@ -52,19 +60,18 @@ def make_handler(client):
             except Exception as exc:
                 print(f"[tunnel] channel failed: {exc}", flush=True)
                 return
-            while True:
-                ready, _, _ = select.select([self.request, chan], [], [])
-                if self.request in ready:
-                    data = self.request.recv(32768)
-                    if not data:
-                        break
-                    chan.sendall(data)
-                if chan in ready:
-                    data = chan.recv(32768)
-                    if not data:
-                        break
-                    self.request.sendall(data)
+
+            client_to_server = threading.Thread(
+                target=forward, args=(self.request, chan), daemon=True
+            )
+            server_to_client = threading.Thread(
+                target=forward, args=(chan, self.request), daemon=True
+            )
+            client_to_server.start()
+            server_to_client.start()
+            client_to_server.join()
             chan.close()
+            self.request.shutdown(2)
 
     return Handler
 
@@ -81,8 +88,7 @@ def main():
     threading.Thread(target=server.serve_forever, daemon=True).start()
     print(f"[tunnel] 127.0.0.1:{LOCAL_PORT} -> {env['VPS_HOST']}:{REMOTE[1]} ready", flush=True)
     try:
-        while client.get_transport().is_active():
-            time.sleep(2)
+        client.get_transport().join()
     except KeyboardInterrupt:
         pass
     print("[tunnel] closed", flush=True)

@@ -230,26 +230,26 @@ const confirmRevertToCoa = () => {
 <template>
   <div
     ref="cardRoot"
-    class="group rounded-xl border-2 border-dashed p-2.5 shadow-md hover:shadow-lg transition-all cursor-pointer"
+    class="group rounded-xl border border-dashed p-2.5 shadow-sm hover:shadow-lg transition-all duration-200 cursor-pointer"
     :class="stageCardClass"
     @click="handleCardClick"
     @contextmenu="handleContextMenu"
   >
     <!-- Shared header: ID, name, level, cert -->
-    <div class="flex items-center gap-1.5 mb-1.5 min-w-0">
-      <span class="text-[9px] font-bold bg-[#007aff] text-white px-1.5 py-0.5 rounded-[4px] shrink-0 shadow-xs">
+    <div class="flex items-center gap-1.5 mb-2 min-w-0">
+      <span class="text-[9px] font-extrabold bg-[#087cff] text-white px-1.5 py-0.5 rounded-md shrink-0 shadow-xs">
         {{ student.id }}
       </span>
-      <span class="text-[11px] font-bold uppercase tracking-wide text-zinc-900 dark:text-zinc-100 truncate">
+      <span class="text-[10.5px] font-extrabold uppercase tracking-wide text-zinc-900 dark:text-zinc-100 truncate leading-tight">
         {{ student.full_name }}
       </span>
     </div>
 
-    <div class="flex items-center justify-between gap-1 mb-2">
-      <div class="flex flex-wrap items-center gap-1 min-w-0">
+    <div class="flex items-center justify-between gap-1 mb-2.5">
+      <div class="flex flex-wrap items-center gap-1.5 min-w-0">
         <span
           v-if="student.level"
-          class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[8.5px] font-bold uppercase tracking-wide shadow-2xs"
+          class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[8px] font-extrabold uppercase tracking-wide shadow-2xs"
           :class="getLevelBadgeClass(student.level)"
         >
           {{ student.level }}
@@ -257,7 +257,7 @@ const confirmRevertToCoa = () => {
         <span
           v-for="(cert, idx) in certs"
           :key="`${cert.type}-${idx}`"
-          class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[8.5px] font-bold shadow-2xs"
+          class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[8px] font-extrabold shadow-2xs"
           :class="cert.type === 'TOPIK' ? 'bg-rose-500 text-white' : 'bg-blue-600 text-white'"
         >
           <span>{{ cert.type }}</span>
@@ -269,7 +269,7 @@ const confirmRevertToCoa = () => {
         type="button"
         title="View student details"
         @click.stop="emit('open-detail')"
-        class="flex items-center justify-center w-5 h-5 rounded-md text-zinc-400 dark:text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer shrink-0"
+        class="flex items-center justify-center w-5 h-5 rounded-full text-zinc-400 dark:text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer shrink-0"
       >
         <Eye class="w-3.5 h-3.5" />
       </button>
@@ -278,14 +278,14 @@ const confirmRevertToCoa = () => {
     <!-- Stage-specific body -->
     <div
       ref="cardBody"
-      class="overflow-hidden"
+      class="overflow-hidden -mx-0.5"
       :style="{ height: cardBodyHeight, transition: 'height 560ms cubic-bezier(0.22, 1, 0.36, 1)' }"
     >
     <div class="flex flex-col gap-1.5" @click.stop>
       <!-- STUDENT: university selector + Not Applied/Applied -->
       <template v-if="stageKey === 'student'">
         <TransitionGroup name="university-row" tag="div" class="flex flex-col gap-1.5">
-        <div v-for="slot in visibleUniversitySlots" :key="slot" class="flex items-center gap-1.5">
+        <div v-for="slot in visibleUniversitySlots" :key="slot" class="university-card-row flex items-center gap-1.5">
           <select
             :value="uniName(slot)"
             :disabled="!authStore.canEdit"
@@ -315,7 +315,7 @@ const confirmRevertToCoa = () => {
            so a second university can still be added from here. -->
       <template v-else-if="stageKey === 'apply'">
         <TransitionGroup name="university-row" tag="div" class="flex flex-col gap-1.5">
-        <div v-for="slot in visibleUniversitySlots" :key="slot" class="flex items-center gap-1.5">
+        <div v-for="slot in visibleUniversitySlots" :key="slot" class="university-card-row flex items-center gap-1.5">
           <select
             v-if="!uniName(slot)"
             :value="uniName(slot)"
@@ -348,7 +348,7 @@ const confirmRevertToCoa = () => {
            of being hidden, so a second university can be added here too. -->
       <template v-else-if="stageKey === 'invoice'">
         <TransitionGroup name="university-row" tag="div" class="flex flex-col gap-1.5">
-        <div v-for="slot in visibleUniversitySlots" :key="slot" class="flex items-center gap-1.5">
+        <div v-for="slot in visibleUniversitySlots" :key="slot" class="university-card-row flex items-center gap-1.5">
           <CheckCircle2
             v-if="uniStatus(slot).trim().toUpperCase() === 'ACCEPTED'"
             class="w-3 h-3 text-emerald-600 dark:text-emerald-400 shrink-0"
@@ -568,5 +568,25 @@ const confirmRevertToCoa = () => {
 
 .university-row-move {
   transition: transform 500ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.university-card-row {
+  min-height: 24px;
+  padding: 2px 4px;
+  border-radius: 7px;
+  background: rgb(255 255 255 / 0.45);
+  transition: background-color 180ms ease, transform 180ms ease;
+}
+
+.dark .university-card-row {
+  background: rgb(255 255 255 / 0.045);
+}
+
+.university-card-row:hover {
+  background: rgb(255 255 255 / 0.72);
+}
+
+.dark .university-card-row:hover {
+  background: rgb(255 255 255 / 0.085);
 }
 </style>
