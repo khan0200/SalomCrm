@@ -266,6 +266,7 @@ const confirmRevertToCoa = () => {
     <div class="flex flex-col gap-1.5" @click.stop>
       <!-- STUDENT: university selector + Not Applied/Applied -->
       <template v-if="stageKey === 'student'">
+        <TransitionGroup name="university-row" tag="div" class="flex flex-col gap-1.5">
         <div v-for="slot in visibleUniversitySlots" :key="slot" class="flex items-center gap-1.5">
           <select
             :value="uniName(slot)"
@@ -288,12 +289,40 @@ const confirmRevertToCoa = () => {
             <option v-for="opt in statusOptions" :key="opt" :value="opt" class="bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200">{{ opt }}</option>
           </select>
         </div>
+        </TransitionGroup>
       </template>
+
+      <style scoped>
+      .university-row-enter-active,
+      .university-row-leave-active {
+        transition: opacity 180ms ease, transform 220ms ease, max-height 220ms ease;
+        overflow: hidden;
+      }
+
+      .university-row-enter-from,
+      .university-row-leave-to {
+        opacity: 0;
+        transform: translateY(-6px) scaleY(0.92);
+        max-height: 0;
+      }
+
+      .university-row-enter-to,
+      .university-row-leave-from {
+        opacity: 1;
+        transform: translateY(0) scaleY(1);
+        max-height: 32px;
+      }
+
+      .university-row-move {
+        transition: transform 220ms ease;
+      }
+      </style>
 
       <!-- APPLY: both slots, full status range. Empty slot gets a university
            name picker (same as Student column) instead of just a label,
            so a second university can still be added from here. -->
       <template v-else-if="stageKey === 'apply'">
+        <TransitionGroup name="university-row" tag="div" class="flex flex-col gap-1.5">
         <div v-for="slot in visibleUniversitySlots" :key="slot" class="flex items-center gap-1.5">
           <select
             v-if="!uniName(slot)"
@@ -319,12 +348,14 @@ const confirmRevertToCoa = () => {
             <option v-for="opt in statusOptions" :key="opt" :value="opt" class="bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200">{{ opt }}</option>
           </select>
         </div>
+        </TransitionGroup>
       </template>
 
       <!-- INVOICE: both slots shown, status editable. Empty slot gets a
            university name picker (same as Apply/Student columns) instead
            of being hidden, so a second university can be added here too. -->
       <template v-else-if="stageKey === 'invoice'">
+        <TransitionGroup name="university-row" tag="div" class="flex flex-col gap-1.5">
         <div v-for="slot in visibleUniversitySlots" :key="slot" class="flex items-center gap-1.5">
           <CheckCircle2
             v-if="uniStatus(slot).trim().toUpperCase() === 'ACCEPTED'"
@@ -387,6 +418,7 @@ const confirmRevertToCoa = () => {
             <option value="CANCELLED" class="bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200">Cancelled</option>
           </select>
         </div>
+        </TransitionGroup>
       </template>
 
       <!-- COA: accepted-uni label (read-only - edit from Invoice) + editable COA + visa selects -->
