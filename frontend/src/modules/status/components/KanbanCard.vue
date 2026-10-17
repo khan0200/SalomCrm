@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, onMounted, onUnmounted } from 'vue'
 import type { Student } from '@/types'
 import type { WorkflowStage } from '../utils/statusWorkflow'
 import { useAuthStore } from '@/stores/auth'
 import { useUniversityStatuses } from '@/composables/useUniversityStatuses'
-import { CheckCircle2, ArrowLeft, Eye } from 'lucide-vue-next'
+import { CheckCircle2, ArrowLeft, Eye, ChevronDown, ChevronUp } from 'lucide-vue-next'
 
 const props = defineProps<{
   student: Student
@@ -25,8 +25,8 @@ const emit = defineEmits<{
   (e: 'open-actions', event: MouseEvent): void
   (e: 'open-embassy'): void
   (e: 'open-detail'): void
-  (e: 'update-university', slot: 1 | 2, name: string): void
-  (e: 'update-university-status', slot: 1 | 2, status: string): void
+  (e: 'update-university', slot: number, name: string): void
+  (e: 'update-university-status', slot: number, status: string): void
   (e: 'update-invoice-status', currentStatus: string | null, newStatus: string): void
   (e: 'update-coa-status', status: string | null): void
   (e: 'update-visa-status', status: string | null): void
@@ -35,6 +35,8 @@ const emit = defineEmits<{
 
 const authStore = useAuthStore()
 const { getStatusBadgeClass } = useUniversityStatuses()
+const cardRoot = ref<HTMLElement | null>(null)
+const universitiesExpanded = ref(false)
 
 const getLevelBadgeClass = (level?: string | null) => {
   switch (level?.toUpperCase()) {
@@ -80,11 +82,40 @@ const statusOptions = computed(() =>
   props.universityStatusOptions.length > 0 ? props.universityStatusOptions : FALLBACK_STATUS_OPTIONS
 )
 
-const uniName = (slot: 1 | 2) => (slot === 1 ? props.student.university_1 : props.student.university_2) || ''
-const uniStatus = (slot: 1 | 2) => {
-  const val = slot === 1 ? props.student.university_1_status : props.student.university_2_status
+const uniName = (slot: number) => (props.student as any)[`university_${slot}`] || ''
+const uniStatus = (slot: number) => {
+  const val = (props.student as any)[`university_${slot}_status`]
   return val && val.trim() ? val : 'Not Applied'
 }
+
+const chosenUniversitySlots = computed(() =>
+  Array.from({ length: 5 }, (_, index) => index + 1)
+    .filter(slot => {
+      const name = (props.student as any)[`university_${slot}`]
+      return typeof name === 'string' && name.trim()
+    })
+)
+
+const visibleUniversitySlots = computed(() =>
+  universitiesExpanded.value
+    ? chosenUniversitySlots.value
+    : (chosenUniversitySlots.value.length > 0 ? [chosenUniversitySlots.value[0]] : [1])
+)
+
+const toggleUniversities = () => {
+  if (chosenUniversitySlots.value.length > 1) {
+    universitiesExpanded.value = !universitiesExpanded.value
+  }
+}
+
+const closeUniversitiesOnOutsideClick = (event: MouseEvent) => {
+  if (cardRoot.value && !cardRoot.value.contains(event.target as Node)) {
+    universitiesExpanded.value = false
+  }
+}
+
+onMounted(() => document.addEventListener('click', closeUniversitiesOnOutsideClick))
+onUnmounted(() => document.removeEventListener('click', closeUniversitiesOnOutsideClick))
 
 // ── Invoice column: accepted university + invoice/coa selects ───────────
 const acceptedUniversities = computed(() => {
@@ -185,6 +216,7 @@ const confirmRevertToCoa = () => {
 
 <template>
   <div
+    ref="cardRoot"
     class="group rounded-xl border-2 border-dashed p-2.5 shadow-md hover:shadow-lg transition-all cursor-pointer"
     :class="stageCardClass"
     @click="handleCardClick"
@@ -234,7 +266,7 @@ const confirmRevertToCoa = () => {
     <div class="flex flex-col gap-1.5" @click.stop>
       <!-- STUDENT: university selector + Not Applied/Applied -->
       <template v-if="stageKey === 'student'">
-        <div v-for="slot in [1, 2] as const" :key="slot" class="flex items-center gap-1.5">
+        <div v-for="slot in visibleUniversitySlots" :key="slot" class="flex items-center gap-1.5">
           <select
             :value="uniName(slot)"
             :disabled="!authStore.canEdit"
@@ -262,7 +294,7 @@ const confirmRevertToCoa = () => {
            name picker (same as Student column) instead of just a label,
            so a second university can still be added from here. -->
       <template v-else-if="stageKey === 'apply'">
-        <div v-for="slot in [1, 2] as const" :key="slot" class="flex items-center gap-1.5">
+        <div v-for="slot in visibleUniversitySlots" :key="slot" class="flex items-center gap-1.5">
           <select
             v-if="!uniName(slot)"
             :value="uniName(slot)"
@@ -293,7 +325,7 @@ const confirmRevertToCoa = () => {
            university name picker (same as Apply/Student columns) instead
            of being hidden, so a second university can be added here too. -->
       <template v-else-if="stageKey === 'invoice'">
-        <div v-for="slot in [1, 2] as const" :key="slot" class="flex items-center gap-1.5">
+        <div v-for="slot in visibleUniversitySlots" :key="slot" class="flex items-center gap-1.5">
           <CheckCircle2
             v-if="uniStatus(slot).trim().toUpperCase() === 'ACCEPTED'"
             class="w-3 h-3 text-emerald-600 dark:text-emerald-400 shrink-0"
@@ -468,6 +500,17 @@ const confirmRevertToCoa = () => {
           </button>
         </div>
       </template>
+
+      <button
+        v-if="chosenUniversitySlots.length > 1"
+        type="button"
+        :title="universitiesExpanded ? 'Hide universities' : 'Show all universities'"
+        @click.stop="toggleUniversities"
+        class="self-center flex items-center justify-center w-6 h-4 rounded-full text-zinc-400 dark:text-zinc-500 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+      >
+        <ChevronUp v-if="universitiesExpanded" class="w-3.5 h-3.5" />
+        <ChevronDown v-else class="w-3.5 h-3.5" />
+      </button>
     </div>
   </div>
 </template>

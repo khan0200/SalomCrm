@@ -19,8 +19,8 @@ defineEmits<{
   (e: 'open-actions', student: Student, event: MouseEvent): void
   (e: 'open-embassy', student: Student): void
   (e: 'open-detail', student: Student): void
-  (e: 'update-university', studentId: string, slot: 1 | 2, name: string): void
-  (e: 'update-university-status', studentId: string, slot: 1 | 2, status: string): void
+  (e: 'update-university', studentId: string, slot: number, name: string): void
+  (e: 'update-university-status', studentId: string, slot: number, status: string): void
   (e: 'update-invoice-status', studentId: string, currentStatus: string | null, newStatus: string): void
   (e: 'update-coa-status', studentId: string, status: string | null): void
   (e: 'update-visa-status', studentId: string, status: string | null): void

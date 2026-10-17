@@ -521,16 +521,18 @@ const reorderUniversities = (student: Student): Student => {
     return Number(aFailed) - Number(bFailed)
   })
 
-  const reordered = { ...student } as Record<string, unknown>
+  const reordered: Student = { ...student }
   for (let index = 0; index < 5; index++) {
     const university = universities[index]
-    reordered[`university_${index + 1}`] = university?.name ?? null
-    reordered[`university_${index + 1}_status`] = university
-      ? (university.status || 'Chosen')
-      : (index === 0 ? 'Chosen' : null)
-    reordered[`university_${index + 1}_major`] = university?.major ?? null
+    Object.assign(reordered, {
+      [`university_${index + 1}`]: university?.name ?? null,
+      [`university_${index + 1}_status`]: university
+        ? (university.status || 'Chosen')
+        : (index === 0 ? 'Chosen' : null),
+      [`university_${index + 1}_major`]: university?.major ?? null,
+    })
   }
-  return reordered as Student
+  return reordered
 }
 
 const updateStudentOptimistically = (studentId: string, patch: Partial<Student>) => {
@@ -688,7 +690,7 @@ const handleUpdateStudentDetail = async (data: Partial<Student>) => {
 }
 
 // ── Kanban: university name/status handlers ──────────────────────────────
-const handleUpdateUniversityField = async (studentId: string, slot: 1 | 2, name: string) => {
+const handleUpdateUniversityField = async (studentId: string, slot: number, name: string) => {
   const field = `university_${slot}` as const
   updateStudentOptimistically(studentId, { [field]: name } as Partial<Student>)
   try {
@@ -700,12 +702,14 @@ const handleUpdateUniversityField = async (studentId: string, slot: 1 | 2, name:
   }
 }
 
-const handleUpdateUniversityStatus = async (studentId: string, slot: 1 | 2, status: string) => {
+const handleUpdateUniversityStatus = async (studentId: string, slot: number, status: string) => {
   const field = `university_${slot}_status` as const
   await quickUpdateWithRollback(
     studentId,
     { [field]: status } as Partial<Student>,
-    () => statusApi.quickUpdate(studentId, { [field]: status } as any),
+    () => slot <= 2
+      ? statusApi.quickUpdate(studentId, { [field]: status } as any)
+      : studentsApi.updateStudent(studentId, { [field]: status } as any),
     'Could not update university status. Please try again.',
   )
 }
