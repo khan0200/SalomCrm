@@ -28,6 +28,14 @@ if not exist "frontend\node_modules" (
     cd frontend && call npm install && cd ..
 )
 
+:: 4. Production bazaga SSH tunnel (127.0.0.1:15432 -> VPS Postgres)
+netstat -ano | findstr /C:"127.0.0.1:15432" | findstr LISTENING >nul
+if errorlevel 1 (
+    echo [INFO] Baza tuneli ochilmoqda...
+    start "DB Tunnel" /min venv\Scripts\python.exe scripts\db_tunnel.py
+    timeout /t 6 /nobreak >nul
+)
+
 echo [OK] Loyiha tayyor!
 echo   - Backend:  http://127.0.0.1:8000
 echo   - Frontend: http://localhost:3000
