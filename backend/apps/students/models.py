@@ -299,7 +299,8 @@ class Student(TenantAwareModel):
                 except Exception:
                     pass
 
-        # Sequential university slot compaction (no gaps allowed: e.g. deleting Uni 1 shifts Uni 2 to Uni 1)
+        # Keep university slots compact and put failed applications last.
+        # The slot numbers are display positions, not permanent university IDs.
         unis = []
         for i in range(1, 6):
             u_name = getattr(self, f'university_{i}', None)
@@ -309,6 +310,11 @@ class Student(TenantAwareModel):
                     'status': getattr(self, f'university_{i}_status', None) or 'Chosen',
                     'major': getattr(self, f'university_{i}_major', None) or None,
                 })
+
+        def is_failed(university):
+            return (university['status'] or '').strip().upper() in {'FAILED', 'REJECTED'}
+
+        unis.sort(key=is_failed)
 
         uni_fields_changed = False
         for i in range(1, 6):
@@ -900,4 +906,3 @@ class ContractAuditEvent(TimeStampedModel):
 
     def __str__(self):
         return f"[{self.action}] Contract {self.contract_id} by {self.actor_email or self.actor_type}"
-

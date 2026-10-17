@@ -52,6 +52,24 @@ class WorkflowStageTestCase(TestCase):
         student = self.make_student(university_1='Seoul Uni', university_1_status='Failed')
         self.assertEqual(compute_workflow_stage(student), 'student')
 
+    def test_failed_university_moves_after_active_universities(self):
+        student = self.make_student(
+            university_1='A University', university_1_status='Applied',
+            university_2='B University', university_2_status='Applied',
+            university_3='C University', university_3_status='Chosen',
+        )
+
+        student.university_1_status = 'Failed'
+        student.save()
+        student.refresh_from_db()
+
+        self.assertEqual(student.university_1, 'B University')
+        self.assertEqual(student.university_1_status, 'Applied')
+        self.assertEqual(student.university_2, 'C University')
+        self.assertEqual(student.university_2_status, 'Chosen')
+        self.assertEqual(student.university_3, 'A University')
+        self.assertEqual(student.university_3_status, 'Failed')
+
     def test_case_4_either_accepted_moves_to_invoice(self):
         student = self.make_student(
             university_1='Seoul Uni', university_1_status='Accepted',

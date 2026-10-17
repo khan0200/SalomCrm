@@ -505,6 +505,34 @@ const WORKFLOW_STAGE_FIELDS = new Set([
 
 const WORKFLOW_STAGE_LABEL = Object.fromEntries(WORKFLOW_STAGES.map(s => [s.key, s.label]))
 
+const reorderUniversities = (student: Student): Student => {
+  const universities = Array.from({ length: 5 }, (_, index) => {
+    const slot = index + 1
+    return {
+      name: student[`university_${slot}` as keyof Student] as string | null | undefined,
+      status: student[`university_${slot}_status` as keyof Student] as string | null | undefined,
+      major: student[`university_${slot}_major` as keyof Student] as string | null | undefined,
+    }
+  }).filter(university => university.name?.trim())
+
+  universities.sort((a, b) => {
+    const aFailed = ['FAILED', 'REJECTED'].includes((a.status || '').trim().toUpperCase())
+    const bFailed = ['FAILED', 'REJECTED'].includes((b.status || '').trim().toUpperCase())
+    return Number(aFailed) - Number(bFailed)
+  })
+
+  const reordered = { ...student } as Record<string, unknown>
+  for (let index = 0; index < 5; index++) {
+    const university = universities[index]
+    reordered[`university_${index + 1}`] = university?.name ?? null
+    reordered[`university_${index + 1}_status`] = university
+      ? (university.status || 'Chosen')
+      : (index === 0 ? 'Chosen' : null)
+    reordered[`university_${index + 1}_major`] = university?.major ?? null
+  }
+  return reordered as Student
+}
+
 const updateStudentOptimistically = (studentId: string, patch: Partial<Student>) => {
   const touchesWorkflowFields = Object.keys(patch).some(k => WORKFLOW_STAGE_FIELDS.has(k))
   const studentBefore = touchesWorkflowFields ? allStudents.value.find(s => s.id === studentId) : undefined
@@ -514,7 +542,9 @@ const updateStudentOptimistically = (studentId: string, patch: Partial<Student>)
     if (!old || !old.results) return old
     return {
       ...old,
-      results: old.results.map((s: Student) => s.id === studentId ? { ...s, ...patch } : s)
+      results: old.results.map((s: Student) => s.id === studentId
+        ? reorderUniversities({ ...s, ...patch })
+        : s)
     }
   })
 
@@ -525,7 +555,7 @@ const updateStudentOptimistically = (studentId: string, patch: Partial<Student>)
   // even though the roster update above and the server write had already
   // landed.
   queryClient.setQueryData(['student-detail', studentId], (old: Student | undefined) =>
-    old ? { ...old, ...patch } : old
+    old ? reorderUniversities({ ...old, ...patch }) : old
   )
 
   if (studentBefore && stageBefore) {
