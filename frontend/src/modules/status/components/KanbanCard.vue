@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { computed, ref, onMounted, onUnmounted } from 'vue'
+import { computed, ref, onMounted, onUnmounted, nextTick } from 'vue'
 import type { Student } from '@/types'
 import type { WorkflowStage } from '../utils/statusWorkflow'
 import { useAuthStore } from '@/stores/auth'
 import { useUniversityStatuses } from '@/composables/useUniversityStatuses'
-import { CheckCircle2, ArrowLeft, Eye, ChevronDown, ChevronUp } from 'lucide-vue-next'
+import { CheckCircle2, ArrowLeft, Eye, ChevronDown } from 'lucide-vue-next'
 
 const props = defineProps<{
   student: Student
@@ -36,6 +36,8 @@ const emit = defineEmits<{
 const authStore = useAuthStore()
 const { getStatusBadgeClass } = useUniversityStatuses()
 const cardRoot = ref<HTMLElement | null>(null)
+const cardBody = ref<HTMLElement | null>(null)
+const cardBodyHeight = ref('auto')
 const universitiesExpanded = ref(false)
 
 const getLevelBadgeClass = (level?: string | null) => {
@@ -102,15 +104,26 @@ const visibleUniversitySlots = computed(() =>
     : (chosenUniversitySlots.value.length > 0 ? [chosenUniversitySlots.value[0]] : [1])
 )
 
+const animateBodyHeight = async (expanded: boolean) => {
+  if (!cardBody.value) return
+  cardBodyHeight.value = `${cardBody.value.scrollHeight}px`
+  universitiesExpanded.value = expanded
+  await nextTick()
+  cardBodyHeight.value = `${cardBody.value.scrollHeight}px`
+  window.setTimeout(() => {
+    if (universitiesExpanded.value === expanded) cardBodyHeight.value = 'auto'
+  }, 600)
+}
+
 const toggleUniversities = () => {
   if (chosenUniversitySlots.value.length > 1) {
-    universitiesExpanded.value = !universitiesExpanded.value
+    void animateBodyHeight(!universitiesExpanded.value)
   }
 }
 
 const closeUniversitiesOnOutsideClick = (event: MouseEvent) => {
   if (cardRoot.value && !cardRoot.value.contains(event.target as Node)) {
-    universitiesExpanded.value = false
+    if (universitiesExpanded.value) void animateBodyHeight(false)
   }
 }
 
@@ -263,6 +276,11 @@ const confirmRevertToCoa = () => {
     </div>
 
     <!-- Stage-specific body -->
+    <div
+      ref="cardBody"
+      class="overflow-hidden"
+      :style="{ height: cardBodyHeight, transition: 'height 560ms cubic-bezier(0.22, 1, 0.36, 1)' }"
+    >
     <div class="flex flex-col gap-1.5" @click.stop>
       <!-- STUDENT: university selector + Not Applied/Applied -->
       <template v-if="stageKey === 'student'">
@@ -291,35 +309,6 @@ const confirmRevertToCoa = () => {
         </div>
         </TransitionGroup>
       </template>
-
-      <style scoped>
-      .university-row-enter-active,
-      .university-row-leave-active {
-        transition:
-          opacity 450ms cubic-bezier(0.22, 1, 0.36, 1),
-          transform 500ms cubic-bezier(0.22, 1, 0.36, 1),
-          max-height 500ms cubic-bezier(0.22, 1, 0.36, 1);
-        overflow: hidden;
-      }
-
-      .university-row-enter-from,
-      .university-row-leave-to {
-        opacity: 0;
-        transform: translateY(-12px) scaleY(0.86);
-        max-height: 0;
-      }
-
-      .university-row-enter-to,
-      .university-row-leave-from {
-        opacity: 1;
-        transform: translateY(0) scaleY(1);
-        max-height: 40px;
-      }
-
-      .university-row-move {
-        transition: transform 500ms cubic-bezier(0.22, 1, 0.36, 1);
-      }
-      </style>
 
       <!-- APPLY: both slots, full status range. Empty slot gets a university
            name picker (same as Student column) instead of just a label,
@@ -549,5 +538,35 @@ const confirmRevertToCoa = () => {
         />
       </button>
     </div>
+    </div>
   </div>
 </template>
+
+<style scoped>
+.university-row-enter-active,
+.university-row-leave-active {
+  transition:
+    opacity 450ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 500ms cubic-bezier(0.22, 1, 0.36, 1),
+    max-height 500ms cubic-bezier(0.22, 1, 0.36, 1);
+  overflow: hidden;
+}
+
+.university-row-enter-from,
+.university-row-leave-to {
+  opacity: 0;
+  transform: translateY(-12px) scaleY(0.86);
+  max-height: 0;
+}
+
+.university-row-enter-to,
+.university-row-leave-from {
+  opacity: 1;
+  transform: translateY(0) scaleY(1);
+  max-height: 40px;
+}
+
+.university-row-move {
+  transition: transform 500ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+</style>
