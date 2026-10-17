@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { computed, ref, onMounted, onUnmounted, nextTick } from 'vue'
+import { computed, ref, onMounted, onUnmounted } from 'vue'
 import type { Student } from '@/types'
 import type { WorkflowStage } from '../utils/statusWorkflow'
 import { useAuthStore } from '@/stores/auth'
 import { useUniversityStatuses } from '@/composables/useUniversityStatuses'
-import { CheckCircle2, ArrowLeft, Eye, ChevronDown } from 'lucide-vue-next'
+import { CheckCircle2, ArrowLeft, Eye, ChevronDown, GraduationCap } from 'lucide-vue-next'
 
 const props = defineProps<{
   student: Student
@@ -36,8 +36,6 @@ const emit = defineEmits<{
 const authStore = useAuthStore()
 const { getStatusBadgeClass } = useUniversityStatuses()
 const cardRoot = ref<HTMLElement | null>(null)
-const cardBody = ref<HTMLElement | null>(null)
-const cardBodyHeight = ref('auto')
 const universitiesExpanded = ref(false)
 
 const getLevelBadgeClass = (level?: string | null) => {
@@ -104,26 +102,17 @@ const visibleUniversitySlots = computed(() =>
     : (chosenUniversitySlots.value.length > 0 ? [chosenUniversitySlots.value[0]] : [1])
 )
 
-const animateBodyHeight = async (expanded: boolean) => {
-  if (!cardBody.value) return
-  cardBodyHeight.value = `${cardBody.value.scrollHeight}px`
-  universitiesExpanded.value = expanded
-  await nextTick()
-  cardBodyHeight.value = `${cardBody.value.scrollHeight}px`
-  window.setTimeout(() => {
-    if (universitiesExpanded.value === expanded) cardBodyHeight.value = 'auto'
-  }, 600)
-}
-
+// The card height follows the university rows' own enter/leave transition
+// (max-height), so the body keeps `height: auto` and the arrow is never clipped.
 const toggleUniversities = () => {
   if (chosenUniversitySlots.value.length > 1) {
-    void animateBodyHeight(!universitiesExpanded.value)
+    universitiesExpanded.value = !universitiesExpanded.value
   }
 }
 
 const closeUniversitiesOnOutsideClick = (event: MouseEvent) => {
   if (cardRoot.value && !cardRoot.value.contains(event.target as Node)) {
-    if (universitiesExpanded.value) void animateBodyHeight(false)
+    universitiesExpanded.value = false
   }
 }
 
@@ -209,10 +198,10 @@ const stageCardClass = computed(() => {
   
   const baseBg = 'bg-white dark:bg-zinc-900'
   switch (props.stageKey) {
-    case 'student': return `border-zinc-400 dark:border-zinc-500 ${baseBg}`
-    case 'apply': return `border-blue-500 dark:border-blue-400 ${baseBg}`
-    case 'invoice': return `border-violet-500 dark:border-violet-400 ${baseBg}`
-    case 'coa': return `border-amber-500 dark:border-amber-400 ${baseBg}`
+    case 'student': return `border-zinc-300/70 dark:border-zinc-700 ${baseBg}`
+    case 'apply': return `border-blue-500/35 dark:border-blue-400/30 ${baseBg}`
+    case 'invoice': return `border-violet-500/35 dark:border-violet-400/30 ${baseBg}`
+    case 'coa': return `border-amber-500/40 dark:border-amber-400/30 ${baseBg}`
     default: return `border-zinc-200/80 dark:border-zinc-700/80 ${baseBg}`
   }
 })
@@ -230,26 +219,35 @@ const confirmRevertToCoa = () => {
 <template>
   <div
     ref="cardRoot"
-    class="group rounded-xl border border-dashed p-2.5 shadow-sm hover:shadow-lg transition-all duration-200 cursor-pointer"
+    class="group rounded-2xl border p-2.5 shadow-[0_1px_2px_rgb(0_0_0/0.04)] hover:shadow-[0_6px_20px_-6px_rgb(0_0_0/0.15)] transition-[box-shadow,transform] duration-200 cursor-pointer"
     :class="stageCardClass"
     @click="handleCardClick"
     @contextmenu="handleContextMenu"
   >
-    <!-- Shared header: ID, name, level, cert -->
-    <div class="flex items-center gap-1.5 mb-2 min-w-0">
-      <span class="text-[9px] font-extrabold bg-[#087cff] text-white px-1.5 py-0.5 rounded-md shrink-0 shadow-xs">
+    <!-- Header: ID + name, details button -->
+    <div class="flex items-center gap-1.5 mb-1.5 min-w-0">
+      <span class="text-[9px] font-bold tabular-nums text-[#087cff] bg-[#087cff]/10 px-1.5 py-0.5 rounded-md shrink-0">
         {{ student.id }}
       </span>
-      <span class="text-[10.5px] font-extrabold uppercase tracking-wide text-zinc-900 dark:text-zinc-100 truncate leading-tight">
+      <span class="flex-1 min-w-0 text-[10.5px] font-semibold uppercase tracking-tight text-zinc-900 dark:text-zinc-100 truncate leading-tight">
         {{ student.full_name }}
       </span>
+      <button
+        type="button"
+        title="View student details"
+        @click.stop="emit('open-detail')"
+        class="flex items-center justify-center w-5 h-5 -mr-0.5 rounded-full text-zinc-400 dark:text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer shrink-0"
+      >
+        <Eye class="w-3.5 h-3.5" />
+      </button>
     </div>
 
-    <div class="flex items-center justify-between gap-1 mb-2.5">
-      <div class="flex flex-wrap items-center gap-1.5 min-w-0">
+    <!-- Meta: level/cert badges + universities toggle (replaces the old bottom arrow) -->
+    <div class="flex items-center justify-between gap-1 mb-2">
+      <div class="flex flex-wrap items-center gap-1 min-w-0">
         <span
           v-if="student.level"
-          class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[8px] font-extrabold uppercase tracking-wide shadow-2xs"
+          class="inline-flex items-center px-1.5 py-px rounded-full text-[8px] font-bold uppercase tracking-wide"
           :class="getLevelBadgeClass(student.level)"
         >
           {{ student.level }}
@@ -257,30 +255,37 @@ const confirmRevertToCoa = () => {
         <span
           v-for="(cert, idx) in certs"
           :key="`${cert.type}-${idx}`"
-          class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[8px] font-extrabold shadow-2xs"
-          :class="cert.type === 'TOPIK' ? 'bg-rose-500 text-white' : 'bg-blue-600 text-white'"
+          class="inline-flex items-center gap-0.5 px-1.5 py-px rounded-full text-[8px] font-bold"
+          :class="cert.type === 'TOPIK'
+            ? 'bg-rose-500/10 text-rose-600 dark:bg-rose-400/15 dark:text-rose-300'
+            : 'bg-blue-500/10 text-blue-600 dark:bg-blue-400/15 dark:text-blue-300'"
         >
           <span>{{ cert.type }}</span>
-          <span v-if="cert.score" class="opacity-90 font-mono">({{ cert.score }})</span>
+          <span v-if="cert.score" class="opacity-80 tabular-nums">{{ cert.score }}</span>
         </span>
         <span v-if="!student.level && certs.length === 0" class="text-[9px] text-zinc-400 dark:text-zinc-500">—</span>
       </div>
       <button
+        v-if="chosenUniversitySlots.length > 1"
         type="button"
-        title="View student details"
-        @click.stop="emit('open-detail')"
-        class="flex items-center justify-center w-5 h-5 rounded-full text-zinc-400 dark:text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer shrink-0"
+        :title="universitiesExpanded ? 'Hide universities' : 'Show all universities'"
+        @click.stop="toggleUniversities"
+        class="flex items-center gap-0.5 h-4 pl-1.5 pr-1 rounded-full text-[8.5px] font-semibold tabular-nums transition-colors cursor-pointer shrink-0"
+        :class="universitiesExpanded
+          ? 'bg-[#087cff]/10 text-[#087cff]'
+          : 'bg-zinc-100 text-zinc-500 hover:text-zinc-700 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200'"
       >
-        <Eye class="w-3.5 h-3.5" />
+        <GraduationCap class="w-3 h-3" />
+        {{ chosenUniversitySlots.length }}
+        <ChevronDown
+          class="w-3 h-3 transition-transform duration-300 ease-out"
+          :class="universitiesExpanded ? 'rotate-180' : 'rotate-0'"
+        />
       </button>
     </div>
 
     <!-- Stage-specific body -->
-    <div
-      ref="cardBody"
-      class="overflow-hidden -mx-0.5"
-      :style="{ height: cardBodyHeight, transition: 'height 560ms cubic-bezier(0.22, 1, 0.36, 1)' }"
-    >
+    <div class="overflow-hidden -mx-0.5">
     <div class="flex flex-col gap-1.5" @click.stop>
       <!-- STUDENT: university selector + Not Applied/Applied -->
       <template v-if="stageKey === 'student'">
@@ -524,31 +529,22 @@ const confirmRevertToCoa = () => {
           </button>
         </div>
       </template>
-
-      <button
-        v-if="chosenUniversitySlots.length > 1"
-        type="button"
-        :title="universitiesExpanded ? 'Hide universities' : 'Show all universities'"
-        @click.stop="toggleUniversities"
-        class="self-center flex items-center justify-center w-6 h-4 rounded-full text-zinc-400 dark:text-zinc-500 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
-      >
-        <ChevronDown
-          class="w-3.5 h-3.5 transition-transform duration-500 ease-out"
-          :class="universitiesExpanded ? 'rotate-180' : 'rotate-0'"
-        />
-      </button>
     </div>
     </div>
   </div>
 </template>
 
 <style scoped>
-.university-row-enter-active,
-.university-row-leave-active {
+/* Doubled class so this wins over .university-card-row's own `transition` below. */
+.university-card-row.university-row-enter-active,
+.university-card-row.university-row-leave-active {
   transition:
     opacity 450ms cubic-bezier(0.22, 1, 0.36, 1),
     transform 500ms cubic-bezier(0.22, 1, 0.36, 1),
-    max-height 500ms cubic-bezier(0.22, 1, 0.36, 1);
+    max-height 500ms cubic-bezier(0.22, 1, 0.36, 1),
+    min-height 500ms cubic-bezier(0.22, 1, 0.36, 1),
+    margin-top 500ms cubic-bezier(0.22, 1, 0.36, 1),
+    padding 500ms cubic-bezier(0.22, 1, 0.36, 1);
   overflow: hidden;
 }
 
@@ -557,6 +553,9 @@ const confirmRevertToCoa = () => {
   opacity: 0;
   transform: translateY(-12px) scaleY(0.86);
   max-height: 0;
+  min-height: 0;
+  padding-top: 0;
+  padding-bottom: 0;
 }
 
 .university-row-enter-to,
@@ -564,6 +563,13 @@ const confirmRevertToCoa = () => {
   opacity: 1;
   transform: translateY(0) scaleY(1);
   max-height: 40px;
+}
+
+/* Cancel the flex gap above a row while it is collapsed, so the card
+   doesn't jump by the gap size when the row is added/removed. */
+.university-row-enter-from:not(:first-child),
+.university-row-leave-to:not(:first-child) {
+  margin-top: -0.375rem;
 }
 
 .university-row-move {
