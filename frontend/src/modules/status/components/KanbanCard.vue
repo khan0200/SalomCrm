@@ -295,14 +295,17 @@ const confirmRevertToCoa = () => {
       <style scoped>
       .university-row-enter-active,
       .university-row-leave-active {
-        transition: opacity 180ms ease, transform 220ms ease, max-height 220ms ease;
+        transition:
+          opacity 450ms cubic-bezier(0.22, 1, 0.36, 1),
+          transform 500ms cubic-bezier(0.22, 1, 0.36, 1),
+          max-height 500ms cubic-bezier(0.22, 1, 0.36, 1);
         overflow: hidden;
       }
 
       .university-row-enter-from,
       .university-row-leave-to {
         opacity: 0;
-        transform: translateY(-6px) scaleY(0.92);
+        transform: translateY(-12px) scaleY(0.86);
         max-height: 0;
       }
 
@@ -310,11 +313,11 @@ const confirmRevertToCoa = () => {
       .university-row-leave-from {
         opacity: 1;
         transform: translateY(0) scaleY(1);
-        max-height: 32px;
+        max-height: 40px;
       }
 
       .university-row-move {
-        transition: transform 220ms ease;
+        transition: transform 500ms cubic-bezier(0.22, 1, 0.36, 1);
       }
       </style>
 
@@ -540,8 +543,10 @@ const confirmRevertToCoa = () => {
         @click.stop="toggleUniversities"
         class="self-center flex items-center justify-center w-6 h-4 rounded-full text-zinc-400 dark:text-zinc-500 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
       >
-        <ChevronUp v-if="universitiesExpanded" class="w-3.5 h-3.5" />
-        <ChevronDown v-else class="w-3.5 h-3.5" />
+        <ChevronDown
+          class="w-3.5 h-3.5 transition-transform duration-500 ease-out"
+          :class="universitiesExpanded ? 'rotate-180' : 'rotate-0'"
+        />
       </button>
     </div>
   </div>
