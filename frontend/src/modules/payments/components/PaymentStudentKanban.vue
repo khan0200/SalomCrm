@@ -32,8 +32,8 @@ const hasAnyPaymentHistory = (s: Student) => {
 
 type ColumnKey = 'new' | 'debtor' | 'full' | 'b2b'
 
-// Card border matches the Status module's Kanban card style (border-2
-// border-dashed, colored per column) instead of a plain thin border. The
+// Card border matches the Status module's Kanban card style (1.5px dashed,
+// colored per column) instead of a plain thin border. The
 // column shell itself also gets a colored border (not just zinc-200/800)
 // since the columns otherwise blend into one continuous table at a glance.
 const COLUMNS: { key: ColumnKey; label: string; headerClass: string; countClass: string; cardBorderClass: string; columnBorderClass: string }[] = [
@@ -109,7 +109,7 @@ const columnFlexClass = (key: ColumnKey) => {
               :key="student.id"
               type="button"
               @click="emit('open-add-payment', student.id)"
-              class="text-left rounded-xl border-2 border-dashed bg-white dark:bg-zinc-900 p-2 shadow-md hover:shadow-lg transition-all cursor-pointer w-full group"
+              class="kanban-card text-left rounded-md border border-dashed bg-white dark:bg-zinc-900 p-2 shadow-md hover:shadow-lg transition-all cursor-pointer w-full group"
               :class="col.cardBorderClass"
             >
               <!-- Name + Archive badge -->
@@ -197,3 +197,11 @@ const columnFlexClass = (key: ColumnKey) => {
     </div>
   </div>
 </template>
+
+<style scoped>
+/* Dashed outline sits between Tailwind's 1px and 2px steps - matches the
+   Status module's Kanban card, which uses the same 1.5px rule. */
+.kanban-card {
+  border-width: 1.5px;
+}
+</style>
