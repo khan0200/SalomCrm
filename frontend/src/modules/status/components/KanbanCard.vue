@@ -178,15 +178,15 @@ const visaCoaSelectTitle = computed(() => isVisaActive('APPLIED') ? 'Applied' : 
 
 const visaCardClass = computed(() => {
   if (isVisaActive('APPROVED')) {
-    return 'border-emerald-300 dark:border-emerald-800 bg-emerald-50/60 dark:bg-emerald-950/30'
+    return 'border-emerald-400 dark:border-emerald-600 bg-emerald-50/60 dark:bg-emerald-950/30'
   }
   if (isVisaActive('REJECTED')) {
-    return 'border-rose-300 dark:border-rose-800 bg-rose-50/60 dark:bg-rose-950/30'
+    return 'border-rose-400 dark:border-rose-600 bg-rose-50/60 dark:bg-rose-950/30'
   }
   if (isVisaActive('APPLIED')) {
-    return 'border-blue-300 dark:border-blue-800 bg-blue-50/60 dark:bg-blue-950/30'
+    return 'border-sky-400 dark:border-sky-600 bg-sky-50/60 dark:bg-sky-950/30'
   }
-  return 'border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900'
+  return 'border-teal-400/70 dark:border-teal-500/60 bg-white dark:bg-zinc-900'
 })
 
 const handleSetVisaStatus = (status: 'APPLIED' | 'APPROVED' | 'REJECTED') => {
@@ -198,11 +198,11 @@ const stageCardClass = computed(() => {
   
   const baseBg = 'bg-white dark:bg-zinc-900'
   switch (props.stageKey) {
-    case 'student': return `border-zinc-300/70 dark:border-zinc-700 ${baseBg}`
-    case 'apply': return `border-blue-500/35 dark:border-blue-400/30 ${baseBg}`
-    case 'invoice': return `border-violet-500/35 dark:border-violet-400/30 ${baseBg}`
-    case 'coa': return `border-amber-500/40 dark:border-amber-400/30 ${baseBg}`
-    default: return `border-zinc-200/80 dark:border-zinc-700/80 ${baseBg}`
+    case 'student': return `border-zinc-400/80 dark:border-zinc-600 ${baseBg}`
+    case 'apply': return `border-blue-500/60 dark:border-blue-400/50 ${baseBg}`
+    case 'invoice': return `border-violet-500/60 dark:border-violet-400/50 ${baseBg}`
+    case 'coa': return `border-amber-500/70 dark:border-amber-400/55 ${baseBg}`
+    default: return `border-zinc-300 dark:border-zinc-700 ${baseBg}`
   }
 })
 
@@ -219,7 +219,7 @@ const confirmRevertToCoa = () => {
 <template>
   <div
     ref="cardRoot"
-    class="group rounded-2xl border p-2.5 shadow-[0_1px_2px_rgb(0_0_0/0.04)] hover:shadow-[0_6px_20px_-6px_rgb(0_0_0/0.15)] transition-[box-shadow,transform] duration-200 cursor-pointer"
+    class="group rounded-2xl border border-dashed p-2.5 shadow-[0_1px_2px_rgb(0_0_0/0.04)] hover:shadow-[0_6px_20px_-6px_rgb(0_0_0/0.15)] transition-[box-shadow,transform] duration-200 cursor-pointer"
     :class="stageCardClass"
     @click="handleCardClick"
     @contextmenu="handleContextMenu"
