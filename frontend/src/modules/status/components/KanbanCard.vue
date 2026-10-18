@@ -219,7 +219,7 @@ const confirmRevertToCoa = () => {
 <template>
   <div
     ref="cardRoot"
-    class="group rounded-2xl border border-dashed p-2.5 shadow-[0_1px_2px_rgb(0_0_0/0.04)] hover:shadow-[0_6px_20px_-6px_rgb(0_0_0/0.15)] transition-[box-shadow,transform] duration-200 cursor-pointer"
+    class="kanban-card group rounded-2xl border border-dashed p-2.5 shadow-[0_1px_3px_rgb(0_0_0/0.05)] hover:shadow-[0_8px_22px_-6px_rgb(0_0_0/0.19)] transition-[box-shadow,transform] duration-200 cursor-pointer"
     :class="stageCardClass"
     @click="handleCardClick"
     @contextmenu="handleContextMenu"
@@ -574,6 +574,12 @@ const confirmRevertToCoa = () => {
 
 .university-row-move {
   transition: transform 500ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Dashed outline sits ~20% heavier than the default 1px hairline so the
+   dashes stay readable at the card's small scale. */
+.kanban-card {
+  border-width: 1.2px;
 }
 
 .university-card-row {
