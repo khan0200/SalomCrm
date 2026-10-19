@@ -112,6 +112,41 @@ class StudentDetailSerializer(MyPreferenceFieldsMixin, serializers.ModelSerializ
 
 
 
+# Fields whose edit date is never shown in the drawer, so stamping them would
+# just bloat the JSON: bookkeeping flags, computed columns and the stamp itself.
+FIELD_STAMP_EXCLUDE = {
+    'id', 'tenant', 'created_by', 'created_at', 'updated_at',
+    'field_updated_at', 'balance', 'discount', 'payment_id', 'workflow_stage',
+    'is_deleted', 'is_permanently_deleted', 'permanently_deleted_at',
+    'jarayon_updated_at', 'status_hidden', 'row_color', 'folder_ids',
+}
+
+
+def stamp_changed_fields(instance, validated_data):
+    """
+    Record today's date against each field whose value actually changes.
+
+    Returns the updated mapping, or None when nothing tracked changed - the
+    caller skips writing field_updated_at entirely in that case so a no-op
+    PATCH never rewrites the column. Comparison is against the in-memory
+    instance, which still holds the pre-save values at call time.
+    """
+    from django.utils import timezone
+
+    today = timezone.localdate().isoformat()
+    stamps = dict(instance.field_updated_at or {})
+    touched = False
+
+    for attr, value in validated_data.items():
+        if attr in FIELD_STAMP_EXCLUDE:
+            continue
+        if value != getattr(instance, attr, None):
+            stamps[attr] = today
+            touched = True
+
+    return stamps if touched else None
+
+
 class StudentCreateUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Student
@@ -208,6 +243,13 @@ class StudentCreateUpdateSerializer(serializers.ModelSerializer):
         # Since payments now FK to the immutable payment_id field (not id),
         # we can safely rename id via raw SQL UPDATE — no cascade, no SET_NULL,
         # no payment re-linking needed at all.
+        # Stamp per-field edit dates before any value is copied onto the
+        # instance - once setattr runs, the old values are gone and nothing
+        # can be compared against.
+        new_stamps = stamp_changed_fields(instance, validated_data)
+        if new_stamps is not None:
+            validated_data['field_updated_at'] = new_stamps
+
         raw_new_id = validated_data.get('id')
         old_id = instance.pk
         if raw_new_id and str(raw_new_id).strip().upper() != str(old_id).strip().upper():

@@ -217,6 +217,12 @@ class Student(TenantAwareModel):
     google_drive_url = models.URLField(max_length=500, blank=True, null=True)
     google_drive_folder_id = models.CharField(max_length=255, blank=True, null=True)
     jarayon_updated_at = models.DateTimeField(blank=True, null=True)
+    # Per-field edit dates, as {"<field_name>": "YYYY-MM-DD"}. The drawer shows
+    # these as ghost timestamps so staff can tell fresh data from stale. Only
+    # keys that have actually been edited are present - a missing key means
+    # "never edited since tracking began" and renders blank rather than
+    # guessing a date from created_at.
+    field_updated_at = models.JSONField(default=dict, blank=True)
     created_by = models.ForeignKey(
         'authentication.User',
         on_delete=models.SET_NULL,
