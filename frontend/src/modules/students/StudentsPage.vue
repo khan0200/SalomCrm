@@ -332,6 +332,15 @@ const createStudentMutation = useMutation({
   }
 })
 
+// Mirrors FIELD_STAMP_EXCLUDE in apps/students/serializers.py - bookkeeping
+// and computed columns that never carry a user-visible "Updated at" date.
+const FIELD_STAMP_EXCLUDE = new Set([
+  'tenant', 'created_by', 'created_at', 'updated_at', 'field_updated_at',
+  'balance', 'discount', 'payment_id', 'workflow_stage', 'is_deleted',
+  'is_permanently_deleted', 'permanently_deleted_at', 'jarayon_updated_at',
+  'status_hidden', 'row_color', 'folder_ids',
+])
+
 const updateStudentMutation = useMutation({
   mutationFn: (data: Partial<Student>) => {
     if (!selectedDetailStudentId.value) throw new Error('No student selected')
@@ -341,6 +350,18 @@ const updateStudentMutation = useMutation({
     if (selectedDetailStudentId.value) {
       updateMasterStudentOptimistically(selectedDetailStudentId.value, s => {
         const merged = { ...s, ...data }
+        // Stamp the per-field edit dates locally so the drawer's "Updated at"
+        // ghost text appears the moment the user saves, instead of waiting a
+        // few seconds for the PATCH to come back. The server recomputes the
+        // same thing authoritatively and onSuccess overwrites this with its
+        // response, so a failed request simply rolls back with the value.
+        const today = new Date().toLocaleDateString('en-CA')
+        const stamps = { ...((s as any).field_updated_at || {}) }
+        for (const key of Object.keys(data)) {
+          if (FIELD_STAMP_EXCLUDE.has(key)) continue
+          if ((data as any)[key] !== (s as any)[key]) stamps[key] = today
+        }
+        ;(merged as any).field_updated_at = stamps
         // Assigning/changing a tariff moves debt onto balance server-side
         // (balance = -tariff_price + existing payments/discounts/withdrawals).
         // Estimate that same shift here so the optimistic patch is never a
