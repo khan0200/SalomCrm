@@ -400,7 +400,7 @@ class UniversityStatusOptionSerializer(serializers.ModelSerializer):
     class Meta:
         from .models import UniversityStatusOption
         model = UniversityStatusOption
-        fields = ('id', 'name', 'color_class', 'created_at')
+        fields = ('id', 'name', 'color_class', 'sort_priority', 'created_at')
         read_only_fields = ('id', 'created_at')
 
 

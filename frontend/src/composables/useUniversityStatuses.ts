@@ -28,6 +28,21 @@ export interface UniversityStatusItem {
   id: string
   name: string
   color_class?: string
+  sort_priority?: number
+}
+
+// Mirrors UniversityStatusOption.sort_priority's model default: an unknown
+// or newly added status ranks mid-pack rather than jumping above Accepted or
+// sinking below Failed.
+export const DEFAULT_SORT_PRIORITY = 50
+
+// Used only until the registry loads, so a first paint still ranks sensibly
+// instead of flashing slot order. The server values win once fetched.
+const FALLBACK_PRIORITIES: Record<string, number> = {
+  ACCEPTED: 1,
+  APPLIED: 2,
+  CHOSEN: 3,
+  FAILED: 99,
 }
 
 const statusesRegistry = ref<UniversityStatusItem[]>([])
@@ -39,7 +54,8 @@ export function useUniversityStatuses() {
       ? data.map((item: any) => ({
           id: String(item.id),
           name: item.name,
-          color_class: item.color_class || 'blue'
+          color_class: item.color_class || 'blue',
+          sort_priority: typeof item.sort_priority === 'number' ? item.sort_priority : DEFAULT_SORT_PRIORITY
         }))
       : []
     isFetched = true
@@ -88,7 +104,6 @@ export function useUniversityStatuses() {
     const norm = statusNameOrColor.trim().toUpperCase()
     if (norm === 'ACCEPTED' || norm === 'FINISHED' || norm === 'ADMITTED') return resolveColor('emerald')
     if (norm === 'FAILED' || norm === 'REJECTED') return resolveColor('rose')
-    if (norm === 'APPLYING') return resolveColor('amber')
     if (norm === 'APPLIED') return resolveColor('orange')
     if (norm === 'CHOSEN') return resolveColor('blue')
     return STATUS_COLOR_OPTIONS[0]
@@ -102,9 +117,35 @@ export function useUniversityStatuses() {
     return getStatusColorOption(statusNameOrColor).badgeClass
   }
 
+  // Rank for one status name. Falls back to the built-in table before the
+  // registry loads, then to the mid-pack default for custom statuses.
+  const getStatusPriority = (statusName?: string | null): number => {
+    const norm = (statusName || '').trim().toUpperCase()
+    if (!norm) return DEFAULT_SORT_PRIORITY
+    const item = getStatusItem(norm)
+    if (item && typeof item.sort_priority === 'number') return item.sort_priority
+    return FALLBACK_PRIORITIES[norm] ?? DEFAULT_SORT_PRIORITY
+  }
+
+  // Order a student's university slots for display: by status rank first,
+  // slot number second. The slot number tiebreak is what keeps universities
+  // sharing a status in their existing order instead of shuffling. Returns
+  // slot numbers only - the stored university_N columns are never reordered,
+  // so editing and gap-compaction keep working off a stable identity.
+  const sortUniversitySlots = (
+    slots: number[],
+    statusOf: (slot: number) => string | null | undefined
+  ): number[] =>
+    [...slots].sort((a, b) => {
+      const diff = getStatusPriority(statusOf(a)) - getStatusPriority(statusOf(b))
+      return diff !== 0 ? diff : a - b
+    })
+
   return {
     statusesRegistry,
     setStatuses,
+    getStatusPriority,
+    sortUniversitySlots,
     fetchStatuses,
     resolveColor,
     getStatusItem,

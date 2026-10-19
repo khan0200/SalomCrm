@@ -34,7 +34,7 @@ const emit = defineEmits<{
 }>()
 
 const authStore = useAuthStore()
-const { getStatusBadgeClass } = useUniversityStatuses()
+const { getStatusBadgeClass, sortUniversitySlots } = useUniversityStatuses()
 const cardRoot = ref<HTMLElement | null>(null)
 const universitiesExpanded = ref(false)
 
@@ -77,7 +77,7 @@ const handleContextMenu = (e: MouseEvent) => {
 // so the Kanban dropdowns always match whatever a manager configured there
 // instead of a hardcoded list. Falls back to the original defaults only if
 // Settings has no options configured yet.
-const FALLBACK_STATUS_OPTIONS = ['Chosen', 'Applying', 'Applied', 'Accepted', 'Failed']
+const FALLBACK_STATUS_OPTIONS = ['Accepted', 'Applied', 'Chosen', 'Failed']
 const statusOptions = computed(() =>
   props.universityStatusOptions.length > 0 ? props.universityStatusOptions : FALLBACK_STATUS_OPTIONS
 )
@@ -88,12 +88,19 @@ const uniStatus = (slot: number) => {
   return val && val.trim() ? val : 'Not Applied'
 }
 
+// Ordered by status rank, not slot number: the collapsed card shows only the
+// first entry, so an Accepted or Applied university must lead rather than
+// whichever happens to sit in university_1. Universities sharing a status keep
+// their slot order.
 const chosenUniversitySlots = computed(() =>
-  Array.from({ length: 5 }, (_, index) => index + 1)
-    .filter(slot => {
-      const name = (props.student as any)[`university_${slot}`]
-      return typeof name === 'string' && name.trim()
-    })
+  sortUniversitySlots(
+    Array.from({ length: 5 }, (_, index) => index + 1)
+      .filter(slot => {
+        const name = (props.student as any)[`university_${slot}`]
+        return typeof name === 'string' && name.trim()
+      }),
+    slot => (props.student as any)[`university_${slot}_status`]
+  )
 )
 
 const visibleUniversitySlots = computed(() =>

@@ -970,6 +970,12 @@ class UniversityStatusOptionViewSet(BaseOptionViewSet):
     model_class = UniversityStatusOption
     serializer_class = UniversityStatusOptionSerializer
 
+    def get_queryset(self):
+        # BaseOptionViewSet sorts every option list alphabetically; these
+        # statuses are ranked instead, so the client receives them already
+        # in priority order (Accepted -> Applied -> Chosen -> Failed).
+        return super().get_queryset().order_by('sort_priority', 'name')
+
 
 class TagOptionViewSet(BaseOptionViewSet):
     model_class = TagOption

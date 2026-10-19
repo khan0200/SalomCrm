@@ -23,6 +23,8 @@ export interface UniversityStatusOption {
   id: string
   name: string
   color_class: string
+  /** Display rank for a student's universities; lowest sorts first. */
+  sort_priority?: number
   created_at?: string
 }
 
@@ -157,11 +159,11 @@ export const settingsApi = {
     const res = await apiClient.get('/university-statuses/')
     return Array.isArray(res.data) ? res.data : (res.data?.results || [])
   },
-  createUniversityStatus: async (data: { name: string; color_class?: string }): Promise<UniversityStatusOption> => {
+  createUniversityStatus: async (data: { name: string; color_class?: string; sort_priority?: number }): Promise<UniversityStatusOption> => {
     const res = await apiClient.post('/university-statuses/', data)
     return res.data
   },
-  updateUniversityStatus: async (id: string, data: { name: string; color_class?: string }): Promise<UniversityStatusOption> => {
+  updateUniversityStatus: async (id: string, data: { name?: string; color_class?: string; sort_priority?: number }): Promise<UniversityStatusOption> => {
     const res = await apiClient.patch(`/university-statuses/${id}/`, data)
     return res.data
   },

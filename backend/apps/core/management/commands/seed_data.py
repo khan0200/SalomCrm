@@ -135,7 +135,6 @@ class Command(BaseCommand):
 
         statuses = [
             ('Chosen', 'text-blue-500'),
-            ('Applying', 'text-amber-500'),
             ('Applied', 'text-purple-500'),
             ('Waiting', 'text-orange-500'),
             ('Accepted', 'text-emerald-500'),
@@ -316,7 +315,7 @@ class Command(BaseCommand):
                 'language_certificate': 'NO CERTIFICATE',
                 'certificate_score': None,
                 'university_1': 'YEUNGNAM UNIVERSITY',
-                'university_1_status': 'Applying',
+                'university_1_status': 'Applied',
                 'office': 'TOSHKENT OFFIS',
                 'student_group': 'Fast Track',
                 'lead_by': 'Telegram',

@@ -3,6 +3,8 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import {
   Tag,
+  ArrowUp,
+  ArrowDown,
   GraduationCap,
   Users,
   Contact,
@@ -480,6 +482,54 @@ const filteredPaymentMethods = computed(() => paymentMethods.value.filter(p => p
 const filteredPaymentReceivers = computed(() => paymentReceivers.value.filter(p => p.name.toLowerCase().includes(query.value)))
 const filteredPaymentNoteTemplates = computed(() => paymentNoteTemplates.value.filter(p => p.name.toLowerCase().includes(query.value)))
 const filteredUniversityStatuses = computed(() => universityStatuses.value.filter(u => u.name.toLowerCase().includes(query.value)))
+
+// Statuses arrive already ranked by the API. Moving one swaps its rank with
+// its neighbour's, so the list stays a clean sequence and both rows are
+// persisted. The rank drives how a student's universities are ordered in the
+// detail drawer and on the Status kanban, where a collapsed card shows only
+// the top one.
+const isReorderingStatus = ref(false)
+const moveUniversityStatus = async (id: string, direction: -1 | 1) => {
+  if (isReorderingStatus.value) return
+  const list = universityStatuses.value
+  const index = list.findIndex(s => String(s.id) === String(id))
+  const target = index + direction
+  if (index === -1 || target < 0 || target >= list.length) return
+
+  const current = list[index]
+  const neighbour = list[target]
+  const currentRank = typeof current.sort_priority === 'number' ? current.sort_priority : 50
+  const neighbourRank = typeof neighbour.sort_priority === 'number' ? neighbour.sort_priority : 50
+  // Equal ranks would leave the pair in the same visual order after a swap,
+  // so step off the neighbour's value instead of copying it.
+  const nextCurrent = currentRank === neighbourRank ? neighbourRank + direction : neighbourRank
+  const previous = [...list]
+
+  isReorderingStatus.value = true
+  const reordered = [...list]
+  reordered[index] = { ...current, sort_priority: nextCurrent }
+  reordered[target] = { ...neighbour, sort_priority: currentRank }
+  reordered.sort((a, b) => (a.sort_priority ?? 50) - (b.sort_priority ?? 50) || a.name.localeCompare(b.name))
+  universityStatuses.value = reordered
+  setStatuses(reordered)
+
+  try {
+    await Promise.all([
+      settingsApi.updateUniversityStatus(String(current.id), { sort_priority: nextCurrent }),
+      settingsApi.updateUniversityStatus(String(neighbour.id), { sort_priority: currentRank }),
+    ])
+  } catch (err) {
+    universityStatuses.value = previous
+    setStatuses(previous)
+    uiStore.addToast({
+      type: 'error',
+      title: 'Reorder Failed',
+      message: 'Could not save the new status order.'
+    })
+  } finally {
+    isReorderingStatus.value = false
+  }
+}
 const filteredTags = computed(() => customTagsRegistry.value.filter(t => t.name.toLowerCase().includes(query.value)))
 
 // Action Handlers
@@ -1602,11 +1652,17 @@ const activeConfig = computed(() => TABS_CONFIG[activeTab.value])
             <span>No university statuses found</span>
           </div>
           <div
-            v-for="item in filteredUniversityStatuses"
+            v-for="(item, idx) in filteredUniversityStatuses"
             :key="item.id"
             class="group flex items-center justify-between gap-3 p-3 bg-zinc-50/70 dark:bg-zinc-850 border border-zinc-200 dark:border-zinc-700/80 hover:border-blue-400 rounded-xl shadow-2xs transition-all"
           >
             <div class="flex items-center gap-2.5 min-w-0">
+              <span
+                class="w-5 h-5 shrink-0 rounded-md bg-zinc-200/70 dark:bg-zinc-700/70 text-zinc-500 dark:text-zinc-300 text-[10px] font-extrabold tabular-nums flex items-center justify-center"
+                title="Sort order on student cards - lower is higher"
+              >
+                {{ idx + 1 }}
+              </span>
               <div class="w-3.5 h-3.5 rounded-full shrink-0 shadow-xs" :class="resolveColor(item.color_class).dotClass" />
               <div class="text-xs font-bold text-zinc-900 dark:text-zinc-100 truncate">{{ item.name }}</div>
               <span class="ml-1.5 px-2.5 py-0.5 rounded-full text-[10.5px] font-extrabold uppercase shadow-2xs border" :class="resolveColor(item.color_class).badgeClass">
@@ -1614,6 +1670,22 @@ const activeConfig = computed(() => TABS_CONFIG[activeTab.value])
               </span>
             </div>
             <div class="flex items-center gap-1 shrink-0">
+              <button
+                @click="moveUniversityStatus(item.id, -1)"
+                :disabled="idx === 0 || isReorderingStatus || !!query"
+                class="w-7 h-7 flex items-center justify-center border border-zinc-200 dark:border-zinc-700 hover:bg-white dark:hover:bg-zinc-750 rounded-lg text-zinc-500 transition-all shadow-2xs disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                :title="query ? 'Clear the search to reorder' : 'Move up (sorts earlier)'"
+              >
+                <ArrowUp class="w-3.5 h-3.5" />
+              </button>
+              <button
+                @click="moveUniversityStatus(item.id, 1)"
+                :disabled="idx === filteredUniversityStatuses.length - 1 || isReorderingStatus || !!query"
+                class="w-7 h-7 flex items-center justify-center border border-zinc-200 dark:border-zinc-700 hover:bg-white dark:hover:bg-zinc-750 rounded-lg text-zinc-500 transition-all shadow-2xs disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                :title="query ? 'Clear the search to reorder' : 'Move down (sorts later)'"
+              >
+                <ArrowDown class="w-3.5 h-3.5" />
+              </button>
               <button
                 @click="handleOpenEdit('university_status', item)"
                 class="w-7 h-7 flex items-center justify-center border border-zinc-200 dark:border-zinc-700 hover:bg-white dark:hover:bg-zinc-750 rounded-lg text-blue-600 transition-all cursor-pointer shadow-2xs"

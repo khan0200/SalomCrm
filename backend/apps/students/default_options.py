@@ -6,12 +6,15 @@ same list, and whatever it adds, renames or deletes afterwards affects only
 that tenant.
 """
 
+# (name, colour, sort_priority). The priority orders a student's universities
+# wherever they are displayed - lowest first - so an Accepted university leads
+# the card and a Failed one sinks. Tenants can re-rank these, and rank their
+# own added statuses, from Settings.
 DEFAULT_UNIVERSITY_STATUSES = [
-    ('Chosen', 'text-blue-500'),
-    ('Applying', 'text-amber-500'),
-    ('Applied', 'text-indigo-500'),
-    ('Accepted', 'text-emerald-500'),
-    ('Failed', 'text-rose-500'),
+    ('Accepted', 'text-emerald-500', 1),
+    ('Applied', 'text-indigo-500', 2),
+    ('Chosen', 'text-blue-500', 3),
+    ('Failed', 'text-rose-500', 99),
 ]
 
 
@@ -214,10 +217,10 @@ def seed_default_options(tenant):
         (n or '').strip().lower()
         for n in UniversityStatusOption.objects.filter(tenant=tenant).values_list('name', flat=True)
     }
-    for name, color in DEFAULT_UNIVERSITY_STATUSES:
+    for name, color, priority in DEFAULT_UNIVERSITY_STATUSES:
         if name.lower() not in existing_statuses:
             UniversityStatusOption.objects.create(
-                name=name, color_class=color, tenant=tenant
+                name=name, color_class=color, sort_priority=priority, tenant=tenant
             )
 
     # ── Universities ──────────────────────────────────────────────────

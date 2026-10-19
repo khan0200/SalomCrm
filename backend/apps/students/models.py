@@ -487,10 +487,17 @@ class UniversityStatusOption(SimpleTenantModel):
     id = models.BigAutoField(primary_key=True)
     name = models.CharField(max_length=100)
     color_class = models.CharField(max_length=100, default='text-blue-500')
+    # Display rank for a student's universities: the lowest number sorts
+    # first, so Accepted (1) floats to the top of a card and Failed (99)
+    # sinks. Agencies add their own statuses, so this is editable in
+    # Settings rather than hardcoded. The 50 default leaves a new status
+    # mid-pack - it can never silently outrank Accepted or sink past
+    # Failed until someone positions it deliberately.
+    sort_priority = models.IntegerField(default=50)
 
     class Meta:
         db_table = 'university_statuses'
-        ordering = ['name']
+        ordering = ['sort_priority', 'name']
 
     def __str__(self):
         return self.name

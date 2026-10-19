@@ -334,8 +334,26 @@ const {
   statusesRegistry: universityStatusList,
   fetchStatuses: fetchUniversityStatuses,
   getStatusDotClass,
-  getStatusBadgeClass: getUniStatusBadgeClass
+  getStatusBadgeClass: getUniStatusBadgeClass,
+  sortUniversitySlots
 } = useUniversityStatuses()
+
+// Slots to render, ordered by status rank so an Accepted university leads and
+// a Failed one sinks. Only the display order changes - each card still edits
+// its own university_N columns, so the stored slots, the gap-compaction above
+// and the Kanban all keep working off the same stable identity.
+const orderedUniversitySlots = computed(() => {
+  const s: any = props.student
+  const visible = [1, 2, 3, 4, 5].filter(slot =>
+    slot === 1 ||
+    (slot === 2 && showUni2.value) ||
+    (slot === 3 && showUni3.value) ||
+    (slot === 4 && showUni4.value) ||
+    (slot === 5 && showUni5.value)
+  )
+  if (!s) return visible
+  return sortUniversitySlots(visible, slot => s[`university_${slot}_status`])
+})
 
 // Helper: Initials
 const getInitials = (name?: string | null) => {
@@ -3032,9 +3050,8 @@ const handleRestoreStudent = () => {
 
                 <div class="flex flex-col gap-1.5">
                   <!-- Dynamic Loop for 5 University Slots -->
-                  <template v-for="slot in 5" :key="slot">
+                  <template v-for="slot in orderedUniversitySlots" :key="slot">
                     <div
-                      v-if="slot === 1 || (slot === 2 && showUni2) || (slot === 3 && showUni3) || (slot === 4 && showUni4) || (slot === 5 && showUni5)"
                       class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 pb-[11px] shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
                       :class="[
                         copiedField === `uni${slot}` && 'animate-copy-press',
