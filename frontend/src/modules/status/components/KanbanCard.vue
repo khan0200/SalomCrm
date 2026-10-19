@@ -546,12 +546,12 @@ const confirmRevertToCoa = () => {
 .university-card-row.university-row-enter-active,
 .university-card-row.university-row-leave-active {
   transition:
-    opacity 450ms cubic-bezier(0.22, 1, 0.36, 1),
-    transform 500ms cubic-bezier(0.22, 1, 0.36, 1),
-    max-height 500ms cubic-bezier(0.22, 1, 0.36, 1),
-    min-height 500ms cubic-bezier(0.22, 1, 0.36, 1),
-    margin-top 500ms cubic-bezier(0.22, 1, 0.36, 1),
-    padding 500ms cubic-bezier(0.22, 1, 0.36, 1);
+    opacity 200ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 280ms cubic-bezier(0.22, 1, 0.36, 1),
+    max-height 280ms cubic-bezier(0.22, 1, 0.36, 1),
+    min-height 280ms cubic-bezier(0.22, 1, 0.36, 1),
+    margin-top 280ms cubic-bezier(0.22, 1, 0.36, 1),
+    padding 280ms cubic-bezier(0.22, 1, 0.36, 1);
   overflow: hidden;
 }
 
@@ -569,18 +569,33 @@ const confirmRevertToCoa = () => {
 .university-row-leave-from {
   opacity: 1;
   transform: translateY(0) scaleY(1);
-  max-height: 40px;
+  max-height: 44px;
 }
+
+/* A leaving row keeps its grid/flex slot for the whole transition, so the
+   card's height only follows along if the row's own box shrinks too - that
+   is what max-height/padding/margin above are for. Opacity is deliberately
+   quicker than the box collapse so the text is gone before the space is,
+   which reads as one motion rather than a fade followed by a jump. */
 
 /* Cancel the flex gap above a row while it is collapsed, so the card
    doesn't jump by the gap size when the row is added/removed. */
 .university-row-enter-from:not(:first-child),
-.university-row-leave-to:not(:first-child) {
+.university-row-leave-to {
   margin-top: -0.375rem;
 }
 
 .university-row-move {
-  transition: transform 500ms cubic-bezier(0.22, 1, 0.36, 1);
+  transition: transform 280ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kanban-card-body,
+  .university-card-row.university-row-enter-active,
+  .university-card-row.university-row-leave-active,
+  .university-row-move {
+    transition-duration: 1ms;
+  }
 }
 
 /* Dashed outline sits between Tailwind's 1px and 2px steps - matches the
