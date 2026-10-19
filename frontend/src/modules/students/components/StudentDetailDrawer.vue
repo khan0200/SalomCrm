@@ -2689,10 +2689,7 @@ const handleRestoreStudent = () => {
                         <span v-if="student.tariff" class="inline-flex self-start px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase bg-emerald-600 text-white shadow-2xs">
                           {{ student.tariff }}
                         </span>
-                        <span v-if="student.tariff && computedTariffPrice > 0" class="text-[12px] font-bold text-zinc-600 dark:text-zinc-300">
-                          {{ formatCurrency(computedTariffPrice) }}
-                        </span>
-                        <span v-else-if="!student.tariff" class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
+                        <span v-else class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
                       </div>
                     </div>
                   </div>
@@ -3383,7 +3380,28 @@ const handleRestoreStudent = () => {
                     </div>
                   </div>
 
-                  <!-- 3.2 BALANCE CARD (iOS Gradient Widget) -->
+                  <!-- 3.2 TARIFF PRICE CARD (iOS Gradient Widget) -->
+                  <div
+                    class="relative bg-gradient-to-br from-[#7c3aed] to-[#6d28d9] rounded-[13px] px-2.5 py-2 text-white flex flex-col justify-between shadow-sm shadow-violet-500/20 border border-white/15 transition-all duration-150 group/card"
+                  >
+                    <div class="flex items-center justify-between">
+                      <span class="text-[9.5px] uppercase font-bold tracking-wider text-violet-100 flex items-center gap-1.5">
+                        <Sparkles class="w-3.5 h-3.5" />
+                        <span>TARIFF PRICE</span>
+                      </span>
+                      <div class="flex items-center gap-1">
+                        <button type="button" @click.stop="startInlineEdit('tariff', student.tariff)" class="w-5 h-5 rounded hover:bg-white/20 text-white/80 hover:text-white flex items-center justify-center transition-all cursor-pointer active:scale-90" title="Edit Tariff">
+                          <Pencil class="w-3 h-3" />
+                        </button>
+                      </div>
+                    </div>
+                    <div class="mt-0.5 flex items-baseline gap-1.5 flex-wrap">
+                      <span v-if="student.tariff && computedTariffPrice > 0" class="text-[14.5px] font-extrabold tracking-tight font-mono leading-tight">{{ formatCurrency(computedTariffPrice) }}</span>
+                      <span v-else class="text-[12.5px] font-semibold text-white/75 italic">Not provided</span>
+                    </div>
+                  </div>
+
+                  <!-- 3.3 BALANCE CARD (iOS Gradient Widget) -->
                   <div
                     v-if="authStore.canAccessPayments"
                     class="relative rounded-[13px] px-2.5 py-2 text-white flex flex-col justify-between shadow-sm border border-white/15 transition-all duration-150 group/card"
@@ -3404,7 +3422,7 @@ const handleRestoreStudent = () => {
                     </div>
                   </div>
 
-                  <!-- 3.3 PAYMENTS DONE CARD (iOS Gradient Widget) -->
+                  <!-- 3.4 PAYMENTS DONE CARD (iOS Gradient Widget) -->
                   <div
                     v-if="authStore.canAccessPayments"
                     class="relative bg-gradient-to-br from-[#10b981] to-[#059669] rounded-[13px] px-2.5 py-2 text-white flex flex-col justify-between shadow-sm shadow-emerald-500/20 border border-white/15 transition-all duration-150 group/card"
@@ -3422,7 +3440,7 @@ const handleRestoreStudent = () => {
                     </div>
                   </div>
 
-                  <!-- 3.4 DISCOUNT CARD (iOS Gradient Widget) -->
+                  <!-- 3.5 DISCOUNT CARD (iOS Gradient Widget) -->
                   <div
                     v-if="authStore.canAccessPayments"
                     class="relative bg-gradient-to-br from-[#f97316] to-[#ea580c] rounded-[13px] px-2.5 py-2 text-white flex flex-col justify-between shadow-sm shadow-orange-500/20 border border-white/15 transition-all duration-150 group/card"
@@ -3440,7 +3458,7 @@ const handleRestoreStudent = () => {
                     </div>
                   </div>
 
-                  <!-- 3.5 WITHDRAWN CARD (iOS Gradient Widget) -->
+                  <!-- 3.6 WITHDRAWN CARD (iOS Gradient Widget) -->
                   <div
                     v-if="authStore.canAccessPayments && computedWithdrawals > 0"
                     class="relative bg-gradient-to-br from-[#e11d48] to-[#be123c] rounded-[13px] px-2.5 py-2 text-white flex flex-col justify-between shadow-sm shadow-rose-500/20 border border-white/15 transition-all duration-150 group/card"
@@ -3456,7 +3474,7 @@ const handleRestoreStudent = () => {
                     </div>
                   </div>
 
-                  <!-- 3.6 STUDENT ID -->
+                  <!-- 3.7 STUDENT ID -->
                   <div
                     class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[12px] px-2.5 py-[5.5px] shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
                     :class="[copiedField === 'student_id' && 'animate-copy-press']"
@@ -3483,7 +3501,7 @@ const handleRestoreStudent = () => {
                     </div>
                   </div>
 
-                  <!-- 3.7 GROUP -->
+                  <!-- 3.8 GROUP -->
                   <div
                     class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[12px] px-2.5 py-[5.5px] shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 group/card"
                   >
@@ -3506,7 +3524,7 @@ const handleRestoreStudent = () => {
                     </div>
                   </div>
 
-                  <!-- 3.8 LEAD BY -->
+                  <!-- 3.9 LEAD BY -->
                   <div
                     class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[12px] px-2.5 py-[5.5px] shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 group/card"
                   >
@@ -3529,7 +3547,7 @@ const handleRestoreStudent = () => {
                     </div>
                   </div>
 
-                  <!-- 3.9 MISSING DOCUMENTS -->
+                  <!-- 3.10 MISSING DOCUMENTS -->
                   <div
                     class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[12px] px-2.5 py-[5.5px] shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
                     :class="[copiedField === 'missing_docs' && 'animate-copy-press']"
@@ -3562,7 +3580,7 @@ const handleRestoreStudent = () => {
                     </div>
                   </div>
 
-                  <!-- 3.10 KORDINATOR -->
+                  <!-- 3.11 KORDINATOR -->
                   <div
                     class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[12px] px-2.5 py-[5.5px] shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 group/card"
                   >
