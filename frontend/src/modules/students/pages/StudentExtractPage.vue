@@ -635,27 +635,21 @@ const handleSaveAllFields = async () => {
     const cleanKey = field.key.replace(/_/g, ' ').toUpperCase().trim()
     const dbField = FIELD_MAPPING[cleanKey] || FIELD_MAPPING[field.key]
     if (!dbField) continue
+    // Skip fields the profile already holds - writing them back would be a
+    // no-op that still stamps a fresh "Updated at" date on untouched data.
+    if (isFieldAlreadySaved(field.key, field.value)) continue
 
-    let finalValue: any = field.value.trim()
-    if (dbField === 'gender') {
-      const char = finalValue.toUpperCase()[0]
-      finalValue = char === 'M' ? 'MALE' : (char === 'F' ? 'FEMALE' : finalValue)
-    } else if (dbField === 'passport') {
-      finalValue = finalValue.replace(/\s/g, '').toUpperCase()
-    } else if (dbField === 'phone1' || dbField === 'phone2') {
-      finalValue = formatPhoneValue(finalValue) || finalValue
-    } else if (['birthday', 'passport_issue_date', 'passport_expire_date', 'date_of_entry', 'date_of_graduation'].includes(dbField as string)) {
-      finalValue = normalizeDate(finalValue)
-    } else if (['full_name', 'address', 'final_school_name', 'major', 'father_name', 'mother_name'].includes(dbField as string)) {
-      finalValue = finalValue.toUpperCase()
-    }
-
-    updatePayload[dbField] = finalValue
+    ;(updatePayload as any)[dbField] = normalizeForField(dbField as string, field.value)
     savedKeys.push(field.key)
   }
 
   if (Object.keys(updatePayload).length === 0) {
     isSavingAll.value = false
+    uiStore.addToast({
+      type: 'info',
+      title: 'Nothing to Save',
+      message: 'Every extracted field already matches the student profile.'
+    })
     return
   }
 
@@ -917,6 +911,44 @@ const saveEditValue = () => {
 
 // Save Field to Student Profile in Django Backend
 const savingFieldKey = ref<string | null>(null)
+// Normalization applied before a scanned value is written to the profile.
+// Shared with isFieldAlreadySaved() below so the "already matches" check can
+// never disagree with what saving would actually store (e.g. a passport
+// scanned as "fb 2554428" normalizes to "FB2554428" and must count as equal
+// to the stored value rather than offering a pointless re-save).
+const normalizeForField = (dbField: string, raw: string): string => {
+  let v: string = String(raw ?? '').trim()
+  if (dbField === 'gender') {
+    const char = v.toUpperCase()[0]
+    v = char === 'M' ? 'MALE' : (char === 'F' ? 'FEMALE' : v)
+  } else if (dbField === 'passport') {
+    v = v.replace(/\s/g, '').toUpperCase()
+  } else if (dbField === 'phone1' || dbField === 'phone2') {
+    v = formatPhoneValue(v) || v
+  } else if (['birthday', 'passport_issue_date', 'passport_expire_date', 'date_of_entry', 'date_of_graduation'].includes(dbField)) {
+    v = normalizeDate(v)
+  } else if (['full_name', 'address', 'final_school_name', 'major', 'father_name', 'mother_name'].includes(dbField)) {
+    v = v.toUpperCase()
+  }
+  return v
+}
+
+// True when the student already holds exactly what this scanned field would
+// write, so the row shows a quiet "Matches" state instead of urging a re-save.
+const isFieldAlreadySaved = (fieldKey: string, value: string): boolean => {
+  const cleanKey = fieldKey.replace(/_/g, ' ').toUpperCase().trim()
+  const dbField = FIELD_MAPPING[cleanKey] || FIELD_MAPPING[fieldKey]
+  if (!dbField || !student.value) return false
+
+  const incoming = normalizeForField(dbField as string, value)
+  if (!incoming) return false
+
+  const current = (student.value as any)[dbField]
+  if (current === null || current === undefined || String(current).trim() === '') return false
+
+  return normalizeForField(dbField as string, String(current)) === incoming
+}
+
 const handleSaveFieldToProfile = async (fieldKey: string, value: string) => {
   const cleanKey = fieldKey.replace(/_/g, ' ').toUpperCase().trim()
   const dbField = FIELD_MAPPING[cleanKey] || FIELD_MAPPING[fieldKey]
@@ -932,21 +964,7 @@ const handleSaveFieldToProfile = async (fieldKey: string, value: string) => {
 
   if (!student.value) return
 
-  let finalValue: any = value.trim()
-
-  // Normalizations
-  if (dbField === 'gender') {
-    const char = finalValue.toUpperCase()[0]
-    finalValue = char === 'M' ? 'MALE' : (char === 'F' ? 'FEMALE' : finalValue)
-  } else if (dbField === 'passport') {
-    finalValue = finalValue.replace(/\s/g, '').toUpperCase()
-  } else if (dbField === 'phone1' || dbField === 'phone2') {
-    finalValue = formatPhoneValue(finalValue) || finalValue
-  } else if (['birthday', 'passport_issue_date', 'passport_expire_date', 'date_of_entry', 'date_of_graduation'].includes(dbField as string)) {
-    finalValue = normalizeDate(finalValue)
-  } else if (['full_name', 'address', 'final_school_name', 'major', 'father_name', 'mother_name'].includes(dbField as string)) {
-    finalValue = finalValue.toUpperCase()
-  }
+  const finalValue: any = normalizeForField(dbField as string, value)
 
   savingFieldKey.value = fieldKey
   try {
@@ -1586,7 +1604,9 @@ const getInitials = (name?: string) => {
                 'p-3 rounded-xl border flex items-center justify-between gap-3 transition-all',
                 savedFields[field.key]
                   ? 'border-emerald-500/40 bg-emerald-50/50 dark:bg-emerald-950/20'
-                  : 'border-zinc-200 dark:border-zinc-800 bg-zinc-50/60 dark:bg-zinc-850/60 hover:border-zinc-300 dark:hover:border-zinc-700'
+                  : isFieldAlreadySaved(field.key, field.value)
+                    ? 'border-zinc-200/70 dark:border-zinc-800/70 bg-zinc-50/30 dark:bg-zinc-850/30 opacity-70'
+                    : 'border-zinc-200 dark:border-zinc-800 bg-zinc-50/60 dark:bg-zinc-850/60 hover:border-zinc-300 dark:hover:border-zinc-700'
               ]"
             >
               <!-- Field Details -->
@@ -1633,19 +1653,25 @@ const getInitials = (name?: string) => {
 
                 <!-- Save to Profile Button -->
                 <button
-                  :disabled="savedFields[field.key] || savingFieldKey === field.key"
+                  :disabled="savedFields[field.key] || savingFieldKey === field.key || isFieldAlreadySaved(field.key, field.value)"
                   @click="handleSaveFieldToProfile(field.key, field.value)"
                   :class="[
-                    'px-3 py-1.5 rounded-lg text-[10px] font-extrabold uppercase transition-all flex items-center gap-1 select-none border cursor-pointer',
+                    'px-3 py-1.5 rounded-lg text-[10px] font-extrabold uppercase transition-all flex items-center gap-1 select-none border',
                     savedFields[field.key]
                       ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 cursor-default'
-                      : 'bg-emerald-600 hover:bg-emerald-500 border-emerald-600 text-white shadow-xs active:scale-[0.96]'
+                      : isFieldAlreadySaved(field.key, field.value)
+                        ? 'bg-transparent text-zinc-400 dark:text-zinc-500 border-zinc-200 dark:border-zinc-700 cursor-default'
+                        : 'bg-emerald-600 hover:bg-emerald-500 border-emerald-600 text-white shadow-xs active:scale-[0.96] cursor-pointer'
                   ]"
                 >
                   <Loader2 v-if="savingFieldKey === field.key" class="w-3 h-3 animate-spin" />
                   <template v-else-if="savedFields[field.key]">
                     <CheckCircle2 class="w-3 h-3 text-emerald-500" />
                     <span>Saved</span>
+                  </template>
+                  <template v-else-if="isFieldAlreadySaved(field.key, field.value)">
+                    <CheckCircle2 class="w-3 h-3" />
+                    <span>Matches</span>
                   </template>
                   <template v-else>
                     <span>Save To &gt;&gt;</span>

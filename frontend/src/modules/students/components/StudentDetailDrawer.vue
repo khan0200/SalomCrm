@@ -2031,7 +2031,7 @@ const handleRestoreStudent = () => {
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                   <!-- FULL NAME -->
                   <div
-                    class="sm:col-span-2 relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 pb-4 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
+                    class="sm:col-span-2 relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 pb-[11px] shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
                     :class="[copiedField === 'full_name' && 'animate-copy-press']"
                     @click="handleCopy('full_name', (nameLanguage === 'KR' ? student.korean_name : student.full_name))"
                     title="Single-click to copy Full Name"
@@ -2163,7 +2163,7 @@ const handleRestoreStudent = () => {
                   <div class="sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                     <!-- SEX -->
                     <div
-                      class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 pb-4 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
+                      class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 pb-[11px] shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
                       :class="[copiedField === 'gender' && 'animate-copy-press']"
                       @click="handleCopy('gender', student.gender)"
                       title="Single-click to copy Sex"
@@ -2192,7 +2192,7 @@ const handleRestoreStudent = () => {
 
                     <!-- BIRTHDAY -->
                     <div
-                      class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 pb-4 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
+                      class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 pb-[11px] shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
                       :class="[copiedField === 'birthday' && 'animate-copy-press']"
                       @click="handleCopy('birthday', formatDateValue(student.birthday))"
                       title="Single-click to copy Birthday"
@@ -2224,7 +2224,7 @@ const handleRestoreStudent = () => {
                   <div class="sm:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-1.5">
                     <!-- PASSPORT -->
                     <div
-                      class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 pb-4 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
+                      class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 pb-[11px] shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
                       :class="[copiedField === 'passport' && 'animate-copy-press']"
                       @click="handleCopy('passport', student.passport)"
                       title="Single-click to copy Passport"
@@ -2253,7 +2253,7 @@ const handleRestoreStudent = () => {
 
                     <!-- DATE OF ISSUE -->
                     <div
-                      class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 pb-4 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
+                      class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 pb-[11px] shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
                       :class="[copiedField === 'passport_issue_date' && 'animate-copy-press']"
                       @click="handleCopy('passport_issue_date', formatDateValue(student.passport_issue_date))"
                       title="Single-click to copy Date of Issue"
@@ -2282,7 +2282,7 @@ const handleRestoreStudent = () => {
 
                     <!-- DATE OF EXPIRATION -->
                     <div
-                      class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 pb-4 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
+                      class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 pb-[11px] shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
                       :class="[copiedField === 'passport_expire_date' && 'animate-copy-press']"
                       @click="handleCopy('passport_expire_date', formatDateValue(student.passport_expire_date))"
                       title="Single-click to copy Date of Expiration"
@@ -2324,7 +2324,7 @@ const handleRestoreStudent = () => {
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-1.5">
                   <!-- PHONE 1 (Formatted) -->
                   <div
-                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 pb-4 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
+                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 pb-[11px] shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
                     :class="[copiedField === 'phone1' && 'animate-copy-press']"
                     @click="handleCopy('phone1', formatPhoneValue(student.phone1))"
                     title="Single-click to copy Phone 1"
@@ -2353,7 +2353,7 @@ const handleRestoreStudent = () => {
 
                   <!-- PHONE 2 (Formatted) -->
                   <div
-                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 pb-4 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
+                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 pb-[11px] shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
                     :class="[copiedField === 'phone2' && 'animate-copy-press']"
                     @click="handleCopy('phone2', formatPhoneValue(student.phone2))"
                     title="Single-click to copy Phone 2"
@@ -2382,7 +2382,7 @@ const handleRestoreStudent = () => {
 
                   <!-- TG USERNAME -->
                   <div
-                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 pb-4 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
+                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 pb-[11px] shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
                     :class="[copiedField === 'telegram_username' && 'animate-copy-press']"
                     @click="handleCopy('telegram_username', student.telegram_username ? formatTelegramDisplay(student.telegram_username) : null)"
                     title="Single-click to copy TG username"
@@ -2430,7 +2430,7 @@ const handleRestoreStudent = () => {
 
                   <div class="accordion-collapse-inner flex flex-col gap-1.5">
                     <div
-                      class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 pb-4 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
+                      class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 pb-[11px] shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
                       :class="[copiedField === 'email' && 'animate-copy-press']"
                       @click="handleCopy('email', student.email)"
                       title="Single-click to copy Email"
@@ -2458,7 +2458,7 @@ const handleRestoreStudent = () => {
                     </div>
 
                     <div
-                      class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 pb-4 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
+                      class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 pb-[11px] shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
                       :class="[copiedField === 'address' && 'animate-copy-press']"
                       @click="handleCopy('address', student.address)"
                       title="Single-click to copy Address"
@@ -2696,7 +2696,7 @@ const handleRestoreStudent = () => {
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                   <!-- TARIFF CARD -->
                   <div
-                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 pb-4 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
+                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 pb-[11px] shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
                     :class="[copiedField === 'tariff' && 'animate-copy-press']"
                     @click="handleCopy('tariff', student.tariff)"
                     title="Single-click to copy Tariff"
@@ -2730,7 +2730,7 @@ const handleRestoreStudent = () => {
 
                   <!-- LEVEL TO STUDY 1 -->
                   <div
-                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 pb-4 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
+                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 pb-[11px] shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
                     :class="[copiedField === 'level' && 'animate-copy-press']"
                     @click="handleCopy('level', student.level)"
                     title="Single-click to copy Level to Study"
@@ -2772,7 +2772,7 @@ const handleRestoreStudent = () => {
                   <!-- LEVEL TO STUDY 2 (Optional) -->
                   <div
                     v-if="showLevel2"
-                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 pb-4 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
+                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 pb-[11px] shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
                     :class="[copiedField === 'level2' && 'animate-copy-press']"
                     @click="handleCopy('level2', student.level2)"
                     title="Single-click to copy Level to Study 2"
@@ -3211,7 +3211,7 @@ const handleRestoreStudent = () => {
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                   <!-- FATHER FULLNAME -->
                   <div
-                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 pb-4 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
+                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 pb-[11px] shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
                     :class="[copiedField === 'father_name' && 'animate-copy-press']"
                     @click="handleCopy('father_name', student.father_name)"
                     title="Single-click to copy Father Full Name"
@@ -3235,7 +3235,7 @@ const handleRestoreStudent = () => {
 
                   <!-- MOTHER FULLNAME -->
                   <div
-                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 pb-4 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
+                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 pb-[11px] shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
                     :class="[copiedField === 'mother_name' && 'animate-copy-press']"
                     @click="handleCopy('mother_name', student.mother_name)"
                     title="Single-click to copy Mother Full Name"
@@ -3259,7 +3259,7 @@ const handleRestoreStudent = () => {
 
                   <!-- FATHER PHONE (Formatted) -->
                   <div
-                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 pb-4 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
+                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 pb-[11px] shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
                     :class="[copiedField === 'father_phone' && 'animate-copy-press']"
                     @click="handleCopy('father_phone', formatPhoneValue(student.father_phone))"
                     title="Single-click to copy Father Phone"
@@ -3283,7 +3283,7 @@ const handleRestoreStudent = () => {
 
                   <!-- MOTHER PHONE (Formatted) -->
                   <div
-                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 pb-4 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
+                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 pb-[11px] shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
                     :class="[copiedField === 'mother_phone' && 'animate-copy-press']"
                     @click="handleCopy('mother_phone', formatPhoneValue(student.mother_phone))"
                     title="Single-click to copy Mother Phone"
@@ -3307,7 +3307,7 @@ const handleRestoreStudent = () => {
 
                   <!-- FATHER JOB (Work Place + Job) -->
                   <div
-                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 pb-4 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
+                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 pb-[11px] shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
                     :class="[copiedField === 'father_job' && 'animate-copy-press']"
                     @click="handleCopy('father_job', [student.father_workplace, student.father_job].filter(Boolean).join(' — '))"
                     title="Single-click to copy Father Job"
@@ -3334,7 +3334,7 @@ const handleRestoreStudent = () => {
 
                   <!-- MOTHER JOB (Work Place + Job) -->
                   <div
-                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 pb-4 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
+                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 pb-[11px] shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
                     :class="[copiedField === 'mother_job' && 'animate-copy-press']"
                     @click="handleCopy('mother_job', [student.mother_workplace, student.mother_job].filter(Boolean).join(' — '))"
                     title="Single-click to copy Mother Job"
@@ -3361,7 +3361,7 @@ const handleRestoreStudent = () => {
 
                   <!-- NOTES -->
                   <div
-                    class="sm:col-span-2 relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 pb-4 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
+                    class="sm:col-span-2 relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 pb-[11px] shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
                     :class="[copiedField === 'notes' && 'animate-copy-press']"
                     @click="handleCopy('notes', student.notes)"
                     title="Single-click to copy Notes"
@@ -3405,7 +3405,7 @@ const handleRestoreStudent = () => {
                 <div class="flex flex-col gap-1.5">
                   <!-- 3.1 OFFICE CARD (iOS Gradient Widget) -->
                   <div
-                    class="relative bg-gradient-to-br from-[#1d70f2] to-[#1456c2] text-white rounded-[13px] px-2.5 py-2 pb-4 shadow-sm shadow-blue-500/15 border border-white/15 flex flex-col justify-between transition-all duration-150 group/card"
+                    class="relative bg-gradient-to-br from-[#1d70f2] to-[#1456c2] text-white rounded-[13px] px-2.5 py-2 pb-[11px] shadow-sm shadow-blue-500/15 border border-white/15 flex flex-col justify-between transition-all duration-150 group/card"
                   >
                     <div class="flex items-center justify-between">
                       <span class="text-[9.5px] uppercase font-bold tracking-wider text-blue-100 flex items-center gap-1.5">
@@ -3426,7 +3426,7 @@ const handleRestoreStudent = () => {
 
                   <!-- 3.2 TARIFF PRICE CARD (iOS Gradient Widget) -->
                   <div
-                    class="relative bg-gradient-to-br from-[#7c3aed] to-[#6d28d9] rounded-[13px] px-2.5 py-2 pb-4 text-white flex flex-col justify-between shadow-sm shadow-violet-500/20 border border-white/15 transition-all duration-150 group/card"
+                    class="relative bg-gradient-to-br from-[#7c3aed] to-[#6d28d9] rounded-[13px] px-2.5 py-2 pb-[11px] text-white flex flex-col justify-between shadow-sm shadow-violet-500/20 border border-white/15 transition-all duration-150 group/card"
                   >
                     <div class="flex items-center justify-between">
                       <span class="text-[9.5px] uppercase font-bold tracking-wider text-violet-100 flex items-center gap-1.5">
@@ -3521,7 +3521,7 @@ const handleRestoreStudent = () => {
 
                   <!-- 3.7 STUDENT ID -->
                   <div
-                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[12px] px-2.5 py-[5.5px] pb-4 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
+                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[12px] px-2.5 py-[5.5px] pb-[11px] shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
                     :class="[copiedField === 'student_id' && 'animate-copy-press']"
                     @click="handleCopy('student_id', student.id)"
                     title="Single-click to copy Student ID"
@@ -3549,7 +3549,7 @@ const handleRestoreStudent = () => {
 
                   <!-- 3.8 GROUP -->
                   <div
-                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[12px] px-2.5 py-[5.5px] pb-4 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 group/card"
+                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[12px] px-2.5 py-[5.5px] pb-[11px] shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 group/card"
                   >
                     <div class="flex items-center justify-between">
                       <span class="text-[9.5px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 flex items-center gap-1.5">
@@ -3573,7 +3573,7 @@ const handleRestoreStudent = () => {
 
                   <!-- 3.9 LEAD BY -->
                   <div
-                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[12px] px-2.5 py-[5.5px] pb-4 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 group/card"
+                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[12px] px-2.5 py-[5.5px] pb-[11px] shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 group/card"
                   >
                     <div class="flex items-center justify-between">
                       <span class="text-[9.5px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 flex items-center gap-1.5">
@@ -3597,7 +3597,7 @@ const handleRestoreStudent = () => {
 
                   <!-- 3.10 MISSING DOCUMENTS -->
                   <div
-                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[12px] px-2.5 py-[5.5px] pb-4 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
+                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[12px] px-2.5 py-[5.5px] pb-[11px] shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
                     :class="[copiedField === 'missing_docs' && 'animate-copy-press']"
                     @click="handleCopy('missing_docs', student.pick_needed ? student.pick_needed.join(', ') : 'FULL OK')"
                     title="Single-click to copy Missing Documents"
@@ -3630,7 +3630,7 @@ const handleRestoreStudent = () => {
 
                   <!-- 3.11 KORDINATOR -->
                   <div
-                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[12px] px-2.5 py-[5.5px] pb-4 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 group/card"
+                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[12px] px-2.5 py-[5.5px] pb-[11px] shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 group/card"
                   >
                     <div class="flex items-center justify-between">
                       <span class="text-[9.5px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 flex items-center gap-1.5">

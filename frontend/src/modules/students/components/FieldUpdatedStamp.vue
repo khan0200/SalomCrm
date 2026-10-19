@@ -30,7 +30,7 @@ const toneClass = computed(() =>
 <template>
   <span
     v-if="hasDate"
-    class="pointer-events-none select-none absolute bottom-1 right-2 text-[8.5px] font-medium tabular-nums leading-none"
+    class="pointer-events-none select-none absolute bottom-0.5 right-2 text-[8.5px] font-medium tabular-nums leading-none"
     :class="toneClass"
     :title="title"
   >
