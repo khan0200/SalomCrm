@@ -34,6 +34,6 @@ const toneClass = computed(() =>
     :class="toneClass"
     :title="title"
   >
-    {{ label }}
+    Updated at {{ label }}
   </span>
 </template>

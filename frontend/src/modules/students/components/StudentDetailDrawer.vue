@@ -2031,7 +2031,7 @@ const handleRestoreStudent = () => {
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                   <!-- FULL NAME -->
                   <div
-                    class="sm:col-span-2 relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
+                    class="sm:col-span-2 relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 pb-4 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
                     :class="[copiedField === 'full_name' && 'animate-copy-press']"
                     @click="handleCopy('full_name', (nameLanguage === 'KR' ? student.korean_name : student.full_name))"
                     title="Single-click to copy Full Name"
@@ -2163,7 +2163,7 @@ const handleRestoreStudent = () => {
                   <div class="sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                     <!-- SEX -->
                     <div
-                      class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
+                      class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 pb-4 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
                       :class="[copiedField === 'gender' && 'animate-copy-press']"
                       @click="handleCopy('gender', student.gender)"
                       title="Single-click to copy Sex"
@@ -2173,7 +2173,7 @@ const handleRestoreStudent = () => {
                           <Users class="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400 shrink-0" />
                           <span>SEX</span>
                         </span>
-                        <div class="relative flex items-center gap-1">
+                        <div class="flex items-center gap-1">
                           <button type="button" @click.stop="handleCopy('gender', student.gender)" class="w-6 h-6 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-all cursor-pointer active:scale-90" title="Copy Sex">
                             <Check v-if="copiedField === 'gender'" class="w-3.5 h-3.5 text-emerald-500" />
                             <Copy v-else class="w-3.5 h-3.5" />
@@ -2181,18 +2181,18 @@ const handleRestoreStudent = () => {
                           <button type="button" @click.stop="startInlineEdit('gender', student.gender)" class="w-6 h-6 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-all cursor-pointer active:scale-90" title="Edit Sex">
                             <Pencil class="w-3.5 h-3.5" />
                           </button>
-                          <FieldUpdatedStamp :date="fieldUpdatedAt('gender')" />
                         </div>
                       </div>
                       <div class="mt-0.5">
                         <span v-if="student.gender" class="text-[13.5px] font-bold text-zinc-900 dark:text-zinc-100 uppercase tracking-tight">{{ student.gender }}</span>
                         <span v-else class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
                       </div>
+                      <FieldUpdatedStamp :date="fieldUpdatedAt('gender')" />
                     </div>
 
                     <!-- BIRTHDAY -->
                     <div
-                      class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
+                      class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 pb-4 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
                       :class="[copiedField === 'birthday' && 'animate-copy-press']"
                       @click="handleCopy('birthday', formatDateValue(student.birthday))"
                       title="Single-click to copy Birthday"
@@ -2202,7 +2202,7 @@ const handleRestoreStudent = () => {
                           <Calendar class="w-3.5 h-3.5 text-blue-500 dark:text-blue-400 shrink-0" />
                           <span>BIRTHDAY</span>
                         </span>
-                        <div class="relative flex items-center gap-1">
+                        <div class="flex items-center gap-1">
                           <button type="button" @click.stop="handleCopy('birthday', formatDateValue(student.birthday))" class="w-6 h-6 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-all cursor-pointer active:scale-90" title="Copy Birthday">
                             <Check v-if="copiedField === 'birthday'" class="w-3.5 h-3.5 text-emerald-500" />
                             <Copy v-else class="w-3.5 h-3.5" />
@@ -2210,13 +2210,13 @@ const handleRestoreStudent = () => {
                           <button type="button" @click.stop="startInlineEdit('birthday', student.birthday)" class="w-6 h-6 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-all cursor-pointer active:scale-90" title="Edit Birthday">
                             <Pencil class="w-3.5 h-3.5" />
                           </button>
-                          <FieldUpdatedStamp :date="fieldUpdatedAt('birthday')" />
                         </div>
                       </div>
                       <div class="mt-0.5">
                         <span v-if="student.birthday" class="text-[13.5px] font-bold font-mono text-zinc-900 dark:text-zinc-100 tracking-tight">{{ formatDateValue(student.birthday) }}</span>
                         <span v-else class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
                       </div>
+                      <FieldUpdatedStamp :date="fieldUpdatedAt('birthday')" />
                     </div>
                   </div>
 
@@ -2224,7 +2224,7 @@ const handleRestoreStudent = () => {
                   <div class="sm:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-1.5">
                     <!-- PASSPORT -->
                     <div
-                      class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
+                      class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 pb-4 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
                       :class="[copiedField === 'passport' && 'animate-copy-press']"
                       @click="handleCopy('passport', student.passport)"
                       title="Single-click to copy Passport"
@@ -2234,7 +2234,7 @@ const handleRestoreStudent = () => {
                           <ShieldCheck class="w-3.5 h-3.5 text-sky-500 dark:text-sky-400 shrink-0" />
                           <span>PASSPORT</span>
                         </span>
-                        <div class="relative flex items-center gap-1">
+                        <div class="flex items-center gap-1">
                           <button type="button" @click.stop="handleCopy('passport', student.passport)" class="w-6 h-6 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-all cursor-pointer active:scale-90" title="Copy Passport">
                             <Check v-if="copiedField === 'passport'" class="w-3.5 h-3.5 text-emerald-500" />
                             <Copy v-else class="w-3.5 h-3.5" />
@@ -2242,18 +2242,18 @@ const handleRestoreStudent = () => {
                           <button type="button" @click.stop="startInlineEdit('passport', student.passport)" class="w-6 h-6 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-all cursor-pointer active:scale-90" title="Edit Passport">
                             <Pencil class="w-3.5 h-3.5" />
                           </button>
-                          <FieldUpdatedStamp :date="fieldUpdatedAt('passport')" />
                         </div>
                       </div>
                       <div class="mt-0.5">
                         <span v-if="student.passport" class="text-[13.5px] font-bold font-mono text-zinc-900 dark:text-zinc-100 uppercase tracking-tight">{{ student.passport }}</span>
                         <span v-else class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
                       </div>
+                      <FieldUpdatedStamp :date="fieldUpdatedAt('passport')" />
                     </div>
 
                     <!-- DATE OF ISSUE -->
                     <div
-                      class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
+                      class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 pb-4 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
                       :class="[copiedField === 'passport_issue_date' && 'animate-copy-press']"
                       @click="handleCopy('passport_issue_date', formatDateValue(student.passport_issue_date))"
                       title="Single-click to copy Date of Issue"
@@ -2263,7 +2263,7 @@ const handleRestoreStudent = () => {
                           <Calendar class="w-3.5 h-3.5 text-teal-500 dark:text-teal-400 shrink-0" />
                           <span>DATE OF ISSUE</span>
                         </span>
-                        <div class="relative flex items-center gap-1">
+                        <div class="flex items-center gap-1">
                           <button type="button" @click.stop="handleCopy('passport_issue_date', formatDateValue(student.passport_issue_date))" class="w-6 h-6 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-all cursor-pointer active:scale-90" title="Copy Date of Issue">
                             <Check v-if="copiedField === 'passport_issue_date'" class="w-3.5 h-3.5 text-emerald-500" />
                             <Copy v-else class="w-3.5 h-3.5" />
@@ -2271,18 +2271,18 @@ const handleRestoreStudent = () => {
                           <button type="button" @click.stop="startInlineEdit('passport_issue_date', student.passport_issue_date)" class="w-6 h-6 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-all cursor-pointer active:scale-90" title="Edit Date of Issue">
                             <Pencil class="w-3.5 h-3.5" />
                           </button>
-                          <FieldUpdatedStamp :date="fieldUpdatedAt('passport_issue_date')" />
                         </div>
                       </div>
                       <div class="mt-0.5">
                         <span v-if="student.passport_issue_date" class="text-[13.5px] font-bold font-mono text-zinc-900 dark:text-zinc-100 tracking-tight">{{ formatDateValue(student.passport_issue_date) }}</span>
                         <span v-else class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
                       </div>
+                      <FieldUpdatedStamp :date="fieldUpdatedAt('passport_issue_date')" />
                     </div>
 
                     <!-- DATE OF EXPIRATION -->
                     <div
-                      class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
+                      class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 pb-4 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
                       :class="[copiedField === 'passport_expire_date' && 'animate-copy-press']"
                       @click="handleCopy('passport_expire_date', formatDateValue(student.passport_expire_date))"
                       title="Single-click to copy Date of Expiration"
@@ -2292,7 +2292,7 @@ const handleRestoreStudent = () => {
                           <Calendar class="w-3.5 h-3.5 text-amber-500 dark:text-amber-400 shrink-0" />
                           <span>DATE OF EXPIRATION</span>
                         </span>
-                        <div class="relative flex items-center gap-1">
+                        <div class="flex items-center gap-1">
                           <button type="button" @click.stop="handleCopy('passport_expire_date', formatDateValue(student.passport_expire_date))" class="w-6 h-6 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-all cursor-pointer active:scale-90" title="Copy Date of Expiration">
                             <Check v-if="copiedField === 'passport_expire_date'" class="w-3.5 h-3.5 text-emerald-500" />
                             <Copy v-else class="w-3.5 h-3.5" />
@@ -2300,13 +2300,13 @@ const handleRestoreStudent = () => {
                           <button type="button" @click.stop="startInlineEdit('passport_expire_date', student.passport_expire_date)" class="w-6 h-6 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-all cursor-pointer active:scale-90" title="Edit Date of Expiration">
                             <Pencil class="w-3.5 h-3.5" />
                           </button>
-                          <FieldUpdatedStamp :date="fieldUpdatedAt('passport_expire_date')" />
                         </div>
                       </div>
                       <div class="mt-0.5">
                         <span v-if="student.passport_expire_date" class="text-[13.5px] font-bold font-mono text-zinc-900 dark:text-zinc-100 tracking-tight">{{ formatDateValue(student.passport_expire_date) }}</span>
                         <span v-else class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
                       </div>
+                      <FieldUpdatedStamp :date="fieldUpdatedAt('passport_expire_date')" />
                     </div>
                   </div>
                 </div>
@@ -2324,7 +2324,7 @@ const handleRestoreStudent = () => {
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-1.5">
                   <!-- PHONE 1 (Formatted) -->
                   <div
-                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
+                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 pb-4 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
                     :class="[copiedField === 'phone1' && 'animate-copy-press']"
                     @click="handleCopy('phone1', formatPhoneValue(student.phone1))"
                     title="Single-click to copy Phone 1"
@@ -2334,7 +2334,7 @@ const handleRestoreStudent = () => {
                         <Phone class="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400 shrink-0" />
                         <span>PHONE 1</span>
                       </span>
-                      <div class="relative flex items-center gap-1">
+                      <div class="flex items-center gap-1">
                         <button type="button" @click.stop="handleCopy('phone1', formatPhoneValue(student.phone1))" class="w-6 h-6 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-all cursor-pointer active:scale-90" title="Copy Phone 1">
                           <Check v-if="copiedField === 'phone1'" class="w-3.5 h-3.5 text-emerald-500" />
                           <Copy v-else class="w-3.5 h-3.5" />
@@ -2342,18 +2342,18 @@ const handleRestoreStudent = () => {
                         <button type="button" @click.stop="startInlineEdit('phone1', student.phone1)" class="w-6 h-6 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-all cursor-pointer active:scale-90" title="Edit Phone 1">
                           <Pencil class="w-3.5 h-3.5" />
                         </button>
-                        <FieldUpdatedStamp :date="fieldUpdatedAt('phone1')" />
                       </div>
                     </div>
                     <div class="mt-0.5">
                       <span v-if="student.phone1" class="text-[13.5px] font-bold font-mono text-zinc-900 dark:text-zinc-100 tracking-tight">{{ formatPhoneValue(student.phone1) }}</span>
                       <span v-else class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
                     </div>
+                    <FieldUpdatedStamp :date="fieldUpdatedAt('phone1')" />
                   </div>
 
                   <!-- PHONE 2 (Formatted) -->
                   <div
-                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
+                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 pb-4 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
                     :class="[copiedField === 'phone2' && 'animate-copy-press']"
                     @click="handleCopy('phone2', formatPhoneValue(student.phone2))"
                     title="Single-click to copy Phone 2"
@@ -2363,7 +2363,7 @@ const handleRestoreStudent = () => {
                         <Phone class="w-3.5 h-3.5 text-teal-500 dark:text-teal-400 shrink-0" />
                         <span>PHONE 2</span>
                       </span>
-                      <div class="relative flex items-center gap-1">
+                      <div class="flex items-center gap-1">
                         <button type="button" @click.stop="handleCopy('phone2', formatPhoneValue(student.phone2))" class="w-6 h-6 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-all cursor-pointer active:scale-90" title="Copy Phone 2">
                           <Check v-if="copiedField === 'phone2'" class="w-3.5 h-3.5 text-emerald-500" />
                           <Copy v-else class="w-3.5 h-3.5" />
@@ -2371,18 +2371,18 @@ const handleRestoreStudent = () => {
                         <button type="button" @click.stop="startInlineEdit('phone2', student.phone2)" class="w-6 h-6 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-all cursor-pointer active:scale-90" title="Edit Phone 2">
                           <Pencil class="w-3.5 h-3.5" />
                         </button>
-                        <FieldUpdatedStamp :date="fieldUpdatedAt('phone2')" />
                       </div>
                     </div>
                     <div class="mt-0.5">
                       <span v-if="student.phone2" class="text-[13.5px] font-bold font-mono text-zinc-900 dark:text-zinc-100 tracking-tight">{{ formatPhoneValue(student.phone2) }}</span>
                       <span v-else class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
                     </div>
+                    <FieldUpdatedStamp :date="fieldUpdatedAt('phone2')" />
                   </div>
 
                   <!-- TG USERNAME -->
                   <div
-                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
+                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 pb-4 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
                     :class="[copiedField === 'telegram_username' && 'animate-copy-press']"
                     @click="handleCopy('telegram_username', student.telegram_username ? formatTelegramDisplay(student.telegram_username) : null)"
                     title="Single-click to copy TG username"
@@ -2394,7 +2394,7 @@ const handleRestoreStudent = () => {
                         </svg>
                         <span>TG USERNAME</span>
                       </span>
-                      <div class="relative flex items-center gap-1">
+                      <div class="flex items-center gap-1">
                         <a
                           v-if="student.telegram_username"
                           :href="formatTelegramUrl(student.telegram_username)"
@@ -2413,7 +2413,6 @@ const handleRestoreStudent = () => {
                         <button type="button" @click.stop="startInlineEdit('telegram_username', student.telegram_username)" class="w-6 h-6 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-all cursor-pointer active:scale-90" title="Edit TG username">
                           <Pencil class="w-3.5 h-3.5" />
                         </button>
-                        <FieldUpdatedStamp :date="fieldUpdatedAt('telegram_username')" />
                       </div>
                     </div>
                     <div class="mt-0.5 flex items-center gap-1.5">
@@ -2422,6 +2421,7 @@ const handleRestoreStudent = () => {
                       </span>
                       <span v-else class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
                     </div>
+                    <FieldUpdatedStamp :date="fieldUpdatedAt('telegram_username')" />
                   </div>
 
 
@@ -2430,7 +2430,7 @@ const handleRestoreStudent = () => {
 
                   <div class="accordion-collapse-inner flex flex-col gap-1.5">
                     <div
-                      class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
+                      class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 pb-4 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
                       :class="[copiedField === 'email' && 'animate-copy-press']"
                       @click="handleCopy('email', student.email)"
                       title="Single-click to copy Email"
@@ -2440,7 +2440,7 @@ const handleRestoreStudent = () => {
                           <Mail class="w-3.5 h-3.5 text-violet-500 dark:text-violet-400 shrink-0" />
                           <span>EMAIL</span>
                         </span>
-                        <div class="relative flex items-center gap-1">
+                        <div class="flex items-center gap-1">
                           <button type="button" @click.stop="handleCopy('email', student.email)" class="w-6 h-6 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-all cursor-pointer active:scale-90" title="Copy Email">
                             <Check v-if="copiedField === 'email'" class="w-3.5 h-3.5 text-emerald-500" />
                             <Copy v-else class="w-3.5 h-3.5" />
@@ -2448,17 +2448,17 @@ const handleRestoreStudent = () => {
                           <button type="button" @click.stop="startInlineEdit('email', student.email)" class="w-6 h-6 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-all cursor-pointer active:scale-90" title="Edit Email">
                             <Pencil class="w-3.5 h-3.5" />
                           </button>
-                          <FieldUpdatedStamp :date="fieldUpdatedAt('email')" />
                         </div>
                       </div>
                       <div class="mt-0.5">
                         <span v-if="student.email" class="text-[13px] font-semibold text-zinc-900 dark:text-zinc-100">{{ student.email }}</span>
                         <span v-else class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
                       </div>
+                      <FieldUpdatedStamp :date="fieldUpdatedAt('email')" />
                     </div>
 
                     <div
-                      class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
+                      class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 pb-4 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
                       :class="[copiedField === 'address' && 'animate-copy-press']"
                       @click="handleCopy('address', student.address)"
                       title="Single-click to copy Address"
@@ -2468,7 +2468,7 @@ const handleRestoreStudent = () => {
                           <MapPin class="w-3.5 h-3.5 text-rose-500 dark:text-rose-400 shrink-0" />
                           <span>ADDRESS</span>
                         </span>
-                        <div class="relative flex items-center gap-1">
+                        <div class="flex items-center gap-1">
                           <button type="button" @click.stop="handleCopy('address', student.address)" class="w-6 h-6 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-all cursor-pointer active:scale-90" title="Copy Address">
                             <Check v-if="copiedField === 'address'" class="w-3.5 h-3.5 text-emerald-500" />
                             <Copy v-else class="w-3.5 h-3.5" />
@@ -2476,13 +2476,13 @@ const handleRestoreStudent = () => {
                           <button type="button" @click.stop="startInlineEdit('address', student.address)" class="w-6 h-6 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-all cursor-pointer active:scale-90" title="Edit Address">
                             <Pencil class="w-3.5 h-3.5" />
                           </button>
-                          <FieldUpdatedStamp :date="fieldUpdatedAt('address')" />
                         </div>
                       </div>
                       <div class="mt-0.5">
                         <span v-if="student.address" class="text-[13px] font-bold uppercase text-zinc-900 dark:text-zinc-100 leading-snug tracking-tight">{{ student.address }}</span>
                         <span v-else class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
                       </div>
+                      <FieldUpdatedStamp :date="fieldUpdatedAt('address')" />
                     </div>
                   </div>
                   </div>
@@ -2696,7 +2696,7 @@ const handleRestoreStudent = () => {
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                   <!-- TARIFF CARD -->
                   <div
-                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
+                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 pb-4 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
                     :class="[copiedField === 'tariff' && 'animate-copy-press']"
                     @click="handleCopy('tariff', student.tariff)"
                     title="Single-click to copy Tariff"
@@ -2706,7 +2706,7 @@ const handleRestoreStudent = () => {
                         <Sparkles class="w-3.5 h-3.5 text-amber-500 shrink-0" />
                         <span>TARIFF</span>
                       </span>
-                      <div class="relative flex items-center gap-1">
+                      <div class="flex items-center gap-1">
                         <button type="button" @click.stop="handleCopy('tariff', student.tariff)" class="w-6 h-6 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-all cursor-pointer active:scale-90" title="Copy Tariff">
                           <Check v-if="copiedField === 'tariff'" class="w-3.5 h-3.5 text-emerald-500" />
                           <Copy v-else class="w-3.5 h-3.5" />
@@ -2714,7 +2714,6 @@ const handleRestoreStudent = () => {
                         <button type="button" @click.stop="startInlineEdit('tariff', student.tariff)" class="w-6 h-6 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-all cursor-pointer active:scale-90" title="Edit Tariff">
                           <Pencil class="w-3.5 h-3.5" />
                         </button>
-                        <FieldUpdatedStamp :date="fieldUpdatedAt('tariff')" />
                       </div>
                     </div>
 
@@ -2726,11 +2725,12 @@ const handleRestoreStudent = () => {
                         <span v-else class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
                       </div>
                     </div>
+                    <FieldUpdatedStamp :date="fieldUpdatedAt('tariff')" />
                   </div>
 
                   <!-- LEVEL TO STUDY 1 -->
                   <div
-                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
+                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 pb-4 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
                     :class="[copiedField === 'level' && 'animate-copy-press']"
                     @click="handleCopy('level', student.level)"
                     title="Single-click to copy Level to Study"
@@ -2740,7 +2740,7 @@ const handleRestoreStudent = () => {
                         <GraduationCap class="w-3.5 h-3.5 text-blue-500 shrink-0" />
                         <span>LEVEL TO STUDY</span>
                       </span>
-                      <div class="relative flex items-center gap-1">
+                      <div class="flex items-center gap-1">
                         <button type="button" @click.stop="handleCopy('level', student.level)" class="w-6 h-6 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-all cursor-pointer active:scale-90" title="Copy Level">
                           <Check v-if="copiedField === 'level'" class="w-3.5 h-3.5 text-emerald-500" />
                           <Copy v-else class="w-3.5 h-3.5" />
@@ -2757,7 +2757,6 @@ const handleRestoreStudent = () => {
                         >
                           <Plus class="w-3.5 h-3.5" />
                         </button>
-                        <FieldUpdatedStamp :date="fieldUpdatedAt('level')" />
                       </div>
                     </div>
 
@@ -2767,12 +2766,13 @@ const handleRestoreStudent = () => {
                       </span>
                       <span v-else class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
                     </div>
+                    <FieldUpdatedStamp :date="fieldUpdatedAt('level')" />
                   </div>
 
                   <!-- LEVEL TO STUDY 2 (Optional) -->
                   <div
                     v-if="showLevel2"
-                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
+                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 pb-4 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
                     :class="[copiedField === 'level2' && 'animate-copy-press']"
                     @click="handleCopy('level2', student.level2)"
                     title="Single-click to copy Level to Study 2"
@@ -2782,7 +2782,7 @@ const handleRestoreStudent = () => {
                         <GraduationCap class="w-3.5 h-3.5 text-indigo-500 shrink-0" />
                         <span>LEVEL TO STUDY 2</span>
                       </span>
-                      <div class="relative flex items-center gap-1">
+                      <div class="flex items-center gap-1">
                         <button type="button" @click.stop="handleCopy('level2', student.level2)" class="w-6 h-6 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-all cursor-pointer active:scale-90" title="Copy Level 2">
                           <Check v-if="copiedField === 'level2'" class="w-3.5 h-3.5 text-emerald-500" />
                           <Copy v-else class="w-3.5 h-3.5" />
@@ -2793,7 +2793,6 @@ const handleRestoreStudent = () => {
                         <button type="button" @click.stop="clearAndHideLevel2" class="w-6 h-6 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-rose-500 flex items-center justify-center transition-all cursor-pointer active:scale-90" title="Remove Level 2">
                           <X class="w-3.5 h-3.5" />
                         </button>
-                        <FieldUpdatedStamp :date="fieldUpdatedAt('level2')" />
                       </div>
                     </div>
 
@@ -2803,6 +2802,7 @@ const handleRestoreStudent = () => {
                       </span>
                       <span v-else class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
                     </div>
+                    <FieldUpdatedStamp :date="fieldUpdatedAt('level2')" />
                   </div>
 
                   <!-- LANGUAGE CERTIFICATE 1 (Split Badge Box) -->
@@ -3211,7 +3211,7 @@ const handleRestoreStudent = () => {
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                   <!-- FATHER FULLNAME -->
                   <div
-                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
+                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 pb-4 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
                     :class="[copiedField === 'father_name' && 'animate-copy-press']"
                     @click="handleCopy('father_name', student.father_name)"
                     title="Single-click to copy Father Full Name"
@@ -3221,21 +3221,21 @@ const handleRestoreStudent = () => {
                         <User class="w-3.5 h-3.5 text-blue-500 dark:text-blue-400 shrink-0" />
                         <span>FATHER FULLNAME</span>
                       </span>
-                      <div class="relative flex items-center gap-1">
+                      <div class="flex items-center gap-1">
                         <button type="button" @click.stop="handleCopy('father_name', student.father_name)" class="w-6 h-6 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-all cursor-pointer active:scale-90" title="Copy Father Name"><Check v-if="copiedField === 'father_name'" class="w-3.5 h-3.5 text-emerald-500" /><Copy v-else class="w-3.5 h-3.5" /></button>
                         <button type="button" @click.stop="startInlineEdit('father_name', student.father_name)" class="w-6 h-6 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-all cursor-pointer active:scale-90" title="Edit Father Name"><Pencil class="w-3.5 h-3.5" /></button>
-                        <FieldUpdatedStamp :date="fieldUpdatedAt('father_name')" />
                       </div>
                     </div>
                     <div class="mt-0.5">
                       <span v-if="student.father_name" class="text-[13px] font-bold uppercase text-zinc-900 dark:text-zinc-100 tracking-tight">{{ student.father_name }}</span>
                       <span v-else class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
                     </div>
+                    <FieldUpdatedStamp :date="fieldUpdatedAt('father_name')" />
                   </div>
 
                   <!-- MOTHER FULLNAME -->
                   <div
-                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
+                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 pb-4 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
                     :class="[copiedField === 'mother_name' && 'animate-copy-press']"
                     @click="handleCopy('mother_name', student.mother_name)"
                     title="Single-click to copy Mother Full Name"
@@ -3245,21 +3245,21 @@ const handleRestoreStudent = () => {
                         <User class="w-3.5 h-3.5 text-pink-500 dark:text-pink-400 shrink-0" />
                         <span>MOTHER FULLNAME</span>
                       </span>
-                      <div class="relative flex items-center gap-1">
+                      <div class="flex items-center gap-1">
                         <button type="button" @click.stop="handleCopy('mother_name', student.mother_name)" class="w-6 h-6 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-all cursor-pointer active:scale-90" title="Copy Mother Name"><Check v-if="copiedField === 'mother_name'" class="w-3.5 h-3.5 text-emerald-500" /><Copy v-else class="w-3.5 h-3.5" /></button>
                         <button type="button" @click.stop="startInlineEdit('mother_name', student.mother_name)" class="w-6 h-6 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-all cursor-pointer active:scale-90" title="Edit Mother Name"><Pencil class="w-3.5 h-3.5" /></button>
-                        <FieldUpdatedStamp :date="fieldUpdatedAt('mother_name')" />
                       </div>
                     </div>
                     <div class="mt-0.5">
                       <span v-if="student.mother_name" class="text-[13px] font-bold uppercase text-zinc-900 dark:text-zinc-100 tracking-tight">{{ student.mother_name }}</span>
                       <span v-else class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
                     </div>
+                    <FieldUpdatedStamp :date="fieldUpdatedAt('mother_name')" />
                   </div>
 
                   <!-- FATHER PHONE (Formatted) -->
                   <div
-                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
+                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 pb-4 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
                     :class="[copiedField === 'father_phone' && 'animate-copy-press']"
                     @click="handleCopy('father_phone', formatPhoneValue(student.father_phone))"
                     title="Single-click to copy Father Phone"
@@ -3269,21 +3269,21 @@ const handleRestoreStudent = () => {
                         <Phone class="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400 shrink-0" />
                         <span>FATHER PHONE</span>
                       </span>
-                      <div class="relative flex items-center gap-1">
+                      <div class="flex items-center gap-1">
                         <button type="button" @click.stop="handleCopy('father_phone', formatPhoneValue(student.father_phone))" class="w-6 h-6 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-all cursor-pointer active:scale-90" title="Copy Father Phone"><Check v-if="copiedField === 'father_phone'" class="w-3.5 h-3.5 text-emerald-500" /><Copy v-else class="w-3.5 h-3.5" /></button>
                         <button type="button" @click.stop="startInlineEdit('father_phone', student.father_phone)" class="w-6 h-6 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-all cursor-pointer active:scale-90" title="Edit Father Phone"><Pencil class="w-3.5 h-3.5" /></button>
-                        <FieldUpdatedStamp :date="fieldUpdatedAt('father_phone')" />
                       </div>
                     </div>
                     <div class="mt-0.5">
                       <span v-if="student.father_phone" class="text-[13px] font-bold font-mono text-zinc-900 dark:text-zinc-100 tracking-tight">{{ formatPhoneValue(student.father_phone) }}</span>
                       <span v-else class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
                     </div>
+                    <FieldUpdatedStamp :date="fieldUpdatedAt('father_phone')" />
                   </div>
 
                   <!-- MOTHER PHONE (Formatted) -->
                   <div
-                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
+                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 pb-4 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
                     :class="[copiedField === 'mother_phone' && 'animate-copy-press']"
                     @click="handleCopy('mother_phone', formatPhoneValue(student.mother_phone))"
                     title="Single-click to copy Mother Phone"
@@ -3293,21 +3293,21 @@ const handleRestoreStudent = () => {
                         <Phone class="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400 shrink-0" />
                         <span>MOTHER PHONE</span>
                       </span>
-                      <div class="relative flex items-center gap-1">
+                      <div class="flex items-center gap-1">
                         <button type="button" @click.stop="handleCopy('mother_phone', formatPhoneValue(student.mother_phone))" class="w-6 h-6 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-all cursor-pointer active:scale-90" title="Copy Mother Phone"><Check v-if="copiedField === 'mother_phone'" class="w-3.5 h-3.5 text-emerald-500" /><Copy v-else class="w-3.5 h-3.5" /></button>
                         <button type="button" @click.stop="startInlineEdit('mother_phone', student.mother_phone)" class="w-6 h-6 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-all cursor-pointer active:scale-90" title="Edit Mother Phone"><Pencil class="w-3.5 h-3.5" /></button>
-                        <FieldUpdatedStamp :date="fieldUpdatedAt('mother_phone')" />
                       </div>
                     </div>
                     <div class="mt-0.5">
                       <span v-if="student.mother_phone" class="text-[13px] font-bold font-mono text-zinc-900 dark:text-zinc-100 tracking-tight">{{ formatPhoneValue(student.mother_phone) }}</span>
                       <span v-else class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
                     </div>
+                    <FieldUpdatedStamp :date="fieldUpdatedAt('mother_phone')" />
                   </div>
 
                   <!-- FATHER JOB (Work Place + Job) -->
                   <div
-                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
+                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 pb-4 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
                     :class="[copiedField === 'father_job' && 'animate-copy-press']"
                     @click="handleCopy('father_job', [student.father_workplace, student.father_job].filter(Boolean).join(' — '))"
                     title="Single-click to copy Father Job"
@@ -3334,7 +3334,7 @@ const handleRestoreStudent = () => {
 
                   <!-- MOTHER JOB (Work Place + Job) -->
                   <div
-                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
+                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 pb-4 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
                     :class="[copiedField === 'mother_job' && 'animate-copy-press']"
                     @click="handleCopy('mother_job', [student.mother_workplace, student.mother_job].filter(Boolean).join(' — '))"
                     title="Single-click to copy Mother Job"
@@ -3361,7 +3361,7 @@ const handleRestoreStudent = () => {
 
                   <!-- NOTES -->
                   <div
-                    class="sm:col-span-2 relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
+                    class="sm:col-span-2 relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 pb-4 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
                     :class="[copiedField === 'notes' && 'animate-copy-press']"
                     @click="handleCopy('notes', student.notes)"
                     title="Single-click to copy Notes"
@@ -3371,7 +3371,7 @@ const handleRestoreStudent = () => {
                         <FileText class="w-3.5 h-3.5 text-violet-500 dark:text-violet-400 shrink-0" />
                         <span>NOTES</span>
                       </span>
-                      <div class="relative flex items-center gap-1">
+                      <div class="flex items-center gap-1">
                         <button type="button" @click.stop="handleCopy('notes', student.notes)" class="w-6 h-6 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-all cursor-pointer active:scale-90" title="Copy Notes">
                           <Check v-if="copiedField === 'notes'" class="w-3.5 h-3.5 text-emerald-500" />
                           <Copy v-else class="w-3.5 h-3.5" />
@@ -3379,13 +3379,13 @@ const handleRestoreStudent = () => {
                         <button type="button" @click.stop="startInlineEdit('notes', student.notes)" class="w-6 h-6 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-all cursor-pointer active:scale-90" title="Edit Notes">
                           <Pencil class="w-3.5 h-3.5" />
                         </button>
-                        <FieldUpdatedStamp :date="fieldUpdatedAt('notes')" />
                       </div>
                     </div>
                     <div class="mt-0.5">
                       <span v-if="student.notes" class="text-[13px] font-bold uppercase text-zinc-900 dark:text-zinc-100 leading-snug tracking-tight">{{ student.notes }}</span>
                       <span v-else class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
                     </div>
+                    <FieldUpdatedStamp :date="fieldUpdatedAt('notes')" />
                   </div>
                 </div>
               </div>
@@ -3405,45 +3405,45 @@ const handleRestoreStudent = () => {
                 <div class="flex flex-col gap-1.5">
                   <!-- 3.1 OFFICE CARD (iOS Gradient Widget) -->
                   <div
-                    class="relative bg-gradient-to-br from-[#1d70f2] to-[#1456c2] text-white rounded-[13px] px-2.5 py-2 shadow-sm shadow-blue-500/15 border border-white/15 flex flex-col justify-between transition-all duration-150 group/card"
+                    class="relative bg-gradient-to-br from-[#1d70f2] to-[#1456c2] text-white rounded-[13px] px-2.5 py-2 pb-4 shadow-sm shadow-blue-500/15 border border-white/15 flex flex-col justify-between transition-all duration-150 group/card"
                   >
                     <div class="flex items-center justify-between">
                       <span class="text-[9.5px] uppercase font-bold tracking-wider text-blue-100 flex items-center gap-1.5">
                         <Building2 class="w-3.5 h-3.5" />
                         <span>OFFICE</span>
                       </span>
-                      <div class="relative flex items-center gap-1">
+                      <div class="flex items-center gap-1">
                         <button type="button" @click.stop="startInlineEdit('office', student.office)" class="w-5 h-5 rounded hover:bg-white/20 text-white/80 hover:text-white flex items-center justify-center transition-all cursor-pointer active:scale-90" title="Edit Office">
                           <Pencil class="w-3 h-3" />
                         </button>
-                        <FieldUpdatedStamp :date="fieldUpdatedAt('office')" tone="light" />
                       </div>
                     </div>
                     <div class="mt-0.5">
                       <span class="text-[13.5px] font-extrabold tracking-tight uppercase leading-tight">{{ student.office || 'Not provided' }}</span>
                     </div>
+                    <FieldUpdatedStamp :date="fieldUpdatedAt('office')" tone="light" />
                   </div>
 
                   <!-- 3.2 TARIFF PRICE CARD (iOS Gradient Widget) -->
                   <div
-                    class="relative bg-gradient-to-br from-[#7c3aed] to-[#6d28d9] rounded-[13px] px-2.5 py-2 text-white flex flex-col justify-between shadow-sm shadow-violet-500/20 border border-white/15 transition-all duration-150 group/card"
+                    class="relative bg-gradient-to-br from-[#7c3aed] to-[#6d28d9] rounded-[13px] px-2.5 py-2 pb-4 text-white flex flex-col justify-between shadow-sm shadow-violet-500/20 border border-white/15 transition-all duration-150 group/card"
                   >
                     <div class="flex items-center justify-between">
                       <span class="text-[9.5px] uppercase font-bold tracking-wider text-violet-100 flex items-center gap-1.5">
                         <Sparkles class="w-3.5 h-3.5" />
                         <span>TARIFF PRICE</span>
                       </span>
-                      <div class="relative flex items-center gap-1">
+                      <div class="flex items-center gap-1">
                         <button type="button" @click.stop="startInlineEdit('tariff', student.tariff)" class="w-5 h-5 rounded hover:bg-white/20 text-white/80 hover:text-white flex items-center justify-center transition-all cursor-pointer active:scale-90" title="Edit Tariff">
                           <Pencil class="w-3 h-3" />
                         </button>
-                        <FieldUpdatedStamp :date="fieldUpdatedAt('tariff')" tone="light" />
                       </div>
                     </div>
                     <div class="mt-0.5 flex items-baseline gap-1.5 flex-wrap">
                       <span v-if="student.tariff && computedTariffPrice > 0" class="text-[14.5px] font-extrabold tracking-tight font-mono leading-tight">{{ formatCurrency(computedTariffPrice) }}</span>
                       <span v-else class="text-[12.5px] font-semibold text-white/75 italic">Not provided</span>
                     </div>
+                    <FieldUpdatedStamp :date="fieldUpdatedAt('tariff')" tone="light" />
                   </div>
 
                   <!-- 3.3 BALANCE CARD (iOS Gradient Widget) -->
@@ -3521,7 +3521,7 @@ const handleRestoreStudent = () => {
 
                   <!-- 3.7 STUDENT ID -->
                   <div
-                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[12px] px-2.5 py-[5.5px] shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
+                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[12px] px-2.5 py-[5.5px] pb-4 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
                     :class="[copiedField === 'student_id' && 'animate-copy-press']"
                     @click="handleCopy('student_id', student.id)"
                     title="Single-click to copy Student ID"
@@ -3531,7 +3531,7 @@ const handleRestoreStudent = () => {
                         <UserCheck class="w-3.5 h-3.5 text-blue-500 shrink-0" />
                         <span>STUDENT ID</span>
                       </span>
-                      <div class="relative flex items-center gap-1">
+                      <div class="flex items-center gap-1">
                         <button type="button" @click.stop="handleCopy('student_id', student.id)" class="w-5 h-5 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-all cursor-pointer active:scale-90" title="Copy Student ID">
                           <Check v-if="copiedField === 'student_id'" class="w-3 h-3 text-emerald-500" />
                           <Copy v-else class="w-3 h-3" />
@@ -3539,28 +3539,27 @@ const handleRestoreStudent = () => {
                         <button type="button" @click.stop="startInlineEdit('id', student.id)" class="w-5 h-5 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-all cursor-pointer active:scale-90" title="Edit Student ID">
                           <Pencil class="w-3 h-3" />
                         </button>
-                        <FieldUpdatedStamp :date="fieldUpdatedAt('id')" />
                       </div>
                     </div>
                     <div class="mt-0.5">
                       <span class="font-bold font-mono text-[13px] text-zinc-900 dark:text-zinc-100 uppercase tracking-tight leading-tight">{{ student.id }}</span>
                     </div>
+                    <FieldUpdatedStamp :date="fieldUpdatedAt('id')" />
                   </div>
 
                   <!-- 3.8 GROUP -->
                   <div
-                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[12px] px-2.5 py-[5.5px] shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 group/card"
+                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[12px] px-2.5 py-[5.5px] pb-4 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 group/card"
                   >
                     <div class="flex items-center justify-between">
                       <span class="text-[9.5px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 flex items-center gap-1.5">
                         <Users class="w-3.5 h-3.5 text-indigo-500 shrink-0" />
                         <span>GROUP</span>
                       </span>
-                      <div class="relative flex items-center gap-1">
+                      <div class="flex items-center gap-1">
                         <button type="button" @click.stop="startInlineEdit('student_group', student.student_group)" class="w-5 h-5 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-all cursor-pointer active:scale-90" title="Edit Group">
                           <Pencil class="w-3 h-3" />
                         </button>
-                        <FieldUpdatedStamp :date="fieldUpdatedAt('student_group')" />
                       </div>
                     </div>
                     <div class="mt-0.5">
@@ -3569,22 +3568,22 @@ const handleRestoreStudent = () => {
                       </span>
                       <span v-else class="text-[11.5px] font-medium text-rose-500/80 italic">Not provided</span>
                     </div>
+                    <FieldUpdatedStamp :date="fieldUpdatedAt('student_group')" />
                   </div>
 
                   <!-- 3.9 LEAD BY -->
                   <div
-                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[12px] px-2.5 py-[5.5px] shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 group/card"
+                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[12px] px-2.5 py-[5.5px] pb-4 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 group/card"
                   >
                     <div class="flex items-center justify-between">
                       <span class="text-[9.5px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 flex items-center gap-1.5">
                         <UserPlus class="w-3.5 h-3.5 text-cyan-500 shrink-0" />
                         <span>LEAD BY</span>
                       </span>
-                      <div class="relative flex items-center gap-1">
+                      <div class="flex items-center gap-1">
                         <button type="button" @click.stop="startInlineEdit('lead_by', student.lead_by)" class="w-5 h-5 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-all cursor-pointer active:scale-90" title="Edit Lead By">
                           <Pencil class="w-3 h-3" />
                         </button>
-                        <FieldUpdatedStamp :date="fieldUpdatedAt('lead_by')" />
                       </div>
                     </div>
                     <div class="mt-0.5">
@@ -3593,11 +3592,12 @@ const handleRestoreStudent = () => {
                       </span>
                       <span v-else class="text-[11.5px] font-medium text-rose-500/80 italic">Not provided</span>
                     </div>
+                    <FieldUpdatedStamp :date="fieldUpdatedAt('lead_by')" />
                   </div>
 
                   <!-- 3.10 MISSING DOCUMENTS -->
                   <div
-                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[12px] px-2.5 py-[5.5px] shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
+                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[12px] px-2.5 py-[5.5px] pb-4 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
                     :class="[copiedField === 'missing_docs' && 'animate-copy-press']"
                     @click="handleCopy('missing_docs', student.pick_needed ? student.pick_needed.join(', ') : 'FULL OK')"
                     title="Single-click to copy Missing Documents"
@@ -3630,18 +3630,17 @@ const handleRestoreStudent = () => {
 
                   <!-- 3.11 KORDINATOR -->
                   <div
-                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[12px] px-2.5 py-[5.5px] shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 group/card"
+                    class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[12px] px-2.5 py-[5.5px] pb-4 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 group/card"
                   >
                     <div class="flex items-center justify-between">
                       <span class="text-[9.5px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 flex items-center gap-1.5">
                         <UserCheck class="w-3.5 h-3.5 text-emerald-500 shrink-0" />
                         <span>KORDINATOR</span>
                       </span>
-                      <div class="relative flex items-center gap-1">
+                      <div class="flex items-center gap-1">
                         <button type="button" @click.stop="startInlineEdit('coordinator', student.coordinator)" class="w-5 h-5 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-all cursor-pointer active:scale-90" title="Edit Coordinator">
                           <Pencil class="w-3 h-3" />
                         </button>
-                        <FieldUpdatedStamp :date="fieldUpdatedAt('coordinator')" />
                       </div>
                     </div>
                     <div class="mt-0.5">
@@ -3650,6 +3649,7 @@ const handleRestoreStudent = () => {
                       </span>
                       <span v-else class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
                     </div>
+                    <FieldUpdatedStamp :date="fieldUpdatedAt('coordinator')" />
                   </div>
                 </div>
               </div>
