@@ -2516,7 +2516,7 @@ const handleRestoreStudent = () => {
                   </button>
                 </div>
 
-                <div class="bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] p-3 shadow-[0_1px_3px_rgba(0,0,0,0.03)] flex flex-col gap-1">
+                <div class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] p-3 pb-[13px] shadow-[0_1px_3px_rgba(0,0,0,0.03)] flex flex-col gap-1">
                   <div
                     class="flex flex-col gap-0.5 cursor-pointer hover:bg-zinc-50/80 dark:hover:bg-zinc-800/60 p-1.5 -m-1 rounded-lg transition-all duration-150"
                     :class="[copiedField === 'final_school_name' && 'animate-copy-press']"
@@ -2676,6 +2676,7 @@ const handleRestoreStudent = () => {
                     <span>{{ eduExpanded ? 'SHOW LESS' : 'SHOW MORE' }}</span>
                     <ChevronDown class="w-3 h-3 transition-transform duration-200" :class="eduExpanded ? 'rotate-180' : ''" />
                   </button>
+                  <FieldUpdatedStamp :date="fieldUpdatedAtAny('final_school_name', 'major', 'gpa', 'gpa_system', 'degree_no', 'date_of_entry', 'date_of_graduation', 'school_address', 'school_website', 'school_phone', 'school_email', 'educational_background')" />
                 </div>
               </div>
 
@@ -2807,7 +2808,7 @@ const handleRestoreStudent = () => {
 
                   <!-- LANGUAGE CERTIFICATE 1 (Split Badge Box) -->
                   <div
-                    class="sm:col-span-2 relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 group/card"
+                    class="sm:col-span-2 relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 pb-[11px] shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 group/card"
                   >
                     <div class="flex items-center justify-between">
                       <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 flex items-center gap-1.5">
@@ -2874,12 +2875,13 @@ const handleRestoreStudent = () => {
                       </div>
                       <span v-else class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
                     </div>
+                    <FieldUpdatedStamp :date="fieldUpdatedAtAny('language_certificate', 'certificate_score', 'certificate_points', 'certificate_test_date', 'certificate_valid_date')" />
                   </div>
 
                   <!-- LANGUAGE CERTIFICATE 2 (Optional) -->
                   <div
                     v-if="showCert2"
-                    class="sm:col-span-2 relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 group/card"
+                    class="sm:col-span-2 relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 pb-[11px] shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 group/card"
                   >
                     <div class="flex items-center justify-between">
                       <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 flex items-center gap-1.5">
@@ -2949,12 +2951,13 @@ const handleRestoreStudent = () => {
                       </div>
                       <span v-else class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
                     </div>
+                    <FieldUpdatedStamp :date="fieldUpdatedAtAny('language_certificate_2', 'certificate_score_2', 'certificate_points_2', 'certificate_2_test_date', 'certificate_2_valid_date')" />
                   </div>
 
                   <!-- LANGUAGE CERTIFICATE 3 (Optional) -->
                   <div
                     v-if="showCert3"
-                    class="sm:col-span-2 relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 group/card"
+                    class="sm:col-span-2 relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 pb-[11px] shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 group/card"
                   >
                     <div class="flex items-center justify-between">
                       <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 flex items-center gap-1.5">
@@ -3015,6 +3018,7 @@ const handleRestoreStudent = () => {
                       </div>
                       <span v-else class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
                     </div>
+                    <FieldUpdatedStamp :date="fieldUpdatedAtAny('language_certificate_3', 'certificate_score_3', 'certificate_points_3', 'certificate_3_test_date', 'certificate_3_valid_date')" />
                   </div>
                 </div>
               </div>
@@ -3031,7 +3035,7 @@ const handleRestoreStudent = () => {
                   <template v-for="slot in 5" :key="slot">
                     <div
                       v-if="slot === 1 || (slot === 2 && showUni2) || (slot === 3 && showUni3) || (slot === 4 && showUni4) || (slot === 5 && showUni5)"
-                      class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
+                      class="relative bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 rounded-[14px] px-3 py-2 pb-[11px] shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white dark:hover:bg-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 cursor-pointer group/card"
                       :class="[
                         copiedField === `uni${slot}` && 'animate-copy-press',
                         activeStatusDropdown === slot ? 'z-50' : 'z-[1]'
@@ -3194,6 +3198,7 @@ const handleRestoreStudent = () => {
                           <span class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
                         </template>
                       </div>
+                      <FieldUpdatedStamp :date="fieldUpdatedAtAny(`university_${slot}`, `university_${slot}_status`, `university_${slot}_major`)" />
                     </div>
                   </template>
                 </div>
