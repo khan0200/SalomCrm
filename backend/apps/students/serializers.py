@@ -115,7 +115,7 @@ class StudentDetailSerializer(MyPreferenceFieldsMixin, serializers.ModelSerializ
 # Fields whose edit date is never shown in the drawer, so stamping them would
 # just bloat the JSON: bookkeeping flags, computed columns and the stamp itself.
 FIELD_STAMP_EXCLUDE = {
-    'id', 'tenant', 'created_by', 'created_at', 'updated_at',
+    'tenant', 'created_by', 'created_at', 'updated_at',
     'field_updated_at', 'balance', 'discount', 'payment_id', 'workflow_stage',
     'is_deleted', 'is_permanently_deleted', 'permanently_deleted_at',
     'jarayon_updated_at', 'status_hidden', 'row_color', 'folder_ids',

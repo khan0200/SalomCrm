@@ -514,6 +514,16 @@ const fieldUpdatedAt = (field: string): string | null => {
   return typeof val === 'string' && val.trim() ? val.trim() : null
 }
 
+// Newest stamp across several fields, for cards that render more than one
+// value (Father/Mother Job combine workplace + job). ISO dates sort
+// lexicographically, so plain string comparison gives the most recent.
+const fieldUpdatedAtAny = (...fields: string[]): string | null => {
+  const dates = fields.map(fieldUpdatedAt).filter((d): d is string => !!d)
+  if (!dates.length) return null
+  const sorted = dates.sort()
+  return sorted[sorted.length - 1]
+}
+
 const isFieldModalOpen = computed(() => editingField.value !== null && !!fieldModalConfig[editingField.value])
 const activeFieldModalDef = computed(() => (editingField.value && fieldModalConfig[editingField.value]) || null)
 const isFieldModalValueInvalid = computed(() => {
@@ -2082,6 +2092,7 @@ const handleRestoreStudent = () => {
                         <span v-else class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
                       </template>
                     </div>
+                    <FieldUpdatedStamp :date="fieldUpdatedAt(nameLanguage === 'KR' ? 'korean_name' : 'full_name')" />
                   </div>
 
                   <!-- FAMILY NAME [AUTO] -->
@@ -3318,6 +3329,7 @@ const handleRestoreStudent = () => {
                     <div class="mt-0.5" v-else>
                       <span class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
                     </div>
+                    <FieldUpdatedStamp :date="fieldUpdatedAtAny('father_workplace', 'father_job')" />
                   </div>
 
                   <!-- MOTHER JOB (Work Place + Job) -->
@@ -3344,6 +3356,7 @@ const handleRestoreStudent = () => {
                     <div class="mt-0.5" v-else>
                       <span class="text-[12.5px] font-medium text-rose-500/80 italic">Not provided</span>
                     </div>
+                    <FieldUpdatedStamp :date="fieldUpdatedAtAny('mother_workplace', 'mother_job')" />
                   </div>
 
                   <!-- NOTES -->
