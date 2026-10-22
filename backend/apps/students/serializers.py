@@ -254,8 +254,32 @@ class StudentCreateUpdateSerializer(serializers.ModelSerializer):
         old_id = instance.pk
         if raw_new_id and str(raw_new_id).strip().upper() != str(old_id).strip().upper():
             from django.db import connection, transaction
+            from rest_framework.exceptions import ValidationError
 
             new_id_upper = str(raw_new_id).strip().upper()
+
+            # Student.id is the primary key, so it is unique across the whole
+            # install rather than per tenant. Renaming onto an id another
+            # agency already uses would raise an IntegrityError from the raw
+            # UPDATE below; catch it first and say which record is in the way.
+            # The clash is reported without naming the other student, since
+            # that record can belong to a different tenant.
+            clash = Student.objects.filter(id=new_id_upper).first()
+            if clash is not None:
+                same_tenant = clash.tenant_id == instance.tenant_id
+                if same_tenant:
+                    detail = (
+                        f"Student ID '{new_id_upper}' is already used by "
+                        f"{clash.full_name or 'another student'}. "
+                        "Free that ID first, or pick a different one."
+                    )
+                else:
+                    detail = (
+                        f"Student ID '{new_id_upper}' is already taken by another "
+                        "branch. Student IDs are shared across all branches, so "
+                        "pick a different ID."
+                    )
+                raise ValidationError({'id': detail})
 
             with transaction.atomic():
                 # Raw SQL UPDATE on id — bypasses Django's PK-change restriction.

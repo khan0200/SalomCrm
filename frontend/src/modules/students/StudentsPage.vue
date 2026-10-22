@@ -394,6 +394,23 @@ const updateStudentMutation = useMutation({
       title: 'Student Updated',
       message: 'Student details updated successfully.'
     })
+  },
+  onError: (err: any) => {
+    // Without this the optimistic patch stayed on screen and the request
+    // failed silently - a rejected Student ID rename looked like it worked
+    // until the page was reloaded. Refetching restores the server's truth.
+    const data = err?.response?.data
+    const message =
+      (typeof data?.id === 'string' && data.id) ||
+      (Array.isArray(data?.id) && data.id[0]) ||
+      data?.detail ||
+      err?.message ||
+      'Could not save the change.'
+    uiStore.addToast({ type: 'error', title: 'Update Failed', message })
+    queryClient.invalidateQueries({ queryKey: ['all-students-master'] })
+    if (selectedDetailStudentId.value) {
+      queryClient.invalidateQueries({ queryKey: ['student-detail', selectedDetailStudentId.value] })
+    }
   }
 })
 
