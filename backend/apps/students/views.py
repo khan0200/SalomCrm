@@ -2566,22 +2566,10 @@ class ContractViewSet(viewsets.ModelViewSet):
         from apps.students.services import normalize_date_to_iso
         crm_student = Student.objects.filter(tenant=tenant, id=student_id).first()
         if not crm_student:
-            # Student.id is the bare primary key (global, not per-tenant -
-            # see Student.Meta), so a match under a DIFFERENT tenant means
-            # this ID is already taken agency-wide, not just by us. A
-            # permanently-deleted row frees its old id for reuse (data
-            # retention keeps the row, not the id) - same convention as
-            # StudentCreateUpdateSerializer.create()'s identical guard.
-            global_match = Student.objects.filter(id=student_id).exclude(tenant=tenant).first()
-            if global_match:
-                if global_match.is_permanently_deleted:
-                    global_match.delete()
-                else:
-                    return Response(
-                        {'detail': f"'{student_id}' ID band - bu ID boshqa tenant tomonidan ishlatilmoqda. Boshqa ID tanlang."},
-                        status=status.HTTP_409_CONFLICT
-                    )
-
+            # Student numbers are per-tenant, so another branch already using
+            # this number is not a conflict and must not be touched. Only a
+            # permanently-deleted row in THIS tenant blocks reuse, and the
+            # serializer's create() guard handles that case.
             crm_student = Student.objects.create(
                 id=student_id,
                 tenant=tenant,

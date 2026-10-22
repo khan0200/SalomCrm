@@ -57,19 +57,20 @@ class Student(TenantAwareModel):
     university choices, language certificates, and status board parameters.
     """
     # 1. Personal & Contact Information
-    id = models.CharField(max_length=50, primary_key=True)  # Alphanumeric uppercase e.g. "UB120", "AA01"
+    # The agency-facing student number (e.g. "UB120", "T15"). Unique WITHIN a
+    # tenant, not globally: every branch numbers its own students, so two
+    # branches may both have a T15. Always look students up together with
+    # their tenant - an id alone is ambiguous across the install.
+    id = models.CharField(max_length=50, db_index=True)
 
-    # Immutable payment anchor — set once at creation from id (e.g. "PF49" for student "F49").
-    # NEVER updated after initial set. Payments FK points here so renaming Student.id
-    # never orphans payment history.
+    # Immutable anchor and the real primary key. Set once at creation from id
+    # (e.g. "PF49" for student "F49") and NEVER updated, so renaming a
+    # student's id leaves payments, contracts and preferences attached.
     payment_id = models.CharField(
         max_length=55,
-        unique=True,
-        null=True,
-        blank=True,
+        primary_key=True,
         editable=False,
-        db_index=True,
-        help_text="Immutable payment anchor. Set once on creation (P + student id). Never changes."
+        help_text="Immutable primary key. Set once on creation (P + student id). Never changes."
     )
 
     full_name = models.CharField(max_length=255, db_index=True)
@@ -238,6 +239,11 @@ class Student(TenantAwareModel):
         verbose_name = 'Student'
         verbose_name_plural = 'Students'
         ordering = ['-created_at']
+        constraints = [
+            # Student numbers are per-branch; this is what lets unibridge and
+            # sodiq each have their own T15.
+            models.UniqueConstraint(fields=['tenant', 'id'], name='uniq_student_id_per_tenant'),
+        ]
         indexes = [
             models.Index(fields=['tenant', 'id']),
             models.Index(fields=['tenant', 'full_name']),
@@ -265,9 +271,15 @@ class Student(TenantAwareModel):
         # "P<id>" anchor occupying the row, so when that candidate is already
         # taken we keep doubling the "P" prefix (PPG49, PPPG49, ...) until we
         # land on a free one instead of raising a 500 on save.
+        # payment_id is the primary key, so it must exist before the first
+        # INSERT and can never change afterwards. Student numbers are only
+        # unique per tenant now, so "PT15" can genuinely be taken by another
+        # branch's T15 - keep doubling the "P" prefix (PT15, PPT15, PPPT15,
+        # ...) until a free anchor is found, which is also how a reused id
+        # from a permanently-deleted row is handled.
         if not self.payment_id and self.id:
             candidate = f"P{self.id.strip().upper()}"
-            while Student.objects.filter(payment_id=candidate).exclude(pk=self.pk).exists():
+            while Student.objects.filter(payment_id=candidate).exists():
                 candidate = f"P{candidate}"
             self.payment_id = candidate
 

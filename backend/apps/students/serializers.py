@@ -210,15 +210,21 @@ class StudentCreateUpdateSerializer(serializers.ModelSerializer):
             except Exception as e:
                 logger.error(f"Auto-translation on student create failed: {e}")
 
-        # A permanently-deleted student row stays in the DB (data retention —
-        # see services.permanent_delete_student) still holding its old id as
-        # PK. Re-issuing that same id to a brand-new student is intentionally
-        # allowed (active/archived ids must never be reused, but permanently
-        # deleted ones may be), so free the id by hard-deleting the stale row
-        # instead of hitting a PK IntegrityError on create.
+        # Student numbers are unique per tenant, so this only looks at the
+        # creating branch's own records - another branch using the same
+        # number is none of our business. (The old global check could
+        # hard-delete a DIFFERENT tenant's permanently-deleted row to free
+        # an id, destroying data that branch still owned.)
+        #
+        # A permanently-deleted row stays in the DB for data retention (see
+        # services.permanent_delete_student) while still holding its id.
+        # Re-issuing that id within the same tenant is intentionally allowed
+        # - active/archived ids must never be reused, permanently deleted
+        # ones may be - so drop the stale row to free the number.
         new_id = str(validated_data.get('id') or '').strip().upper()
-        if new_id:
-            existing = Student.objects.filter(id=new_id).first()
+        tenant = validated_data.get('tenant')
+        if new_id and tenant is not None:
+            existing = Student.objects.filter(tenant=tenant, id=new_id).first()
             if existing:
                 if existing.is_permanently_deleted:
                     existing.delete()
@@ -251,66 +257,37 @@ class StudentCreateUpdateSerializer(serializers.ModelSerializer):
             validated_data['field_updated_at'] = new_stamps
 
         raw_new_id = validated_data.get('id')
-        old_id = instance.pk
+        # The student number, not instance.pk - pk is payment_id now.
+        old_id = instance.id
         if raw_new_id and str(raw_new_id).strip().upper() != str(old_id).strip().upper():
-            from django.db import connection, transaction
             from rest_framework.exceptions import ValidationError
 
             new_id_upper = str(raw_new_id).strip().upper()
 
-            # Student.id is the primary key, so it is unique across the whole
-            # install rather than per tenant. Renaming onto an id another
-            # agency already uses would raise an IntegrityError from the raw
-            # UPDATE below; catch it first and say which record is in the way.
-            # The clash is reported without naming the other student, since
-            # that record can belong to a different tenant.
-            clash = Student.objects.filter(id=new_id_upper).first()
+            # Student numbers are unique per tenant, so only this branch's
+            # records can collide - another branch legitimately having the
+            # same number is not a conflict. payment_id is the primary key
+            # and never changes, so a rename needs no raw SQL and leaves
+            # payments, contracts and preferences attached.
+            clash = (
+                Student.objects
+                .filter(tenant_id=instance.tenant_id, id=new_id_upper)
+                .exclude(pk=instance.pk)
+                .first()
+            )
             if clash is not None:
-                same_tenant = clash.tenant_id == instance.tenant_id
-                if same_tenant:
-                    detail = (
-                        f"Student ID '{new_id_upper}' is already used by "
-                        f"{clash.full_name or 'another student'}. "
-                        "Free that ID first, or pick a different one."
-                    )
-                else:
-                    detail = (
-                        f"Student ID '{new_id_upper}' is already taken by another "
-                        "branch. Student IDs are shared across all branches, so "
-                        "pick a different ID."
-                    )
-                raise ValidationError({'id': detail})
+                raise ValidationError({'id': (
+                    f"Student ID '{new_id_upper}' is already used by "
+                    f"{clash.full_name or 'another student'}. "
+                    "Free that ID first, or pick a different one."
+                )})
 
-            with transaction.atomic():
-                # Raw SQL UPDATE on id — bypasses Django's PK-change restriction.
-                # payment_id is NOT updated (stays as original e.g. 'PT207').
-                # All other field changes are applied in the same transaction.
-                other_fields = {k: v for k, v in validated_data.items() if k != 'id'}
-                for attr, value in other_fields.items():
-                    setattr(instance, attr, value)
+            validated_data['id'] = new_id_upper
+            logger.info(
+                "Student id renamed %s -> %s (tenant %s); payment_id %s unchanged.",
+                old_id, new_id_upper, instance.tenant_id, instance.payment_id,
+            )
 
-                # First rename id via raw SQL (no FK cascades since payments
-                # reference payment_id, not id)
-                with connection.cursor() as cursor:
-                    cursor.execute(
-                        "UPDATE students SET id = %s WHERE id = %s",
-                        [new_id_upper, old_id]
-                    )
-
-                # Now save remaining field changes (update_fields avoids
-                # touching id or payment_id)
-                if other_fields:
-                    instance.pk = new_id_upper
-                    instance.save(update_fields=list(other_fields.keys()) + ['updated_at'])
-                else:
-                    instance.pk = new_id_upper
-
-                logger.info(
-                    f"Student ID renamed {old_id} -> {new_id_upper} via raw SQL. "
-                    f"payment_id '{instance.payment_id}' unchanged."
-                )
-
-            return instance
         # ── End ID rename handling ────────────────────────────────────────────
 
         # If full_name was changed and korean_name was NOT explicitly sent, auto-translate full_name to Korean
