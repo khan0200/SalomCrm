@@ -377,26 +377,26 @@ class StudentViewSet(viewsets.ModelViewSet):
 
     # ── Actions: Archive / Restore / Permanent Delete ──────────────────────
     @action(detail=True, methods=['post'])
-    def archive(self, request, pk=None):
+    def archive(self, request, id=None):
         student = self.get_object()
         archive_student(student, request.user)
         return Response({'status': 'Student archived'})
 
     @action(detail=True, methods=['post'])
-    def restore(self, request, pk=None):
+    def restore(self, request, id=None):
         student = self.get_object()
         restore_student(student, request.user)
         return Response({'status': 'Student restored'})
 
     @action(detail=True, methods=['delete'], permission_classes=[IsTenantHeadManager])
-    def permanent_delete(self, request, pk=None):
+    def permanent_delete(self, request, id=None):
         student = self.get_object()
         permanent_delete_student(student, request.user)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     # ── Actions: Color / Folder Assignment / Custom Tags ───────────────────
     @action(detail=True, methods=['post'])
-    def set_color(self, request, pk=None):
+    def set_color(self, request, id=None):
         student = self.get_object()
         serializer = StudentSetColorSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -442,7 +442,7 @@ class StudentViewSet(viewsets.ModelViewSet):
         })
 
     @action(detail=True, methods=['post'])
-    def set_folders(self, request, pk=None):
+    def set_folders(self, request, id=None):
         student = self.get_object()
         serializer = StudentSetFoldersSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -461,7 +461,7 @@ class StudentViewSet(viewsets.ModelViewSet):
         })
 
     @action(detail=True, methods=['post'])
-    def toggle_tag(self, request, pk=None):
+    def toggle_tag(self, request, id=None):
         student = self.get_object()
         tag_name = request.data.get('tag')
         scope = request.data.get('scope', 'all')
@@ -511,7 +511,7 @@ class StudentViewSet(viewsets.ModelViewSet):
         })
 
     @action(detail=True, methods=['post'])
-    def clear_all(self, request, pk=None):
+    def clear_all(self, request, id=None):
         student = self.get_object()
         student.row_color = None
         student.status_row_color = None
@@ -528,7 +528,7 @@ class StudentViewSet(viewsets.ModelViewSet):
         })
 
     @action(detail=True, methods=['post'], url_path='translate-korean')
-    def translate_korean(self, request, pk=None):
+    def translate_korean(self, request, id=None):
         """Translates/transliterates student's English Full Name to Korean using AI."""
         student = self.get_object()
         full_name = request.data.get('full_name') or student.full_name
