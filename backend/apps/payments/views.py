@@ -102,7 +102,11 @@ class PaymentViewSet(viewsets.ModelViewSet):
         user = request.user
         sid = student_id.strip().upper()
         student_qs = Student.objects.filter(Q(id=sid) | Q(payment_id=sid))
-        if tenant and not (user.is_superuser or getattr(user, 'role', '') == UserRole.SUPER_ADMIN):
+        # Student numbers repeat across branches, so an unscoped match is
+        # ambiguous. Scope to the acting tenant whenever we have one - even
+        # for a superuser, who would otherwise get whichever branch's row
+        # happened to come back first.
+        if tenant:
             student_qs = student_qs.filter(tenant=tenant)
         student = student_qs.filter(branch_scope_filter(user)).first()
         if student is None and student_qs.exists():

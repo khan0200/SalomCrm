@@ -91,6 +91,13 @@ class StudentViewSet(viewsets.ModelViewSet):
     alphanumeric ID sorting, folder scopes, soft archive/restore, and color tagging.
     """
     permission_classes = [IsTenantManagerOrReadOnly]
+    # URLs carry the agency-facing student number (/students/F011/), not the
+    # payment_id primary key. Since student numbers are only unique per
+    # tenant, this is safe purely because get_queryset() below already
+    # restricts the queryset to the caller's tenant before get_object()
+    # filters it - two branches' F011 can never be confused.
+    lookup_field = 'id'
+    lookup_value_regex = '[^/]+'
 
     def get_serializer_class(self):
         if self.action == 'list':
