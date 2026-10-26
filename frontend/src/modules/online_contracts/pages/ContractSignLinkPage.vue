@@ -247,6 +247,30 @@ function startKycPolling() {
   pollTimer = setInterval(refreshKycStatus, 4000)
 }
 
+// True when a window.open() call was swallowed by the browser. Mobile
+// Chrome/Safari only honour window.open inside the click handler itself;
+// ours runs after an await, so the popup is routinely blocked and the
+// visitor was left staring at "continue in the verification window" with
+// no window ever having opened.
+const kycPopupBlocked = ref(false)
+
+function openKycWindow(url: string): boolean {
+  // No 'noopener' on purpose: severing window.opener would block
+  // window.close() from working once Didit's callback lands back on
+  // this same page.
+  const w = window.open(url, '_blank')
+  const blocked = !w || w.closed || typeof w.closed === 'undefined'
+  kycPopupBlocked.value = blocked
+  return !blocked
+}
+
+// Fallback for a blocked popup: Didit redirects back to this same URL when
+// it finishes, so navigating the current tab completes the flow just as
+// well - the page reloads into the callback branch and resumes polling.
+function openKycHere() {
+  if (kycSessionUrl.value) window.location.href = kycSessionUrl.value
+}
+
 async function handleStartKyc() {
   kycError.value = ''
   isStartingKyc.value = true
@@ -254,10 +278,7 @@ async function handleStartKyc() {
     const res = await onlineContractsApi.startSignKyc(token.value, 'PASSPORT')
     kycStatus.value = res.status
     kycSessionUrl.value = res.url
-    // No 'noopener' on purpose: severing window.opener would block
-    // window.close() from working once Didit's callback lands back on
-    // this same page.
-    window.open(res.url, '_blank')
+    openKycWindow(res.url)
     startKycPolling()
   } catch (err: any) {
     kycError.value = err?.response?.data?.detail
@@ -268,7 +289,7 @@ async function handleStartKyc() {
 }
 
 function handleReopenKyc() {
-  if (kycSessionUrl.value) window.open(kycSessionUrl.value, '_blank')
+  if (kycSessionUrl.value) openKycWindow(kycSessionUrl.value)
 }
 
 function handleRetryKyc() {
@@ -735,22 +756,49 @@ onBeforeUnmount(() => {
 
           <template v-else-if="kycStatus === 'IN_PROGRESS'">
             <div class="flex flex-col items-center text-center py-6">
-              <Loader2 class="w-6 h-6 animate-spin text-zinc-900 dark:text-white mb-3" />
-              <p class="text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
-                Tekshiruv oynasida davom eting
-              </p>
-              <p class="text-[11px] text-zinc-500 dark:text-zinc-400 max-w-xs leading-relaxed mb-5">
-                Yangi ochilgan oynada hujjatingizni skanerlab, selfie oling. Tasdiqlangach, o'sha oynani yoping va
-                <strong>shu sahifaga qayting</strong> - avtomatik davom etadi.
-              </p>
+              <!-- Popup blocked (the normal case on mobile): lead with the
+                   button that continues in this tab, since telling the
+                   visitor to use a window that never opened is what left
+                   them stuck here. -->
+              <template v-if="kycPopupBlocked">
+                <ScanFace class="w-6 h-6 text-zinc-900 dark:text-white mb-3" />
+                <p class="text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                  Tekshiruvni davom ettiring
+                </p>
+                <p class="text-[11px] text-zinc-500 dark:text-zinc-400 max-w-xs leading-relaxed mb-4">
+                  Brauzeringiz yangi oynani ochishga ruxsat bermadi. Quyidagi tugma orqali
+                  shu sahifada davom eting - tasdiqlangach avtomatik qaytasiz.
+                </p>
+                <button
+                  type="button"
+                  @click="openKycHere"
+                  class="w-full max-w-xs inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:hover:bg-white dark:text-zinc-950 text-xs font-medium transition-all cursor-pointer active:scale-98 shadow-xs mb-4"
+                >
+                  <ScanFace class="w-3.5 h-3.5" />
+                  <span>Tekshiruvni ochish</span>
+                  <ArrowRight class="w-3.5 h-3.5" />
+                </button>
+              </template>
+
+              <template v-else>
+                <Loader2 class="w-6 h-6 animate-spin text-zinc-900 dark:text-white mb-3" />
+                <p class="text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                  Tekshiruv oynasida davom eting
+                </p>
+                <p class="text-[11px] text-zinc-500 dark:text-zinc-400 max-w-xs leading-relaxed mb-5">
+                  Yangi ochilgan oynada hujjatingizni skanerlab, selfie oling. Tasdiqlangach, o'sha oynani yoping va
+                  <strong>shu sahifaga qayting</strong> - avtomatik davom etadi.
+                </p>
+              </template>
+
               <div class="flex items-center gap-3">
                 <button
                   type="button"
-                  @click="handleReopenKyc"
+                  @click="kycPopupBlocked ? openKycHere() : handleReopenKyc()"
                   class="inline-flex items-center gap-1.5 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white underline transition-colors cursor-pointer"
                 >
                   <ExternalLink class="w-3.5 h-3.5" />
-                  <span>Oynani qayta ochish</span>
+                  <span>{{ kycPopupBlocked ? 'Shu sahifada ochish' : 'Oynani qayta ochish' }}</span>
                 </button>
                 <button
                   type="button"
