@@ -72,11 +72,28 @@ const kycConfirmError = ref('')
 // Landing here with that query param means this load IS the popup tab
 // returning - close it immediately so the visitor ends up back on the
 // original tab, which is already polling.
-const isDiditCallbackTab = !!new URLSearchParams(window.location.search).get('verificationSessionId')
+// Set when this tab navigated to Didit itself (popup was blocked), so the
+// return is a normal navigation in the SAME tab - there is nothing to
+// close and no other tab waiting behind it. Survives the round trip via
+// sessionStorage because the page fully reloads on the way back.
+const KYC_SAME_TAB_KEY = 'kyc_same_tab_flow'
+
+const isDiditCallback = !!new URLSearchParams(window.location.search).get('verificationSessionId')
+const isSameTabReturn = sessionStorage.getItem(KYC_SAME_TAB_KEY) === '1'
+// Only the popup variant should try to close itself and show the
+// "close this window" notice.
+const isDiditCallbackTab = isDiditCallback && !isSameTabReturn
 const showManualCloseMessage = ref(false)
 if (isDiditCallbackTab) {
   window.close()
   setTimeout(() => { showManualCloseMessage.value = true }, 600)
+}
+if (isDiditCallback && isSameTabReturn) {
+  // Returned into the original tab: drop the flag and strip the query so a
+  // refresh does not look like another callback, then let the normal flow
+  // resume - the status fetch below picks the verification up.
+  sessionStorage.removeItem(KYC_SAME_TAB_KEY)
+  window.history.replaceState({}, '', window.location.pathname)
 }
 
 // ── Preview + declarations (student) ──────────────────────────────────────
@@ -268,7 +285,9 @@ function openKycWindow(url: string): boolean {
 // it finishes, so navigating the current tab completes the flow just as
 // well - the page reloads into the callback branch and resumes polling.
 function openKycHere() {
-  if (kycSessionUrl.value) window.location.href = kycSessionUrl.value
+  if (!kycSessionUrl.value) return
+  sessionStorage.setItem(KYC_SAME_TAB_KEY, '1')
+  window.location.href = kycSessionUrl.value
 }
 
 async function handleStartKyc() {
