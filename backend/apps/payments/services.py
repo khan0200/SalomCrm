@@ -53,8 +53,10 @@ def recalculate_student_financials(student, reprice=False):
     """
     from apps.students.models import Student
     with cast(Any, transaction.atomic()):
-        # Lock row to prevent race conditions
-        student_obj = Student.objects.select_for_update().get(id=student.id)
+        # Lock row to prevent race conditions. Re-fetch by pk (payment_id),
+        # never by id: student numbers are only unique per tenant, so two
+        # branches' "T15" would make get(id=...) raise MultipleObjectsReturned.
+        student_obj = Student.objects.select_for_update().get(pk=student.pk)
 
         # 1. Calculate sum of standard payments (non-discount, non-withdrawal)
         payments_sum = student_obj.payments.filter(
