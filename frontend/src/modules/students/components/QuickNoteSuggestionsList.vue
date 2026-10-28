@@ -119,7 +119,7 @@ const handleDelete = async (item: QuickNoteSuggestionItem) => {
     <div class="flex items-center justify-between pb-0.5">
       <div class="flex items-center gap-1.5 text-[11px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider select-none">
         <Sparkles class="w-3.5 h-3.5 text-amber-500 shrink-0" />
-        <span>Suggestions (Click to insert):</span>
+        <span>SUGGESTIONS:</span>
       </div>
 
       <button
