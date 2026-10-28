@@ -245,22 +245,26 @@ const performClearAll = () => {
 }
 
 const handleSaveQuickNotes = () => {
-  isSavingQuickNotes.value = true
-  emit('update-quick-notes', localQuickNotes.value.trim())
+  const text = localQuickNotes.value.trim()
+  if (props.student) {
+    props.student.quick_notes = text
+  }
+  isEditingQuickNotes.value = false
+  quickNotesSavedBadge.value = true
   setTimeout(() => {
-    isSavingQuickNotes.value = false
-    isEditingQuickNotes.value = false
-    quickNotesSavedBadge.value = true
-    setTimeout(() => {
-      quickNotesSavedBadge.value = false
-    }, 2500)
-  }, 200)
+    quickNotesSavedBadge.value = false
+  }, 2000)
+  emit('update-quick-notes', text)
 }
 
 const handleDeleteQuickNotes = () => {
-  if (!confirm('Delete quick note for this student?')) return
+  const name = props.student?.full_name || 'this student'
+  if (!confirm(`Are you sure you want to delete quick note for "${name}"?`)) return
   localQuickNotes.value = ''
-  isEditingQuickNotes.value = true
+  if (props.student) {
+    props.student.quick_notes = ''
+  }
+  isEditingQuickNotes.value = false
   emit('update-quick-notes', '')
 }
 
@@ -316,7 +320,7 @@ const handleRestoreStudent = () => {
         >
           <div
             v-if="student"
-            class="relative w-full max-w-[640px] overflow-hidden rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-2xl z-10 text-xs text-zinc-900 dark:text-zinc-100 flex flex-col my-auto select-none"
+            class="relative w-full max-w-[760px] overflow-hidden rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-2xl z-10 text-xs text-zinc-900 dark:text-zinc-100 flex flex-col my-auto select-none transition-all"
             @click.stop
           >
             <!-- 1. Header with Student Name, ID, +Note and Close Button -->
@@ -528,53 +532,58 @@ const handleRestoreStudent = () => {
                   </button>
                 </div>
 
-                <!-- 3. Edit View -->
-                <div v-else class="space-y-2">
-                  <textarea
-                    ref="quickNoteTextareaRef"
-                    v-model="localQuickNotes"
-                    rows="3"
-                    placeholder="Type quick note (e.g. O'tgan semestrda atkazi bor, Zagrani hali chiqmadi)..."
-                    class="w-full px-3 py-2 text-xs rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50/50 dark:bg-zinc-800/60 text-zinc-800 dark:text-zinc-200 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500/25 focus:border-blue-500 transition-all resize-y select-text"
-                    @keydown.ctrl.enter.prevent="handleSaveQuickNotes"
-                    @keydown.meta.enter.prevent="handleSaveQuickNotes"
-                  />
+                <!-- 3. Edit View (Side-by-side: Input on left, Suggestions on right) -->
+                <div v-else class="grid grid-cols-1 md:grid-cols-12 gap-5 items-stretch">
+                  <!-- Left: Input & Buttons -->
+                  <div class="md:col-span-7 flex flex-col space-y-2">
+                    <textarea
+                      ref="quickNoteTextareaRef"
+                      v-model="localQuickNotes"
+                      rows="6"
+                      placeholder="Type quick note (e.g. O'tgan semestrda atkazi bor, Zagrani hali chiqmadi)..."
+                      class="w-full flex-1 px-3 py-2 text-xs rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50/50 dark:bg-zinc-800/60 text-zinc-800 dark:text-zinc-200 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500/25 focus:border-blue-500 transition-all resize-none min-h-[140px] select-text"
+                      @keydown.ctrl.enter.prevent="handleSaveQuickNotes"
+                      @keydown.meta.enter.prevent="handleSaveQuickNotes"
+                    />
 
-                  <!-- Suggestions While Writing (Editable & Deletable) -->
-                  <QuickNoteSuggestionsList
-                    :filter-text="localQuickNotes"
-                    max-height-class="max-h-28"
-                    @select="applyQuickNoteSuggestion"
-                  />
+                    <div class="flex items-center justify-between gap-2 pt-1">
+                      <button
+                        v-if="hasQuickNotes"
+                        type="button"
+                        @click="cancelEditQuickNotes"
+                        class="text-[11px] font-semibold text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 cursor-pointer transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        v-else-if="localQuickNotes"
+                        type="button"
+                        @click="localQuickNotes = ''"
+                        class="text-[11px] font-semibold text-rose-500 hover:text-rose-600 dark:hover:text-rose-400 cursor-pointer transition-colors"
+                      >
+                        Clear
+                      </button>
+                      <span v-else class="text-[10px] text-zinc-400 italic">Press Ctrl+Enter to save</span>
 
-                  <div class="flex items-center justify-between gap-2 pt-1">
-                    <button
-                      v-if="hasQuickNotes"
-                      type="button"
-                      @click="cancelEditQuickNotes"
-                      class="text-[11px] font-semibold text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 cursor-pointer transition-colors"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      v-else-if="localQuickNotes"
-                      type="button"
-                      @click="localQuickNotes = ''"
-                      class="text-[11px] font-semibold text-rose-500 hover:text-rose-600 dark:hover:text-rose-400 cursor-pointer transition-colors"
-                    >
-                      Clear
-                    </button>
-                    <span v-else class="text-[10px] text-zinc-400 italic">Press Ctrl+Enter to save</span>
+                      <button
+                        type="button"
+                        @click="handleSaveQuickNotes"
+                        :disabled="localQuickNotes === (student.quick_notes || '')"
+                        class="px-3.5 py-1.5 rounded-xl text-[11.5px] font-bold bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white shadow-xs transition-all cursor-pointer flex items-center gap-1.5 ml-auto active:scale-95"
+                      >
+                        <Check class="w-3.5 h-3.5 stroke-[2.5]" />
+                        <span>Save Note</span>
+                      </button>
+                    </div>
+                  </div>
 
-                    <button
-                      type="button"
-                      @click="handleSaveQuickNotes"
-                      :disabled="isSavingQuickNotes || localQuickNotes === (student.quick_notes || '')"
-                      class="px-3.5 py-1.5 rounded-xl text-[11.5px] font-bold bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white shadow-xs transition-all cursor-pointer flex items-center gap-1.5 ml-auto active:scale-95"
-                    >
-                      <Check class="w-3.5 h-3.5 stroke-[2.5]" />
-                      <span>{{ isSavingQuickNotes ? 'Saving...' : 'Save Note' }}</span>
-                    </button>
+                  <!-- Right: Quick Note Suggestion Board -->
+                  <div class="md:col-span-5 border-t md:border-t-0 md:border-l border-zinc-200 dark:border-zinc-800 pt-3 md:pt-0 md:pl-4 flex flex-col">
+                    <QuickNoteSuggestionsList
+                      :filter-text="localQuickNotes"
+                      max-height-class="max-h-[190px]"
+                      @select="applyQuickNoteSuggestion"
+                    />
                   </div>
                 </div>
               </div>

@@ -679,9 +679,11 @@ const handleOpenQuickNotes = (student: Student) => {
   isQuickNoteModalOpen.value = true
 }
 
-const handleSaveQuickNotes = async (notes: string, student: Student) => {
+const handleSaveQuickNotes = (notes: string, student: Student) => {
   const trimmed = notes.trim()
-  // 0ms instant optimistic update across caches and open modals
+  const previousNote = student.quick_notes || null
+  // 0ms instant optimistic update across all local state and caches
+  student.quick_notes = trimmed || null
   updateMasterStudentOptimistically(student.id, s => ({ ...s, quick_notes: trimmed || null }))
   if (selectedActionStudent.value && selectedActionStudent.value.id === student.id) {
     selectedActionStudent.value = { ...selectedActionStudent.value, quick_notes: trimmed || null }
@@ -692,23 +694,24 @@ const handleSaveQuickNotes = async (notes: string, student: Student) => {
   if (quickNoteStudent.value && quickNoteStudent.value.id === student.id) {
     quickNoteStudent.value = { ...quickNoteStudent.value, quick_notes: trimmed || null }
   }
-  try {
-    await studentsApi.updateStudent(student.id, { quick_notes: trimmed })
-    queryClient.invalidateQueries({ queryKey: ['all-students-master'] })
-    queryClient.invalidateQueries({ queryKey: ['student-detail', student.id] })
+
+  // Fire in background with dedicated fast endpoint (0ms UI wait)
+  studentsApi.updateQuickNotes(student.id, trimmed).then(() => {
     uiStore.addToast({
       type: 'success',
       title: 'Quick Note Saved',
       message: `Note updated for ${student.full_name}`
     })
-  } catch (err: any) {
+  }).catch((err: any) => {
+    // Rollback on network failure
+    student.quick_notes = previousNote
+    updateMasterStudentOptimistically(student.id, s => ({ ...s, quick_notes: previousNote }))
     uiStore.addToast({
       type: 'error',
       title: 'Failed to Save Note',
       message: err?.response?.data?.detail || 'Could not save note'
     })
-    queryClient.invalidateQueries({ queryKey: ['all-students-master'] })
-  }
+  })
 }
 
 const handleToggleFolderFromContextMenu = (folderId: string, student: Student) => {

@@ -67,19 +67,17 @@ const cancelEdit = () => {
 
 const handleSave = () => {
   if (!props.student) return
-  isSaving.value = true
-  emit('save', noteText.value.trim(), props.student)
-  setTimeout(() => {
-    isSaving.value = false
-    isEditing.value = false
-    emit('close')
-  }, 100)
+  const text = noteText.value.trim()
+  props.student.quick_notes = text
+  emit('save', text, props.student)
+  emit('close')
 }
 
 const handleDelete = () => {
   if (!props.student) return
-  if (!confirm(`Delete quick note for ${props.student.full_name}?`)) return
+  if (!confirm(`Are you sure you want to delete quick note for "${props.student.full_name}"?`)) return
   noteText.value = ''
+  props.student.quick_notes = ''
   emit('save', '', props.student)
   emit('close')
 }
@@ -144,7 +142,7 @@ onUnmounted(() => {
           leave-to-class="transform scale-95 opacity-0 translate-y-3"
         >
           <div
-            class="relative w-full max-w-lg overflow-hidden rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-2xl z-10 text-xs text-zinc-900 dark:text-zinc-100 flex flex-col my-auto"
+            class="relative w-full max-w-3xl overflow-hidden rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-2xl z-10 text-xs text-zinc-900 dark:text-zinc-100 flex flex-col my-auto transition-all"
             @click.stop
           >
             <!-- Header -->
@@ -188,30 +186,38 @@ onUnmounted(() => {
               </div>
             </div>
 
-            <!-- Body: EDIT MODE -->
-            <div v-else class="p-6 space-y-3.5">
-              <div class="flex items-center justify-between">
-                <label class="block font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider text-[10.5px]">
-                  {{ hasExistingNote ? 'EDIT QUICK NOTE' : 'WRITE QUICK NOTE' }}
-                </label>
-                <span class="text-[10.5px] text-zinc-400 font-mono">{{ noteText.length }} chars</span>
+            <!-- Body: EDIT MODE (Left: Textarea, Right: Suggestions Board) -->
+            <div v-else class="p-6">
+              <div class="grid grid-cols-1 md:grid-cols-12 gap-6 items-stretch">
+                <!-- Left: Write Quick Note Input -->
+                <div class="md:col-span-7 flex flex-col space-y-2">
+                  <div class="flex items-center justify-between">
+                    <label class="block font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider text-[11px]">
+                      {{ hasExistingNote ? 'EDIT QUICK NOTE' : 'WRITE QUICK NOTE' }}
+                    </label>
+                    <span class="text-[11px] text-zinc-400 font-mono">{{ noteText.length }} chars</span>
+                  </div>
+
+                  <!-- Textarea -->
+                  <textarea
+                    ref="textareaRef"
+                    v-model="noteText"
+                    rows="8"
+                    placeholder="Type quick note (e.g. O'tgan semestrda atkazi bor, Zagrani hali chiqmadi)..."
+                    class="w-full flex-1 px-3.5 py-3 text-xs rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50/50 dark:bg-zinc-800/50 text-zinc-800 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-all resize-none min-h-[190px]"
+                  />
+                  <span class="text-[10px] text-zinc-400 italic">Press Ctrl+Enter to save immediately</span>
+                </div>
+
+                <!-- Right: Quick Note Suggestion Board -->
+                <div class="md:col-span-5 flex flex-col border-t md:border-t-0 md:border-l border-zinc-200 dark:border-zinc-800 pt-4 md:pt-0 md:pl-6">
+                  <QuickNoteSuggestionsList
+                    :filter-text="noteText"
+                    max-height-class="max-h-[220px]"
+                    @select="applySuggestion"
+                  />
+                </div>
               </div>
-
-              <!-- Textarea -->
-              <textarea
-                ref="textareaRef"
-                v-model="noteText"
-                rows="4"
-                placeholder="Type quick note (e.g. O'tgan semestrda atkazi bor, Zagrani hali chiqmadi)..."
-                class="w-full px-3.5 py-2.5 text-xs rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50/50 dark:bg-zinc-800/50 text-zinc-800 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-all resize-y min-h-[90px]"
-              />
-
-              <!-- Suggestions While Writing (Editable & Deletable) -->
-              <QuickNoteSuggestionsList
-                :filter-text="noteText"
-                max-height-class="max-h-36"
-                @select="applySuggestion"
-              />
             </div>
 
             <!-- Footer: READ-ONLY MODE ACTIONS -->
@@ -274,7 +280,7 @@ onUnmounted(() => {
                 <button
                   type="button"
                   @click="handleSave"
-                  class="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-md shadow-blue-500/20 transition-all cursor-pointer"
+                  class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md shadow-blue-500/20 transition-all cursor-pointer active:scale-95"
                 >
                   <Check class="w-3.5 h-3.5 stroke-[2.5]" />
                   <span>Save Note</span>

@@ -60,6 +60,11 @@ export const studentsApi = {
     return response.data
   },
 
+  updateQuickNotes: async (id: string, quickNotes: string): Promise<{ status: string; id: string; quick_notes: string | null }> => {
+    const response = await apiClient.post(`/students/${id}/quick-notes/`, { quick_notes: quickNotes })
+    return response.data
+  },
+
   archiveStudent: async (id: string) => {
     const response = await apiClient.post(`/students/${id}/archive/`)
     return response.data

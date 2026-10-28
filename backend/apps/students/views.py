@@ -460,6 +460,14 @@ class StudentViewSet(viewsets.ModelViewSet):
             'folder_ids': [str(fid) for fid in student.folder_ids]
         })
 
+    @action(detail=True, methods=['post', 'patch'], url_path='quick-notes')
+    def set_quick_notes(self, request, id=None):
+        student = self.get_object()
+        notes = request.data.get('quick_notes', '')
+        student.quick_notes = notes.strip() if isinstance(notes, str) and notes.strip() else None
+        student.save(update_fields=['quick_notes', 'updated_at'])
+        return Response({'status': 'ok', 'id': student.id, 'quick_notes': student.quick_notes})
+
     @action(detail=True, methods=['post'])
     def toggle_tag(self, request, id=None):
         student = self.get_object()
