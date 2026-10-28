@@ -533,15 +533,15 @@ const handleRestoreStudent = () => {
                 </div>
 
                 <!-- 3. Edit View (Side-by-side: Input on left, Suggestions on right) -->
-                <div v-else class="grid grid-cols-1 md:grid-cols-12 gap-5 items-stretch">
-                  <!-- Left: Input & Buttons -->
-                  <div class="md:col-span-7 flex flex-col space-y-2">
+                <div v-else class="grid grid-cols-1 md:grid-cols-12 gap-5 items-start">
+                  <!-- Left: Input & Buttons (Compact 50% width & height) -->
+                  <div class="md:col-span-4 flex flex-col space-y-2">
                     <textarea
                       ref="quickNoteTextareaRef"
                       v-model="localQuickNotes"
-                      rows="6"
+                      rows="3"
                       placeholder="Type quick note (e.g. O'tgan semestrda atkazi bor, Zagrani hali chiqmadi)..."
-                      class="w-full flex-1 px-3 py-2 text-xs rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50/50 dark:bg-zinc-800/60 text-zinc-800 dark:text-zinc-200 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500/25 focus:border-blue-500 transition-all resize-none min-h-[140px] select-text"
+                      class="w-full px-3 py-2 text-xs rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50/50 dark:bg-zinc-800/60 text-zinc-800 dark:text-zinc-200 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500/25 focus:border-blue-500 transition-all resize-y min-h-[85px] select-text"
                       @keydown.ctrl.enter.prevent="handleSaveQuickNotes"
                       @keydown.meta.enter.prevent="handleSaveQuickNotes"
                     />
@@ -563,25 +563,25 @@ const handleRestoreStudent = () => {
                       >
                         Clear
                       </button>
-                      <span v-else class="text-[10px] text-zinc-400 italic">Press Ctrl+Enter to save</span>
+                      <span v-else class="text-[10px] text-zinc-400 italic">Press Ctrl+Enter</span>
 
                       <button
                         type="button"
                         @click="handleSaveQuickNotes"
                         :disabled="localQuickNotes === (student.quick_notes || '')"
-                        class="px-3.5 py-1.5 rounded-xl text-[11.5px] font-bold bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white shadow-xs transition-all cursor-pointer flex items-center gap-1.5 ml-auto active:scale-95"
+                        class="px-3 py-1.5 rounded-xl text-[11px] font-bold bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white shadow-xs transition-all cursor-pointer flex items-center gap-1 ml-auto active:scale-95"
                       >
                         <Check class="w-3.5 h-3.5 stroke-[2.5]" />
-                        <span>Save Note</span>
+                        <span>Save</span>
                       </button>
                     </div>
                   </div>
 
-                  <!-- Right: Quick Note Suggestion Board -->
-                  <div class="md:col-span-5 border-t md:border-t-0 md:border-l border-zinc-200 dark:border-zinc-800 pt-3 md:pt-0 md:pl-4 flex flex-col">
+                  <!-- Right: Expanded Quick Note Suggestion Board -->
+                  <div class="md:col-span-8 border-t md:border-t-0 md:border-l border-zinc-200 dark:border-zinc-800 pt-3 md:pt-0 md:pl-5 flex flex-col">
                     <QuickNoteSuggestionsList
                       :filter-text="localQuickNotes"
-                      max-height-class="max-h-[190px]"
+                      max-height-class="max-h-[220px]"
                       @select="applyQuickNoteSuggestion"
                     />
                   </div>

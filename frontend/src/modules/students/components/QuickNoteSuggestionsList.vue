@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, nextTick } from 'vue'
-import { Sparkles, Plus, Loader2 } from 'lucide-vue-next'
+import { Sparkles, Plus, Loader2, Pencil, X, Check } from 'lucide-vue-next'
 import {
   useQuickNoteSuggestions,
   type QuickNoteSuggestionItem,
@@ -11,7 +11,7 @@ const props = withDefaults(defineProps<{
   maxHeightClass?: string
 }>(), {
   filterText: '',
-  maxHeightClass: 'max-h-[320px]',
+  maxHeightClass: 'max-h-[300px]',
 })
 
 const emit = defineEmits<{
@@ -36,75 +36,52 @@ const filteredItems = computed(() => {
   return getFilteredSuggestions(props.filterText)
 })
 
-// Add New Suggestion State
-const isAdding = ref(false)
-const newText = ref('')
-const addInputRef = ref<HTMLInputElement | null>(null)
-const isSubmittingAdd = ref(false)
+// Separate Modal State for Add / Edit
+const isModalOpen = ref(false)
+const editingItem = ref<QuickNoteSuggestionItem | null>(null)
+const modalText = ref('')
+const modalInputRef = ref<HTMLTextAreaElement | null>(null)
+const isSubmitting = ref(false)
 
-const openAdd = () => {
-  isAdding.value = true
-  newText.value = ''
+const openAddModal = () => {
+  editingItem.value = null
+  modalText.value = ''
+  isModalOpen.value = true
   nextTick(() => {
-    addInputRef.value?.focus()
+    modalInputRef.value?.focus()
   })
 }
 
-const handleSaveNew = async () => {
-  const text = newText.value.trim()
-  if (!text) {
-    isAdding.value = false
-    return
-  }
-  isSubmittingAdd.value = true
-  try {
-    await addSuggestion(text)
-    newText.value = ''
-    isAdding.value = false
-  } finally {
-    isSubmittingAdd.value = false
-  }
-}
-
-const cancelAdd = () => {
-  isAdding.value = false
-  newText.value = ''
-}
-
-// Edit Existing Suggestion State
-const editingId = ref<string | number | null>(null)
-const editingText = ref('')
-const editInputRef = ref<HTMLInputElement | null>(null)
-const isSubmittingEdit = ref(false)
-
-const startEdit = (item: QuickNoteSuggestionItem) => {
-  editingId.value = item.id
-  editingText.value = item.text
+const openEditModal = (item: QuickNoteSuggestionItem) => {
+  editingItem.value = item
+  modalText.value = item.text
+  isModalOpen.value = true
   nextTick(() => {
-    editInputRef.value?.focus()
-    editInputRef.value?.select()
+    modalInputRef.value?.focus()
+    modalInputRef.value?.select()
   })
 }
 
-const handleSaveEdit = async (item: QuickNoteSuggestionItem) => {
-  const text = editingText.value.trim()
-  if (!text) {
-    cancelEdit()
-    return
-  }
-  isSubmittingEdit.value = true
-  try {
-    await updateSuggestion(item.id, text)
-    editingId.value = null
-    editingText.value = ''
-  } finally {
-    isSubmittingEdit.value = false
-  }
+const closeModal = () => {
+  isModalOpen.value = false
+  editingItem.value = null
+  modalText.value = ''
 }
 
-const cancelEdit = () => {
-  editingId.value = null
-  editingText.value = ''
+const handleModalSave = async () => {
+  const text = modalText.value.trim()
+  if (!text) return
+  isSubmitting.value = true
+  try {
+    if (editingItem.value) {
+      await updateSuggestion(editingItem.value.id, text)
+    } else {
+      await addSuggestion(text)
+    }
+    closeModal()
+  } finally {
+    isSubmitting.value = false
+  }
 }
 
 const handleDelete = async (item: QuickNoteSuggestionItem) => {
@@ -123,10 +100,9 @@ const handleDelete = async (item: QuickNoteSuggestionItem) => {
       </div>
 
       <button
-        v-if="!isAdding"
         type="button"
-        @click="openAdd"
-        class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-bold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/50 transition-colors cursor-pointer select-none"
+        @click="openAddModal"
+        class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/50 transition-colors cursor-pointer select-none"
         title="Add new suggestion template"
       >
         <Plus class="w-3.5 h-3.5 stroke-[2.5]" />
@@ -134,39 +110,9 @@ const handleDelete = async (item: QuickNoteSuggestionItem) => {
       </button>
     </div>
 
-    <!-- Inline Add New Template Form -->
-    <div v-if="isAdding" class="flex items-center gap-1.5 p-1.5 rounded-xl border border-blue-300 dark:border-blue-700 bg-blue-50/40 dark:bg-blue-950/20">
-      <input
-        ref="addInputRef"
-        v-model="newText"
-        type="text"
-        placeholder="Type new template..."
-        class="flex-1 px-2.5 py-1 text-xs rounded-lg border border-blue-400 dark:border-blue-600 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
-        @keydown.enter.prevent="handleSaveNew"
-        @keydown.esc.prevent="cancelAdd"
-      />
-      <button
-        type="button"
-        @click="handleSaveNew"
-        :disabled="isSubmittingAdd || !newText.trim()"
-        class="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold text-[11px] transition-all cursor-pointer shadow-2xs"
-      >
-        <Loader2 v-if="isSubmittingAdd" class="w-3 h-3 animate-spin" />
-        <span v-else>Save</span>
-      </button>
-      <button
-        type="button"
-        @click="cancelAdd"
-        class="p-1 rounded text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 text-xs transition-colors cursor-pointer"
-        title="Cancel"
-      >
-        ✕
-      </button>
-    </div>
-
     <!-- Vertical List of Suggestions: Suggestion A (Edit, Delete) -->
     <div
-      class="flex flex-col gap-1.5 overflow-y-auto scrollbar-thin pr-0.5"
+      class="flex flex-col gap-1.5 overflow-y-auto scrollbar-thin pr-1"
       :class="maxHeightClass"
     >
       <div v-if="isLoading && suggestions.length === 0" class="flex items-center gap-1.5 py-3 text-xs text-zinc-400">
@@ -177,78 +123,125 @@ const handleDelete = async (item: QuickNoteSuggestionItem) => {
       <div
         v-for="item in filteredItems"
         :key="item.id"
-        class="group/sug relative flex items-center justify-between gap-2 p-2 rounded-xl border border-zinc-200/90 dark:border-zinc-800 bg-zinc-50/60 dark:bg-zinc-850/60 hover:bg-amber-50/50 dark:hover:bg-amber-950/20 hover:border-amber-300/80 dark:hover:border-amber-700/60 transition-all text-xs"
+        class="group/sug relative flex items-center justify-between gap-3 px-3 py-2 rounded-xl border border-zinc-200/90 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-850/70 hover:bg-amber-50/50 dark:hover:bg-amber-950/20 hover:border-amber-300/80 dark:hover:border-amber-700/60 transition-all text-xs"
       >
-        <!-- 1. Inline Edit Mode for this row -->
-        <div v-if="editingId === item.id" class="flex items-center gap-1.5 w-full">
-          <input
-            ref="editInputRef"
-            v-model="editingText"
-            type="text"
-            class="flex-1 px-2.5 py-1 text-xs rounded-lg border border-blue-500 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none ring-1 ring-blue-500/20"
-            @keydown.enter.prevent="handleSaveEdit(item)"
-            @keydown.esc.prevent="cancelEdit"
-          />
+        <!-- Suggestion Text (Click to insert) -->
+        <button
+          type="button"
+          @click="emit('select', item.text)"
+          class="flex-1 text-left font-medium text-zinc-800 dark:text-zinc-200 hover:text-amber-800 dark:hover:text-amber-300 transition-colors cursor-pointer text-xs leading-snug break-words"
+          :title="`Click to insert: ${item.text}`"
+        >
+          <span class="text-amber-500 font-bold mr-1.5 select-none">+</span>
+          <span>{{ item.text }}</span>
+        </button>
+
+        <!-- (Edit, Delete) Buttons -->
+        <div class="flex items-center gap-1.5 shrink-0 text-[11px] select-none">
           <button
             type="button"
-            @click="handleSaveEdit(item)"
-            :disabled="isSubmittingEdit"
-            class="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] cursor-pointer transition-colors shadow-2xs"
-            title="Save edit"
+            @click.stop="openEditModal(item)"
+            class="px-2 py-0.5 rounded-md text-blue-600 dark:text-blue-400 hover:bg-blue-100/60 dark:hover:bg-blue-950/60 font-semibold transition-colors cursor-pointer"
+            title="Edit suggestion"
           >
-            Save
+            Edit
           </button>
+          <span class="text-zinc-300 dark:text-zinc-700">|</span>
           <button
             type="button"
-            @click="cancelEdit"
-            class="p-1 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 text-xs rounded cursor-pointer transition-colors"
-            title="Cancel"
+            @click.stop="handleDelete(item)"
+            class="px-2 py-0.5 rounded-md text-rose-600 dark:text-rose-400 hover:bg-rose-100/60 dark:hover:bg-rose-950/60 font-semibold transition-colors cursor-pointer"
+            title="Delete suggestion"
           >
-            ✕
+            Delete
           </button>
         </div>
-
-        <!-- 2. Normal View: Text on Left, Edit & Delete on Right -->
-        <template v-else>
-          <button
-            type="button"
-            @click="emit('select', item.text)"
-            class="flex-1 text-left font-medium text-zinc-800 dark:text-zinc-200 hover:text-amber-800 dark:hover:text-amber-300 transition-colors cursor-pointer text-xs leading-snug line-clamp-2"
-            :title="`Click to insert: ${item.text}`"
-          >
-            <span class="text-amber-500 font-bold mr-1 select-none">+</span>
-            <span>{{ item.text }}</span>
-          </button>
-
-          <!-- (Edit, Delete) Buttons -->
-          <div class="flex items-center gap-1 shrink-0 text-[11px] select-none">
-            <button
-              type="button"
-              @click.stop="startEdit(item)"
-              class="px-2 py-0.5 rounded text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/50 font-semibold transition-colors cursor-pointer"
-              title="Edit suggestion"
-            >
-              Edit
-            </button>
-            <span class="text-zinc-300 dark:text-zinc-700">|</span>
-            <button
-              type="button"
-              @click.stop="handleDelete(item)"
-              class="px-2 py-0.5 rounded text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/50 font-semibold transition-colors cursor-pointer"
-              title="Delete suggestion"
-            >
-              Delete
-            </button>
-          </div>
-        </template>
       </div>
 
       <div
         v-if="!isLoading && filteredItems.length === 0"
-        class="py-3 text-center text-xs text-zinc-400 italic"
+        class="py-4 text-center text-xs text-zinc-400 italic"
       >
         No matching suggestions. Click "+ Add" to create one.
       </div>
     </div>
+
+    <!-- SEPARATE MODAL: Edit / Add Suggestion Modal Dialog -->
+    <Teleport to="body">
+      <transition
+        enter-active-class="transition duration-150 ease-out"
+        enter-from-class="opacity-0"
+        enter-to-class="opacity-100"
+        leave-active-class="transition duration-100 ease-in"
+        leave-from-class="opacity-100"
+        leave-to-class="opacity-0"
+      >
+        <div
+          v-if="isModalOpen"
+          class="fixed inset-0 z-[140] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs select-none"
+          @click.self="closeModal"
+        >
+          <div
+            class="relative w-full max-w-md rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-2xl p-5 space-y-4 text-zinc-900 dark:text-zinc-100"
+            @click.stop
+          >
+            <!-- Modal Header -->
+            <div class="flex items-center justify-between pb-1 border-b border-zinc-100 dark:border-zinc-800">
+              <h4 class="text-sm font-bold flex items-center gap-2 text-zinc-900 dark:text-zinc-100">
+                <Pencil v-if="editingItem" class="w-4 h-4 text-amber-500" />
+                <Plus v-else class="w-4 h-4 text-blue-500" />
+                <span>{{ editingItem ? 'Edit Suggestion Template' : 'New Suggestion Template' }}</span>
+              </h4>
+              <button
+                type="button"
+                @click="closeModal"
+                class="p-1 rounded-lg text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors cursor-pointer"
+              >
+                <X class="w-4 h-4" />
+              </button>
+            </div>
+
+            <!-- Modal Body: Textarea -->
+            <div class="space-y-1.5">
+              <label class="block text-[11px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
+                Template Text
+              </label>
+              <textarea
+                ref="modalInputRef"
+                v-model="modalText"
+                rows="3"
+                placeholder="Enter suggestion template..."
+                class="w-full px-3 py-2 text-xs rounded-xl border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-all resize-y select-text"
+                @keydown.ctrl.enter.prevent="handleModalSave"
+                @keydown.enter.exact.prevent="handleModalSave"
+                @keydown.esc.prevent="closeModal"
+              />
+              <p class="text-[10px] text-zinc-400">Press Enter or Ctrl+Enter to save</p>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="flex items-center justify-end gap-2 pt-1 border-t border-zinc-100 dark:border-zinc-800">
+              <button
+                type="button"
+                @click="closeModal"
+                class="px-4 py-1.5 rounded-xl border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 font-semibold text-xs hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                @click="handleModalSave"
+                :disabled="isSubmitting || !modalText.trim()"
+                class="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-xs shadow-xs transition-all cursor-pointer active:scale-95"
+              >
+                <Loader2 v-if="isSubmitting" class="w-3.5 h-3.5 animate-spin" />
+                <Check v-else class="w-3.5 h-3.5 stroke-[2.5]" />
+                <span>{{ editingItem ? 'Save Changes' : 'Add Template' }}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </transition>
+    </Teleport>
   </div>
 </template>
