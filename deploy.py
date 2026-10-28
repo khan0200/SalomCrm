@@ -56,9 +56,9 @@ def _load_env_file():
 
 _load_env_file()
 
-HOST = os.environ.get("DEPLOY_HOST", "178.238.231.210")
-USER = os.environ.get("DEPLOY_USER", "root")
-PASSWORD = os.environ.get("DEPLOY_PASSWORD")
+HOST = os.environ.get("VPS_HOST") or os.environ.get("DEPLOY_HOST", "178.238.231.210")
+USER = os.environ.get("VPS_SSH_USER") or os.environ.get("DEPLOY_USER", "root")
+PASSWORD = os.environ.get("VPS_ROOT_PASSWORD") or os.environ.get("DEPLOY_PASSWORD")
 KEYFILE = os.environ.get("DEPLOY_KEY")
 
 APP_DIR = os.environ.get("DEPLOY_APP_DIR", "/var/www/SalomCrm")
