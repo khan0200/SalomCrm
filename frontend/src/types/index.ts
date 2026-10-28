@@ -175,6 +175,7 @@ export interface Student {
   lead_by?: string | null
   coordinator?: string | null
   notes?: string | null
+  quick_notes?: string | null
   is_deleted?: boolean
   is_permanently_deleted?: boolean
   permanently_deleted_at?: string | null

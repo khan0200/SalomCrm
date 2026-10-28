@@ -1944,6 +1944,7 @@ def _serialize_students_for_fill(request, student_ids):
             "lead_by": s.lead_by,
             "office": s.office,
             "notes": s.notes,
+            "quick_notes": s.quick_notes,
         }
         for s in ordered
     ]

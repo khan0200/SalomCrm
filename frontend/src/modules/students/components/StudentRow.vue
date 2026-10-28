@@ -13,6 +13,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'open-detail', id: string): void
   (e: 'open-actions', student: Student): void
+  (e: 'open-notes', student: Student): void
+  (e: 'contextmenu', student: Student, event: MouseEvent): void
 }>()
 
 const authStore = useAuthStore()
@@ -131,6 +133,7 @@ const universities = computed(() => {
 <template>
   <tr
     @click="emit('open-detail', student.id)"
+    @contextmenu.stop.prevent="emit('contextmenu', student, $event)"
     class="group cursor-pointer border-b border-zinc-200/70 dark:border-zinc-800/70 text-xs transition-colors select-none"
     :class="rowBgClass"
     :style="rowBgStyle"
@@ -348,6 +351,36 @@ const universities = computed(() => {
     <!-- 6. Actions Column (Tags & Actions Menu Trigger) -->
     <td class="px-4 py-3 text-right whitespace-nowrap" @click.stop>
       <div class="flex items-center justify-end gap-2">
+        <!-- Quick Note ! Indicator (Next to custom tag) -->
+        <div
+          v-if="student.quick_notes && student.quick_notes.trim()"
+          class="group/quicknote relative inline-flex items-center justify-center shrink-0"
+        >
+          <button
+            type="button"
+            @click="emit('open-notes', student)"
+            class="relative inline-flex items-center justify-center w-6 h-6 text-xs font-black bg-amber-500/20 dark:bg-amber-500/25 border border-amber-500/40 dark:border-amber-500/45 text-amber-600 dark:text-amber-400 rounded-lg shadow-2xs hover:scale-110 active:scale-95 transition-all cursor-pointer backdrop-blur-xs hover:bg-amber-500/30"
+            title="Quick note"
+          >
+            <span class="leading-none text-[13px] font-black">!</span>
+          </button>
+
+          <!-- iOS Styled Solid Black Tooltip -->
+          <div
+            class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 opacity-0 scale-90 translate-y-1 group-hover/quicknote:opacity-100 group-hover/quicknote:scale-100 group-hover/quicknote:translate-y-0 transition-all duration-150 ease-out z-50 flex flex-col items-center select-none"
+          >
+            <div class="px-2.5 py-1.5 bg-black text-white text-[11px] rounded-md shadow-xl shadow-black/50 whitespace-normal max-w-xs break-words text-left">
+              <div class="text-[9.5px] uppercase font-bold text-amber-400 mb-0.5 flex items-center gap-1">
+                <span>QUICK NOTE</span>
+              </div>
+              <div class="font-normal text-zinc-100 whitespace-pre-wrap leading-tight text-[11px]">
+                {{ student.quick_notes }}
+              </div>
+            </div>
+            <div class="w-0 h-0 border-x-4 border-x-transparent border-t-4 border-t-black -mt-[0.5px]"></div>
+          </div>
+        </div>
+
         <!-- Task Tags Container (Icon only with iOS-styled Solid Black Tooltip) -->
         <div v-if="displayTags.length > 0" class="flex items-center gap-1 flex-wrap justify-end shrink-0">
           <div

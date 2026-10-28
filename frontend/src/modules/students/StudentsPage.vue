@@ -18,6 +18,8 @@ import StudentFoldersManager from './components/StudentFoldersManager.vue'
 import StudentDetailDrawer from './components/StudentDetailDrawer.vue'
 import ExportExcelModal from './components/ExportExcelModal.vue'
 import AddStudentsToFolderModal from './components/AddStudentsToFolderModal.vue'
+import StudentRosterContextMenu from './components/StudentRosterContextMenu.vue'
+import StudentQuickNoteModal from './components/StudentQuickNoteModal.vue'
 import { useStudentDashboardStore } from '@/stores/studentDashboard'
 import { useCustomTags } from '@/composables/useCustomTags'
 import { useStudentFiltering } from '@/composables/useStudentFiltering'
@@ -147,6 +149,14 @@ const isActionsModalOpen = ref(false)
 const selectedActionStudent = ref<Student | null>(null)
 const selectedDetailStudentId = ref<string | null>(null)
 const isDetailDrawerOpen = ref(false)
+
+// Context Menu & Quick Note State
+const isContextMenuOpen = ref(false)
+const contextMenuX = ref(0)
+const contextMenuY = ref(0)
+const contextMenuStudent = ref<Student | null>(null)
+const isQuickNoteModalOpen = ref(false)
+const quickNoteStudent = ref<Student | null>(null)
 
 // Query: Student Options
 const { data: optionsData } = useQuery({
@@ -657,6 +667,92 @@ const openActions = (student: Student) => {
   isActionsModalOpen.value = true
 }
 
+const handleContextMenu = (student: Student, event: MouseEvent) => {
+  contextMenuStudent.value = student
+  contextMenuX.value = event.clientX
+  contextMenuY.value = event.clientY
+  isContextMenuOpen.value = true
+}
+
+const handleOpenQuickNotes = (student: Student) => {
+  quickNoteStudent.value = student
+  isQuickNoteModalOpen.value = true
+}
+
+const handleSaveQuickNotes = async (notes: string, student: Student) => {
+  const trimmed = notes.trim()
+  // 0ms instant optimistic update across caches and open modals
+  updateMasterStudentOptimistically(student.id, s => ({ ...s, quick_notes: trimmed || null }))
+  if (selectedActionStudent.value && selectedActionStudent.value.id === student.id) {
+    selectedActionStudent.value = { ...selectedActionStudent.value, quick_notes: trimmed || null }
+  }
+  if (contextMenuStudent.value && contextMenuStudent.value.id === student.id) {
+    contextMenuStudent.value = { ...contextMenuStudent.value, quick_notes: trimmed || null }
+  }
+  if (quickNoteStudent.value && quickNoteStudent.value.id === student.id) {
+    quickNoteStudent.value = { ...quickNoteStudent.value, quick_notes: trimmed || null }
+  }
+  try {
+    await studentsApi.updateStudent(student.id, { quick_notes: trimmed })
+    queryClient.invalidateQueries({ queryKey: ['all-students-master'] })
+    queryClient.invalidateQueries({ queryKey: ['student-detail', student.id] })
+    uiStore.addToast({
+      type: 'success',
+      title: 'Quick Note Saved',
+      message: `Note updated for ${student.full_name}`
+    })
+  } catch (err: any) {
+    uiStore.addToast({
+      type: 'error',
+      title: 'Failed to Save Note',
+      message: err?.response?.data?.detail || 'Could not save note'
+    })
+    queryClient.invalidateQueries({ queryKey: ['all-students-master'] })
+  }
+}
+
+const handleToggleFolderFromContextMenu = (folderId: string, student: Student) => {
+  const strId = String(folderId)
+  const current = [...(student.folder_ids || []).map(String)]
+  const idx = current.indexOf(strId)
+  if (idx > -1) {
+    current.splice(idx, 1)
+  } else {
+    current.push(strId)
+  }
+  setFoldersMutation.mutate({ id: student.id, folderIds: current })
+  if (contextMenuStudent.value && contextMenuStudent.value.id === student.id) {
+    contextMenuStudent.value = { ...contextMenuStudent.value, folder_ids: current }
+  }
+}
+
+const handleClearFoldersFromContextMenu = (student: Student) => {
+  setFoldersMutation.mutate({ id: student.id, folderIds: [] })
+  if (contextMenuStudent.value && contextMenuStudent.value.id === student.id) {
+    contextMenuStudent.value = { ...contextMenuStudent.value, folder_ids: [] }
+  }
+}
+
+const handleToggleTagFromContextMenu = (tagName: string, student: Student) => {
+  toggleTagMutation.mutate({ id: student.id, tagName, scope: 'all' })
+  if (contextMenuStudent.value && contextMenuStudent.value.id === student.id) {
+    const inAll = (contextMenuStudent.value.task_tags || []).includes(tagName)
+    const inMine = (contextMenuStudent.value.my_task_tags || []).includes(tagName)
+    let newTags = [...(contextMenuStudent.value.task_tags || [])]
+    if (inAll || inMine) {
+      newTags = newTags.filter(t => t !== tagName)
+    } else {
+      newTags.push(tagName)
+    }
+    contextMenuStudent.value = { ...contextMenuStudent.value, task_tags: newTags }
+  }
+}
+
+const handleOpenActionsFromContextMenu = (student: Student) => {
+  selectedActionStudent.value = student
+  isActionsModalOpen.value = true
+}
+
 const toggleSort = () => {
   sortOrder.value = sortOrder.value === 'asc' ? 'desc' : 'asc'
 }
@@ -788,6 +884,8 @@ dashboardStore.onExportExcel = handleExportExcel
       @toggle-sort="toggleSort"
       @open-detail="openDetail"
       @open-actions="openActions"
+      @open-notes="handleOpenQuickNotes"
+      @contextmenu="handleContextMenu"
     />
 
     <!-- Pagination Controls -->
@@ -845,15 +943,41 @@ dashboardStore.onExportExcel = handleExportExcel
       :is-open="isActionsModalOpen"
       :student="selectedActionStudent"
       :folders="folders"
+      :all-students="allStudents"
       @close="isActionsModalOpen = false"
       @set-color="(c, scope) => selectedActionStudent && setColorMutation.mutate({ id: selectedActionStudent.id, color: c, scope })"
       @clear-color="() => selectedActionStudent && clearColorMutation.mutate(selectedActionStudent.id)"
       @set-folders="fIds => selectedActionStudent && setFoldersMutation.mutate({ id: selectedActionStudent.id, folderIds: fIds })"
       @toggle-tag="(t, scope) => selectedActionStudent && toggleTagMutation.mutate({ id: selectedActionStudent.id, tagName: t, scope })"
+      @update-quick-notes="notes => selectedActionStudent && handleSaveQuickNotes(notes, selectedActionStudent)"
       @clear-all="() => selectedActionStudent && clearAllMutation.mutate(selectedActionStudent.id)"
       @archive="() => selectedActionStudent && archiveMutation.mutate(selectedActionStudent.id)"
       @restore="() => selectedActionStudent && restoreMutation.mutate(selectedActionStudent.id)"
       @permanent-delete="() => selectedActionStudent && permanentDeleteMutation.mutate(selectedActionStudent.id)"
+    />
+
+    <!-- Student Right-Click Context Menu -->
+    <StudentRosterContextMenu
+      :is-open="isContextMenuOpen"
+      :x="contextMenuX"
+      :y="contextMenuY"
+      :student="contextMenuStudent"
+      :folders="folders"
+      @close="isContextMenuOpen = false"
+      @quick-notes="handleOpenQuickNotes"
+      @open-actions="handleOpenActionsFromContextMenu"
+      @toggle-folder="handleToggleFolderFromContextMenu"
+      @clear-folders="handleClearFoldersFromContextMenu"
+      @toggle-tag="handleToggleTagFromContextMenu"
+    />
+
+    <!-- Quick Note Modal -->
+    <StudentQuickNoteModal
+      :is-open="isQuickNoteModalOpen"
+      :student="quickNoteStudent"
+      :all-students="allStudents"
+      @close="isQuickNoteModalOpen = false"
+      @save="handleSaveQuickNotes"
     />
 
     <StudentDetailDrawer

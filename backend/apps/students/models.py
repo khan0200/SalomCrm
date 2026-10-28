@@ -202,6 +202,7 @@ class Student(TenantAwareModel):
     lead_by = models.CharField(max_length=100, blank=True, null=True, db_index=True)
     coordinator = models.CharField(max_length=100, blank=True, null=True)
     notes = models.TextField(blank=True, null=True)
+    quick_notes = models.TextField(blank=True, null=True)
     is_deleted = models.BooleanField(default=False, db_index=True)  # Soft delete archive
 
     # "Permanently deleted" no longer means a real DB delete - agencies must

@@ -19,6 +19,8 @@ const emit = defineEmits<{
   (e: 'toggle-sort'): void
   (e: 'open-detail', id: string): void
   (e: 'open-actions', student: Student): void
+  (e: 'open-notes', student: Student): void
+  (e: 'contextmenu', student: Student, event: MouseEvent): void
 }>()
 </script>
 
@@ -90,6 +92,8 @@ const emit = defineEmits<{
             :student="student"
             @open-detail="id => emit('open-detail', id)"
             @open-actions="s => emit('open-actions', s)"
+            @open-notes="s => emit('open-notes', s)"
+            @contextmenu="(s, e) => emit('contextmenu', s, e)"
           />
         </tbody>
       </table>
