@@ -2,9 +2,9 @@
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import type { Student } from '@/types'
 import {
-  X, Check, Trash2, StickyNote, Edit3, Sparkles
+  X, Check, Trash2, StickyNote, Edit3
 } from 'lucide-vue-next'
-import { getQuickNoteSuggestions } from '@/composables/useQuickNoteSuggestions'
+import QuickNoteSuggestionsList from './QuickNoteSuggestionsList.vue'
 
 const props = withDefaults(defineProps<{
   isOpen: boolean
@@ -26,11 +26,6 @@ const isSaving = ref(false)
 
 const hasExistingNote = computed(() => {
   return !!(props.student?.quick_notes && props.student.quick_notes.trim())
-})
-
-// Auto-suggestions based on current tenant students and typed text
-const filteredSuggestions = computed(() => {
-  return getQuickNoteSuggestions(props.allStudents, noteText.value).slice(0, 8)
 })
 
 watch(() => props.isOpen, (newVal) => {
@@ -211,27 +206,12 @@ onUnmounted(() => {
                 class="w-full px-3.5 py-2.5 text-xs rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50/50 dark:bg-zinc-800/50 text-zinc-800 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-all resize-y min-h-[90px]"
               />
 
-              <!-- Suggestions While Writing -->
-              <div class="space-y-1.5 pt-1">
-                <div class="flex items-center gap-1 text-[10.5px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">
-                  <Sparkles class="w-3 h-3 text-amber-500" />
-                  <span>Suggestions (Click to insert):</span>
-                </div>
-
-                <div class="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto scrollbar-thin py-0.5">
-                  <button
-                    v-for="sug in filteredSuggestions"
-                    :key="sug"
-                    type="button"
-                    @click="applySuggestion(sug)"
-                    class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium border border-zinc-200 dark:border-zinc-700/80 bg-zinc-50 dark:bg-zinc-800/60 hover:bg-amber-50 hover:border-amber-300 dark:hover:bg-amber-950/40 dark:hover:border-amber-700 text-zinc-700 dark:text-zinc-300 hover:text-amber-800 dark:hover:text-amber-200 transition-all cursor-pointer text-left"
-                    :title="`Click to insert: ${sug}`"
-                  >
-                    <span>+</span>
-                    <span>{{ sug }}</span>
-                  </button>
-                </div>
-              </div>
+              <!-- Suggestions While Writing (Editable & Deletable) -->
+              <QuickNoteSuggestionsList
+                :filter-text="noteText"
+                max-height-class="max-h-36"
+                @select="applySuggestion"
+              />
             </div>
 
             <!-- Footer: READ-ONLY MODE ACTIONS -->

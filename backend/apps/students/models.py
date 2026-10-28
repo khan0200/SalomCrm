@@ -530,6 +530,24 @@ class TagOption(SimpleTenantModel):
         return f"{self.icon} {self.name}"
 
 
+class QuickNoteSuggestion(SimpleTenantModel):
+    """
+    Configurable quick note suggestions/templates.
+    Editable, deletable, and tenant-scoped.
+    Mapped to 'crm_quick_note_suggestions' table.
+    """
+    id = models.BigAutoField(primary_key=True)
+    text = models.CharField(max_length=500)
+    sort_order = models.IntegerField(default=0)
+
+    class Meta:
+        db_table = 'crm_quick_note_suggestions'
+        ordering = ['sort_order', 'id']
+
+    def __str__(self):
+        return self.text
+
+
 class StudentUserPreference(models.Model):
     """
     Per-user "Only Me" row color and tags for a student -- private data

@@ -413,6 +413,14 @@ class TagOptionSerializer(serializers.ModelSerializer):
         read_only_fields = ('id', 'created_at')
 
 
+class QuickNoteSuggestionSerializer(serializers.ModelSerializer):
+    class Meta:
+        from .models import QuickNoteSuggestion
+        model = QuickNoteSuggestion
+        fields = ('id', 'text', 'sort_order', 'created_at')
+        read_only_fields = ('id', 'created_at')
+
+
 class SchoolDirectorySerializer(serializers.ModelSerializer):
     class Meta:
         from .models import SchoolDirectory

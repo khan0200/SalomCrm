@@ -3,9 +3,9 @@ import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import type { Student, Folder } from '@/types'
 import { ROW_COLOR_MAP } from '@/types'
 import {
-  X, Check, CheckCircle2, Trash2, RefreshCw, AlertTriangle, Edit3, Sparkles, Plus, StickyNote
+  X, Check, CheckCircle2, Trash2, RefreshCw, AlertTriangle, Edit3, Plus, StickyNote
 } from 'lucide-vue-next'
-import { getQuickNoteSuggestions } from '@/composables/useQuickNoteSuggestions'
+import QuickNoteSuggestionsList from './QuickNoteSuggestionsList.vue'
 
 export interface CustomTag {
   name: string
@@ -62,10 +62,6 @@ const quickNoteTextareaRef = ref<HTMLTextAreaElement | null>(null)
 
 const hasQuickNotes = computed(() => {
   return !!(props.student?.quick_notes && props.student.quick_notes.trim())
-})
-
-const filteredQuickNoteSuggestions = computed(() => {
-  return getQuickNoteSuggestions(props.allStudents, localQuickNotes.value).slice(0, 8)
 })
 
 const syncFromStudent = (s: Student | null) => {
@@ -544,25 +540,12 @@ const handleRestoreStudent = () => {
                     @keydown.meta.enter.prevent="handleSaveQuickNotes"
                   />
 
-                  <!-- Suggestions While Writing -->
-                  <div class="space-y-1">
-                    <div class="flex items-center gap-1 text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">
-                      <Sparkles class="w-2.5 h-2.5 text-amber-500" />
-                      <span>Suggestions:</span>
-                    </div>
-                    <div class="flex flex-wrap gap-1 max-h-24 overflow-y-auto scrollbar-thin py-0.5">
-                      <button
-                        v-for="sug in filteredQuickNoteSuggestions"
-                        :key="sug"
-                        type="button"
-                        @click="applyQuickNoteSuggestion(sug)"
-                        class="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-md text-[10.5px] border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 hover:bg-amber-50 hover:border-amber-300 dark:hover:bg-amber-950/40 text-zinc-700 dark:text-zinc-300 transition-all cursor-pointer"
-                      >
-                        <span class="text-amber-500 font-bold">+</span>
-                        <span>{{ sug }}</span>
-                      </button>
-                    </div>
-                  </div>
+                  <!-- Suggestions While Writing (Editable & Deletable) -->
+                  <QuickNoteSuggestionsList
+                    :filter-text="localQuickNotes"
+                    max-height-class="max-h-28"
+                    @select="applyQuickNoteSuggestion"
+                  />
 
                   <div class="flex items-center justify-between gap-2 pt-1">
                     <button

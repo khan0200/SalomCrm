@@ -27,7 +27,7 @@ from apps.authentication.models import UserRole
 from .models import (
     Student, Folder, TariffOption, EducationLevelOption,
     StudentGroupOption, LeadSourceOption, CoordinatorOption,
-    UniversityOption, UniversityStatusOption, TagOption, SchoolDirectory, MajorOption,
+    UniversityOption, UniversityStatusOption, TagOption, QuickNoteSuggestion, SchoolDirectory, MajorOption,
     WorkplaceDirectory, JobTitleDirectory,
     StudentUserPreference, Contract, ContractAuditEvent
 )
@@ -37,7 +37,7 @@ from .serializers import (
     TariffOptionSerializer, EducationLevelOptionSerializer, StudentGroupOptionSerializer,
     LeadSourceOptionSerializer, CoordinatorOptionSerializer,
     UniversityOptionSerializer, UniversityStatusOptionSerializer,
-    TagOptionSerializer, SchoolDirectorySerializer, MajorOptionSerializer,
+    TagOptionSerializer, QuickNoteSuggestionSerializer, SchoolDirectorySerializer, MajorOptionSerializer,
     WorkplaceDirectorySerializer, JobTitleDirectorySerializer,
     ContractListSerializer, ContractDetailSerializer, ContractCreateUpdateSerializer
 )
@@ -987,6 +987,84 @@ class UniversityStatusOptionViewSet(BaseOptionViewSet):
 class TagOptionViewSet(BaseOptionViewSet):
     model_class = TagOption
     serializer_class = TagOptionSerializer
+
+
+class QuickNoteSuggestionViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsTenantUser]
+    pagination_class = None
+    serializer_class = QuickNoteSuggestionSerializer
+
+    def get_queryset(self):
+        req: Any = self.request
+        user = req.user
+        tenant = getattr(req, 'tenant', None) or getattr(user, 'tenant', None)
+        if not tenant:
+            return QuickNoteSuggestion.objects.none()
+
+        qs = QuickNoteSuggestion.objects.filter(tenant=tenant)
+        settings_dict = getattr(tenant, 'settings', {}) or {}
+        if not settings_dict.get('quick_notes_seeded') and not qs.exists():
+            self._seed_default_suggestions(tenant)
+            settings_dict['quick_notes_seeded'] = True
+            tenant.settings = settings_dict
+            tenant.save(update_fields=['settings'])
+            qs = QuickNoteSuggestion.objects.filter(tenant=tenant)
+
+        return qs.order_by('sort_order', 'id')
+
+    def _seed_default_suggestions(self, tenant):
+        existing_notes = set()
+        students = Student.objects.filter(tenant=tenant).exclude(quick_notes__isnull=True).exclude(quick_notes='')
+        for s in students:
+            val = (s.quick_notes or '').strip()
+            if val:
+                existing_notes.add(val)
+
+        default_list = [
+            "O'tgan semestrda atkazi bor",
+            "IELTS ning Listening va Reading qismida 5.0 bor",
+            "TOPIK endi oladi",
+            "Til sertifikati endi oladi",
+            "Telefonini olmadi",
+            "Emaili noto'g'ri ekan",
+            "Zagrani hali chiqmadi",
+            "8-band bilan atkaz olgan",
+            "Bank schet o'zi qo'yadi",
+            "OTA-ONA rasmiy ish haqi yo'q (qilish kerak)",
+            "Ota-ona ajrim bo'lgan",
+            "Diplom / Attestat apostil qilinmagan",
+            "App fee o'zi to'laydi",
+            "1% lik universitet kerak",
+            "Hujjatlarini to'liq olib kelmadi",
+            "Shartnoma to'lovi qilinmagan",
+            "Qayta qo'ng'iroq qilish kerak",
+            "Viza chiqsa to'laydi",
+            "IELTS section problem (E-viza)",
+            "Natija kutilmoqda",
+        ]
+
+        items_to_create = []
+        seen = set()
+        order = 1
+        for text in list(existing_notes) + default_list:
+            clean = text.strip()
+            key = clean.lower()
+            if clean and key not in seen:
+                seen.add(key)
+                items_to_create.append(QuickNoteSuggestion(tenant=tenant, text=clean, sort_order=order))
+                order += 1
+
+        if items_to_create:
+            QuickNoteSuggestion.objects.bulk_create(items_to_create)
+
+    def perform_create(self, serializer):
+        from rest_framework.exceptions import ValidationError
+        req: Any = self.request
+        user = req.user
+        tenant = getattr(req, 'tenant', None) or getattr(user, 'tenant', None)
+        if not tenant:
+            raise ValidationError({'tenant': 'Tenant is required.'})
+        serializer.save(tenant=tenant)
 
 
 class SchoolDirectoryViewSet(viewsets.ModelViewSet):
