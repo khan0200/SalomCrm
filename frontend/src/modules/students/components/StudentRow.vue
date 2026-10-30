@@ -368,9 +368,9 @@ const universities = computed(() => {
           <div
             class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 opacity-0 scale-90 translate-y-1 group-hover/quicknote:opacity-100 group-hover/quicknote:scale-100 group-hover/quicknote:translate-y-0 transition-all duration-150 ease-out z-50 flex flex-col items-center select-none"
           >
-            <div class="px-2.5 py-1 bg-black text-white text-[11px] rounded-md shadow-xl shadow-black/50 whitespace-nowrap tracking-wide flex items-center gap-1.5 max-w-sm truncate">
+            <div class="px-2.5 py-1 bg-black text-white text-[11px] rounded-md shadow-xl shadow-black/50 whitespace-normal tracking-wide flex items-start gap-1.5 w-max max-w-[min(24rem,calc(100vw-2rem))] text-left break-words">
               <span class="text-amber-400 font-bold">Note:</span>
-              <span class="font-normal text-zinc-100 truncate">{{ student.quick_notes }}</span>
+              <span class="font-normal text-zinc-100 whitespace-pre-wrap break-words">{{ student.quick_notes }}</span>
             </div>
             <div class="w-0 h-0 border-x-4 border-x-transparent border-t-4 border-t-black -mt-[0.5px]"></div>
           </div>
