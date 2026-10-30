@@ -21,6 +21,22 @@ const authStore = useAuthStore()
 
 const isNameCopied = ref(false)
 const isPhoneCopied = ref(false)
+const isQuickNoteHovered = ref(false)
+const quickNoteTooltipStyle = ref<Record<string, string>>({})
+
+const showQuickNoteTooltip = (event: MouseEvent) => {
+  const trigger = event.currentTarget as HTMLElement
+  const rect = trigger.getBoundingClientRect()
+  quickNoteTooltipStyle.value = {
+    left: `${rect.left + rect.width / 2}px`,
+    bottom: `${window.innerHeight - rect.top + 6}px`,
+  }
+  isQuickNoteHovered.value = true
+}
+
+const hideQuickNoteTooltip = () => {
+  isQuickNoteHovered.value = false
+}
 
 const copyName = () => {
   navigator.clipboard.writeText(props.student.full_name)
@@ -355,6 +371,8 @@ const universities = computed(() => {
         <div
           v-if="student.quick_notes && student.quick_notes.trim()"
           class="group/quicknote relative inline-flex items-center justify-center shrink-0"
+          @mouseenter="showQuickNoteTooltip"
+          @mouseleave="hideQuickNoteTooltip"
         >
           <button
             type="button"
@@ -364,17 +382,22 @@ const universities = computed(() => {
             <span class="leading-none text-[13px] font-black">!</span>
           </button>
 
-          <!-- iOS Styled Solid Black Tooltip -->
+        </div>
+
+        <!-- Teleported so the table's horizontal-scroll container cannot clip it. -->
+        <Teleport to="body">
           <div
-            class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 opacity-0 scale-90 translate-y-1 group-hover/quicknote:opacity-100 group-hover/quicknote:scale-100 group-hover/quicknote:translate-y-0 transition-all duration-150 ease-out z-50 flex flex-col items-center select-none"
+            v-if="isQuickNoteHovered"
+            class="pointer-events-none fixed z-[9999] flex -translate-x-1/2 flex-col items-center select-none"
+            :style="quickNoteTooltipStyle"
           >
             <div class="px-2.5 py-1 bg-black text-white text-[11px] rounded-md shadow-xl shadow-black/50 whitespace-normal tracking-wide flex items-start gap-1.5 w-max max-w-[min(24rem,calc(100vw-2rem))] text-left break-words">
-              <span class="text-amber-400 font-bold">Note:</span>
-              <span class="font-normal text-zinc-100 whitespace-pre-wrap break-words">{{ student.quick_notes }}</span>
+              <span class="shrink-0 text-amber-400 font-bold">Note:</span>
+              <span class="min-w-0 font-normal text-zinc-100 whitespace-pre-wrap break-words">{{ student.quick_notes }}</span>
             </div>
             <div class="w-0 h-0 border-x-4 border-x-transparent border-t-4 border-t-black -mt-[0.5px]"></div>
           </div>
-        </div>
+        </Teleport>
 
         <!-- Task Tags Container (Icon only with iOS-styled Solid Black Tooltip) -->
         <div v-if="displayTags.length > 0" class="flex items-center gap-1 flex-wrap justify-end shrink-0">
