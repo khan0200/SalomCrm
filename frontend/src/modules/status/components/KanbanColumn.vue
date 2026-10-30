@@ -48,7 +48,7 @@ const EXPANDED_SCALE = 1.3
 
 const expanded = ref(false)
 const isFilterOpen = ref(false)
-const selectedUniversities = ref<string[]>([])
+const selectedUniversityFilters = ref<string[]>([])
 const toggleExpand = () => { expanded.value = !expanded.value }
 
 const universityFilters = computed(() => {
@@ -80,22 +80,33 @@ const universityFilters = computed(() => {
 })
 
 const filteredStudents = computed(() => {
-  if (selectedUniversities.value.length === 0) return props.students
-  const selected = new Set(selectedUniversities.value)
+  if (selectedUniversityFilters.value.length === 0) return props.students
+  const selected = new Set(selectedUniversityFilters.value)
   return props.students.filter(student =>
     Array.from({ length: 5 }, (_, index) => index + 1)
-      .some(slot => selected.has((student as any)[`university_${slot}`]?.trim()))
+      .some(slot => {
+        const name = (student as any)[`university_${slot}`]
+        if (typeof name !== 'string' || !name.trim()) return false
+        const rawStatus = (student as any)[`university_${slot}_status`]
+        const status = typeof rawStatus === 'string' && rawStatus.trim()
+          ? rawStatus.trim()
+          : 'Not Applied'
+        return selected.has(`${status}::${name.trim()}`)
+      })
   )
 })
 
-const toggleUniversity = (name: string) => {
-  selectedUniversities.value = selectedUniversities.value.includes(name)
-    ? selectedUniversities.value.filter(value => value !== name)
-    : [...selectedUniversities.value, name]
+const filterKey = (status: string, name: string) => `${status}::${name}`
+
+const toggleUniversity = (status: string, name: string) => {
+  const key = filterKey(status, name)
+  selectedUniversityFilters.value = selectedUniversityFilters.value.includes(key)
+    ? selectedUniversityFilters.value.filter(value => value !== key)
+    : [...selectedUniversityFilters.value, key]
 }
 
 const clearFilter = () => {
-  selectedUniversities.value = []
+  selectedUniversityFilters.value = []
 }
 </script>
 
@@ -126,7 +137,7 @@ const clearFilter = () => {
           @click="isFilterOpen = true"
           title="Filter by university"
           class="flex items-center justify-center w-5 h-5 rounded-md transition-colors cursor-pointer"
-          :class="selectedUniversities.length > 0
+          :class="selectedUniversityFilters.length > 0
             ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40'
             : 'text-zinc-400 dark:text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-700'"
         >
@@ -181,9 +192,9 @@ const clearFilter = () => {
               >
                 <input
                   type="checkbox"
-                  :checked="selectedUniversities.includes(university)"
+                  :checked="selectedUniversityFilters.includes(filterKey(group.status, university))"
                   class="accent-blue-600"
-                  @change="toggleUniversity(university)"
+                  @change="toggleUniversity(group.status, university)"
                 />
                 <span class="truncate">{{ university }}</span>
               </label>
@@ -197,7 +208,7 @@ const clearFilter = () => {
             <button
               type="button"
               class="px-3 py-1.5 rounded-lg text-[11px] font-semibold text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer"
-              :disabled="selectedUniversities.length === 0"
+              :disabled="selectedUniversityFilters.length === 0"
               @click="clearFilter"
             >
               Clear
