@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import type { Student } from '@/types'
 import { WORKFLOW_STAGES, type WorkflowStage } from '../utils/statusWorkflow'
-import { Users, ChevronsLeftRight, ChevronsRightLeft } from 'lucide-vue-next'
+import { Users, Filter, X, ChevronsLeftRight, ChevronsRightLeft } from 'lucide-vue-next'
 import KanbanCard from './KanbanCard.vue'
 
 const props = defineProps<{
@@ -47,7 +47,56 @@ const COLUMN_GAP_REM = (BOARD_GAP_REM * (WORKFLOW_STAGES.length - 1)) / WORKFLOW
 const EXPANDED_SCALE = 1.3
 
 const expanded = ref(false)
+const isFilterOpen = ref(false)
+const selectedUniversities = ref<string[]>([])
 const toggleExpand = () => { expanded.value = !expanded.value }
+
+const universityFilters = computed(() => {
+  const grouped = new Map<string, Set<string>>()
+  for (const student of props.students) {
+    for (let slot = 1; slot <= 5; slot++) {
+      const name = (student as any)[`university_${slot}`]
+      if (typeof name !== 'string' || !name.trim()) continue
+      const rawStatus = (student as any)[`university_${slot}_status`]
+      const status = typeof rawStatus === 'string' && rawStatus.trim()
+        ? rawStatus.trim()
+        : 'Not Applied'
+      if (!grouped.has(status)) grouped.set(status, new Set())
+      grouped.get(status)?.add(name.trim())
+    }
+  }
+
+  const priority = ['Applied', 'Chosen', 'Accepted', 'Failed', 'Not Applied']
+  return [...grouped.entries()]
+    .sort(([a], [b]) => {
+      const aIndex = priority.findIndex(value => value.toUpperCase() === a.toUpperCase())
+      const bIndex = priority.findIndex(value => value.toUpperCase() === b.toUpperCase())
+      if (aIndex !== -1 || bIndex !== -1) {
+        return (aIndex === -1 ? priority.length : aIndex) - (bIndex === -1 ? priority.length : bIndex)
+      }
+      return a.localeCompare(b)
+    })
+    .map(([status, names]) => ({ status, names: [...names].sort((a, b) => a.localeCompare(b)) }))
+})
+
+const filteredStudents = computed(() => {
+  if (selectedUniversities.value.length === 0) return props.students
+  const selected = new Set(selectedUniversities.value)
+  return props.students.filter(student =>
+    Array.from({ length: 5 }, (_, index) => index + 1)
+      .some(slot => selected.has((student as any)[`university_${slot}`]?.trim()))
+  )
+})
+
+const toggleUniversity = (name: string) => {
+  selectedUniversities.value = selectedUniversities.value.includes(name)
+    ? selectedUniversities.value.filter(value => value !== name)
+    : [...selectedUniversities.value, name]
+}
+
+const clearFilter = () => {
+  selectedUniversities.value = []
+}
 </script>
 
 <template>
@@ -67,14 +116,22 @@ const toggleExpand = () => { expanded.value = !expanded.value }
     <!-- Column header -->
     <div class="flex items-center justify-between px-3.5 py-3 border-b border-zinc-200 dark:border-zinc-800 shrink-0 bg-white/60 dark:bg-zinc-850/60">
       <h3 class="text-xs font-bold uppercase tracking-wider" :class="STAGE_ACCENT[stageKey]">
-        {{ label }}
+        {{ label }} ({{ filteredStudents.length }})
       </h3>
 
-      <!-- Count badge + expand button -->
+      <!-- Filter and expand controls -->
       <div class="flex items-center gap-1.5">
-        <span class="text-[10.5px] font-bold text-zinc-500 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded-full">
-          {{ students.length }}
-        </span>
+        <button
+          type="button"
+          @click="isFilterOpen = true"
+          title="Filter by university"
+          class="flex items-center justify-center w-5 h-5 rounded-md transition-colors cursor-pointer"
+          :class="selectedUniversities.length > 0
+            ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40'
+            : 'text-zinc-400 dark:text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-700'"
+        >
+          <Filter class="w-3.5 h-3.5" />
+        </button>
         <button
           type="button"
           @click="toggleExpand"
@@ -86,6 +143,76 @@ const toggleExpand = () => { expanded.value = !expanded.value }
         </button>
       </div>
     </div>
+
+    <!-- University status filter modal -->
+    <Teleport to="body">
+      <div
+        v-if="isFilterOpen"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black/20 dark:bg-black/50 px-4"
+        @click.self="isFilterOpen = false"
+      >
+        <div
+          class="w-full max-w-[32rem] max-h-[min(34rem,calc(100vh-2rem))] flex flex-col rounded-2xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-2xl"
+          role="dialog"
+          aria-modal="true"
+          :aria-label="`${label} university filter`"
+        >
+          <div class="flex items-center justify-between px-4 py-3 border-b border-zinc-200 dark:border-zinc-800">
+            <h4 class="text-[13px] font-bold text-zinc-800 dark:text-zinc-100">Filter</h4>
+            <button
+              type="button"
+              title="Close filter"
+              class="flex items-center justify-center w-7 h-7 rounded-lg text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 dark:hover:text-zinc-200 dark:hover:bg-zinc-800 cursor-pointer"
+              @click="isFilterOpen = false"
+            >
+              <X class="w-4 h-4" />
+            </button>
+          </div>
+
+          <div class="overflow-y-auto px-4 py-3 space-y-4">
+            <section v-for="group in universityFilters" :key="group.status">
+              <h5 class="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                {{ group.status }}:
+              </h5>
+              <label
+                v-for="university in group.names"
+                :key="`${group.status}-${university}`"
+                class="flex items-center gap-2 px-2 py-1.5 rounded-lg text-[11px] text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 cursor-pointer"
+              >
+                <input
+                  type="checkbox"
+                  :checked="selectedUniversities.includes(university)"
+                  class="accent-blue-600"
+                  @change="toggleUniversity(university)"
+                />
+                <span class="truncate">{{ university }}</span>
+              </label>
+            </section>
+            <p v-if="universityFilters.length === 0" class="py-6 text-center text-[11px] text-zinc-400">
+              No universities in this column.
+            </p>
+          </div>
+
+          <div class="flex items-center justify-between gap-2 px-4 py-3 border-t border-zinc-200 dark:border-zinc-800">
+            <button
+              type="button"
+              class="px-3 py-1.5 rounded-lg text-[11px] font-semibold text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer"
+              :disabled="selectedUniversities.length === 0"
+              @click="clearFilter"
+            >
+              Clear
+            </button>
+            <button
+              type="button"
+              class="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-[11px] font-bold text-white cursor-pointer"
+              @click="isFilterOpen = false"
+            >
+              Show ({{ filteredStudents.length }})
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
 
     <!-- Card list -->
     <div class="flex-1 min-h-0 overflow-y-auto scrollbar-thin px-2.5 py-2.5">
@@ -99,7 +226,7 @@ const toggleExpand = () => { expanded.value = !expanded.value }
 
       <TransitionGroup v-else name="kanban-card" tag="div" class="relative flex flex-col gap-1.5">
         <KanbanCard
-          v-for="student in students"
+          v-for="student in filteredStudents"
           :key="student.id"
           :student="student"
           :stage-key="stageKey"

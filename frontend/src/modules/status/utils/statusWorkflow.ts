@@ -50,7 +50,13 @@ export function calculateStudentWorkflowStage(student: Student): WorkflowStage {
     return 'invoice'
   }
 
-  const isAnyUniApplied = [student.university_1_status, student.university_2_status]
+  const isAnyUniApplied = [
+    student.university_1_status,
+    student.university_2_status,
+    student.university_3_status,
+    student.university_4_status,
+    student.university_5_status,
+  ]
     .some(status => status?.trim().toUpperCase() === 'APPLIED')
 
   if (isAnyUniApplied) {

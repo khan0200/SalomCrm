@@ -180,7 +180,11 @@ def compute_workflow_stage(student) -> str:
 
     is_any_uni_applied = any(
         (s or '').strip().upper() == 'APPLIED'
-        for s in (student.university_1_status, student.university_2_status)
+        for s in (
+            student.university_1_status, student.university_2_status,
+            student.university_3_status, student.university_4_status,
+            student.university_5_status,
+        )
     )
     if is_any_uni_applied:
         return 'apply'

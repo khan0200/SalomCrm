@@ -48,6 +48,15 @@ class WorkflowStageTestCase(TestCase):
         )
         self.assertEqual(compute_workflow_stage(student), 'apply')
 
+    def test_case_3c_university_3_to_5_applied_moves_to_apply(self):
+        for slot in (3, 4, 5):
+            with self.subTest(slot=slot):
+                student = self.make_student(**{
+                    f'university_{slot}': f'University {slot}',
+                    f'university_{slot}_status': 'Applied',
+                })
+                self.assertEqual(compute_workflow_stage(student), 'apply')
+
     def test_case_3b_university_1_failed_stays_student(self):
         student = self.make_student(university_1='Seoul Uni', university_1_status='Failed')
         self.assertEqual(compute_workflow_stage(student), 'student')
