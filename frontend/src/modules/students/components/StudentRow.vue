@@ -5,6 +5,7 @@ import { ROW_COLOR_MAP } from '@/types'
 import { Copy, Check, MoreVertical } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
 import { formatPhoneValue } from '@/utils/phone'
+import { useUniversityStatuses } from '@/composables/useUniversityStatuses'
 
 const props = defineProps<{
   student: Student
@@ -18,6 +19,7 @@ const emit = defineEmits<{
 }>()
 
 const authStore = useAuthStore()
+const { getStatusIcon, getStatusColorOption, sortUniversitySlots } = useUniversityStatuses()
 
 const isNameCopied = ref(false)
 const isPhoneCopied = ref(false)
@@ -135,14 +137,25 @@ const certs = computed(() => {
   return list.filter(c => c.type && c.type !== 'NO CERTIFICATE')
 })
 
+// Each entry carries its own status so the list can show a per-university
+// icon. Slots are ranked by status (Accepted first, Failed last) to match
+// how the Status board orders the same universities.
 const universities = computed(() => {
-  return [
-    props.student.university_1,
-    props.student.university_2,
-    props.student.university_3,
-    props.student.university_4,
-    props.student.university_5,
-  ].filter(Boolean)
+  const slots = [1, 2, 3, 4, 5].filter(
+    i => (props.student as any)[`university_${i}`]
+  )
+  const statusOf = (slot: number): string | null | undefined =>
+    (props.student as any)[`university_${slot}_status`]
+
+  return sortUniversitySlots(slots, statusOf).map(slot => {
+    const status = statusOf(slot)
+    return {
+      name: (props.student as any)[`university_${slot}`] as string,
+      status,
+      icon: getStatusIcon(status),
+      hex: getStatusColorOption(status).hex,
+    }
+  })
 })
 </script>
 
@@ -342,12 +355,19 @@ const universities = computed(() => {
           :key="uniIdx"
           class="group/uni relative flex items-center gap-1.5 text-[11.5px]"
         >
-          <span :class="hasRowColor ? 'text-zinc-700 dark:text-zinc-300 font-bold' : 'text-zinc-400'" class="shrink-0">•</span>
+          <!-- Status icon: emoji for the known statuses, else a dot tinted
+               with the status's own registry colour. -->
+          <span v-if="uni.icon" class="shrink-0 text-[11px] leading-none">{{ uni.icon }}</span>
+          <span
+            v-else
+            class="shrink-0 h-2 w-2 rounded-full"
+            :style="{ backgroundColor: uni.hex }"
+          />
           <span
             class="truncate uppercase cursor-default"
             :class="hasRowColor ? 'font-bold text-zinc-950 dark:text-white' : 'font-medium text-zinc-700 dark:text-zinc-300'"
           >
-            {{ uni }}
+            {{ uni.name }}
           </span>
 
           <!-- iOS Styled Solid Black Tooltip -->
@@ -355,7 +375,8 @@ const universities = computed(() => {
             class="pointer-events-none absolute bottom-full left-0 mb-1.5 opacity-0 scale-90 translate-y-1 group-hover/uni:opacity-100 group-hover/uni:scale-100 group-hover/uni:translate-y-0 transition-all duration-150 ease-out z-50 flex flex-col items-start select-none"
           >
             <div class="px-2.5 py-1 bg-black text-white text-[11px] font-semibold rounded-md shadow-xl shadow-black/50 whitespace-nowrap tracking-wide flex items-center gap-1">
-              <span>{{ uni }}</span>
+              <span>{{ uni.name }}</span>
+              <span v-if="uni.status" class="opacity-70 font-normal">({{ uni.status }})</span>
             </div>
             <div class="w-0 h-0 border-x-4 border-x-transparent border-t-4 border-t-black -mt-[0.5px] ml-3"></div>
           </div>

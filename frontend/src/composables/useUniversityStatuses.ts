@@ -109,6 +109,25 @@ export function useUniversityStatuses() {
     return STATUS_COLOR_OPTIONS[0]
   }
 
+  // Emoji badge for a status. Only the four well-known names get a glyph;
+  // agency-defined statuses fall through to undefined so callers render the
+  // registry-coloured dot instead of a glyph that contradicts their colour.
+  const STATUS_ICONS: Record<string, string> = {
+    ACCEPTED: '✅',
+    ADMITTED: '✅',
+    FINISHED: '✅',
+    APPLIED: '🟡',
+    FAILED: '❌',
+    REJECTED: '❌',
+    CHOSEN: '🔷',
+  }
+
+  const getStatusIcon = (statusName?: string | null): string | undefined => {
+    const norm = (statusName || '').trim().toUpperCase()
+    if (!norm) return undefined
+    return STATUS_ICONS[norm]
+  }
+
   const getStatusDotClass = (statusNameOrColor?: string | null): string => {
     return getStatusColorOption(statusNameOrColor).dotClass
   }
@@ -150,6 +169,7 @@ export function useUniversityStatuses() {
     resolveColor,
     getStatusItem,
     getStatusColorOption,
+    getStatusIcon,
     getStatusDotClass,
     getStatusBadgeClass,
     STATUS_COLOR_OPTIONS

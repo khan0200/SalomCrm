@@ -22,6 +22,7 @@ import StudentRosterContextMenu from './components/StudentRosterContextMenu.vue'
 import StudentQuickNoteModal from './components/StudentQuickNoteModal.vue'
 import { useStudentDashboardStore } from '@/stores/studentDashboard'
 import { useCustomTags } from '@/composables/useCustomTags'
+import { useUniversityStatuses } from '@/composables/useUniversityStatuses'
 import { useStudentFiltering } from '@/composables/useStudentFiltering'
 import { getTariffPrice } from '@/utils/tariff'
 
@@ -30,6 +31,10 @@ const uiStore = useUiStore()
 const dashboardStore = useStudentDashboardStore()
 const { fetchTags } = useCustomTags()
 fetchTags()
+
+// University status registry drives the per-university icons/colours in each row.
+const { fetchStatuses: fetchUniversityStatuses } = useUniversityStatuses()
+fetchUniversityStatuses()
 
 const activeFolder = ref('all')
 const currentPage = ref(1)
