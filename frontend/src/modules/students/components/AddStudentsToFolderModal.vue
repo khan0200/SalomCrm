@@ -372,7 +372,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div v-if="isOpen" class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 md:p-6 select-none">
+  <div v-if="isOpen" class="fixed inset-0 layer-modal flex items-center justify-center p-3 sm:p-4 md:p-6 select-none">
     <!-- Backdrop Overlay -->
     <div
       @click="emit('close')"

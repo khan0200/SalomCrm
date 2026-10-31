@@ -905,7 +905,7 @@ onUnmounted(() => {
   <!-- 1. Main Student Selection & Filtering Modal -->
   <div
     v-if="isOpen"
-    class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs select-none animate-page-in"
+    class="fixed inset-0 layer-modal flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs select-none animate-page-in"
     @click.self="emit('close')"
   >
     <div

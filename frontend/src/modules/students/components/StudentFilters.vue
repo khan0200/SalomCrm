@@ -501,7 +501,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeyDown))
 
     <!-- Mobile Backdrop -->
     <div
-      class="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs md:hidden cursor-default"
+      class="fixed inset-0 layer-drawer bg-black/40 backdrop-blur-xs md:hidden cursor-default"
       @click="emit('close')"
     />
 

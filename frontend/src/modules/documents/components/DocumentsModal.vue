@@ -169,7 +169,7 @@ const counters = computed(() => {
       leave-active-class="transition-all duration-[220ms] ease-out"
       leave-to-class="opacity-0"
     >
-      <div v-if="isOpen && student" class="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-auto">
+      <div v-if="isOpen && student" class="fixed inset-0 layer-modal flex items-center justify-center p-4 overflow-auto">
         <!-- Backdrop -->
         <div class="fixed inset-0 bg-black/50 backdrop-blur-[2px]" @click="emit('close')" />
 

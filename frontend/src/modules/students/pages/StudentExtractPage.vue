@@ -1687,7 +1687,7 @@ const getInitials = (name?: string) => {
     <!-- Quick Edit Value Modal -->
     <div
       v-if="isEditModalOpen"
-      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs"
+      class="fixed inset-0 layer-modal flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs"
     >
       <div class="w-full max-w-sm bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 shadow-2xl space-y-4">
         <div class="flex items-center justify-between">

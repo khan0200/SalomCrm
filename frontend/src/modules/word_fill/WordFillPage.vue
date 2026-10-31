@@ -38,6 +38,7 @@ import { studentsApi } from '@/api/students'
 import type { Student } from '@/types'
 import { ROW_COLOR_MAP } from '@/types'
 import { formatPhoneValue } from '@/utils/phone'
+import { useGenerationFilters } from '@/composables/useGenerationFilters'
 
 // ─── Step State ─────────────────────────────────────────────────────────────
 const currentStep = ref<1 | 2 | 3 | 4>(1)
@@ -77,62 +78,31 @@ const mappings = ref<WordMappingConfig[]>([])
 const onlyMappedFilter = ref(false)
 
 // ─── Student Selection State & Advanced Filters ─────────────────────────────
-const searchType = ref<'all' | 'id' | 'name' | 'phone' | 'university'>('all')
-const searchQuery = ref('')
-const selectedStudentIds = ref<Set<string>>(new Set())
-
-const selectedFolders = ref<string[]>([])
-const selectedTariffs = ref<string[]>([])
-const selectedLevels = ref<string[]>([])
-const selectedGroups = ref<string[]>([])
-const selectedCerts = ref<string[]>([])
-const selectedTags = ref<string[]>([])
-const selectedLeads = ref<string[]>([])
-
-const isFolderDropdownOpen = ref(false)
-const isTariffDropdownOpen = ref(false)
-const isLevelDropdownOpen = ref(false)
-const isGroupDropdownOpen = ref(false)
-const isCertDropdownOpen = ref(false)
-const isTagDropdownOpen = ref(false)
-const isLeadDropdownOpen = ref(false)
-
-const closeAllDropdowns = () => {
-  isFolderDropdownOpen.value = false
-  isTariffDropdownOpen.value = false
-  isLevelDropdownOpen.value = false
-  isGroupDropdownOpen.value = false
-  isCertDropdownOpen.value = false
-  isTagDropdownOpen.value = false
-  isLeadDropdownOpen.value = false
-}
-
-type DropdownKey = 'folder' | 'tariff' | 'level' | 'group' | 'cert' | 'tag' | 'lead'
-const dropdownRefs: Record<DropdownKey, typeof isFolderDropdownOpen> = {
-  folder: isFolderDropdownOpen,
-  tariff: isTariffDropdownOpen,
-  level: isLevelDropdownOpen,
-  group: isGroupDropdownOpen,
-  cert: isCertDropdownOpen,
-  tag: isTagDropdownOpen,
-  lead: isLeadDropdownOpen,
-}
-const toggleDropdown = (key: DropdownKey) => {
-  const target = dropdownRefs[key]
-  const wasOpen = target.value
-  closeAllDropdowns()
-  target.value = !wasOpen
-}
-
-const toggleInList = (list: string[], value: string) => {
-  const idx = list.indexOf(value)
-  if (idx === -1) list.push(value)
-  else list.splice(idx, 1)
-}
-
-const CERT_OPTIONS = ['NO CERTIFICATE', 'EXPECTED', 'TOPIK', 'IELTS', 'TOEFL', 'CEFR', 'SAT', 'SKA']
-const PREDEFINED_TAGS = ['Call', 'Apply', 'Documents', 'Payment']
-const TAG_OPTIONS = [...PREDEFINED_TAGS, 'Custom']
+const {
+  searchType,
+  searchQuery,
+  selectedStudentIds,
+  selectedFolders,
+  selectedTariffs,
+  selectedLevels,
+  selectedGroups,
+  selectedCerts,
+  selectedTags,
+  selectedLeads,
+  isFolderDropdownOpen,
+  isTariffDropdownOpen,
+  isLevelDropdownOpen,
+  isGroupDropdownOpen,
+  isCertDropdownOpen,
+  isTagDropdownOpen,
+  isLeadDropdownOpen,
+  closeAllDropdowns,
+  toggleDropdown,
+  toggleInList,
+  CERT_OPTIONS,
+  PREDEFINED_TAGS,
+  TAG_OPTIONS,
+} = useGenerationFilters()
 
 // ─── Generation & Output State ──────────────────────────────────────────────
 const filenamePattern = ref('{full_name}')
@@ -1538,7 +1508,7 @@ const resetWizard = () => {
     <!-- Modal for Catalog when triggered from any step -->
     <div
       v-if="showCatalogModal"
-      class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto"
+      class="fixed inset-0 layer-modal flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto"
       @click.self="showCatalogModal = false"
     >
       <div class="w-full max-w-6xl bg-white dark:bg-[#111315] rounded-2xl shadow-2xl border border-zinc-200 dark:border-zinc-800 max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">

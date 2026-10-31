@@ -2843,7 +2843,7 @@ const exportWithdrawalExcel = async () => {
     <Teleport to="body">
       <div
         v-if="viewingPayment"
-        class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs select-none"
+        class="fixed inset-0 layer-modal flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs select-none"
       >
         <div class="relative w-full max-w-lg rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#15171a] p-6 shadow-2xl space-y-4">
           <div class="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-3">
@@ -2924,7 +2924,7 @@ const exportWithdrawalExcel = async () => {
     <Teleport to="body">
       <div
         v-if="activeKpiModal"
-        class="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/65 backdrop-blur-xs select-none"
+        class="fixed inset-0 layer-modal flex items-center justify-center p-2 sm:p-4 bg-black/65 backdrop-blur-xs select-none"
         @click.self="closeKpiModal"
       >
         <div

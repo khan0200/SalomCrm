@@ -34,7 +34,7 @@ onUnmounted(() => window.removeEventListener('keydown', handleKeyDown))
   <Teleport to="body">
     <div
       v-if="isOpen"
-      class="fixed inset-0 z-50 overflow-hidden flex justify-end"
+      class="fixed inset-0 layer-drawer overflow-hidden flex justify-end"
     >
       <!-- Backdrop -->
       <transition

@@ -1709,7 +1709,7 @@ const activeConfig = computed(() => TABS_CONFIG[activeTab.value])
     <!-- Add/Edit Option Modal Dialog -->
     <div
       v-if="isModalOpen"
-      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs select-none"
+      class="fixed inset-0 layer-modal flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs select-none"
     >
       <div class="bg-white dark:bg-[#181a1d] border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-page-in">
         <div class="px-5 py-4 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
@@ -1851,7 +1851,7 @@ const activeConfig = computed(() => TABS_CONFIG[activeTab.value])
     <!-- Custom Tag Modal Dialog with Emoji Selector -->
     <div
       v-if="isTagModalOpen"
-      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs select-none"
+      class="fixed inset-0 layer-modal flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs select-none"
     >
       <div class="bg-white dark:bg-[#181a1d] border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-page-in">
         <div class="px-5 py-4 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
@@ -1913,7 +1913,7 @@ const activeConfig = computed(() => TABS_CONFIG[activeTab.value])
     <!-- Delete Confirmation Modal Dialog -->
     <div
       v-if="itemToDelete"
-      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs select-none"
+      class="fixed inset-0 layer-modal flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs select-none"
       @click.self="itemToDelete = null"
     >
       <div class="bg-white dark:bg-[#181a1d] border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden p-5 space-y-4 animate-page-in">

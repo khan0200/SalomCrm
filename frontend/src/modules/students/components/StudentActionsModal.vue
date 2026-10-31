@@ -249,7 +249,7 @@ const handleRestoreStudent = () => {
     >
       <div
         v-if="isOpen && !isPermanentConfirmOpen && !isVisibilityChoiceOpen && !isClearAllConfirmOpen"
-        class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto"
+        class="fixed inset-0 layer-modal flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto"
         @click.self="emit('close')"
       >
         <transition
@@ -485,7 +485,7 @@ const handleRestoreStudent = () => {
     >
       <div
         v-if="isPermanentConfirmOpen"
-        class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs"
+        class="fixed inset-0 layer-modal flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs"
         @click.self="isPermanentConfirmOpen = false"
       >
         <div class="relative w-full max-w-md overflow-hidden rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-2xl p-6 space-y-4 text-xs">
@@ -541,7 +541,7 @@ const handleRestoreStudent = () => {
     >
       <div
         v-if="isVisibilityChoiceOpen"
-        class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs"
+        class="fixed inset-0 layer-modal flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs"
         @click.self="cancelVisibilityChoice"
       >
         <div class="relative w-full max-w-sm overflow-hidden rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-2xl p-6 space-y-4 text-xs">
@@ -590,7 +590,7 @@ const handleRestoreStudent = () => {
     >
       <div
         v-if="isClearAllConfirmOpen"
-        class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs"
+        class="fixed inset-0 layer-modal flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs"
         @click.self="isClearAllConfirmOpen = false"
       >
         <div class="relative w-full max-w-md overflow-hidden rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-2xl p-6 space-y-4 text-xs">

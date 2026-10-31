@@ -225,7 +225,7 @@ onBeforeUnmount(() => {
   <Teleport to="body">
     <div
       v-if="isOpen"
-      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs"
+      class="fixed inset-0 layer-modal flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs"
       @click.self="emit('close')"
     >
       <!-- Modal Box: 500px by 500px on desktop, responsive on smaller mobile -->

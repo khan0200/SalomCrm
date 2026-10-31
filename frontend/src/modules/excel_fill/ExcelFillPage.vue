@@ -38,6 +38,7 @@ import { excelFillApi, type ExcelAnalysisResult, type ColumnMappingConfig, type 
 import { studentsApi } from '@/api/students'
 import type { Student } from '@/types'
 import { ROW_COLOR_MAP } from '@/types'
+import { useGenerationFilters } from '@/composables/useGenerationFilters'
 
 // ─── Step State ─────────────────────────────────────────────────────────────
 const currentStep = ref<1 | 2 | 3 | 4>(1)
@@ -57,57 +58,32 @@ const sortMappedFirst = ref(false)
 const step2ViewMode = ref<'grid' | 'table' | 'cards'>('grid')
 
 // ─── Student Selection State & Advanced Filters ─────────────────────────────
-const searchType = ref<'all' | 'id' | 'name' | 'phone' | 'university'>('all')
-const searchQuery = ref('')
-const selectedStudentIds = ref<Set<string>>(new Set())
-
-const selectedStatuses = ref<string[]>(['active'])
-const selectedFolders = ref<string[]>([])
-const selectedTariffs = ref<string[]>([])
-const selectedLevels = ref<string[]>([])
-const selectedGroups = ref<string[]>([])
-const selectedCerts = ref<string[]>([])
-const selectedTags = ref<string[]>([])
-const selectedLeads = ref<string[]>([])
-
-// Dropdown popover open states
-const isStatusDropdownOpen = ref(false)
-const isFolderDropdownOpen = ref(false)
-const isTariffDropdownOpen = ref(false)
-const isLevelDropdownOpen = ref(false)
-const isGroupDropdownOpen = ref(false)
-const isCertDropdownOpen = ref(false)
-const isTagDropdownOpen = ref(false)
-const isLeadDropdownOpen = ref(false)
-
-const closeAllDropdowns = () => {
-  isStatusDropdownOpen.value = false
-  isFolderDropdownOpen.value = false
-  isTariffDropdownOpen.value = false
-  isLevelDropdownOpen.value = false
-  isGroupDropdownOpen.value = false
-  isCertDropdownOpen.value = false
-  isTagDropdownOpen.value = false
-  isLeadDropdownOpen.value = false
-}
-
-type DropdownKey = 'status' | 'folder' | 'tariff' | 'level' | 'group' | 'cert' | 'tag' | 'lead'
-const dropdownRefs: Record<DropdownKey, typeof isFolderDropdownOpen> = {
-  status: isStatusDropdownOpen,
-  folder: isFolderDropdownOpen,
-  tariff: isTariffDropdownOpen,
-  level: isLevelDropdownOpen,
-  group: isGroupDropdownOpen,
-  cert: isCertDropdownOpen,
-  tag: isTagDropdownOpen,
-  lead: isLeadDropdownOpen,
-}
-const toggleDropdown = (key: DropdownKey) => {
-  const target = dropdownRefs[key]
-  const wasOpen = target.value
-  closeAllDropdowns()
-  target.value = !wasOpen
-}
+const {
+  searchType,
+  searchQuery,
+  selectedStudentIds,
+  selectedStatuses,
+  selectedFolders,
+  selectedTariffs,
+  selectedLevels,
+  selectedGroups,
+  selectedCerts,
+  selectedTags,
+  selectedLeads,
+  isStatusDropdownOpen,
+  isFolderDropdownOpen,
+  isTariffDropdownOpen,
+  isLevelDropdownOpen,
+  isGroupDropdownOpen,
+  isCertDropdownOpen,
+  isTagDropdownOpen,
+  isLeadDropdownOpen,
+  closeAllDropdowns,
+  toggleDropdown,
+  toggleInList,
+  CERT_OPTIONS,
+  PREDEFINED_TAGS,
+} = useGenerationFilters()
 
 // Status Helpers & Counts
 const statusCounts = computed(() => {
@@ -159,15 +135,6 @@ const statusButtonLabel = computed(() => {
   }
   return `Status · ${selectedStatuses.value.length}`
 })
-
-const toggleInList = (list: string[], value: string) => {
-  const idx = list.indexOf(value)
-  if (idx === -1) list.push(value)
-  else list.splice(idx, 1)
-}
-
-const CERT_OPTIONS = ['NO CERTIFICATE', 'EXPECTED', 'TOPIK', 'IELTS', 'TOEFL', 'CEFR', 'SAT', 'SKA']
-const PREDEFINED_TAGS = ['Call', 'Apply', 'Documents', 'Payment']
 
 // ─── Generation & Output State ──────────────────────────────────────────────
 const fillMode = ref<'append' | 'overwrite'>('append')
@@ -2624,7 +2591,7 @@ const resetWizard = () => {
     <Teleport to="body">
       <div
         v-if="isFileNameModalOpen"
-        class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150"
+        class="fixed inset-0 layer-modal flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150"
         @click.self="isFileNameModalOpen = false"
       >
         <div

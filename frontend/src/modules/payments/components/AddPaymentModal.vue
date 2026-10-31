@@ -252,7 +252,7 @@ const handleSubmit = () => {
 <template>
   <div
     v-if="isOpen"
-    class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs select-none overflow-hidden"
+    class="fixed inset-0 layer-modal flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs select-none overflow-hidden"
   >
     <div class="fixed inset-0" @click="handleClose" />
 
