@@ -5,6 +5,7 @@ import {
   X, Check, Trash2, StickyNote, Edit3
 } from 'lucide-vue-next'
 import QuickNoteSuggestionsList from './QuickNoteSuggestionsList.vue'
+import { useQuickNoteSuggestions } from '@/composables/useQuickNoteSuggestions'
 
 const props = withDefaults(defineProps<{
   isOpen: boolean
@@ -23,6 +24,8 @@ const isEditing = ref(false)
 const noteText = ref('')
 const textareaRef = ref<HTMLTextAreaElement | null>(null)
 const isSaving = ref(false)
+
+const { addSuggestion } = useQuickNoteSuggestions()
 
 const hasExistingNote = computed(() => {
   return !!(props.student?.quick_notes && props.student.quick_notes.trim())
@@ -70,6 +73,16 @@ const handleSave = () => {
   const text = noteText.value.trim()
   props.student.quick_notes = text
   emit('save', text, props.student)
+
+  // Keep a manually typed note as a reusable suggestion for this tenant --
+  // the same wording usually applies to several students. addSuggestion
+  // de-dupes case-insensitively, so re-saving an existing note is a no-op.
+  // Deliberately not awaited: the note itself is already on its way, and a
+  // failed suggestion save must not block closing the modal.
+  if (text) {
+    void addSuggestion(text)
+  }
+
   emit('close')
 }
 

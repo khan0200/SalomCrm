@@ -1072,6 +1072,21 @@ class QuickNoteSuggestionViewSet(viewsets.ModelViewSet):
         tenant = getattr(req, 'tenant', None) or getattr(user, 'tenant', None)
         if not tenant:
             raise ValidationError({'tenant': 'Tenant is required.'})
+
+        # Saving a student's quick note also files it as a reusable
+        # suggestion, so the same wording arrives here repeatedly - once per
+        # student sharing it. Return the existing row instead of stacking
+        # duplicates; the client's own de-dupe can't see rows added by a
+        # colleague or by a concurrent save.
+        text = (serializer.validated_data.get('text') or '').strip()
+        if text:
+            existing = QuickNoteSuggestion.objects.filter(
+                tenant=tenant, text__iexact=text
+            ).order_by('sort_order', 'id').first()
+            if existing:
+                serializer.instance = existing
+                return
+
         serializer.save(tenant=tenant)
 
 
