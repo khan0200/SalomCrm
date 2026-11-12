@@ -26,6 +26,7 @@ import StudentActionsModal from '@/modules/students/components/StudentActionsMod
 import AddStudentsToFolderModal from '@/modules/students/components/AddStudentsToFolderModal.vue'
 import StudentDetailDrawer from '@/modules/students/components/StudentDetailDrawer.vue'
 import { useUniversityStatuses } from '@/composables/useUniversityStatuses'
+import { matchesCertificate } from '@/composables/useStudentFiltering'
 import { calculateStudentWorkflowStage, WORKFLOW_STAGES } from './utils/statusWorkflow'
 import QuickPillFilters from '@/components/QuickPillFilters.vue'
 import ActiveFilterChips from '@/components/ActiveFilterChips.vue'
@@ -373,6 +374,7 @@ const filteredStudents = computed(() => {
 
   // 3. Multi-Select Criteria Filters
   if (selectedTariffs.value.length > 0) {
+    if (selectedTariffs.value.includes('__NONE__')) return []
     list = list.filter(s => {
       if (selectedTariffs.value.includes('NO_TARIFF') && !s.tariff) return true
       return s.tariff && selectedTariffs.value.includes(s.tariff)
@@ -380,6 +382,7 @@ const filteredStudents = computed(() => {
   }
 
   if (selectedLevels.value.length > 0) {
+    if (selectedLevels.value.includes('__NONE__')) return []
     list = list.filter(s => {
       if (selectedLevels.value.includes('NO_LEVEL') && !s.level) return true
       return s.level && selectedLevels.value.includes(s.level)
@@ -387,6 +390,7 @@ const filteredStudents = computed(() => {
   }
 
   if (selectedGroups.value.length > 0) {
+    if (selectedGroups.value.includes('__NONE__')) return []
     list = list.filter(s => {
       if (selectedGroups.value.includes('NO_GROUP') && !s.student_group) return true
       return s.student_group && selectedGroups.value.includes(s.student_group)
@@ -394,6 +398,7 @@ const filteredStudents = computed(() => {
   }
 
   if (selectedBranches.value.length > 0) {
+    if (selectedBranches.value.includes('__NONE__')) return []
     const hasNoBranch = selectedBranches.value.includes('NO_BRANCH') || selectedBranches.value.includes('No Branch')
     const cleanBranches = selectedBranches.value.filter(b => b !== 'NO_BRANCH' && b !== 'No Branch').map(b => b.trim().toLowerCase())
     list = list.filter(s => {
@@ -409,53 +414,20 @@ const filteredStudents = computed(() => {
     })
   }
 
-  // Certificate filter: checks all 3 certificate slots, not just the
-  // first, and treats "EXPECTED" as a score value (student.certificate_score)
-  // rather than a certificate type - mirrors DocumentsPage.vue's logic,
-  // which StudentsPage.vue and this page previously only checked slot 1 for
-  // (so a student whose EXPECTED/matching cert was in slot 2 or 3 never
-  // matched, even though the filter panel's own counts included them).
-  if (selectedCerts.value.length > 0) {
-    list = list.filter(s => {
-      let matchesCert = false
-      if (selectedCerts.value.includes('NO CERTIFICATE') && (!s.language_certificate || s.language_certificate === 'NO CERTIFICATE')) {
-        matchesCert = true
-      }
-      if (selectedCerts.value.includes('EXPECTED') &&
-          (s.certificate_score?.toUpperCase() === 'EXPECTED' ||
-           s.certificate_score_2?.toUpperCase() === 'EXPECTED' ||
-           s.certificate_score_3?.toUpperCase() === 'EXPECTED')) {
-        matchesCert = true
-      }
-      const certMatches = [s.language_certificate, s.language_certificate_2, s.language_certificate_3]
-        .some(c => c && c !== 'NO CERTIFICATE' && selectedCerts.value.includes(c))
-      if (certMatches) matchesCert = true
-
-      // If a specific score sub-filter is also active alongside exactly one
-      // selected certificate type, narrow further to that cert+score pair.
-      if (matchesCert && selectedScores.value.length > 0 && selectedCerts.value.length === 1) {
-        const cert = selectedCerts.value[0] || ''
-        const scores = [s.certificate_score, s.certificate_score_2, s.certificate_score_3]
-        const certs = [s.language_certificate, s.language_certificate_2, s.language_certificate_3]
-        matchesCert = certs.some((c, i) => {
-          if (!c || c === 'NO CERTIFICATE') return false
-          if (c.toUpperCase() !== cert.toUpperCase()) return false
-          const score = (scores[i] || '').trim().toUpperCase()
-          return selectedScores.value.some(f => f.toUpperCase() === score)
-        })
-      }
-
-      return matchesCert
-    })
-  } else if (selectedScores.value.length > 0) {
-    list = list.filter(s =>
-      [s.certificate_score, s.certificate_score_2, s.certificate_score_3]
-        .some(score => score && selectedScores.value.includes(score))
-    )
+  // Unified certificate & score filtering
+  if (selectedCerts.value.length > 0 || (dashboardStore.selectedCertScores && Object.keys(dashboardStore.selectedCertScores).length > 0) || selectedScores.value.length > 0) {
+    list = list.filter(s => matchesCertificate(s, selectedCerts.value, dashboardStore.selectedCertScores, selectedScores.value))
   }
 
   if (selectedTags.value.length > 0) {
-    list = list.filter(s => (s.task_tags || []).some(t => selectedTags.value.includes(t)))
+    if (selectedTags.value.includes('__NONE__')) return []
+    const hasNoTags = selectedTags.value.includes('NO_TAGS') || selectedTags.value.includes('No Tags')
+    const cleanTags = selectedTags.value.filter(t => t !== 'NO_TAGS' && t !== 'No Tags')
+    list = list.filter(s => {
+      const studentTags = s.task_tags || []
+      if (hasNoTags && studentTags.length === 0) return true
+      return cleanTags.some(t => studentTags.includes(t))
+    })
   }
 
   if (selectedLeads.value.length > 0) {

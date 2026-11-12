@@ -8,6 +8,7 @@ import { paymentsApi } from '@/api/payments'
 import { useStudentDashboardStore } from '@/stores/studentDashboard'
 import { useAlphanumericSort } from '@/composables/useAlphanumericSort'
 import { useDocumentHelpers, syncMissingDocuments, isFieldFilled, CERT_SLOTS } from '@/composables/useDocumentHelpers'
+import { matchesCertificate } from '@/composables/useStudentFiltering'
 import { useAuthStore } from '@/stores/auth'
 import DocumentsModal from './components/DocumentsModal.vue'
 import StudentFilters from '@/modules/students/components/StudentFilters.vue'
@@ -155,6 +156,7 @@ const filteredStudents = computed(() => students.value.filter(student => {
 
   // 2. Tariff Filter
   if (dashboardStore.selectedTariffs.length > 0) {
+    if (dashboardStore.selectedTariffs.includes('__NONE__')) return false
     const matchesTariff = dashboardStore.selectedTariffs.includes(student.tariff || 'NO_TARIFF') ||
                           (dashboardStore.selectedTariffs.includes('NO_TARIFF') && !student.tariff)
     if (!matchesTariff) return false
@@ -163,6 +165,7 @@ const filteredStudents = computed(() => students.value.filter(student => {
   // 3. Level Filter
   const activeLevels = dashboardStore.selectedLevels.filter(l => l !== 'DELETED')
   if (activeLevels.length > 0) {
+    if (activeLevels.includes('__NONE__')) return false
     const matchesLevel = activeLevels.includes(student.level || '') ||
                          activeLevels.includes(student.level2 || '') ||
                          (activeLevels.includes('NO_LEVEL') && !student.level && !student.level2)
@@ -171,6 +174,7 @@ const filteredStudents = computed(() => students.value.filter(student => {
 
   // 4. Group Filter
   if (dashboardStore.selectedGroups.length > 0) {
+    if (dashboardStore.selectedGroups.includes('__NONE__')) return false
     const matchesGroup = dashboardStore.selectedGroups.includes(student.student_group || '') ||
                          (dashboardStore.selectedGroups.includes('NO_GROUP') && !student.student_group)
     if (!matchesGroup) return false
@@ -186,36 +190,10 @@ const filteredStudents = computed(() => students.value.filter(student => {
   }
 
   // 5. Certificate Filter
-  if (dashboardStore.selectedCerts.length > 0) {
-    let matchesCert = false
-    if (dashboardStore.selectedCerts.includes('NO CERTIFICATE') &&
-        (!student.language_certificate || student.language_certificate === 'NO CERTIFICATE')) {
-      matchesCert = true
+  if (dashboardStore.selectedCerts.length > 0 || (dashboardStore.selectedCertScores && Object.keys(dashboardStore.selectedCertScores).length > 0) || dashboardStore.selectedScores.length > 0) {
+    if (!matchesCertificate(student, dashboardStore.selectedCerts, dashboardStore.selectedCertScores, dashboardStore.selectedScores)) {
+      return false
     }
-    if (dashboardStore.selectedCerts.includes('EXPECTED') &&
-        (student.certificate_score?.toUpperCase() === 'EXPECTED' ||
-         student.certificate_score_2?.toUpperCase() === 'EXPECTED' ||
-         student.certificate_score_3?.toUpperCase() === 'EXPECTED')) {
-      matchesCert = true
-    }
-    const certMatches = [student.language_certificate, student.language_certificate_2, student.language_certificate_3]
-      .some(c => c && c !== 'NO CERTIFICATE' && dashboardStore.selectedCerts.includes(c))
-    if (certMatches) matchesCert = true
-
-    // If a specific score sub-filter is also active, additionally check score
-    if (matchesCert && dashboardStore.selectedScores.length > 0 && dashboardStore.selectedCerts.length === 1) {
-      const cert = dashboardStore.selectedCerts[0] || ''
-      const scores = [student.certificate_score, student.certificate_score_2, student.certificate_score_3]
-      const certs = [student.language_certificate, student.language_certificate_2, student.language_certificate_3]
-      matchesCert = certs.some((c, i) => {
-        if (!c || c === 'NO CERTIFICATE') return false
-        if (c.toUpperCase() !== cert.toUpperCase()) return false
-        const score = (scores[i] || '').trim().toUpperCase()
-        return dashboardStore.selectedScores.some(f => f.toUpperCase() === score)
-      })
-    }
-
-    if (!matchesCert) return false
   }
 
   // 6. Missing Docs Filter (OR matching)

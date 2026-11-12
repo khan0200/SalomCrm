@@ -16,24 +16,25 @@ export const useStudentDashboardStore = defineStore('studentDashboard', () => {
   const selectedBranches = ref<string[]>([])
   const selectedCerts = ref<string[]>([])
   const selectedScores = ref<string[]>([])
+  const selectedCertScores = ref<Record<string, string[]>>({})
   const selectedTags = ref<string[]>([])
   const selectedLeads = ref<string[]>([])
   const selectedCoordinators = ref<string[]>([])
   const selectedMissingDocs = ref<string[]>([])
 
   const activeFiltersCount = computed(() => {
-    return (
-      selectedTariffs.value.length +
-      selectedLevels.value.length +
-      selectedGroups.value.length +
-      selectedBranches.value.length +
-      selectedCerts.value.length +
-      selectedScores.value.length +
-      selectedTags.value.length +
-      selectedLeads.value.length +
-      selectedCoordinators.value.length +
-      selectedMissingDocs.value.length
-    )
+    let count = 0
+    if (selectedTariffs.value.length > 0) count++
+    if (selectedLevels.value.length > 0) count++
+    if (selectedGroups.value.length > 0) count++
+    if (selectedBranches.value.length > 0) count++
+    if (selectedCerts.value.length > 0 || Object.keys(selectedCertScores.value).length > 0) count++
+    if (selectedScores.value.length > 0) count++
+    if (selectedTags.value.length > 0) count++
+    if (selectedLeads.value.length > 0) count++
+    if (selectedCoordinators.value.length > 0) count++
+    if (selectedMissingDocs.value.length > 0) count++
+    return count
   })
 
   const resetAllFilters = () => {
@@ -44,6 +45,7 @@ export const useStudentDashboardStore = defineStore('studentDashboard', () => {
     selectedBranches.value = []
     selectedCerts.value = []
     selectedScores.value = []
+    selectedCertScores.value = {}
     selectedTags.value = []
     selectedLeads.value = []
     selectedCoordinators.value = []
@@ -93,6 +95,7 @@ export const useStudentDashboardStore = defineStore('studentDashboard', () => {
     selectedBranches,
     selectedCerts,
     selectedScores,
+    selectedCertScores,
     selectedTags,
     selectedLeads,
     selectedCoordinators,

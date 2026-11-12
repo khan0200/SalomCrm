@@ -276,6 +276,7 @@ const filterCriteria = computed(() => ({
   selectedBranches: selectedBranches.value,
   selectedCerts: selectedCerts.value,
   selectedScores: selectedScores.value,
+  selectedCertScores: dashboardStore.selectedCertScores,
   selectedTags: selectedTags.value,
   selectedLeads: selectedLeads.value,
   selectedCoordinators: selectedCoordinators.value,
