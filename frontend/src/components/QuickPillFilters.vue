@@ -25,6 +25,7 @@ const searchQueries = ref<Record<string, string>>({
   tariff: '',
   level: '',
   group: '',
+  branch: '',
   cert: '',
   tag: '',
   coordinator: '',
@@ -134,6 +135,28 @@ const filteredGroups = computed(() => {
 
 const getGroupLabel = (opt: string) => {
   if (opt === 'NO_GROUP') return 'No Group'
+  return opt
+}
+
+// ── 3b. BRANCH OPTIONS ──
+const branchRawOptions = computed<string[]>(() => {
+  const rawList: string[] = (optionsData.value?.offices as string[]) || []
+  const list = rawList.filter(o => o && o !== 'NO_BRANCH' && o !== 'No Branch')
+  const uniqueList = Array.from(new Set(list))
+  return ['NO_BRANCH', ...uniqueList.sort((a, b) => a.localeCompare(b))]
+})
+
+const filteredBranches = computed(() => {
+  const q = (searchQueries.value.branch || '').trim().toLowerCase()
+  if (!q) return branchRawOptions.value
+  return branchRawOptions.value.filter(b => {
+    const label = b === 'NO_BRANCH' ? 'no branch' : b.toLowerCase()
+    return label.includes(q)
+  })
+})
+
+const getBranchLabel = (opt: string) => {
+  if (opt === 'NO_BRANCH') return 'No Branch'
   return opt
 }
 
@@ -324,6 +347,7 @@ const getCheckedCount = (selectedList: string[], allOptions: string[]): number =
 const isTariffFiltered = computed(() => dashboardStore.selectedTariffs.length > 0)
 const isLevelFiltered = computed(() => dashboardStore.selectedLevels.length > 0)
 const isGroupFiltered = computed(() => dashboardStore.selectedGroups.length > 0)
+const isBranchFiltered = computed(() => (dashboardStore.selectedBranches || []).length > 0)
 const isCertFiltered = computed(() => (
   dashboardStore.selectedCerts.length > 0 ||
   Object.keys(dashboardStore.selectedCertScores || {}).length > 0
@@ -335,6 +359,7 @@ const hasAnyQuickFilter = computed(() => (
   isTariffFiltered.value ||
   isLevelFiltered.value ||
   isGroupFiltered.value ||
+  isBranchFiltered.value ||
   isCertFiltered.value ||
   isTagFiltered.value ||
   isCoordinatorFiltered.value
@@ -344,6 +369,7 @@ const resetQuickFilters = () => {
   dashboardStore.selectedTariffs = []
   dashboardStore.selectedLevels = []
   dashboardStore.selectedGroups = []
+  dashboardStore.selectedBranches = []
   dashboardStore.selectedCerts = []
   dashboardStore.selectedCertScores = {}
   dashboardStore.selectedScores = []
@@ -599,6 +625,89 @@ const resetQuickFilters = () => {
                     class="h-3.5 w-3.5 rounded border-zinc-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                   />
                   <span class="text-xs font-semibold text-zinc-800 dark:text-zinc-200 truncate">{{ getGroupLabel(opt) }}</span>
+                </div>
+              </label>
+            </div>
+          </div>
+        </Transition>
+      </div>
+
+      <!-- 3b. BRANCH DROPDOWN -->
+      <div class="relative shrink-0" :class="openDropdown === 'branch' ? 'z-50' : 'z-20'">
+        <button
+          type="button"
+          @click.stop="toggleDropdown('branch')"
+          class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] md:text-[11px] font-bold uppercase tracking-wider transition-all border select-none cursor-pointer h-7"
+          :class="[
+            isBranchFiltered
+              ? 'bg-blue-50 dark:bg-blue-950/50 border-blue-400 dark:border-blue-600 text-blue-700 dark:text-blue-300 ring-1 ring-blue-500/20'
+              : 'bg-white dark:bg-[#141619] border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-850',
+            openDropdown === 'branch' ? 'ring-2 ring-blue-500/30' : ''
+          ]"
+        >
+          <span>BRANCH</span>
+          <span
+            v-if="isBranchFiltered"
+            class="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-blue-600 text-white leading-none"
+          >
+            {{ getCheckedCount(dashboardStore.selectedBranches, branchRawOptions) }}
+          </span>
+          <ChevronDown class="size-3 text-zinc-400 transition-transform" :class="{ 'rotate-180': openDropdown === 'branch' }" />
+        </button>
+
+        <Transition
+          enter-active-class="transition duration-100 ease-out"
+          enter-from-class="opacity-0 scale-95"
+          enter-to-class="opacity-100 scale-100"
+          leave-active-class="transition duration-75 ease-in"
+          leave-from-class="opacity-100 scale-100"
+          leave-to-class="opacity-0 scale-95"
+        >
+          <div
+            v-if="openDropdown === 'branch'"
+            class="absolute left-0 top-full mt-1.5 w-60 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#15171a] shadow-2xl z-50 text-xs flex flex-col overflow-hidden animate-page-in"
+          >
+            <div class="p-2 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between bg-zinc-50/70 dark:bg-zinc-900/60">
+              <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Branch Filter</span>
+              <label class="flex items-center gap-1.5 text-[10px] font-semibold text-blue-600 dark:text-blue-400 cursor-pointer">
+                <input
+                  type="checkbox"
+                  :checked="isAllChecked(dashboardStore.selectedBranches, branchRawOptions)"
+                  @change="dashboardStore.selectedBranches = toggleSelectAll(dashboardStore.selectedBranches, branchRawOptions)"
+                  class="h-3.5 w-3.5 rounded border-zinc-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                />
+                <span>Select All</span>
+              </label>
+            </div>
+
+            <div v-if="branchRawOptions.length > 5" class="p-1.5 border-b border-zinc-100 dark:border-zinc-800">
+              <div class="relative">
+                <Search class="absolute left-2 top-1/2 -translate-y-1/2 size-3 text-zinc-400" />
+                <input
+                  v-model="searchQueries.branch"
+                  type="text"
+                  placeholder="Search branch..."
+                  class="w-full pl-6 pr-2 py-1 text-xs bg-zinc-50 dark:bg-zinc-850 rounded-md border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-blue-500"
+                  @click.stop
+                />
+              </div>
+            </div>
+
+            <div class="overflow-y-auto max-h-56 p-1 space-y-0.5 scrollbar-thin">
+              <label
+                v-for="opt in filteredBranches"
+                :key="opt"
+                class="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800/70 cursor-pointer transition-colors select-none"
+                @click.stop
+              >
+                <div class="flex items-center gap-2 min-w-0">
+                  <input
+                    type="checkbox"
+                    :checked="isOptionChecked(opt, dashboardStore.selectedBranches)"
+                    @change="dashboardStore.selectedBranches = toggleOption(opt, dashboardStore.selectedBranches, branchRawOptions)"
+                    class="h-3.5 w-3.5 rounded border-zinc-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                  />
+                  <span class="text-xs font-semibold text-zinc-800 dark:text-zinc-200 truncate">{{ getBranchLabel(opt) }}</span>
                 </div>
               </label>
             </div>
