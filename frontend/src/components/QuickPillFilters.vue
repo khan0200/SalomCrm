@@ -388,7 +388,7 @@ const resetQuickFilters = () => {
         <button
           type="button"
           @click.stop="toggleDropdown('tariff')"
-          class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] md:text-[11px] font-bold uppercase tracking-wider transition-all border select-none cursor-pointer h-7"
+          class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] md:text-[11px] font-bold uppercase tracking-wider transition-all border select-none cursor-pointer h-7 whitespace-nowrap"
           :class="[
             isTariffFiltered
               ? 'bg-blue-50 dark:bg-blue-950/50 border-blue-400 dark:border-blue-600 text-blue-700 dark:text-blue-300 ring-1 ring-blue-500/20'
@@ -482,7 +482,7 @@ const resetQuickFilters = () => {
         <button
           type="button"
           @click.stop="toggleDropdown('level')"
-          class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] md:text-[11px] font-bold uppercase tracking-wider transition-all border select-none cursor-pointer h-7"
+          class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] md:text-[11px] font-bold uppercase tracking-wider transition-all border select-none cursor-pointer h-7 whitespace-nowrap"
           :class="[
             isLevelFiltered
               ? 'bg-blue-50 dark:bg-blue-950/50 border-blue-400 dark:border-blue-600 text-blue-700 dark:text-blue-300 ring-1 ring-blue-500/20'
@@ -575,7 +575,7 @@ const resetQuickFilters = () => {
         <button
           type="button"
           @click.stop="toggleDropdown('group')"
-          class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] md:text-[11px] font-bold uppercase tracking-wider transition-all border select-none cursor-pointer h-7"
+          class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] md:text-[11px] font-bold uppercase tracking-wider transition-all border select-none cursor-pointer h-7 whitespace-nowrap"
           :class="[
             isGroupFiltered
               ? 'bg-blue-50 dark:bg-blue-950/50 border-blue-400 dark:border-blue-600 text-blue-700 dark:text-blue-300 ring-1 ring-blue-500/20'
@@ -668,7 +668,7 @@ const resetQuickFilters = () => {
         <button
           type="button"
           @click.stop="toggleDropdown('branch')"
-          class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] md:text-[11px] font-bold uppercase tracking-wider transition-all border select-none cursor-pointer h-7"
+          class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] md:text-[11px] font-bold uppercase tracking-wider transition-all border select-none cursor-pointer h-7 whitespace-nowrap"
           :class="[
             isBranchFiltered
               ? 'bg-blue-50 dark:bg-blue-950/50 border-blue-400 dark:border-blue-600 text-blue-700 dark:text-blue-300 ring-1 ring-blue-500/20'
@@ -761,7 +761,7 @@ const resetQuickFilters = () => {
         <button
           type="button"
           @click.stop="toggleDropdown('cert')"
-          class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] md:text-[11px] font-bold uppercase tracking-wider transition-all border select-none cursor-pointer h-7"
+          class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] md:text-[11px] font-bold uppercase tracking-wider transition-all border select-none cursor-pointer h-7 whitespace-nowrap"
           :class="[
             isCertFiltered
               ? 'bg-blue-50 dark:bg-blue-950/50 border-blue-400 dark:border-blue-600 text-blue-700 dark:text-blue-300 ring-1 ring-blue-500/20'
@@ -917,7 +917,7 @@ const resetQuickFilters = () => {
         <button
           type="button"
           @click.stop="toggleDropdown('tag')"
-          class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] md:text-[11px] font-bold uppercase tracking-wider transition-all border select-none cursor-pointer h-7"
+          class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] md:text-[11px] font-bold uppercase tracking-wider transition-all border select-none cursor-pointer h-7 whitespace-nowrap"
           :class="[
             isTagFiltered
               ? 'bg-blue-50 dark:bg-blue-950/50 border-blue-400 dark:border-blue-600 text-blue-700 dark:text-blue-300 ring-1 ring-blue-500/20'
@@ -1010,7 +1010,7 @@ const resetQuickFilters = () => {
         <button
           type="button"
           @click.stop="toggleDropdown('coordinator')"
-          class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] md:text-[11px] font-bold uppercase tracking-wider transition-all border select-none cursor-pointer h-7"
+          class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] md:text-[11px] font-bold uppercase tracking-wider transition-all border select-none cursor-pointer h-7 whitespace-nowrap"
           :class="[
             isCoordinatorFiltered
               ? 'bg-blue-50 dark:bg-blue-950/50 border-blue-400 dark:border-blue-600 text-blue-700 dark:text-blue-300 ring-1 ring-blue-500/20'
@@ -1113,3 +1113,4 @@ const resetQuickFilters = () => {
     </div>
   </div>
 </template>
+
