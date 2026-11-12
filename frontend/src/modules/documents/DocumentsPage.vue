@@ -533,7 +533,7 @@ const DOC_BADGE_BASE = 'h-8 w-8 shrink-0 rounded-full inline-flex items-center j
     <ActiveFilterChips />
 
     <!-- Summary line -->
-    <div class="flex items-center justify-between px-1 min-h-[28px]">
+    <div class="flex items-center justify-between px-1 min-h-[28px] relative z-20">
       <span class="text-xs font-bold text-zinc-500 dark:text-zinc-400 shrink-0">
         Showing {{ pagedStudents.length }} of {{ sortedStudents.length }} students
       </span>

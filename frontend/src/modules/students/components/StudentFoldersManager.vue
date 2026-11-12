@@ -191,7 +191,7 @@ const activeFolderName = computed(() => {
     </div>
 
     <!-- Subtitle Bar matching the screenshot -->
-    <div class="flex items-center justify-between text-[11px] text-zinc-400 dark:text-zinc-500 px-1 pt-0.5 select-none min-h-[28px]">
+    <div class="flex items-center justify-between text-[11px] text-zinc-400 dark:text-zinc-500 px-1 pt-0.5 select-none min-h-[28px] relative z-20">
       <div class="italic">
         Showing all students in <span class="font-medium text-zinc-600 dark:text-zinc-300">{{ activeFolderName }}</span>
       </div>

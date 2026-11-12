@@ -1159,7 +1159,7 @@ const handleSaveFolderAdd = async (selectedIds: string[]) => {
     </div>
 
     <!-- Roster Total Count Info -->
-    <div class="mb-2 flex justify-between items-center text-xs text-zinc-500 dark:text-zinc-400 italic px-1 font-medium select-none min-h-[28px]">
+    <div class="mb-2 flex justify-between items-center text-xs text-zinc-500 dark:text-zinc-400 italic px-1 font-medium select-none min-h-[28px] relative z-20">
       <div>
         <span v-if="searchQuery || dashboardStore.activeFiltersCount > 0">
           Showing {{ filteredStudents.length }} of {{ allStudents.length }} students

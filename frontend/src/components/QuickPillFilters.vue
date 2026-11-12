@@ -353,11 +353,11 @@ const resetQuickFilters = () => {
 </script>
 
 <template>
-  <div ref="dropdownContainerRef" class="flex-1 flex items-center justify-center min-w-0 px-1 overflow-visible relative">
-    <div class="flex items-center gap-1 sm:gap-1.5 overflow-x-auto scrollbar-none py-1 max-w-full">
+  <div ref="dropdownContainerRef" class="flex-1 flex items-center justify-center min-w-0 px-1 overflow-visible relative z-30">
+    <div class="flex items-center gap-1 sm:gap-1.5 py-1 max-w-full overflow-visible">
 
       <!-- 1. TARIFF DROPDOWN -->
-      <div class="relative shrink-0">
+      <div class="relative shrink-0" :class="openDropdown === 'tariff' ? 'z-50' : 'z-20'">
         <button
           type="button"
           @click.stop="toggleDropdown('tariff')"
@@ -390,7 +390,7 @@ const resetQuickFilters = () => {
         >
           <div
             v-if="openDropdown === 'tariff'"
-            class="absolute left-0 top-full mt-1.5 w-60 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#15171a] shadow-xl z-50 text-xs flex flex-col overflow-hidden animate-page-in"
+            class="absolute left-0 top-full mt-1.5 w-60 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#15171a] shadow-2xl z-50 text-xs flex flex-col overflow-hidden animate-page-in"
           >
             <div class="p-2 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between bg-zinc-50/70 dark:bg-zinc-900/60">
               <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Tariff Filter</span>
@@ -441,7 +441,7 @@ const resetQuickFilters = () => {
       </div>
 
       <!-- 2. LEVEL DROPDOWN -->
-      <div class="relative shrink-0">
+      <div class="relative shrink-0" :class="openDropdown === 'level' ? 'z-50' : 'z-20'">
         <button
           type="button"
           @click.stop="toggleDropdown('level')"
@@ -473,7 +473,7 @@ const resetQuickFilters = () => {
         >
           <div
             v-if="openDropdown === 'level'"
-            class="absolute left-0 top-full mt-1.5 w-60 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#15171a] shadow-xl z-50 text-xs flex flex-col overflow-hidden animate-page-in"
+            class="absolute left-0 top-full mt-1.5 w-60 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#15171a] shadow-2xl z-50 text-xs flex flex-col overflow-hidden animate-page-in"
           >
             <div class="p-2 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between bg-zinc-50/70 dark:bg-zinc-900/60">
               <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Level Filter</span>
@@ -524,7 +524,7 @@ const resetQuickFilters = () => {
       </div>
 
       <!-- 3. GROUP DROPDOWN -->
-      <div class="relative shrink-0">
+      <div class="relative shrink-0" :class="openDropdown === 'group' ? 'z-50' : 'z-20'">
         <button
           type="button"
           @click.stop="toggleDropdown('group')"
@@ -556,7 +556,7 @@ const resetQuickFilters = () => {
         >
           <div
             v-if="openDropdown === 'group'"
-            class="absolute left-0 top-full mt-1.5 w-60 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#15171a] shadow-xl z-50 text-xs flex flex-col overflow-hidden animate-page-in"
+            class="absolute left-0 top-full mt-1.5 w-60 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#15171a] shadow-2xl z-50 text-xs flex flex-col overflow-hidden animate-page-in"
           >
             <div class="p-2 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between bg-zinc-50/70 dark:bg-zinc-900/60">
               <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Group Filter</span>
@@ -607,7 +607,7 @@ const resetQuickFilters = () => {
       </div>
 
       <!-- 4. CERTIFICATE DROPDOWN (WITH MINI SIDE MODAL MENU) -->
-      <div class="relative shrink-0">
+      <div class="relative shrink-0" :class="openDropdown === 'cert' ? 'z-50' : 'z-20'">
         <button
           type="button"
           @click.stop="toggleDropdown('cert')"
@@ -640,7 +640,7 @@ const resetQuickFilters = () => {
         >
           <div
             v-if="openDropdown === 'cert'"
-            class="absolute left-0 top-full mt-1.5 w-64 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#15171a] shadow-xl z-50 text-xs flex flex-col overflow-visible animate-page-in"
+            class="absolute left-0 top-full mt-1.5 w-64 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#15171a] shadow-2xl z-50 text-xs flex flex-col overflow-visible animate-page-in"
           >
             <div class="p-2 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between bg-zinc-50/70 dark:bg-zinc-900/60 rounded-t-xl">
               <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Certificate Filter</span>
@@ -699,7 +699,7 @@ const resetQuickFilters = () => {
                 <!-- Mini Side Modal Menu for Scores (TOPIK / IELTS / CEFR) -->
                 <div
                   v-if="CERT_SUB_SCORES[opt] && openSubMenu === opt"
-                  class="absolute left-full top-0 ml-1.5 w-44 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#15171a] shadow-2xl p-2 z-60 text-xs animate-page-in"
+                  class="absolute left-full top-0 ml-1.5 w-44 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#15171a] shadow-2xl p-2 z-[60] text-xs animate-page-in"
                   @click.stop
                 >
                   <div class="flex items-center justify-between pb-1.5 mb-1.5 border-b border-zinc-100 dark:border-zinc-800">
@@ -743,7 +743,7 @@ const resetQuickFilters = () => {
       </div>
 
       <!-- 5. TAGS DROPDOWN -->
-      <div class="relative shrink-0">
+      <div class="relative shrink-0" :class="openDropdown === 'tag' ? 'z-50' : 'z-20'">
         <button
           type="button"
           @click.stop="toggleDropdown('tag')"
@@ -775,7 +775,7 @@ const resetQuickFilters = () => {
         >
           <div
             v-if="openDropdown === 'tag'"
-            class="absolute left-0 top-full mt-1.5 w-60 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#15171a] shadow-xl z-50 text-xs flex flex-col overflow-hidden animate-page-in"
+            class="absolute left-0 top-full mt-1.5 w-60 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#15171a] shadow-2xl z-50 text-xs flex flex-col overflow-hidden animate-page-in"
           >
             <div class="p-2 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between bg-zinc-50/70 dark:bg-zinc-900/60">
               <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Tags Filter</span>
@@ -826,7 +826,7 @@ const resetQuickFilters = () => {
       </div>
 
       <!-- 6. KORDINATOR DROPDOWN -->
-      <div class="relative shrink-0">
+      <div class="relative shrink-0" :class="openDropdown === 'coordinator' ? 'z-50' : 'z-20'">
         <button
           type="button"
           @click.stop="toggleDropdown('coordinator')"
@@ -858,7 +858,7 @@ const resetQuickFilters = () => {
         >
           <div
             v-if="openDropdown === 'coordinator'"
-            class="absolute left-0 sm:right-0 sm:left-auto top-full mt-1.5 w-60 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#15171a] shadow-xl z-50 text-xs flex flex-col overflow-hidden animate-page-in"
+            class="absolute left-0 sm:right-0 sm:left-auto top-full mt-1.5 w-60 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#15171a] shadow-2xl z-50 text-xs flex flex-col overflow-hidden animate-page-in"
           >
             <div class="p-2 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between bg-zinc-50/70 dark:bg-zinc-900/60">
               <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Kordinator Filter</span>
