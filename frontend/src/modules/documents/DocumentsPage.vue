@@ -105,6 +105,7 @@ watch([
   () => dashboardStore.selectedScores,
   () => dashboardStore.selectedTags,
   () => dashboardStore.selectedLeads,
+  () => dashboardStore.selectedCoordinators,
   () => dashboardStore.selectedMissingDocs,
   searchQuery,
   searchMode,
@@ -122,6 +123,7 @@ const handleApplyFilters = (filters: {
   scores: string[]
   tags: string[]
   leads: string[]
+  coordinators?: string[]
   missingDocs: string[]
 }) => {
   dashboardStore.selectedTariffs = filters.tariffs
@@ -132,6 +134,7 @@ const handleApplyFilters = (filters: {
   dashboardStore.selectedScores = filters.scores
   dashboardStore.selectedTags = filters.tags
   dashboardStore.selectedLeads = filters.leads
+  dashboardStore.selectedCoordinators = filters.coordinators || []
   dashboardStore.selectedMissingDocs = filters.missingDocs || []
   currentPage.value = 1
   isFilterPanelOpen.value = false
@@ -241,7 +244,16 @@ const filteredStudents = computed(() => students.value.filter(student => {
     if (!matchNoLead && !matchLead) return false
   }
 
-  // 9. Search query matching — identical to students page
+  // 9. Coordinator Filter
+  if (dashboardStore.selectedCoordinators.length > 0) {
+    const hasNoCoord = dashboardStore.selectedCoordinators.includes('NO_COORDINATOR') || dashboardStore.selectedCoordinators.includes('No Coordinator')
+    const cleanCoords = dashboardStore.selectedCoordinators.filter(c => c !== 'NO_COORDINATOR' && c !== 'No Coordinator').map(c => c.toLowerCase())
+    const matchNo = hasNoCoord && !student.coordinator
+    const matchCoord = student.coordinator && cleanCoords.includes(student.coordinator.toLowerCase())
+    if (!matchNo && !matchCoord) return false
+  }
+
+  // 10. Search query matching — identical to students page
   const cleanSearch = searchQuery.value.trim().toLowerCase()
   if (cleanSearch) {
     let matchesSearch: boolean
@@ -522,7 +534,7 @@ const DOC_BADGE_BASE = 'h-8 w-8 shrink-0 rounded-full inline-flex items-center j
     <!-- Master-Detail Filter Panel Popover (Triggered from Top Navbar) -->
     <StudentFilters
       :is-open="isFilterPanelOpen"
-      :options="optionsData || { tariffs: [], levels: [], groups: [], leads: [], folders: [], offices: [] }"
+      :options="optionsData || { tariffs: [], levels: [], groups: [], leads: [], coordinators: [], folders: [], offices: [] }"
       :students="students"
       :selected-tariffs="dashboardStore.selectedTariffs"
       :selected-levels="dashboardStore.selectedLevels"
@@ -532,6 +544,7 @@ const DOC_BADGE_BASE = 'h-8 w-8 shrink-0 rounded-full inline-flex items-center j
       :selected-scores="dashboardStore.selectedScores"
       :selected-tags="dashboardStore.selectedTags"
       :selected-leads="dashboardStore.selectedLeads"
+      :selected-coordinators="dashboardStore.selectedCoordinators"
       :selected-missing-docs="dashboardStore.selectedMissingDocs"
       :matching-count="filteredStudents.length"
       @close="isFilterPanelOpen = false"

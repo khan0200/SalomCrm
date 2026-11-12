@@ -98,6 +98,10 @@ const selectedLeads = computed({
   get: () => dashboardStore.selectedLeads,
   set: (v) => dashboardStore.selectedLeads = v,
 })
+const selectedCoordinators = computed({
+  get: () => dashboardStore.selectedCoordinators,
+  set: (v) => dashboardStore.selectedCoordinators = v,
+})
 const selectedMissingDocs = computed({
   get: () => dashboardStore.selectedMissingDocs,
   set: (v) => dashboardStore.selectedMissingDocs = v,
@@ -461,6 +465,15 @@ const filteredStudents = computed(() => {
     })
   }
 
+  if (selectedCoordinators.value.length > 0) {
+    const hasNoCoord = selectedCoordinators.value.includes('NO_COORDINATOR') || selectedCoordinators.value.includes('No Coordinator')
+    const cleanCoords = selectedCoordinators.value.filter(c => c !== 'NO_COORDINATOR' && c !== 'No Coordinator').map(c => c.toLowerCase())
+    list = list.filter(s => {
+      if (hasNoCoord && (!s.coordinator || cleanCoords.includes(s.coordinator.toLowerCase()))) return true
+      return s.coordinator && cleanCoords.includes(s.coordinator.toLowerCase())
+    })
+  }
+
   if (selectedMissingDocs.value.length > 0) {
     list = list.filter(s => {
       const missingList = getEffectiveMissingDocs(s)
@@ -489,7 +502,7 @@ const paginatedStudents = computed(() => {
 })
 
 // Reset page on filter changes
-watch([searchQuery, activeFolder, selectedTariffs, selectedLevels, selectedGroups, selectedCerts, selectedScores, selectedTags, selectedLeads, selectedMissingDocs], () => {
+watch([searchQuery, activeFolder, selectedTariffs, selectedLevels, selectedGroups, selectedCerts, selectedScores, selectedTags, selectedLeads, selectedCoordinators, selectedMissingDocs], () => {
   currentPage.value = 1
 })
 
@@ -977,6 +990,7 @@ const handleApplyFilters = (filters: any) => {
   selectedScores.value = filters.scores
   selectedTags.value = filters.tags
   selectedLeads.value = filters.leads
+  selectedCoordinators.value = filters.coordinators || []
   selectedMissingDocs.value = filters.missingDocs || []
   isFilterPanelOpen.value = false
 }
@@ -1043,7 +1057,7 @@ const handleSaveFolderAdd = async (selectedIds: string[]) => {
     <!-- Shared Filter Drawer -->
     <StudentFilters
       :is-open="isFilterPanelOpen"
-      :options="optionsData || { tariffs: [], levels: [], groups: [], leads: [], folders: [], offices: [] }"
+      :options="optionsData || { tariffs: [], levels: [], groups: [], leads: [], coordinators: [], folders: [], offices: [] }"
       :students="allStudents"
       :selected-tariffs="selectedTariffs"
       :selected-levels="selectedLevels"
@@ -1053,6 +1067,7 @@ const handleSaveFolderAdd = async (selectedIds: string[]) => {
       :selected-scores="selectedScores"
       :selected-tags="selectedTags"
       :selected-leads="selectedLeads"
+      :selected-coordinators="selectedCoordinators"
       :selected-missing-docs="selectedMissingDocs"
       :matching-count="filteredStudents.length"
       @close="isFilterPanelOpen = false"
@@ -1068,7 +1083,7 @@ const handleSaveFolderAdd = async (selectedIds: string[]) => {
       <button
         type="button"
         @click="activeFolder = 'all'"
-        class="relative text-sm font-semibold transition-all cursor-pointer whitespace-nowrap pb-2 -mb-2.5 border-b-2"
+        class="relative text-[11.5px] font-semibold transition-all cursor-pointer whitespace-nowrap pb-2 -mb-2.5 border-b-2"
         :class="[
           activeFolder === 'all'
             ? 'text-blue-600 dark:text-blue-400 border-blue-600 dark:border-blue-400 font-bold'
@@ -1076,7 +1091,7 @@ const handleSaveFolderAdd = async (selectedIds: string[]) => {
         ]"
       >
         All
-        <span class="text-xs font-normal ml-0.5" :class="activeFolder === 'all' ? 'text-blue-600 dark:text-blue-400 font-semibold' : 'text-zinc-400 dark:text-zinc-500'">
+        <span class="text-[10px] font-normal ml-0.5" :class="activeFolder === 'all' ? 'text-blue-600 dark:text-blue-400 font-semibold' : 'text-zinc-400 dark:text-zinc-500'">
           ({{ folderCounts.all || 0 }})
         </span>
       </button>
@@ -1087,7 +1102,7 @@ const handleSaveFolderAdd = async (selectedIds: string[]) => {
         :key="folder.id"
         type="button"
         @click="activeFolder = folder.id"
-        class="relative text-sm font-semibold transition-all cursor-pointer whitespace-nowrap pb-2 -mb-2.5 border-b-2"
+        class="relative text-[11.5px] font-semibold transition-all cursor-pointer whitespace-nowrap pb-2 -mb-2.5 border-b-2"
         :class="[
           activeFolder === folder.id
             ? 'text-blue-600 dark:text-blue-400 border-blue-600 dark:border-blue-400 font-bold'
@@ -1095,7 +1110,7 @@ const handleSaveFolderAdd = async (selectedIds: string[]) => {
         ]"
       >
         {{ folder.name }}
-        <span class="text-xs font-normal ml-0.5" :class="activeFolder === folder.id ? 'text-blue-600 dark:text-blue-400 font-semibold' : 'text-zinc-400 dark:text-zinc-500'">
+        <span class="text-[10px] font-normal ml-0.5" :class="activeFolder === folder.id ? 'text-blue-600 dark:text-blue-400 font-semibold' : 'text-zinc-400 dark:text-zinc-500'">
           ({{ folderCounts[folder.id] || 0 }})
         </span>
       </button>
@@ -1105,7 +1120,7 @@ const handleSaveFolderAdd = async (selectedIds: string[]) => {
         v-if="kdbFolder"
         type="button"
         @click="activeFolder = kdbFolder.id"
-        class="relative text-sm font-semibold transition-all cursor-pointer whitespace-nowrap pb-2 -mb-2.5 border-b-2 ml-auto"
+        class="relative text-[11.5px] font-semibold transition-all cursor-pointer whitespace-nowrap pb-2 -mb-2.5 border-b-2 ml-auto"
         :class="[
           activeFolder === kdbFolder.id
             ? 'text-blue-600 dark:text-blue-400 border-blue-600 dark:border-blue-400 font-bold'
@@ -1113,7 +1128,7 @@ const handleSaveFolderAdd = async (selectedIds: string[]) => {
         ]"
       >
         KDB
-        <span class="text-xs font-normal ml-0.5" :class="activeFolder === kdbFolder.id ? 'text-blue-600 dark:text-blue-400 font-semibold' : 'text-zinc-400 dark:text-zinc-500'">
+        <span class="text-[10px] font-normal ml-0.5" :class="activeFolder === kdbFolder.id ? 'text-blue-600 dark:text-blue-400 font-semibold' : 'text-zinc-400 dark:text-zinc-500'">
           ({{ folderCounts[kdbFolder.id] || 0 }})
         </span>
       </button>
@@ -1122,7 +1137,7 @@ const handleSaveFolderAdd = async (selectedIds: string[]) => {
       <button
         type="button"
         @click="activeFolder = 'except'"
-        class="relative text-sm font-semibold transition-all cursor-pointer whitespace-nowrap pb-2 -mb-2.5 border-b-2"
+        class="relative text-[11.5px] font-semibold transition-all cursor-pointer whitespace-nowrap pb-2 -mb-2.5 border-b-2"
         :class="[
           !kdbFolder ? 'ml-auto' : '',
           activeFolder === 'except'
@@ -1131,7 +1146,7 @@ const handleSaveFolderAdd = async (selectedIds: string[]) => {
         ]"
       >
         Except
-        <span class="text-xs font-normal ml-0.5" :class="activeFolder === 'except' ? 'text-blue-600 dark:text-blue-400 font-semibold' : 'text-zinc-400 dark:text-zinc-500'">
+        <span class="text-[10px] font-normal ml-0.5" :class="activeFolder === 'except' ? 'text-blue-600 dark:text-blue-400 font-semibold' : 'text-zinc-400 dark:text-zinc-500'">
           ({{ folderCounts.except || 0 }})
         </span>
       </button>
@@ -1140,7 +1155,7 @@ const handleSaveFolderAdd = async (selectedIds: string[]) => {
       <button
         type="button"
         @click="activeFolder = 'hidden'"
-        class="relative text-sm font-semibold transition-all cursor-pointer whitespace-nowrap pb-2 -mb-2.5 border-b-2"
+        class="relative text-[11.5px] font-semibold transition-all cursor-pointer whitespace-nowrap pb-2 -mb-2.5 border-b-2"
         :class="[
           activeFolder === 'hidden'
             ? 'text-amber-500 border-amber-500 font-bold'
@@ -1148,7 +1163,7 @@ const handleSaveFolderAdd = async (selectedIds: string[]) => {
         ]"
       >
         Hidden
-        <span class="text-xs font-normal ml-0.5" :class="activeFolder === 'hidden' ? 'text-amber-500 font-semibold' : 'text-zinc-400 dark:text-zinc-500'">
+        <span class="text-[10px] font-normal ml-0.5" :class="activeFolder === 'hidden' ? 'text-amber-500 font-semibold' : 'text-zinc-400 dark:text-zinc-500'">
           ({{ folderCounts.hidden || 0 }})
         </span>
       </button>
@@ -1157,7 +1172,7 @@ const handleSaveFolderAdd = async (selectedIds: string[]) => {
       <button
         type="button"
         @click="activeFolder = 'deleted'"
-        class="relative text-sm font-semibold transition-all cursor-pointer whitespace-nowrap pb-2 -mb-2.5 border-b-2"
+        class="relative text-[11.5px] font-semibold transition-all cursor-pointer whitespace-nowrap pb-2 -mb-2.5 border-b-2"
         :class="[
           activeFolder === 'deleted'
             ? 'text-red-500 border-red-500 font-bold'
@@ -1165,7 +1180,7 @@ const handleSaveFolderAdd = async (selectedIds: string[]) => {
         ]"
       >
         Archive
-        <span class="text-xs font-normal ml-0.5" :class="activeFolder === 'deleted' ? 'text-red-500 font-semibold' : 'text-zinc-400 dark:text-zinc-500'">
+        <span class="text-[10px] font-normal ml-0.5" :class="activeFolder === 'deleted' ? 'text-red-500 font-semibold' : 'text-zinc-400 dark:text-zinc-500'">
           ({{ folderCounts.deleted || 0 }})
         </span>
       </button>

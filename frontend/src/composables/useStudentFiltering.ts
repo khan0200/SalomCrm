@@ -14,6 +14,7 @@ export interface StudentFilterCriteria {
   selectedScores: string[]
   selectedTags: string[]
   selectedLeads: string[]
+  selectedCoordinators?: string[]
   selectedMissingDocs: string[]
 }
 
@@ -150,6 +151,16 @@ export function useStudentFiltering(students: Ref<Student[]>, criteria: Ref<Stud
       list = list.filter(s => {
         if (hasNoLead && (!s.lead_by || cleanLeadsLower.includes(s.lead_by.toLowerCase()))) return true
         return !!s.lead_by && cleanLeadsLower.includes(s.lead_by.toLowerCase())
+      })
+    }
+
+    if (c.selectedCoordinators && c.selectedCoordinators.length > 0) {
+      const hasNoCoord = c.selectedCoordinators.includes('NO_COORDINATOR') || c.selectedCoordinators.includes('No Coordinator')
+      const cleanCoords = c.selectedCoordinators.filter(co => co !== 'NO_COORDINATOR' && co !== 'No Coordinator')
+      const cleanCoordsLower = cleanCoords.map(co => co.toLowerCase())
+      list = list.filter(s => {
+        if (hasNoCoord && (!s.coordinator || cleanCoordsLower.includes(s.coordinator.toLowerCase()))) return true
+        return !!s.coordinator && cleanCoordsLower.includes(s.coordinator.toLowerCase())
       })
     }
 

@@ -96,6 +96,15 @@ const dashboardStore = useStudentDashboardStore()
       <X class="w-2.5 h-2.5 cursor-pointer hover:text-red-500" @click="dashboardStore.selectedLeads = dashboardStore.selectedLeads.filter(x => x !== lb)" />
     </span>
 
+    <span
+      v-for="co in dashboardStore.selectedCoordinators"
+      :key="`co-${co}`"
+      class="inline-flex items-center gap-1 px-1.5 py-0 bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800 rounded-full font-medium"
+    >
+      <span>Coordinator: {{ co === 'NO_COORDINATOR' ? 'No Coordinator' : co }}</span>
+      <X class="w-2.5 h-2.5 cursor-pointer hover:text-red-500" @click="dashboardStore.selectedCoordinators = dashboardStore.selectedCoordinators.filter(x => x !== co)" />
+    </span>
+
     <button
       type="button"
       @click="dashboardStore.resetAllFilters()"

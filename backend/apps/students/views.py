@@ -265,6 +265,20 @@ class StudentViewSet(viewsets.ModelViewSet):
                     lead_q |= Q(lead_by__iexact=l)
                 qs = qs.filter(lead_q)
 
+        coordinators = (getlist('coordinator') if getlist else None) or (params.get('coordinator', '').split(',') if params.get('coordinator') else [])
+        if coordinators and coordinators[0]:
+            if 'NO_COORDINATOR' in coordinators or 'No Coordinator' in coordinators:
+                clean_coordinators = [c for c in coordinators if c not in ('NO_COORDINATOR', 'No Coordinator')]
+                coord_q = Q(coordinator__isnull=True) | Q(coordinator='')
+                for c in clean_coordinators:
+                    coord_q |= Q(coordinator__iexact=c)
+                qs = qs.filter(coord_q)
+            else:
+                coord_q = Q()
+                for c in coordinators:
+                    coord_q |= Q(coordinator__iexact=c)
+                qs = qs.filter(coord_q)
+
         office = params.get('office')
         if office:
             qs = qs.filter(office=office)
@@ -839,6 +853,20 @@ class StudentExportView(APIView):
         levels = (getlist('level') if getlist else None) or (params.get('level', '').split(',') if params.get('level') else [])
         if levels and levels[0]:
             qs = qs.filter(Q(level__in=levels) | Q(level2__in=levels))
+
+        coordinators = (getlist('coordinator') if getlist else None) or (params.get('coordinator', '').split(',') if params.get('coordinator') else [])
+        if coordinators and coordinators[0]:
+            if 'NO_COORDINATOR' in coordinators or 'No Coordinator' in coordinators:
+                clean_coordinators = [c for c in coordinators if c not in ('NO_COORDINATOR', 'No Coordinator')]
+                coord_q = Q(coordinator__isnull=True) | Q(coordinator='')
+                for c in clean_coordinators:
+                    coord_q |= Q(coordinator__iexact=c)
+                qs = qs.filter(coord_q)
+            else:
+                coord_q = Q()
+                for c in coordinators:
+                    coord_q |= Q(coordinator__iexact=c)
+                qs = qs.filter(coord_q)
 
         students_list = sorted(list(qs), key=lambda s: alphanumeric_key(s.id))
 

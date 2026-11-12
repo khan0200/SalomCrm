@@ -130,6 +130,10 @@ const selectedLeads = computed({
   get: () => dashboardStore.selectedLeads,
   set: (v) => dashboardStore.selectedLeads = v,
 })
+const selectedCoordinators = computed({
+  get: () => dashboardStore.selectedCoordinators,
+  set: (v) => dashboardStore.selectedCoordinators = v,
+})
 const selectedMissingDocs = computed({
   get: () => dashboardStore.selectedMissingDocs,
   set: (v) => dashboardStore.selectedMissingDocs = v,
@@ -144,6 +148,7 @@ const handleApplyFilters = (filters: {
   scores: string[]
   tags: string[]
   leads: string[]
+  coordinators?: string[]
   missingDocs?: string[]
 }) => {
   selectedTariffs.value = filters.tariffs
@@ -154,6 +159,7 @@ const handleApplyFilters = (filters: {
   selectedScores.value = filters.scores
   selectedTags.value = filters.tags
   selectedLeads.value = filters.leads
+  selectedCoordinators.value = filters.coordinators || []
   selectedMissingDocs.value = filters.missingDocs || []
   isFilterPanelOpen.value = false
 }
@@ -305,6 +311,7 @@ const filterCriteria = computed(() => ({
   selectedScores: selectedScores.value,
   selectedTags: selectedTags.value,
   selectedLeads: selectedLeads.value,
+  selectedCoordinators: selectedCoordinators.value,
   selectedMissingDocs: selectedMissingDocs.value,
 }))
 
@@ -954,6 +961,7 @@ const exportPaymentHistoryToExcel = async () => {
         :selected-scores="selectedScores"
         :selected-tags="selectedTags"
         :selected-leads="selectedLeads"
+        :selected-coordinators="selectedCoordinators"
         :selected-missing-docs="selectedMissingDocs"
         :matching-count="sortedStudents.length"
         @close="isFilterPanelOpen = false"

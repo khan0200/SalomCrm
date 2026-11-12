@@ -36,7 +36,7 @@ const routes = [
         path: 'contracts',
         name: 'contracts',
         component: () => import('@/modules/contracts/ContractsPage.vue'),
-        meta: { title: 'Contracts' }
+        meta: { title: 'Contracts', platformSuperAdminOnly: true }
       },
       {
         path: 'payments',
@@ -72,7 +72,7 @@ const routes = [
         path: 'app-form',
         name: 'app-form',
         component: () => import('@/modules/app_form/AppFormPage.vue'),
-        meta: { title: 'App Form', headManagerOnly: true }
+        meta: { title: 'App Form', platformSuperAdminOnly: true }
       },
       // Kept so older links and bookmarks land on the matching tab.
       {
@@ -135,6 +135,8 @@ router.beforeEach((to, from, next) => {
   if (!to.meta.public && !authStore.isAuthenticated) {
     next({ name: 'login' })
   } else if (to.name === 'login' && authStore.isAuthenticated) {
+    next({ name: 'students' })
+  } else if (to.meta.platformSuperAdminOnly && !authStore.isPlatformSuperAdmin) {
     next({ name: 'students' })
   } else if (to.meta.superAdminOnly && !authStore.isSuperAdmin) {
     next({ name: 'students' })

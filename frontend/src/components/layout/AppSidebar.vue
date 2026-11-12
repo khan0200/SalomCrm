@@ -38,8 +38,10 @@ const navItems = computed<NavItem[]>(() => {
     { name: 'DOCUMENTS', path: '/documents', icon: FileText },
   ]
 
-  // CONTRACTS added right before PAYMENTS
-  items.push({ name: 'CONTRACTS', path: '/contracts', icon: FileSignature })
+  // CONTRACTS: Available for superadmin (admin@uniapp.com) only
+  if (authStore.isPlatformSuperAdmin) {
+    items.push({ name: 'CONTRACTS', path: '/contracts', icon: FileSignature })
+  }
 
   if (authStore.canAccessPayments) {
     items.push({ name: 'PAYMENTS', path: '/payments', icon: CreditCard })
@@ -47,7 +49,8 @@ const navItems = computed<NavItem[]>(() => {
 
   items.push({ name: 'VISACHECK', path: '/visacheck', icon: ShieldCheck })
 
-  if (authStore.isHeadManager) {
+  // APP FORM: Available for superadmin (admin@uniapp.com) only
+  if (authStore.isPlatformSuperAdmin) {
     items.push({ name: 'APP FORM', path: '/app-form', icon: FilePenLine })
   }
 

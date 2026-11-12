@@ -14,6 +14,7 @@ export interface StudentFilterParams {
   score?: string[]
   tag?: string[]
   lead_by?: string[]
+  coordinator?: string[]
   office?: string
   sort_by?: string
   sort_order?: 'asc' | 'desc'
@@ -40,6 +41,7 @@ export const studentsApi = {
     if (params.score?.length) params.score.forEach(s => queryParams.append('score', s))
     if (params.tag?.length) params.tag.forEach(tg => queryParams.append('tag', tg))
     if (params.lead_by?.length) params.lead_by.forEach(lb => queryParams.append('lead_by', lb))
+    if (params.coordinator?.length) params.coordinator.forEach(c => queryParams.append('coordinator', c))
 
     const response = await apiClient.get(`/students/?${queryParams.toString()}`)
     return response.data
@@ -143,6 +145,7 @@ export const studentsApi = {
     if (params.include_archive) queryParams.set('include_archive', 'true')
     if (params.tariff?.length) params.tariff.forEach(t => queryParams.append('tariff', t))
     if (params.level?.length) params.level.forEach(l => queryParams.append('level', l))
+    if (params.coordinator?.length) params.coordinator.forEach(c => queryParams.append('coordinator', c))
 
     const response = await apiClient.get(`/students/export/excel/?${queryParams.toString()}`, {
       responseType: 'blob'

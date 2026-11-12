@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import {
-  X, Check, Tag, Layers, Users, Award, Bookmark, UserCheck, Hash, FileText, Building2
+  X, Check, Tag, Layers, Users, Award, Bookmark, UserCheck, Hash, FileText, Building2, UserCog
 } from 'lucide-vue-next'
 import type { Student } from '@/types'
 import { useCustomTags } from '@/composables/useCustomTags'
@@ -19,6 +19,7 @@ const props = withDefaults(defineProps<{
     levels: string[]
     groups: string[]
     leads: string[]
+    coordinators?: string[]
     folders?: { id: string; name: string }[]
     offices?: string[]
   }
@@ -31,11 +32,13 @@ const props = withDefaults(defineProps<{
   selectedScores: string[]
   selectedTags: string[]
   selectedLeads: string[]
+  selectedCoordinators?: string[]
   selectedMissingDocs?: string[]
   matchingCount?: number
 }>(), {
   students: () => [],
   selectedBranches: () => [],
+  selectedCoordinators: () => [],
   selectedMissingDocs: () => []
 })
 
@@ -50,6 +53,7 @@ const emit = defineEmits<{
     scores: string[]
     tags: string[]
     leads: string[]
+    coordinators: string[]
     missingDocs: string[]
   }): void
 }>()
@@ -66,6 +70,7 @@ const draftCerts = ref<string[]>([])
 const draftScores = ref<string[]>([])
 const draftTags = ref<string[]>([])
 const draftLeads = ref<string[]>([])
+const draftCoordinators = ref<string[]>([])
 const draftMissingDocs = ref<string[]>([])
 
 // Active category
@@ -83,6 +88,7 @@ watch(() => props.isOpen, (newVal) => {
     draftScores.value = [...props.selectedScores]
     draftTags.value = [...props.selectedTags]
     draftLeads.value = [...props.selectedLeads]
+    draftCoordinators.value = [...(props.selectedCoordinators || [])]
     draftMissingDocs.value = [...(props.selectedMissingDocs || [])]
     activeCategory.value = 'tariff'
   }
@@ -138,6 +144,19 @@ const categories = computed<CategoryItem[]>(() => {
 
   const leadOpts = ['NO_LEADBY', ...(props.options.leads || [])]
   const dynamicTagOpts = tagsRegistry.value.map(t => t.name)
+
+  const coordSet = new Set<string>()
+  ;(props.options.coordinators || []).forEach((c: any) => {
+    const name = typeof c === 'string' ? c.trim() : (c?.name || '').trim()
+    if (name && name !== 'NO_COORDINATOR' && name !== 'No Coordinator') coordSet.add(name)
+  })
+  if (props.students) {
+    props.students.forEach(s => {
+      const name = (s.coordinator || '').trim()
+      if (name && name !== 'NO_COORDINATOR' && name !== 'No Coordinator') coordSet.add(name)
+    })
+  }
+  const coordinatorOpts = ['NO_COORDINATOR', ...Array.from(coordSet).sort((a: string, b: string) => a.localeCompare(b))]
 
   const list: CategoryItem[] = [
     {
@@ -221,6 +240,14 @@ const categories = computed<CategoryItem[]>(() => {
       drafts: draftLeads.value,
       fullOpts: leadOpts,
       labelMapping: (opt) => opt === 'NO_LEADBY' ? 'No Lead by' : opt
+    },
+    {
+      id: 'coordinator',
+      label: 'Kordinator',
+      icon: UserCog,
+      drafts: draftCoordinators.value,
+      fullOpts: coordinatorOpts,
+      labelMapping: (opt) => opt === 'NO_COORDINATOR' ? 'No Coordinator' : opt
     }
   )
 
@@ -268,6 +295,10 @@ const toggleDraftOption = (catId: string, val: string) => {
     draftLeads.value = draftLeads.value.includes(val)
       ? draftLeads.value.filter(x => x !== val)
       : [...draftLeads.value, val]
+  } else if (catId === 'coordinator') {
+    draftCoordinators.value = draftCoordinators.value.includes(val)
+      ? draftCoordinators.value.filter(x => x !== val)
+      : [...draftCoordinators.value, val]
   }
 }
 
@@ -280,6 +311,7 @@ const clearAll = () => {
   draftScores.value = []
   draftTags.value = []
   draftLeads.value = []
+  draftCoordinators.value = []
   draftMissingDocs.value = []
 }
 
@@ -293,6 +325,7 @@ const handleApply = () => {
     scores: draftScores.value,
     tags: draftTags.value,
     leads: draftLeads.value,
+    coordinators: draftCoordinators.value,
     missingDocs: draftMissingDocs.value
   })
 }
@@ -306,6 +339,7 @@ const hasDrafts = computed(() => {
     draftScores.value.length > 0 ||
     draftTags.value.length > 0 ||
     draftLeads.value.length > 0 ||
+    draftCoordinators.value.length > 0 ||
     draftMissingDocs.value.length > 0
 })
 
@@ -409,7 +443,15 @@ const matchingStudentsCount = computed(() => {
       if (!matchNoLead && !matchLead) return false
     }
 
-    // 9. Missing Docs filter
+    // 9. Coordinator filter (case-insensitive)
+    if (draftCoordinators.value.length > 0) {
+      const draftCoordsLower = draftCoordinators.value.map(c => c.toLowerCase())
+      const matchNoCoord = (draftCoordsLower.includes('no_coordinator') || draftCoordsLower.includes('no coordinator')) && !student.coordinator
+      const matchCoord = !!student.coordinator && draftCoordsLower.includes(student.coordinator.toLowerCase())
+      if (!matchNoCoord && !matchCoord) return false
+    }
+
+    // 10. Missing Docs filter
     if (draftMissingDocs.value.length > 0) {
       const missingList = getEffectiveMissingDocs(student)
       const matchesMissing = draftMissingDocs.value.some(d => missingList.includes(d))
@@ -475,6 +517,10 @@ const getOptionCount = (catId: string, opt: string): number => {
     if (catId === 'lead') {
       if (opt === 'NO_LEADBY') return !s.lead_by
       return !!s.lead_by && s.lead_by.toLowerCase() === opt.toLowerCase()
+    }
+    if (catId === 'coordinator') {
+      if (opt === 'NO_COORDINATOR' || opt === 'No Coordinator') return !s.coordinator
+      return !!s.coordinator && s.coordinator.toLowerCase() === opt.toLowerCase()
     }
     return true
   }).length

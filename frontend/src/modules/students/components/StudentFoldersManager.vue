@@ -59,11 +59,11 @@ const activeFolderName = computed(() => {
     <!-- Folder Tabs Row -->
     <div class="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-2.5 px-1 overflow-x-auto scrollbar-none gap-4">
       <!-- Left Folder Tabs -->
-      <div class="flex items-center gap-3 sm:gap-5 min-w-0 flex-nowrap">
+      <div class="flex items-center gap-2.5 sm:gap-4 min-w-0 flex-nowrap">
         <!-- All Tab -->
         <button
           @click="emit('select', 'all')"
-          class="relative text-sm font-semibold transition-all cursor-pointer whitespace-nowrap pb-2.5 -mb-3 border-b-2 shrink-0"
+          class="relative text-[11.5px] font-semibold transition-all cursor-pointer whitespace-nowrap pb-2.5 -mb-3 border-b-2 shrink-0"
           :class="[
             activeFolder === 'all'
               ? 'text-blue-600 dark:text-blue-400 border-blue-600 dark:border-blue-400 font-bold'
@@ -72,7 +72,7 @@ const activeFolderName = computed(() => {
         >
           <span>All</span>
           <span
-            class="ml-1 text-xs font-normal"
+            class="ml-1 text-[10px] font-normal"
             :class="activeFolder === 'all' ? 'text-blue-600 dark:text-blue-400 font-semibold' : 'text-zinc-400 dark:text-zinc-500'"
           >
             ({{ folderCounts?.all ?? totalCount }})
@@ -84,7 +84,7 @@ const activeFolderName = computed(() => {
           v-for="folder in folders.filter(f => f.name?.toUpperCase() !== 'KDB')"
           :key="folder.id"
           @click="emit('select', folder.id)"
-          class="relative text-sm font-semibold transition-all cursor-pointer whitespace-nowrap pb-2.5 -mb-3 border-b-2 shrink-0"
+          class="relative text-[11.5px] font-semibold transition-all cursor-pointer whitespace-nowrap pb-2.5 -mb-3 border-b-2 shrink-0"
           :class="[
             String(activeFolder) === String(folder.id)
               ? 'text-blue-600 dark:text-blue-400 border-blue-600 dark:border-blue-400 font-bold'
@@ -93,7 +93,7 @@ const activeFolderName = computed(() => {
         >
           <span>{{ folder.name }}</span>
           <span
-            class="ml-1 text-xs font-normal"
+            class="ml-1 text-[10px] font-normal"
             :class="String(activeFolder) === String(folder.id) ? 'text-blue-600 dark:text-blue-400 font-semibold' : 'text-zinc-400 dark:text-zinc-500'"
           >
             ({{ folderCounts?.[folder.id] ?? folder.student_count ?? 0 }})
@@ -112,11 +112,11 @@ const activeFolderName = computed(() => {
       </div>
 
       <!-- Right Folder Tabs (Except & Archive) -->
-      <div class="flex items-center gap-3 sm:gap-4 shrink-0 pl-2">
+      <div class="flex items-center gap-2.5 sm:gap-3.5 shrink-0 pl-2">
         <!-- Except Tab -->
         <button
           @click="emit('select', 'except')"
-          class="relative text-sm font-semibold transition-all cursor-pointer whitespace-nowrap pb-2.5 -mb-3 border-b-2"
+          class="relative text-[11.5px] font-semibold transition-all cursor-pointer whitespace-nowrap pb-2.5 -mb-3 border-b-2"
           :class="[
             activeFolder === 'except'
               ? 'text-blue-600 dark:text-blue-400 border-blue-600 dark:border-blue-400 font-bold'
@@ -125,7 +125,7 @@ const activeFolderName = computed(() => {
         >
           <span>Except</span>
           <span
-            class="ml-1 text-xs font-normal"
+            class="ml-1 text-[10px] font-normal"
             :class="activeFolder === 'except' ? 'text-blue-600 dark:text-blue-400 font-semibold' : 'text-zinc-400 dark:text-zinc-500'"
           >
             ({{ folderCounts?.except ?? 0 }})
@@ -135,7 +135,7 @@ const activeFolderName = computed(() => {
         <!-- Archive Tab (covers both its "Archive" and "Permanently Deleted" sub-tabs) -->
         <button
           @click="emit('select', 'deleted')"
-          class="relative text-sm font-semibold transition-all cursor-pointer whitespace-nowrap pb-2.5 -mb-3 border-b-2"
+          class="relative text-[11.5px] font-semibold transition-all cursor-pointer whitespace-nowrap pb-2.5 -mb-3 border-b-2"
           :class="[
             isInArchiveSection
               ? 'text-blue-600 dark:text-blue-400 border-blue-600 dark:border-blue-400 font-bold'
@@ -144,7 +144,7 @@ const activeFolderName = computed(() => {
         >
           <span>Archive</span>
           <span
-            class="ml-1 text-xs font-normal"
+            class="ml-1 text-[10px] font-normal"
             :class="isInArchiveSection ? 'text-blue-600 dark:text-blue-400 font-semibold' : 'text-zinc-400 dark:text-zinc-500'"
           >
             ({{ (folderCounts?.deleted ?? 0) + (folderCounts?.permanently_deleted ?? 0) }})

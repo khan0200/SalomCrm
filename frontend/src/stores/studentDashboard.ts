@@ -18,6 +18,7 @@ export const useStudentDashboardStore = defineStore('studentDashboard', () => {
   const selectedScores = ref<string[]>([])
   const selectedTags = ref<string[]>([])
   const selectedLeads = ref<string[]>([])
+  const selectedCoordinators = ref<string[]>([])
   const selectedMissingDocs = ref<string[]>([])
 
   const activeFiltersCount = computed(() => {
@@ -30,6 +31,7 @@ export const useStudentDashboardStore = defineStore('studentDashboard', () => {
       selectedScores.value.length +
       selectedTags.value.length +
       selectedLeads.value.length +
+      selectedCoordinators.value.length +
       selectedMissingDocs.value.length
     )
   })
@@ -44,6 +46,7 @@ export const useStudentDashboardStore = defineStore('studentDashboard', () => {
     selectedScores.value = []
     selectedTags.value = []
     selectedLeads.value = []
+    selectedCoordinators.value = []
     selectedMissingDocs.value = []
   }
 
@@ -92,6 +95,7 @@ export const useStudentDashboardStore = defineStore('studentDashboard', () => {
     selectedScores,
     selectedTags,
     selectedLeads,
+    selectedCoordinators,
     selectedMissingDocs,
     activeFiltersCount,
     resetAllFilters,

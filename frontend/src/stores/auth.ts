@@ -20,6 +20,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   const isAuthenticated = computed(() => !!token.value && !!user.value)
   const isSuperAdmin = computed(() => !!user.value?.is_superuser || user.value?.role === 'SUPER_ADMIN')
+  const isPlatformSuperAdmin = computed(() => isSuperAdmin.value && user.value?.email?.toLowerCase() === 'admin@uniapp.com')
   const isHeadManager = computed(() => isSuperAdmin.value || user.value?.role === 'HEAD_MANAGER')
   const isManager = computed(() => isHeadManager.value || user.value?.role === 'MANAGER')
 
@@ -152,6 +153,7 @@ export const useAuthStore = defineStore('auth', () => {
     activeTenantName,
     isAuthenticated,
     isSuperAdmin,
+    isPlatformSuperAdmin,
     isHeadManager,
     isManager,
     canEdit,
