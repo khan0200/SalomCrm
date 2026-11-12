@@ -42,7 +42,7 @@ export function matchesCertificate(
                    (!student.language_certificate_2 || student.language_certificate_2 === 'NO CERTIFICATE') &&
                    (!student.language_certificate_3 || student.language_certificate_3 === 'NO CERTIFICATE')
   if (isNoCert) {
-    return certsToCheck ? certsToCheck.includes('NO CERTIFICATE') : true
+    return certsToCheck ? certsToCheck.includes('NO CERTIFICATE') : false
   }
 
   // 2. Check EXPECTED as a cert slot or score

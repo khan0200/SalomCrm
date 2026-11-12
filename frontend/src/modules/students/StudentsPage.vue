@@ -790,6 +790,7 @@ const handleApplyFilters = (filters: {
   selectedBranches.value = filters.branches || []
   selectedCerts.value = filters.certs
   selectedScores.value = filters.scores
+  dashboardStore.selectedCertScores = {}
   selectedTags.value = filters.tags
   selectedLeads.value = filters.leads
   selectedCoordinators.value = filters.coordinators || []

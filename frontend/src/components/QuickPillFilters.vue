@@ -234,114 +234,115 @@ const getCoordinatorLabel = (opt: string) => {
   return opt
 }
 
-// ── Checkbox Helper Logic: All checked by default ──
+// ── Standard Selection Logic (Matches StudentFilters modal) ──
 const isOptionChecked = (opt: string, selectedList: string[]): boolean => {
-  if (selectedList.includes('__NONE__')) return false
-  if (selectedList.length === 0) return true
-  return selectedList.includes(opt)
+  return (selectedList || []).includes(opt)
 }
 
 const isAllChecked = (selectedList: string[], allOptions: string[]): boolean => {
-  if (selectedList.includes('__NONE__')) return false
-  if (selectedList.length === 0) return true
+  if (!selectedList || selectedList.length === 0 || allOptions.length === 0) return false
   return allOptions.every(o => selectedList.includes(o))
 }
 
-const toggleOption = (opt: string, currentSelected: string[], allOptions: string[]): string[] => {
-  if (currentSelected.length === 0) {
-    // Unchecking an option from "all checked" default
-    return allOptions.filter(o => o !== opt)
-  }
-
-  if (currentSelected.includes('__NONE__')) {
-    // Checking first option from "none checked"
-    return [opt]
-  }
-
-  const isChecked = currentSelected.includes(opt)
-  if (isChecked) {
-    const next = currentSelected.filter(o => o !== opt)
-    if (next.length === 0) return ['__NONE__']
-    return next
+const toggleOption = (opt: string, currentSelected: string[]): string[] => {
+  const list = [...(currentSelected || [])]
+  const idx = list.indexOf(opt)
+  if (idx > -1) {
+    list.splice(idx, 1)
   } else {
-    const next = [...currentSelected, opt]
-    if (allOptions.every(o => next.includes(o))) {
-      return [] // All checked -> reset to []
-    }
-    return next
+    list.push(opt)
   }
+  return list
 }
 
 const toggleSelectAll = (currentSelected: string[], allOptions: string[]): string[] => {
   if (isAllChecked(currentSelected, allOptions)) {
-    return ['__NONE__']
-  } else {
     return []
+  } else {
+    return [...allOptions]
   }
 }
 
 // ── Sub-Scores Logic for Certificate ──
 const isSubScoreChecked = (cert: string, score: string): boolean => {
   const allowed = dashboardStore.selectedCertScores?.[cert]
-  if (!allowed || allowed.length === 0) return true
-  if (allowed.includes('__NONE__')) return false
-  return allowed.includes(score)
+  return (allowed || []).includes(score)
 }
 
 const isAllSubScoresChecked = (cert: string): boolean => {
   const allScores = CERT_SUB_SCORES[cert] || []
-  const allowed = dashboardStore.selectedCertScores?.[cert]
-  if (!allowed || allowed.length === 0) return true
-  if (allowed.includes('__NONE__')) return false
+  const allowed = dashboardStore.selectedCertScores?.[cert] || []
+  if (allowed.length === 0 || allScores.length === 0) return false
   return allScores.every(s => allowed.includes(s))
 }
 
 const toggleSubScore = (cert: string, score: string) => {
-  const allScores = CERT_SUB_SCORES[cert] || []
-  const current = dashboardStore.selectedCertScores?.[cert] || []
-  let nextScores: string[]
-
-  if (current.length === 0) {
-    nextScores = allScores.filter(s => s !== score)
-  } else if (current.includes('__NONE__')) {
-    nextScores = [score]
+  const current = [...(dashboardStore.selectedCertScores?.[cert] || [])]
+  const idx = current.indexOf(score)
+  if (idx > -1) {
+    current.splice(idx, 1)
   } else {
-    if (current.includes(score)) {
-      nextScores = current.filter(s => s !== score)
-      if (nextScores.length === 0) nextScores = ['__NONE__']
-    } else {
-      nextScores = [...current, score]
-      if (allScores.every(s => nextScores.includes(s))) {
-        nextScores = [] // All checked
-      }
-    }
+    current.push(score)
   }
 
   const updated = { ...(dashboardStore.selectedCertScores || {}) }
-  if (nextScores.length === 0) {
+  if (current.length === 0) {
     delete updated[cert]
   } else {
-    updated[cert] = nextScores
+    updated[cert] = current
+    // Auto-check parent cert in selectedCerts
+    if (!dashboardStore.selectedCerts.includes(cert)) {
+      dashboardStore.selectedCerts = [...dashboardStore.selectedCerts, cert]
+    }
   }
   dashboardStore.selectedCertScores = updated
 }
 
 const toggleAllSubScores = (cert: string) => {
+  const allScores = CERT_SUB_SCORES[cert] || []
   const updated = { ...(dashboardStore.selectedCertScores || {}) }
   if (isAllSubScoresChecked(cert)) {
-    updated[cert] = ['__NONE__']
-  } else {
     delete updated[cert]
+  } else {
+    updated[cert] = [...allScores]
+    if (!dashboardStore.selectedCerts.includes(cert)) {
+      dashboardStore.selectedCerts = [...dashboardStore.selectedCerts, cert]
+    }
   }
   dashboardStore.selectedCertScores = updated
 }
 
-// Count of checked options for button badge
-const getCheckedCount = (selectedList: string[], allOptions: string[]): number => {
-  if (selectedList.includes('__NONE__')) return 0
-  if (selectedList.length === 0) return allOptions.length
-  return selectedList.filter(o => allOptions.includes(o)).length
+const clearSubScores = (cert: string) => {
+  if (dashboardStore.selectedCertScores?.[cert]) {
+    const updated = { ...dashboardStore.selectedCertScores }
+    delete updated[cert]
+    dashboardStore.selectedCertScores = updated
+  }
 }
+
+const toggleCertOption = (cert: string) => {
+  const current = [...dashboardStore.selectedCerts]
+  const idx = current.indexOf(cert)
+  if (idx > -1) {
+    current.splice(idx, 1)
+    // Clear subscores if certificate is unchecked
+    clearSubScores(cert)
+  } else {
+    current.push(cert)
+  }
+  dashboardStore.selectedCerts = current
+}
+
+// Count of checked options for button badge
+const getCheckedCount = (selectedList: string[]): number => {
+  return (selectedList || []).length
+}
+
+const certBadgeCount = computed(() => {
+  const set = new Set<string>(dashboardStore.selectedCerts)
+  Object.keys(dashboardStore.selectedCertScores || {}).forEach(k => set.add(k))
+  return set.size
+})
 
 // Whether dimension is actively filtering
 const isTariffFiltered = computed(() => dashboardStore.selectedTariffs.length > 0)
@@ -400,7 +401,7 @@ const resetQuickFilters = () => {
             v-if="isTariffFiltered"
             class="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-blue-600 text-white leading-none"
           >
-            {{ getCheckedCount(dashboardStore.selectedTariffs, tariffRawOptions) }}
+            {{ getCheckedCount(dashboardStore.selectedTariffs) }}
           </span>
           <ChevronDown class="size-3 text-zinc-400 transition-transform" :class="{ 'rotate-180': openDropdown === 'tariff' }" />
         </button>
@@ -420,15 +421,25 @@ const resetQuickFilters = () => {
           >
             <div class="p-2 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between bg-zinc-50/70 dark:bg-zinc-900/60">
               <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Tariff Filter</span>
-              <label class="flex items-center gap-1.5 text-[10px] font-semibold text-blue-600 dark:text-blue-400 cursor-pointer">
-                <input
-                  type="checkbox"
-                  :checked="isAllChecked(dashboardStore.selectedTariffs, tariffRawOptions)"
-                  @change="dashboardStore.selectedTariffs = toggleSelectAll(dashboardStore.selectedTariffs, tariffRawOptions)"
-                  class="h-3.5 w-3.5 rounded border-zinc-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                />
-                <span>Select All</span>
-              </label>
+              <div class="flex items-center gap-2">
+                <button
+                  v-if="dashboardStore.selectedTariffs.length > 0"
+                  type="button"
+                  @click="dashboardStore.selectedTariffs = []"
+                  class="text-[10px] font-semibold text-zinc-400 hover:text-rose-600 dark:hover:text-rose-400 cursor-pointer"
+                >
+                  Clear
+                </button>
+                <label class="flex items-center gap-1.5 text-[10px] font-semibold text-blue-600 dark:text-blue-400 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    :checked="isAllChecked(dashboardStore.selectedTariffs, tariffRawOptions)"
+                    @change="dashboardStore.selectedTariffs = toggleSelectAll(dashboardStore.selectedTariffs, tariffRawOptions)"
+                    class="h-3.5 w-3.5 rounded border-zinc-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                  />
+                  <span>Select All</span>
+                </label>
+              </div>
             </div>
 
             <div v-if="tariffRawOptions.length > 5" class="p-1.5 border-b border-zinc-100 dark:border-zinc-800">
@@ -455,7 +466,7 @@ const resetQuickFilters = () => {
                   <input
                     type="checkbox"
                     :checked="isOptionChecked(opt, dashboardStore.selectedTariffs)"
-                    @change="dashboardStore.selectedTariffs = toggleOption(opt, dashboardStore.selectedTariffs, tariffRawOptions)"
+                    @change="dashboardStore.selectedTariffs = toggleOption(opt, dashboardStore.selectedTariffs)"
                     class="h-3.5 w-3.5 rounded border-zinc-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                   />
                   <span class="text-xs font-semibold text-zinc-800 dark:text-zinc-200 truncate">{{ getTariffLabel(opt) }}</span>
@@ -484,7 +495,7 @@ const resetQuickFilters = () => {
             v-if="isLevelFiltered"
             class="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-blue-600 text-white leading-none"
           >
-            {{ getCheckedCount(dashboardStore.selectedLevels, levelRawOptions) }}
+            {{ getCheckedCount(dashboardStore.selectedLevels) }}
           </span>
           <ChevronDown class="size-3 text-zinc-400 transition-transform" :class="{ 'rotate-180': openDropdown === 'level' }" />
         </button>
@@ -503,15 +514,25 @@ const resetQuickFilters = () => {
           >
             <div class="p-2 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between bg-zinc-50/70 dark:bg-zinc-900/60">
               <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Level Filter</span>
-              <label class="flex items-center gap-1.5 text-[10px] font-semibold text-blue-600 dark:text-blue-400 cursor-pointer">
-                <input
-                  type="checkbox"
-                  :checked="isAllChecked(dashboardStore.selectedLevels, levelRawOptions)"
-                  @change="dashboardStore.selectedLevels = toggleSelectAll(dashboardStore.selectedLevels, levelRawOptions)"
-                  class="h-3.5 w-3.5 rounded border-zinc-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                />
-                <span>Select All</span>
-              </label>
+              <div class="flex items-center gap-2">
+                <button
+                  v-if="dashboardStore.selectedLevels.length > 0"
+                  type="button"
+                  @click="dashboardStore.selectedLevels = []"
+                  class="text-[10px] font-semibold text-zinc-400 hover:text-rose-600 dark:hover:text-rose-400 cursor-pointer"
+                >
+                  Clear
+                </button>
+                <label class="flex items-center gap-1.5 text-[10px] font-semibold text-blue-600 dark:text-blue-400 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    :checked="isAllChecked(dashboardStore.selectedLevels, levelRawOptions)"
+                    @change="dashboardStore.selectedLevels = toggleSelectAll(dashboardStore.selectedLevels, levelRawOptions)"
+                    class="h-3.5 w-3.5 rounded border-zinc-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                  />
+                  <span>Select All</span>
+                </label>
+              </div>
             </div>
 
             <div v-if="levelRawOptions.length > 6" class="p-1.5 border-b border-zinc-100 dark:border-zinc-800">
@@ -538,7 +559,7 @@ const resetQuickFilters = () => {
                   <input
                     type="checkbox"
                     :checked="isOptionChecked(opt, dashboardStore.selectedLevels)"
-                    @change="dashboardStore.selectedLevels = toggleOption(opt, dashboardStore.selectedLevels, levelRawOptions)"
+                    @change="dashboardStore.selectedLevels = toggleOption(opt, dashboardStore.selectedLevels)"
                     class="h-3.5 w-3.5 rounded border-zinc-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                   />
                   <span class="text-xs font-semibold text-zinc-800 dark:text-zinc-200 truncate">{{ getLevelLabel(opt) }}</span>
@@ -567,7 +588,7 @@ const resetQuickFilters = () => {
             v-if="isGroupFiltered"
             class="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-blue-600 text-white leading-none"
           >
-            {{ getCheckedCount(dashboardStore.selectedGroups, groupRawOptions) }}
+            {{ getCheckedCount(dashboardStore.selectedGroups) }}
           </span>
           <ChevronDown class="size-3 text-zinc-400 transition-transform" :class="{ 'rotate-180': openDropdown === 'group' }" />
         </button>
@@ -586,15 +607,25 @@ const resetQuickFilters = () => {
           >
             <div class="p-2 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between bg-zinc-50/70 dark:bg-zinc-900/60">
               <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Group Filter</span>
-              <label class="flex items-center gap-1.5 text-[10px] font-semibold text-blue-600 dark:text-blue-400 cursor-pointer">
-                <input
-                  type="checkbox"
-                  :checked="isAllChecked(dashboardStore.selectedGroups, groupRawOptions)"
-                  @change="dashboardStore.selectedGroups = toggleSelectAll(dashboardStore.selectedGroups, groupRawOptions)"
-                  class="h-3.5 w-3.5 rounded border-zinc-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                />
-                <span>Select All</span>
-              </label>
+              <div class="flex items-center gap-2">
+                <button
+                  v-if="dashboardStore.selectedGroups.length > 0"
+                  type="button"
+                  @click="dashboardStore.selectedGroups = []"
+                  class="text-[10px] font-semibold text-zinc-400 hover:text-rose-600 dark:hover:text-rose-400 cursor-pointer"
+                >
+                  Clear
+                </button>
+                <label class="flex items-center gap-1.5 text-[10px] font-semibold text-blue-600 dark:text-blue-400 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    :checked="isAllChecked(dashboardStore.selectedGroups, groupRawOptions)"
+                    @change="dashboardStore.selectedGroups = toggleSelectAll(dashboardStore.selectedGroups, groupRawOptions)"
+                    class="h-3.5 w-3.5 rounded border-zinc-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                  />
+                  <span>Select All</span>
+                </label>
+              </div>
             </div>
 
             <div class="p-1.5 border-b border-zinc-100 dark:border-zinc-800">
@@ -621,7 +652,7 @@ const resetQuickFilters = () => {
                   <input
                     type="checkbox"
                     :checked="isOptionChecked(opt, dashboardStore.selectedGroups)"
-                    @change="dashboardStore.selectedGroups = toggleOption(opt, dashboardStore.selectedGroups, groupRawOptions)"
+                    @change="dashboardStore.selectedGroups = toggleOption(opt, dashboardStore.selectedGroups)"
                     class="h-3.5 w-3.5 rounded border-zinc-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                   />
                   <span class="text-xs font-semibold text-zinc-800 dark:text-zinc-200 truncate">{{ getGroupLabel(opt) }}</span>
@@ -650,7 +681,7 @@ const resetQuickFilters = () => {
             v-if="isBranchFiltered"
             class="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-blue-600 text-white leading-none"
           >
-            {{ getCheckedCount(dashboardStore.selectedBranches, branchRawOptions) }}
+            {{ getCheckedCount(dashboardStore.selectedBranches) }}
           </span>
           <ChevronDown class="size-3 text-zinc-400 transition-transform" :class="{ 'rotate-180': openDropdown === 'branch' }" />
         </button>
@@ -669,15 +700,25 @@ const resetQuickFilters = () => {
           >
             <div class="p-2 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between bg-zinc-50/70 dark:bg-zinc-900/60">
               <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Branch Filter</span>
-              <label class="flex items-center gap-1.5 text-[10px] font-semibold text-blue-600 dark:text-blue-400 cursor-pointer">
-                <input
-                  type="checkbox"
-                  :checked="isAllChecked(dashboardStore.selectedBranches, branchRawOptions)"
-                  @change="dashboardStore.selectedBranches = toggleSelectAll(dashboardStore.selectedBranches, branchRawOptions)"
-                  class="h-3.5 w-3.5 rounded border-zinc-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                />
-                <span>Select All</span>
-              </label>
+              <div class="flex items-center gap-2">
+                <button
+                  v-if="dashboardStore.selectedBranches.length > 0"
+                  type="button"
+                  @click="dashboardStore.selectedBranches = []"
+                  class="text-[10px] font-semibold text-zinc-400 hover:text-rose-600 dark:hover:text-rose-400 cursor-pointer"
+                >
+                  Clear
+                </button>
+                <label class="flex items-center gap-1.5 text-[10px] font-semibold text-blue-600 dark:text-blue-400 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    :checked="isAllChecked(dashboardStore.selectedBranches, branchRawOptions)"
+                    @change="dashboardStore.selectedBranches = toggleSelectAll(dashboardStore.selectedBranches, branchRawOptions)"
+                    class="h-3.5 w-3.5 rounded border-zinc-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                  />
+                  <span>Select All</span>
+                </label>
+              </div>
             </div>
 
             <div v-if="branchRawOptions.length > 5" class="p-1.5 border-b border-zinc-100 dark:border-zinc-800">
@@ -704,7 +745,7 @@ const resetQuickFilters = () => {
                   <input
                     type="checkbox"
                     :checked="isOptionChecked(opt, dashboardStore.selectedBranches)"
-                    @change="dashboardStore.selectedBranches = toggleOption(opt, dashboardStore.selectedBranches, branchRawOptions)"
+                    @change="dashboardStore.selectedBranches = toggleOption(opt, dashboardStore.selectedBranches)"
                     class="h-3.5 w-3.5 rounded border-zinc-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                   />
                   <span class="text-xs font-semibold text-zinc-800 dark:text-zinc-200 truncate">{{ getBranchLabel(opt) }}</span>
@@ -733,7 +774,7 @@ const resetQuickFilters = () => {
             v-if="isCertFiltered"
             class="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-blue-600 text-white leading-none"
           >
-            {{ getCheckedCount(dashboardStore.selectedCerts, certRawOptions) }}
+            {{ certBadgeCount }}
           </span>
           <ChevronDown class="size-3 text-zinc-400 transition-transform" :class="{ 'rotate-180': openDropdown === 'cert' }" />
         </button>
@@ -753,15 +794,25 @@ const resetQuickFilters = () => {
           >
             <div class="p-2 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between bg-zinc-50/70 dark:bg-zinc-900/60 rounded-t-xl">
               <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Certificate Filter</span>
-              <label class="flex items-center gap-1.5 text-[10px] font-semibold text-blue-600 dark:text-blue-400 cursor-pointer">
-                <input
-                  type="checkbox"
-                  :checked="isAllChecked(dashboardStore.selectedCerts, certRawOptions)"
-                  @change="dashboardStore.selectedCerts = toggleSelectAll(dashboardStore.selectedCerts, certRawOptions)"
-                  class="h-3.5 w-3.5 rounded border-zinc-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                />
-                <span>Select All</span>
-              </label>
+              <div class="flex items-center gap-2">
+                <button
+                  v-if="isCertFiltered"
+                  type="button"
+                  @click="dashboardStore.selectedCerts = []; dashboardStore.selectedCertScores = {}"
+                  class="text-[10px] font-semibold text-zinc-400 hover:text-rose-600 dark:hover:text-rose-400 cursor-pointer"
+                >
+                  Clear
+                </button>
+                <label class="flex items-center gap-1.5 text-[10px] font-semibold text-blue-600 dark:text-blue-400 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    :checked="isAllChecked(dashboardStore.selectedCerts, certRawOptions)"
+                    @change="dashboardStore.selectedCerts = toggleSelectAll(dashboardStore.selectedCerts, certRawOptions)"
+                    class="h-3.5 w-3.5 rounded border-zinc-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                  />
+                  <span>Select All</span>
+                </label>
+              </div>
             </div>
 
             <div class="p-1 space-y-0.5">
@@ -780,7 +831,7 @@ const resetQuickFilters = () => {
                     <input
                       type="checkbox"
                       :checked="isOptionChecked(opt, dashboardStore.selectedCerts)"
-                      @change="dashboardStore.selectedCerts = toggleOption(opt, dashboardStore.selectedCerts, certRawOptions)"
+                      @change="toggleCertOption(opt)"
                       class="h-3.5 w-3.5 rounded border-zinc-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                     />
                     <span class="text-xs font-semibold text-zinc-800 dark:text-zinc-200 truncate">{{ getCertLabel(opt) }}</span>
@@ -792,7 +843,7 @@ const resetQuickFilters = () => {
                       v-if="dashboardStore.selectedCertScores?.[opt]?.length"
                       class="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300"
                     >
-                      {{ dashboardStore.selectedCertScores[opt].includes('__NONE__') ? '0' : dashboardStore.selectedCertScores[opt].length }}/{{ CERT_SUB_SCORES[opt].length }}
+                      {{ dashboardStore.selectedCertScores[opt].length }} scores
                     </span>
                     <button
                       type="button"
@@ -813,15 +864,25 @@ const resetQuickFilters = () => {
                 >
                   <div class="flex items-center justify-between pb-1.5 mb-1.5 border-b border-zinc-100 dark:border-zinc-800">
                     <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-500">{{ opt }} Scores</span>
-                    <label class="flex items-center gap-1 text-[10px] font-semibold text-blue-600 dark:text-blue-400 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        :checked="isAllSubScoresChecked(opt)"
-                        @change="toggleAllSubScores(opt)"
-                        class="h-3 w-3 rounded border-zinc-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                      />
-                      <span>All</span>
-                    </label>
+                    <div class="flex items-center gap-1.5">
+                      <button
+                        v-if="dashboardStore.selectedCertScores?.[opt]?.length"
+                        type="button"
+                        @click="clearSubScores(opt)"
+                        class="text-[10px] font-semibold text-zinc-400 hover:text-rose-600 dark:hover:text-rose-400 cursor-pointer"
+                      >
+                        Clear
+                      </button>
+                      <label class="flex items-center gap-1 text-[10px] font-semibold text-blue-600 dark:text-blue-400 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          :checked="isAllSubScoresChecked(opt)"
+                          @change="toggleAllSubScores(opt)"
+                          class="h-3 w-3 rounded border-zinc-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                        />
+                        <span>All</span>
+                      </label>
+                    </div>
                   </div>
 
                   <div class="space-y-0.5 max-h-52 overflow-y-auto scrollbar-thin">
@@ -869,7 +930,7 @@ const resetQuickFilters = () => {
             v-if="isTagFiltered"
             class="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-blue-600 text-white leading-none"
           >
-            {{ getCheckedCount(dashboardStore.selectedTags, tagRawOptions) }}
+            {{ getCheckedCount(dashboardStore.selectedTags) }}
           </span>
           <ChevronDown class="size-3 text-zinc-400 transition-transform" :class="{ 'rotate-180': openDropdown === 'tag' }" />
         </button>
@@ -888,15 +949,25 @@ const resetQuickFilters = () => {
           >
             <div class="p-2 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between bg-zinc-50/70 dark:bg-zinc-900/60">
               <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Tags Filter</span>
-              <label class="flex items-center gap-1.5 text-[10px] font-semibold text-blue-600 dark:text-blue-400 cursor-pointer">
-                <input
-                  type="checkbox"
-                  :checked="isAllChecked(dashboardStore.selectedTags, tagRawOptions)"
-                  @change="dashboardStore.selectedTags = toggleSelectAll(dashboardStore.selectedTags, tagRawOptions)"
-                  class="h-3.5 w-3.5 rounded border-zinc-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                />
-                <span>Select All</span>
-              </label>
+              <div class="flex items-center gap-2">
+                <button
+                  v-if="dashboardStore.selectedTags.length > 0"
+                  type="button"
+                  @click="dashboardStore.selectedTags = []"
+                  class="text-[10px] font-semibold text-zinc-400 hover:text-rose-600 dark:hover:text-rose-400 cursor-pointer"
+                >
+                  Clear
+                </button>
+                <label class="flex items-center gap-1.5 text-[10px] font-semibold text-blue-600 dark:text-blue-400 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    :checked="isAllChecked(dashboardStore.selectedTags, tagRawOptions)"
+                    @change="dashboardStore.selectedTags = toggleSelectAll(dashboardStore.selectedTags, tagRawOptions)"
+                    class="h-3.5 w-3.5 rounded border-zinc-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                  />
+                  <span>Select All</span>
+                </label>
+              </div>
             </div>
 
             <div v-if="tagRawOptions.length > 5" class="p-1.5 border-b border-zinc-100 dark:border-zinc-800">
@@ -923,7 +994,7 @@ const resetQuickFilters = () => {
                   <input
                     type="checkbox"
                     :checked="isOptionChecked(opt, dashboardStore.selectedTags)"
-                    @change="dashboardStore.selectedTags = toggleOption(opt, dashboardStore.selectedTags, tagRawOptions)"
+                    @change="dashboardStore.selectedTags = toggleOption(opt, dashboardStore.selectedTags)"
                     class="h-3.5 w-3.5 rounded border-zinc-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                   />
                   <span class="text-xs font-semibold text-zinc-800 dark:text-zinc-200 truncate">{{ getTagLabel(opt) }}</span>
@@ -952,7 +1023,7 @@ const resetQuickFilters = () => {
             v-if="isCoordinatorFiltered"
             class="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-blue-600 text-white leading-none"
           >
-            {{ getCheckedCount(dashboardStore.selectedCoordinators, coordinatorRawOptions) }}
+            {{ getCheckedCount(dashboardStore.selectedCoordinators) }}
           </span>
           <ChevronDown class="size-3 text-zinc-400 transition-transform" :class="{ 'rotate-180': openDropdown === 'coordinator' }" />
         </button>
@@ -971,15 +1042,25 @@ const resetQuickFilters = () => {
           >
             <div class="p-2 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between bg-zinc-50/70 dark:bg-zinc-900/60">
               <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Kordinator Filter</span>
-              <label class="flex items-center gap-1.5 text-[10px] font-semibold text-blue-600 dark:text-blue-400 cursor-pointer">
-                <input
-                  type="checkbox"
-                  :checked="isAllChecked(dashboardStore.selectedCoordinators, coordinatorRawOptions)"
-                  @change="dashboardStore.selectedCoordinators = toggleSelectAll(dashboardStore.selectedCoordinators, coordinatorRawOptions)"
-                  class="h-3.5 w-3.5 rounded border-zinc-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                />
-                <span>Select All</span>
-              </label>
+              <div class="flex items-center gap-2">
+                <button
+                  v-if="dashboardStore.selectedCoordinators.length > 0"
+                  type="button"
+                  @click="dashboardStore.selectedCoordinators = []"
+                  class="text-[10px] font-semibold text-zinc-400 hover:text-rose-600 dark:hover:text-rose-400 cursor-pointer"
+                >
+                  Clear
+                </button>
+                <label class="flex items-center gap-1.5 text-[10px] font-semibold text-blue-600 dark:text-blue-400 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    :checked="isAllChecked(dashboardStore.selectedCoordinators, coordinatorRawOptions)"
+                    @change="dashboardStore.selectedCoordinators = toggleSelectAll(dashboardStore.selectedCoordinators, coordinatorRawOptions)"
+                    class="h-3.5 w-3.5 rounded border-zinc-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                  />
+                  <span>Select All</span>
+                </label>
+              </div>
             </div>
 
             <div v-if="coordinatorRawOptions.length > 5" class="p-1.5 border-b border-zinc-100 dark:border-zinc-800">
@@ -1006,7 +1087,7 @@ const resetQuickFilters = () => {
                   <input
                     type="checkbox"
                     :checked="isOptionChecked(opt, dashboardStore.selectedCoordinators)"
-                    @change="dashboardStore.selectedCoordinators = toggleOption(opt, dashboardStore.selectedCoordinators, coordinatorRawOptions)"
+                    @change="dashboardStore.selectedCoordinators = toggleOption(opt, dashboardStore.selectedCoordinators)"
                     class="h-3.5 w-3.5 rounded border-zinc-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                   />
                   <span class="text-xs font-semibold text-zinc-800 dark:text-zinc-200 truncate">{{ getCoordinatorLabel(opt) }}</span>
@@ -1023,7 +1104,7 @@ const resetQuickFilters = () => {
         type="button"
         @click="resetQuickFilters"
         class="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer select-none h-7 shrink-0 ml-0.5"
-        title="Reset quick filters to all checked"
+        title="Reset quick filters"
       >
         <RotateCcw class="size-3" />
         <span class="hidden xl:inline">Reset</span>

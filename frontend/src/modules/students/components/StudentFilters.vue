@@ -80,16 +80,16 @@ const activeCategory = ref<string>('tariff')
 watch(() => props.isOpen, (newVal) => {
   if (newVal) {
     fetchTags()
-    draftTariffs.value = [...props.selectedTariffs]
-    draftLevels.value = [...props.selectedLevels]
-    draftGroups.value = [...props.selectedGroups]
-    draftBranches.value = [...(props.selectedBranches || [])]
-    draftCerts.value = [...props.selectedCerts]
-    draftScores.value = [...props.selectedScores]
-    draftTags.value = [...props.selectedTags]
-    draftLeads.value = [...props.selectedLeads]
-    draftCoordinators.value = [...(props.selectedCoordinators || [])]
-    draftMissingDocs.value = [...(props.selectedMissingDocs || [])]
+    draftTariffs.value = [...props.selectedTariffs].filter(x => x !== '__NONE__')
+    draftLevels.value = [...props.selectedLevels].filter(x => x !== '__NONE__')
+    draftGroups.value = [...props.selectedGroups].filter(x => x !== '__NONE__')
+    draftBranches.value = [...(props.selectedBranches || [])].filter(x => x !== '__NONE__')
+    draftCerts.value = [...props.selectedCerts].filter(x => x !== '__NONE__')
+    draftScores.value = [...props.selectedScores].filter(x => x !== '__NONE__')
+    draftTags.value = [...props.selectedTags].filter(x => x !== '__NONE__')
+    draftLeads.value = [...props.selectedLeads].filter(x => x !== '__NONE__')
+    draftCoordinators.value = [...(props.selectedCoordinators || [])].filter(x => x !== '__NONE__')
+    draftMissingDocs.value = [...(props.selectedMissingDocs || [])].filter(x => x !== '__NONE__')
     activeCategory.value = 'tariff'
   }
 }, { immediate: true })
