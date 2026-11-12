@@ -396,13 +396,7 @@ const resetQuickFilters = () => {
             openDropdown === 'tariff' ? 'ring-2 ring-blue-500/30' : ''
           ]"
         >
-          <span>TARIFF</span>
-          <span
-            v-if="isTariffFiltered"
-            class="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-blue-600 text-white leading-none"
-          >
-            {{ getCheckedCount(dashboardStore.selectedTariffs) }}
-          </span>
+          <span>TARIFF<span v-if="isTariffFiltered"> ({{ getCheckedCount(dashboardStore.selectedTariffs) }})</span></span>
           <ChevronDown class="size-3 text-zinc-400 transition-transform" :class="{ 'rotate-180': openDropdown === 'tariff' }" />
         </button>
 
@@ -490,13 +484,8 @@ const resetQuickFilters = () => {
             openDropdown === 'level' ? 'ring-2 ring-blue-500/30' : ''
           ]"
         >
-          <span>LEVEL</span>
-          <span
-            v-if="isLevelFiltered"
-            class="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-blue-600 text-white leading-none"
-          >
-            {{ getCheckedCount(dashboardStore.selectedLevels) }}
-          </span>
+          <span>LEVEL<span v-if="isLevelFiltered"> ({{ getCheckedCount(dashboardStore.selectedLevels) }})</span></span>
+          
           <ChevronDown class="size-3 text-zinc-400 transition-transform" :class="{ 'rotate-180': openDropdown === 'level' }" />
         </button>
 
@@ -583,13 +572,8 @@ const resetQuickFilters = () => {
             openDropdown === 'group' ? 'ring-2 ring-blue-500/30' : ''
           ]"
         >
-          <span>GROUP</span>
-          <span
-            v-if="isGroupFiltered"
-            class="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-blue-600 text-white leading-none"
-          >
-            {{ getCheckedCount(dashboardStore.selectedGroups) }}
-          </span>
+          <span>GROUP<span v-if="isGroupFiltered"> ({{ getCheckedCount(dashboardStore.selectedGroups) }})</span></span>
+          
           <ChevronDown class="size-3 text-zinc-400 transition-transform" :class="{ 'rotate-180': openDropdown === 'group' }" />
         </button>
 
@@ -676,13 +660,8 @@ const resetQuickFilters = () => {
             openDropdown === 'branch' ? 'ring-2 ring-blue-500/30' : ''
           ]"
         >
-          <span>BRANCH</span>
-          <span
-            v-if="isBranchFiltered"
-            class="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-blue-600 text-white leading-none"
-          >
-            {{ getCheckedCount(dashboardStore.selectedBranches) }}
-          </span>
+          <span>BRANCH<span v-if="isBranchFiltered"> ({{ getCheckedCount(dashboardStore.selectedBranches) }})</span></span>
+          
           <ChevronDown class="size-3 text-zinc-400 transition-transform" :class="{ 'rotate-180': openDropdown === 'branch' }" />
         </button>
 
@@ -769,13 +748,8 @@ const resetQuickFilters = () => {
             openDropdown === 'cert' ? 'ring-2 ring-blue-500/30' : ''
           ]"
         >
-          <span>CERTIFICATE</span>
-          <span
-            v-if="isCertFiltered"
-            class="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-blue-600 text-white leading-none"
-          >
-            {{ certBadgeCount }}
-          </span>
+          <span>CERTIFICATE<span v-if="isCertFiltered"> ({{ certBadgeCount }})</span></span>
+          
           <ChevronDown class="size-3 text-zinc-400 transition-transform" :class="{ 'rotate-180': openDropdown === 'cert' }" />
         </button>
 
@@ -925,13 +899,8 @@ const resetQuickFilters = () => {
             openDropdown === 'tag' ? 'ring-2 ring-blue-500/30' : ''
           ]"
         >
-          <span>TAGS</span>
-          <span
-            v-if="isTagFiltered"
-            class="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-blue-600 text-white leading-none"
-          >
-            {{ getCheckedCount(dashboardStore.selectedTags) }}
-          </span>
+          <span>TAGS<span v-if="isTagFiltered"> ({{ getCheckedCount(dashboardStore.selectedTags) }})</span></span>
+          
           <ChevronDown class="size-3 text-zinc-400 transition-transform" :class="{ 'rotate-180': openDropdown === 'tag' }" />
         </button>
 
@@ -1018,13 +987,8 @@ const resetQuickFilters = () => {
             openDropdown === 'coordinator' ? 'ring-2 ring-blue-500/30' : ''
           ]"
         >
-          <span>KORDINATOR</span>
-          <span
-            v-if="isCoordinatorFiltered"
-            class="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-blue-600 text-white leading-none"
-          >
-            {{ getCheckedCount(dashboardStore.selectedCoordinators) }}
-          </span>
+          <span>KORDINATOR<span v-if="isCoordinatorFiltered"> ({{ getCheckedCount(dashboardStore.selectedCoordinators) }})</span></span>
+          
           <ChevronDown class="size-3 text-zinc-400 transition-transform" :class="{ 'rotate-180': openDropdown === 'coordinator' }" />
         </button>
 
